@@ -1,0 +1,86 @@
+# Anchorworks — dual-target CI.
+#
+# Each push runs two parallel pipelines:
+#   1. PWA — fast Node-only `npm run build:web` that exercises the
+#      shipping web bundle (~1 min, runs on every commit).
+#   2. Native — Tauri bundle matrix across macOS / Windows / Linux. Each
+#      job runs `npm run build:native` so the same Vite build is wrapped
+#      by `tauri build`; the bundle is signed with the keys stored in
+#      repo secrets (TAURI_SIGNING_PRIVATE_KEY / *_PASSWORD).
+#
+# The native matrix is what produces the auto-updater payloads consumed
+# by the endpoint configured in `src-tauri/tauri.conf.json#updater`. The
+# `release.yml` workflow takes over from here on tag push: it downloads
+# the per-OS artifacts, generates `latest.json`, and uploads everything
+# to a GitHub Release.
+
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pwa:
+    name: PWA build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build:web
+      - name: Upload PWA dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-pwa
+          path: dist
+          retention-days: 14
+
+  native:
+    name: Native bundle (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Rust toolchain + GTK / WebKit deps required by tauri-build.
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux WebKitGTK deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libudev-dev
+
+      - run: npm ci
+
+      # Cache Cargo registry + target dir keyed on Cargo.lock so subsequent
+      # native builds skip the cold dependency compile (~12 min on Linux).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Build native bundle
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run build:native
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-bundle-${{ matrix.os }}
+          path: |
+            src-tauri/target/release/bundle/**/*
+          retention-days: 14

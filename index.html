@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- crossorigin is required for the preconnect to actually share its
+         TCP/TLS handshake with the subsequent stylesheet/font fetches; without
+         it the browser opens a fresh connection and the hint is wasted. -->
+    <link rel="preconnect" href="https://rsms.me/" crossorigin />
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#15151a" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f7f9" />
+    <!-- iOS PWA: standalone display mode, solid dark status bar matching the
+         brand bg, custom app title for the Home Screen icon. Safari ignores
+         the manifest `icons` and uses the apple-touch-icon link below. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Anchorworks" />
+    <link rel="apple-touch-icon" href="/icon-192.svg" />
+    <meta
+      name="description"
+      content="AI-assisted vector graphics editor — Illustrator-class tooling, multi-format export, and direct output to laser cutters, plotters, and printers. Works offline."
+    />
+    <!-- Open Graph + Twitter Card for link previews on social / chat apps. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Anchorworks" />
+    <meta
+      property="og:description"
+      content="AI-assisted vector graphics editor — Illustrator-class tooling, multi-format export, and direct output to laser cutters, plotters, and printers. Works offline."
+    />
+    <meta property="og:image" content="/icon-512.svg" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Anchorworks" />
+    <meta
+      name="twitter:description"
+      content="AI-assisted vector graphics editor — Illustrator-class tooling, multi-format export, and direct output to laser cutters, plotters, and printers. Works offline."
+    />
+    <title>Anchorworks</title>
+    <script>
+      // Boot-time sync of theme + language. Runs before splash paints so the
+      // first frame matches the user's saved preferences. Mirror these with
+      // the Zustand stores: `theme` (src/store/editor.ts, key `vs:theme`) and
+      // `lang` (src/lib/i18n.ts, persisted via zustand persist key `vector.lang`).
+      (function () {
+        try {
+          // ---- Theme ----
+          var raw = localStorage.getItem('vs:theme');
+          var saved = raw ? (raw.replace(/^"|"$/g, '')) : null;
+          var prefersLight = window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: light)').matches;
+          var theme = (saved === 'light' || saved === 'dark') ? saved : (prefersLight ? 'light' : 'dark');
+          if (theme === 'light') document.documentElement.dataset.theme = 'light';
+
+          // ---- High contrast — honour OS `prefers-contrast: more` on first
+          //      run, unless the user has explicitly toggled the in-app
+          //      "High Contrast" item (which persists `vs:hc` separately). ----
+          var hcRaw = localStorage.getItem('vs:hc');
+          var prefersHC = window.matchMedia &&
+            window.matchMedia('(prefers-contrast: more)').matches;
+          var hc = hcRaw === 'true' ? true : hcRaw === 'false' ? false : prefersHC;
+          if (hc) document.documentElement.dataset.highContrast = 'true';
+
+          // ---- Language — sets <html lang> and a body attribute used by CSS. ----
+          var langRaw = localStorage.getItem('vector.lang');
+          var langState = langRaw ? JSON.parse(langRaw) : null;
+          var lang = (langState && langState.state && langState.state.lang) || null;
+          if (lang === 'zh') {
+            document.documentElement.lang = 'zh-CN';
+            document.documentElement.dataset.lang = 'zh';
+          } else {
+            document.documentElement.dataset.lang = 'en';
+          }
+        } catch (_) { /* ignore */ }
+      })();
+    </script>
+    <style>
+      html, body { margin: 0; background: #15151a; color: #e7e7ea; height: 100%; }
+      :root[data-theme="light"] html, :root[data-theme="light"] body { background: #f7f7f9; color: #1c1c21; }
+      #splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #15151a;
+        font-family: Inter, system-ui, -apple-system, sans-serif;
+        transition: opacity 280ms ease;
+      }
+      :root[data-theme="light"] #splash { background: #f7f7f9; }
+      #splash.hide { opacity: 0; pointer-events: none; }
+      #splash .mark {
+        width: 56px; height: 56px;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 18px;
+      }
+      #splash .wordmark {
+        font-size: 17px; font-weight: 600;
+        letter-spacing: -0.005em;
+        color: #e7e7ea;
+      }
+      :root[data-theme="light"] #splash .wordmark { color: #1c1c21; }
+      #splash .wordmark .studio { color: #a3a3b0; font-weight: 500; margin-left: 0.25em; }
+      :root[data-theme="light"] #splash .wordmark .studio { color: #6a6a76; }
+      #splash .tagline {
+        margin-top: 8px; font-size: 10px; color: #6a6a76;
+        letter-spacing: 0.18em; text-transform: uppercase;
+      }
+      /* CJK 字间距问题：uppercase + 0.18em letter-spacing 把中文"加载中"切成"加 载 中"。
+         zh 模式下取消两项，回归紧凑中文渲染。 */
+      :root[data-lang="zh"] #splash .tagline { letter-spacing: normal; text-transform: none; }
+      :root[data-theme="light"] #splash .tagline { color: #a3a3b0; }
+      /* Localized tagline — CSS pseudo-content keyed off <html data-lang>. */
+      #splash .tagline::after { content: 'Loading editor'; }
+      :root[data-lang="zh"] #splash .tagline::after { content: '加载中'; letter-spacing: normal; }
+      #splash .tagline-text { display: none; }
+      #splash .bar {
+        margin-top: 26px; width: 120px; height: 1px;
+        background: rgba(255, 255, 255, 0.06); border-radius: 1px; overflow: hidden;
+      }
+      :root[data-theme="light"] #splash .bar { background: rgba(0, 0, 0, 0.08); }
+      /* Hollow start anchor — fill matches the splash background so the
+       * orange curve correctly hides behind it (anchor convention,
+       * matches Logo.tsx / favicon.svg / icon-192.svg). */
+      #splash .mark .anchor-hollow { fill: #15151a; }
+      :root[data-theme="light"] #splash .mark .anchor-hollow { fill: #f7f7f9; }
+      #splash .bar::after {
+        content: ''; display: block; width: 35%; height: 100%;
+        background: linear-gradient(90deg, transparent, #ff8a4c, transparent);
+        animation: splash-slide 1.2s ease-in-out infinite;
+      }
+      @keyframes splash-slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(385%); }
+      }
+      /* Respect prefers-reduced-motion at boot — the rest of the app honours
+       * it via index.css (loaded later), but the splash paints on first byte
+       * and would otherwise run its sliding orange bar regardless of the
+       * user's accessibility preference. Fall back to a quiet static fill
+       * so the bar still communicates "loading" without continuous motion. */
+      @media (prefers-reduced-motion: reduce) {
+        #splash .bar::after {
+          animation: none;
+          width: 100%;
+          background: rgba(255, 138, 76, 0.35);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Splash is decorative pre-app loading state; SR users get the real
+         app content once React mounts and the splash unmounts. Marking the
+         whole tree aria-hidden keeps the splash silent (no half-translated
+         "Loading" announcement) and avoids polluting the a11y tree. -->
+    <div id="splash" aria-hidden="true">
+      <div class="mark">
+        <!-- Anchorworks brand mark — a single cubic with two visible anchors.
+             Kept inline so the splash paints on first byte. Mirror this in
+             src/components/Logo.tsx if you change the design. -->
+        <svg width="56" height="56" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="6" y1="6" x2="14" y2="13" stroke="#5ac8d8" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round" />
+          <path d="M6 6 C 14 14, 18 14, 26 26" stroke="#ff8a4c" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+          <rect class="anchor-hollow" x="3" y="3" width="6" height="6" rx="0.5" stroke="#5ac8d8" stroke-width="2.4" />
+          <rect x="23" y="23" width="6" height="6" rx="0.5" fill="#5ac8d8" />
+        </svg>
+      </div>
+      <div class="wordmark">Vector<span class="studio">Studio</span></div>
+      <div class="tagline"><span class="tagline-text">Loading editor</span></div>
+      <div class="bar"></div>
+    </div>
+    <div id="root"></div>
+    <script>
+      // Hide the splash once React has mounted real content into #root.
+      (function () {
+        var root = document.getElementById('root');
+        var splash = document.getElementById('splash');
+        if (!root || !splash) return;
+        var hidden = false;
+        function hide() {
+          if (hidden) return;
+          hidden = true;
+          splash.classList.add('hide');
+          setTimeout(function () { splash.remove(); }, 320);
+        }
+        var obs = new MutationObserver(function () {
+          if (root.childNodes.length > 0) { hide(); obs.disconnect(); }
+        });
+        obs.observe(root, { childList: true });
+        // Fallback — if nothing mounts within 8s, give up and reveal the app.
+        setTimeout(hide, 8000);
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

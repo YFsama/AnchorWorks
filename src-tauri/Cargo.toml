@@ -1,0 +1,54 @@
+[package]
+name = "anchorworks"
+version = "0.9.0"
+description = "Anchorworks — Illustrator-class vector graphics editor"
+authors = ["YFsama <yf@rbq.ai>"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "anchorworks_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# tauri-plugin-* are wired in T1; declared here so `cargo check` doesn't need
+# a fresh dependency resolve on each new plugin. Comment out anything you don't
+# need to keep first-build time down.
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-shell = "2"
+# T3 — second-launch focus + argv forwarding. Without this, opening a
+# `.vstudio.json` from the file explorer when an instance is already
+# running would spawn a second window instead of routing the path into
+# the existing one. The plugin is desktop-only (no mobile equivalent).
+tauri-plugin-single-instance = "2"
+# T4 — auto-updater. Polls the configured endpoint for a signed bundle
+# and installs in place. Signing keys are generated out-of-band via
+# `cargo tauri signer generate` and threaded into CI via secrets.
+tauri-plugin-updater = "2"
+# T3 — deep-link / custom-protocol. Lets users open
+# `anchorworks://share/<id>` URLs and have the running instance handle
+# the navigation. Registered alongside `tauri-plugin-single-instance` so
+# the same window receives the URL on subsequent launches.
+tauri-plugin-deep-link = "2"
+# T1 commands — native filesystem + serial. The dialog/fs plugins handle
+# native open/save UI; `serialport` enumerates platform serial ports for the
+# Plotter dialog when running under the desktop shell.
+# `default-features = false` strips the libudev system-library dep so
+# `cargo check` works in sandboxed CI / dev environments without root. On
+# Linux port enumeration falls back to `/sys/class/tty` scanning (no
+# hot-plug events, no USB metadata), which is acceptable for the plotter
+# use case — users explicitly pick a port from a list anyway. macOS /
+# Windows builds aren't affected (they don't use libudev either way).
+serialport = { version = "4", default-features = false }
+
+[features]
+# This feature is used for production builds or when a dev server is not
+# specified, DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]

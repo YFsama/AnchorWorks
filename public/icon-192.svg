@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <!-- Anchorworks PWA icon — 192x192 install-tile.
+       Scaled mirror of favicon.svg / <Logo />. Background uses the
+       in-app dark surface (#1e1c21) so the install tile feels native
+       on dark OS theme; rounded corner ratio = 32/192 ≈ Apple's
+       17.5% squircle radius.
+
+       Geometry (192 viewBox = original 32 × 6):
+         5,23 → 30,138    cps 11,23 / 11,9     → 66,138 / 66,54
+         16,9  → 96,54    cps 21,9  / 21,23    → 126,54 / 126,138
+         27,23 → 162,138 -->
+  <rect width="192" height="192" rx="32" fill="#1e1c21"/>
+  <path d="M30 138 C 66 138, 66 54, 96 54 C 126 54, 126 138, 162 138"
+        stroke="#5ac8d8" stroke-width="12" stroke-linecap="round"
+        stroke-linejoin="round" fill="none" opacity="0.75"/>
+  <line x1="30" y1="138" x2="96" y2="96" stroke="#5ac8d8" stroke-opacity="0.35" stroke-width="6" stroke-linecap="round"/>
+  <line x1="162" y1="138" x2="96" y2="96" stroke="#5ac8d8" stroke-opacity="0.35" stroke-width="6" stroke-linecap="round"/>
+  <g transform="rotate(45 30 138)">
+    <rect x="16.2" y="124.2" width="27.6" height="27.6" fill="#1e1c21" stroke="#5ac8d8" stroke-width="7"/>
+  </g>
+  <g transform="rotate(45 162 138)">
+    <rect x="148.2" y="124.2" width="27.6" height="27.6" fill="#5ac8d8"/>
+  </g>
+  <g transform="rotate(5 96 96)">
+    <rect x="76.8" y="76.8" width="38.4" height="38.4" rx="4.8" fill="#ff8a4c"/>
+  </g>
+</svg>

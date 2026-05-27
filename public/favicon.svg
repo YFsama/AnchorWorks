@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Anchorworks favicon — bezier curve threaded through a central
+       anchor square with two diamond tangent handles. Mirrors <Logo />
+       but with hardcoded hex so the browser-tab render is independent
+       of any CSS context. -->
+  <rect width="32" height="32" rx="6" fill="#1e1c21"/>
+  <path d="M5 23 C 11 23, 11 9, 16 9 C 21 9, 21 23, 27 23"
+        stroke="#5ac8d8" stroke-width="2" stroke-linecap="round"
+        stroke-linejoin="round" fill="none" opacity="0.75"/>
+  <line x1="5" y1="23" x2="16" y2="16" stroke="#5ac8d8" stroke-opacity="0.35" stroke-width="1" stroke-linecap="round"/>
+  <line x1="27" y1="23" x2="16" y2="16" stroke="#5ac8d8" stroke-opacity="0.35" stroke-width="1" stroke-linecap="round"/>
+  <g transform="rotate(45 5 23)">
+    <rect x="2.7" y="20.7" width="4.6" height="4.6" fill="#1e1c21" stroke="#5ac8d8" stroke-width="1.2"/>
+  </g>
+  <g transform="rotate(45 27 23)">
+    <rect x="24.7" y="20.7" width="4.6" height="4.6" fill="#5ac8d8"/>
+  </g>
+  <g transform="rotate(5 16 16)">
+    <rect x="12.8" y="12.8" width="6.4" height="6.4" rx="0.8" fill="#ff8a4c"/>
+  </g>
+</svg>
