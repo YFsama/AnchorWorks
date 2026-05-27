@@ -73,8 +73,13 @@ jobs:
 
       - name: Build native bundle
         env:
+          # Private key is required for updater signing. The password env
+          # var is intentionally absent — our key was generated without
+          # one (`tauri signer generate -p ""`), so leaving the variable
+          # unset is correct. If you regenerate with a password later,
+          # add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` here and create the
+          # matching repo secret.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run build:native
 
       - name: Upload bundle artifact
