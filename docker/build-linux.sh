@@ -11,11 +11,10 @@ set -euo pipefail
 cd /work
 
 echo "==> Installing JS deps"
-# --legacy-peer-deps: package.json carries @vitest/coverage-v8@4.x against
-# vitest@3.x — npm's strict resolver rejects this, but the host project
-# has been running with the looser legacy semantics. Match here so the
-# container's install graph matches what's been validated locally.
-npm ci --no-audit --no-fund --legacy-peer-deps
+# `npm install` (not `npm ci`) for parity with the GitHub Actions
+# workflows — see .github/workflows/build.yml for the cross-platform
+# optional-dep lockfile gap that makes npm ci unreliable.
+npm install --no-audit --no-fund --prefer-offline
 
 echo "==> Building web bundle"
 npm run build:web

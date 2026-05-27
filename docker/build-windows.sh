@@ -7,7 +7,9 @@ set -euo pipefail
 cd /work
 
 echo "==> Installing JS deps"
-npm ci --no-audit --no-fund --legacy-peer-deps
+# `npm install` (not `npm ci`) — same cross-platform optional-dep
+# rationale as build-linux.sh + the GitHub Actions workflows.
+npm install --no-audit --no-fund --prefer-offline
 
 echo "==> Building web bundle"
 npm run build:web

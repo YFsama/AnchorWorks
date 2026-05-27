@@ -32,7 +32,14 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      # `npm install` (not `npm ci`) — works around a known npm bug
+      # where the lockfile is missing transitive deps of the wasm32
+      # rolldown binding (`@emnapi/core` / `@emnapi/runtime`). The
+      # wasm32 binding itself is unused on every CI runner (each has
+      # a native rolldown binding); `npm ci` strict-validates the
+      # entire lockfile anyway and fails. `npm install` reads the
+      # lockfile but doesn't strict-validate cross-platform optionals.
+      - run: npm install --no-audit --no-fund --prefer-offline
       - run: npm run build:web
       - name: Upload PWA dist
         uses: actions/upload-artifact@v5
@@ -63,7 +70,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libudev-dev
 
-      - run: npm ci
+      # `npm install` (not `npm ci`) — works around a known npm bug
+      # where the lockfile is missing transitive deps of the wasm32
+      # rolldown binding (`@emnapi/core` / `@emnapi/runtime`). The
+      # wasm32 binding itself is unused on every CI runner (each has
+      # a native rolldown binding); `npm ci` strict-validates the
+      # entire lockfile anyway and fails. `npm install` reads the
+      # lockfile but doesn't strict-validate cross-platform optionals.
+      - run: npm install --no-audit --no-fund --prefer-offline
 
       # Cache Cargo registry + target dir keyed on Cargo.lock so subsequent
       # native builds skip the cold dependency compile (~12 min on Linux).

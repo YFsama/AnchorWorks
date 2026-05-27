@@ -64,7 +64,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libudev-dev
-      - run: npm ci
+      # See build.yml for the rationale on npm install vs npm ci.
+      - run: npm install --no-audit --no-fund --prefer-offline
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
