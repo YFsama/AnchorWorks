@@ -14,7 +14,30 @@ Anchorworks 是一款 Web 优先的矢量编辑器。可以当成「装在浏览
 **两种使用方式**：
 
 1. 浏览器（推荐）：访问网址即可，不用装。Chrome/Edge 「安装为应用」后变独立窗口。
-2. 桌面壳：Tauri 2 打包成 .deb / .rpm / .AppImage / .exe，提供原生菜单、文件关联、串口直连。
+2. 桌面壳：Tauri 2 打包成 .deb / .rpm / .AppImage / .exe / .dmg，提供原生菜单、文件关联、串口直连。
+
+---
+
+## 下载安装（桌面版）
+
+每次 release 的安装包都挂在 [Releases 页](https://github.com/YFsama/AnchorWorks/releases)。
+
+| 系统 | 文件 | 首次打开备注 |
+|---|---|---|
+| **macOS** | `Anchorworks_<版本>_universal.dmg` | 当前**未做 Apple 公证**。双击会被 Gatekeeper 拦截，提示「无法打开，因为 Apple 无法验证开发者」。**解决方法**：在访达里**右键点 .app → 打开 → 在弹出框点「打开」**。macOS 记住你的选择，以后正常双击就行。 |
+| **Windows** | `Anchorworks_<版本>_x64-setup.exe` | 当前**未做 Authenticode 代码签名**。SmartScreen 会弹「Windows 已保护你的电脑」。**解决方法**：点蓝字「**更多信息**」→ 出现「**仍要运行**」按钮 → 点它。 |
+| **Linux deb (Ubuntu/Debian)** | `Anchorworks_<版本>_amd64.deb` | `sudo apt install ./Anchorworks_<版本>_amd64.deb` 自动装依赖 |
+| **Linux rpm (Fedora)** | `Anchorworks-<版本>-1.x86_64.rpm` | `sudo dnf install ./...rpm` |
+| **Linux 任意发行版** | `Anchorworks_<版本>_amd64.AppImage` | `chmod +x` 后直接跑，免安装 |
+
+> **不想装？** 直接访问网页版即可。Chrome/Edge 浏览器 ⋮ 菜单 → **「安装 Anchorworks」** → 变成独立窗口应用，自动绑定 `.svg` / `.vstudio.json` 文件，离线可用。**推荐普通用户走 PWA 这条路**；只有需要原生文件对话框或串口直连时才需要桌面版。
+
+### 为什么有「未签名」警告？
+
+- macOS Apple Developer Program $99/年 + notarization 流程才能消除 Gatekeeper 警告
+- Windows OV 代码签名证书约 ¥500/年 / EV 约 ¥2000/年才能消除 SmartScreen 警告
+
+我们暂时没买这两个证书，所以首次打开会被警告。**但安装包本身是有更新器签名**（minisign）的，每次自动更新的 payload 都会校验，确保不会被中间人替换。
 
 ---
 

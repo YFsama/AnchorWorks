@@ -19,6 +19,20 @@ Deploy: `dist/` is a static site. Drop it on any host (Vercel, Netlify, Cloudfla
 
 **Install as desktop client**: open in Chrome/Edge → ⋮ menu → "Install Anchorworks". App becomes a standalone window, registers `.svg` / `.vstudio.json` file associations, opens via `web+vector://` protocol, works offline after first visit.
 
+## Installing the native bundles
+
+Pre-built installers for every release are on the [Releases page](https://github.com/YFsama/AnchorWorks/releases). Pick the one matching your OS:
+
+| OS | File | First-launch note |
+|---|---|---|
+| **macOS (universal)** | `Anchorworks_0.9.0_universal.dmg` | The build is **not Apple-signed yet** — Gatekeeper will refuse to open it on double-click and show "cannot be opened because Apple cannot verify the developer". **Workaround**: right-click the `.app` → **Open** → confirm in the dialog. macOS remembers your choice and stops asking. We'll ship a notarized build once we have an Apple Developer cert. |
+| **Windows x64** | `Anchorworks_0.9.0_x64-setup.exe` (NSIS) or `.msi` | The `.exe` is **not Authenticode-signed yet** — SmartScreen will show "Windows protected your PC". **Workaround**: click **More info** → **Run anyway**. Future builds with an OV/EV code-signing cert will skip this entirely. |
+| **Linux (Debian / Ubuntu)** | `Anchorworks_0.9.0_amd64.deb` | `sudo apt install ./Anchorworks_0.9.0_amd64.deb` (apt resolves the WebKitGTK + GTK deps automatically). |
+| **Linux (Fedora / RHEL)** | `Anchorworks-0.9.0-1.x86_64.rpm` | `sudo dnf install ./Anchorworks-0.9.0-1.x86_64.rpm` |
+| **Linux (any)** | `Anchorworks_0.9.0_amd64.AppImage` | `chmod +x` and run directly. Self-contained — no install needed. |
+
+> **Don't want to install?** The PWA path above is fully offline-capable after first visit and gets every Tauri feature *except* native file dialogs / serial port direct access. For most users the PWA install is the better path.
+
 ## Features
 
 **Editor**
