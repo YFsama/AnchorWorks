@@ -86,12 +86,17 @@ jobs:
           # Password env var omitted — our updater key was generated
           # without a password. See build.yml for the rationale.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Apple code-signing env vars deliberately ABSENT — passing an
+          # empty `APPLE_CERTIFICATE=""` triggers `security import`
+          # against the empty string, which dies with
+          #   SecKeychainItemImport: One or more parameters … were not valid
+          # If you obtain an Apple Developer cert later, paste these
+          # six secrets in repo Settings and uncomment the env block:
+          #   APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD
+          #   APPLE_SIGNING_IDENTITY / APPLE_ID
+          #   APPLE_PASSWORD / APPLE_TEAM_ID
+          # Until then, the .dmg ships unsigned (Gatekeeper warns on
+          # first launch; users right-click → Open to bypass).
         with:
           releaseId: ${{ needs.draft.outputs.release_id }}
           args: ${{ matrix.args }}
