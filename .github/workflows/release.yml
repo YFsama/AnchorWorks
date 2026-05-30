@@ -108,13 +108,26 @@ jobs:
       # every OS has attached its bundles. Looks up the release by tag
       # name rather than a passed-in id so this stays decoupled from the
       # bundle matrix.
+      #
+      # CRITICAL: must use `listReleases` (not `getReleaseByTag`) — the
+      # latter endpoint only returns PUBLISHED releases and 404s on
+      # drafts. Since tauri-action creates the release as a draft, we
+      # paginate listReleases and filter by tag_name ourselves.
       - name: Mark release as published
         uses: actions/github-script@v7
         with:
           script: |
             const { owner, repo } = context.repo;
             const tag = context.ref.replace('refs/tags/', '');
-            const { data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+            const releases = await github.paginate(
+              github.rest.repos.listReleases, { owner, repo, per_page: 100 }
+            );
+            const release = releases.find(r => r.tag_name === tag);
+            if (!release) {
+              core.setFailed(`No release found for tag ${tag}. ` +
+                `tauri-action may have failed to create one.`);
+              return;
+            }
             await github.rest.repos.updateRelease({
               owner, repo, release_id: release.id, draft: false,
             });
