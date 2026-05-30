@@ -97,9 +97,130 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+  # Portable Windows variant — ships a self-contained .zip with the raw
+  # executable plus a fixed-version WebView2 runtime alongside it. The
+  # binary's webviewInstallMode is overridden via --config so the loader
+  # looks for WebView2 next to itself instead of in the system Edge
+  # install, which means the zip Just Works on locked-down or offline
+  # Windows machines that don't have WebView2 pre-installed.
+  #
+  # Trade-off: the zip is ~200 MB (WebView2 fixed runtime is most of it).
+  # The regular NSIS installer remains the recommended download for
+  # everyday users; this portable lives alongside it for the offline /
+  # USB-stick / no-admin use cases.
+  portable-windows:
+    name: Portable Windows (.zip)
+    needs: bundle
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      # Pinned WebView2 fixed-runtime version. Bump deliberately when you
+      # want to track a newer Chromium/WebView2 baseline; staying pinned
+      # gives reproducible portable builds across releases.
+      WEBVIEW2_VERSION: '131.0.2903.86'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm install --no-audit --no-fund --prefer-offline
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # WebView2 fixed-version runtime is distributed as a NuGet package.
+      # nuget.org gives a stable, scriptable URL — no developer-portal
+      # form submission required like the standalone MSI installer.
+      - name: Download WebView2 fixed runtime
+        shell: pwsh
+        run: |
+          $ver = $env:WEBVIEW2_VERSION
+          $pkgId = "Microsoft.Web.WebView2.FixedVersionRuntime.$ver.x64"
+          $url = "https://www.nuget.org/api/v2/package/$pkgId/$ver"
+          Invoke-WebRequest -Uri $url -OutFile webview2.nupkg
+          Expand-Archive -Force -Path webview2.nupkg -DestinationPath webview2-temp
+          # The NuGet package nests the runtime under build\native\<dir>.
+          # Lift it up to src-tauri\ so the Tauri config below can reference
+          # it via a clean relative path.
+          $runtimeDir = Get-ChildItem -Path webview2-temp\build\native -Directory `
+                       -Filter "Microsoft.WebView2.FixedVersionRuntime.*" |
+                       Select-Object -First 1
+          if (-not $runtimeDir) { throw "WebView2 runtime folder not found in NuGet package" }
+          Move-Item $runtimeDir.FullName -Destination src-tauri\
+          $relPath = "./$($runtimeDir.Name)/"
+          echo "WEBVIEW2_RELPATH=$relPath" >> $env:GITHUB_ENV
+          echo "WEBVIEW2_DIRNAME=$($runtimeDir.Name)" >> $env:GITHUB_ENV
+
+      # Override webviewInstallMode at build time so the produced binary
+      # carries the fixed-runtime relative path baked in.  --bundles app
+      # asks Tauri to produce only the raw executable (no installer); we
+      # zip it ourselves below alongside the WebView2 folder.
+      - name: Build portable bundle
+        shell: pwsh
+        run: |
+          $cfg = @{
+            bundle = @{
+              windows = @{
+                webviewInstallMode = @{
+                  type = 'fixedRuntime'
+                  path = $env:WEBVIEW2_RELPATH
+                }
+              }
+            }
+          } | ConvertTo-Json -Depth 10 -Compress
+          # ConvertTo-Json on a single-key object emits non-array JSON
+          # already, but tauri's --config wants a path or a string; pass it
+          # via stdin-style argument so PowerShell doesn't word-split.
+          npx tauri build --target x86_64-pc-windows-msvc --bundles app --config "$cfg"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
+      - name: Package portable .zip
+        shell: pwsh
+        run: |
+          $ver = (Get-Content package.json | ConvertFrom-Json).version
+          $dist = "Anchorworks_${ver}_x64-portable"
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          Copy-Item "src-tauri\target\x86_64-pc-windows-msvc\release\anchorworks.exe" `
+                    -Destination "$dist\Anchorworks.exe"
+          Copy-Item -Recurse "src-tauri\$env:WEBVIEW2_DIRNAME" -Destination "$dist\"
+          # Self-documenting README so users who unzip into a random folder
+          # know what they're looking at without checking the GitHub page.
+          @"
+          Anchorworks $ver — Portable Edition
+          ====================================
+
+          Unzip anywhere and run Anchorworks.exe. No install, no admin
+          rights, no internet required at first launch (a fixed-version
+          WebView2 runtime is included alongside the exe).
+
+          What's inside:
+            Anchorworks.exe                          — the application
+            $env:WEBVIEW2_DIRNAME\  — bundled Edge WebView2 runtime
+
+          Keep the WebView2 folder next to the exe; the loader looks for
+          it via a relative path. Moving the exe out of this directory
+          will make it fall back to the system WebView2 install (which
+          may not be present on locked-down boxes).
+          "@ | Out-File -Encoding utf8 "$dist\README.txt"
+          Compress-Archive -Path "$dist\*" -DestinationPath "$dist.zip"
+          echo "PORTABLE_ZIP=$dist.zip" >> $env:GITHUB_ENV
+
+      - name: Attach portable .zip to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: ${{ env.PORTABLE_ZIP }}
+          # Don't flip published status here — the publish job below does
+          # that after both bundle + portable-windows finish.
+          draft: true
+
   publish:
     name: Publish release
-    needs: bundle
+    needs: [bundle, portable-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
