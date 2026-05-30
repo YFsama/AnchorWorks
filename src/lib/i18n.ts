@@ -457,6 +457,18 @@ const dict: Record<string, Record<Lang, string>> = {
     zh: '输出将使用刻字路径而非画布 SVG。',
   },
   'cut paths': { en: 'cut paths', zh: '刻字路径' },
+  'Open Cut Contour dialog': { en: 'Open Cut Contour dialog', zh: '打开刻字轮廓对话框' },
+  'The image is cross-origin and cannot be read pixel-by-pixel. Save it locally and drag it in as a file.': {
+    en: 'The image is cross-origin and cannot be read pixel-by-pixel. Save it locally and drag it in as a file.',
+    zh: '图像来自跨域来源，浏览器禁止逐像素读取。请先保存到本地，再以文件方式拖入。',
+  },
+  'Trace blocked by browser': { en: 'Trace blocked by browser', zh: '浏览器拒绝描摹' },
+  'Marks would have overlapped — auto-shrunk to fit.': {
+    en: 'Marks would have overlapped — auto-shrunk to fit.',
+    zh: '标记会重叠 — 已自动缩小适配。',
+  },
+  'Reg marks (clamped)': { en: 'Reg marks (clamped)', zh: '对位标记（已缩小）' },
+  'Arm': { en: 'Arm', zh: '臂长' },
 
   // -------- Updater UX (toast + progress bar) --------
   'Updates': { en: 'Updates', zh: '更新' },

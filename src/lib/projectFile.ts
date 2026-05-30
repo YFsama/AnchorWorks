@@ -35,12 +35,23 @@ import { isTauri, callNative } from './runtime';
 
 export interface ProjectFile {
   kind: 'anchorworks-project';
-  version: 1;
+  // Bumped from 1 → 2 when cutPaths joined the schema. Loaders accept both:
+  // missing cutPaths on a v1 file just means no contours have been generated.
+  version: 1 | 2;
   createdAt: number;
   doc: DocSettings;
   canvas: object;
   artboards: Artboard[];
   symbols: SymbolEntry[];
+  /** Vinyl-cutter cut paths (outlines / traces / regmarks). v2+ only. */
+  cutPaths?: Array<{
+    id: string;
+    points: Array<[number, number]>;
+    closed: boolean;
+    kind: 'outline' | 'trace' | 'regmark' | 'manual';
+    sourceObjectId?: string;
+    passes?: number;
+  }>;
 }
 
 const FILE_EXT = '.vstudio.json';
@@ -117,16 +128,18 @@ function pickerTypes() {
 /** Gather the current editor state into a `ProjectFile` envelope. */
 export function buildProject(): ProjectFile {
   const canvas = getCanvas();
-  const doc = useEditor.getState().doc;
+  const state = useEditor.getState();
   const canvasJSON: object = canvas ? (canvas.toJSON() as object) : {};
   return {
     kind: 'anchorworks-project',
-    version: 1,
+    // v2 carries cutPaths. Loaders below accept v1 too (cutPaths omitted).
+    version: 2,
     createdAt: Date.now(),
-    doc: { ...doc },
+    doc: { ...state.doc },
     canvas: canvasJSON,
     artboards: getArtboards().map((a) => ({ ...a })),
     symbols: getSymbols().map((s) => ({ ...s })),
+    cutPaths: state.cutPaths.map((p) => ({ ...p, points: p.points.map((pt) => [pt[0], pt[1]] as [number, number]) })),
   };
 }
 
@@ -146,7 +159,7 @@ function isProjectFile(value: unknown): value is ProjectFile {
  */
 export async function applyProject(p: ProjectFile): Promise<void> {
   if (!isProjectFile(p)) throw new Error('Not a Anchorworks project file');
-  if (p.version !== 1) {
+  if (p.version !== 1 && p.version !== 2) {
     throw new Error(`Unsupported project version: ${p.version}`);
   }
 
@@ -186,6 +199,22 @@ export async function applyProject(p: ProjectFile): Promise<void> {
   const symbols = Array.isArray(p.symbols) ? p.symbols : [];
   try { localStorage.setItem(SYMBOLS_KEY, JSON.stringify(symbols)); } catch { /* quota */ }
   try { window.dispatchEvent(new CustomEvent('vector:symbols-changed')); } catch { /* ignore */ }
+
+  // 5) Cut paths — v2+ only. Filter to defensively drop entries that don't
+  // look like CutPath shape (defensive against future-version files opened
+  // by an older build that doesn't know the latest schema additions).
+  if (Array.isArray(p.cutPaths)) {
+    const validKinds = new Set(['outline', 'trace', 'regmark', 'manual']);
+    const cleaned = p.cutPaths.filter(c =>
+      c && typeof c.id === 'string'
+        && Array.isArray(c.points)
+        && validKinds.has(c.kind),
+    );
+    useEditor.getState().setCutPaths(cleaned);
+  } else {
+    // v1 file → clear any leftover paths from a previous edit.
+    useEditor.getState().setCutPaths([]);
+  }
 
   // Seed a history entry so the open is undoable back to whatever was there.
   pushHistory();

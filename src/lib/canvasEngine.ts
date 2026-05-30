@@ -82,6 +82,20 @@ export function initCanvas(el: HTMLCanvasElement) {
   canvas.on('mouse:up', onMouseUp);
   canvas.on('mouse:wheel', handleWheel);
 
+  // Cut-path mutations are first-class history events — without this,
+  // accidentally hitting Clear All inside CutContourDialog would be
+  // unrecoverable. Subscribe to the slice; on identity change snapshot
+  // the canvas + cut paths into the history stack via pushHistory.
+  // History.capture compares both canvas + cutPaths so this fires
+  // independently of canvas object events.
+  let prevCutPaths = useEditor.getState().cutPaths;
+  useEditor.subscribe((state) => {
+    if (state.cutPaths !== prevCutPaths) {
+      prevCutPaths = state.cutPaths;
+      pushHistory();
+    }
+  });
+
   // Context-menu (right-click) bridge. Fabric's `stopContextMenu: true`
   // (set above) calls BOTH preventDefault AND stopPropagation on the
   // browser-level contextmenu event, so a listener on the wrapping <div>

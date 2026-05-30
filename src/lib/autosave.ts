@@ -10,6 +10,7 @@
 
 import { getCanvas } from './canvasEngine';
 import { getAutoSaveInterval } from './preferences';
+import { useEditor, type CutPath } from '../store/editor';
 
 // Re-exported so callers (e.g. PreferencesDialog) can read the effective
 // interval without pulling in `./preferences` separately.
@@ -20,6 +21,11 @@ const AUTOSAVE_KEY = 'vector.autosave';
 export interface AutoSaveEntry {
   json: object;
   ts: number;
+  /** Vinyl-cutter cut paths. Saved alongside the canvas so a reload
+   *  / crash doesn't lose the contour work. Optional for forwards-
+   *  compatibility with older autosave entries written before the
+   *  cut-contour feature shipped. */
+  cutPaths?: CutPath[];
 }
 
 export interface AutoSaveStatus {
@@ -52,7 +58,16 @@ function persistOnce() {
   try {
     const json = canvas.toJSON();
     const ts = Date.now();
-    const entry: AutoSaveEntry = { json: json as object, ts };
+    const cutPaths = useEditor.getState().cutPaths;
+    const entry: AutoSaveEntry = {
+      json: json as object,
+      ts,
+      // Omit the field entirely when no cut paths exist — keeps the
+      // serialised payload small for the 99% case where users aren't
+      // doing print-and-cut, and the entry remains shape-compatible
+      // with the older v1 reader.
+      ...(cutPaths.length > 0 ? { cutPaths } : {}),
+    };
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(entry));
     setStatus({ lastSavedAt: ts, dirty: false });
   } catch {
@@ -75,10 +90,21 @@ function attachCanvasListeners() {
   canvas.on('object:added', markDirty);
   canvas.on('object:modified', markDirty);
   canvas.on('object:removed', markDirty);
+  // Cut-path mutations need the same dirty-bit flip so autosave fires
+  // after a contour/trace/regmark is generated. Subscribe to the
+  // zustand store and watch for cutPaths identity changes.
+  let prevCutPaths = useEditor.getState().cutPaths;
+  const unsubCuts = useEditor.subscribe((state) => {
+    if (state.cutPaths !== prevCutPaths) {
+      prevCutPaths = state.cutPaths;
+      markDirty();
+    }
+  });
   detachCanvasListeners = () => {
     canvas.off('object:added', markDirty);
     canvas.off('object:modified', markDirty);
     canvas.off('object:removed', markDirty);
+    unsubCuts();
   };
 }
 

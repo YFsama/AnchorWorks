@@ -5,6 +5,7 @@ import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { logger } from '../lib/debug';
+import { useEditor } from '../store/editor';
 
 export function RecoveryDialog() {
   const t = useT();
@@ -38,6 +39,11 @@ export function RecoveryDialog() {
     try {
       await c.loadFromJSON(entry.json);
       c.renderAll();
+      // Restore cut paths alongside the canvas — autosave snapshots
+      // these too as of project schema v2 / autosave entry v2.
+      if (Array.isArray(entry.cutPaths)) {
+        useEditor.getState().setCutPaths(entry.cutPaths);
+      }
       pushHistory();
     } catch (err) {
       logger.error('autosave', `restore failed: ${err instanceof Error ? err.message : String(err)}`);

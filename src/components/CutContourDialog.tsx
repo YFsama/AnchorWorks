@@ -161,7 +161,25 @@ export function CutContourDialog() {
     const tctx = tmp.getContext('2d', { willReadFrequently: true });
     if (!tctx) return;
     tctx.drawImage(src, 0, 0);
-    const imgData = tctx.getImageData(0, 0, tmp.width, tmp.height);
+    // getImageData throws SecurityError on a tainted canvas — that's what
+    // happens when the placed image was loaded from a cross-origin URL
+    // (e.g. dragged from a browser tab rather than the file system).
+    // Catch and surface a clearer message so the user knows what to do.
+    let imgData: ImageData;
+    try {
+      imgData = tctx.getImageData(0, 0, tmp.width, tmp.height);
+    } catch (err) {
+      const name = err instanceof Error ? err.name : '';
+      if (name === 'SecurityError') {
+        toast.error(
+          t('The image is cross-origin and cannot be read pixel-by-pixel. Save it locally and drag it in as a file.'),
+          { title: t('Trace blocked by browser') },
+        );
+      } else {
+        toast.error((err as Error).message, { title: t('Trace failed') });
+      }
+      return;
+    }
 
     // Pixel size in mm: image's on-canvas display width divided by its
     // natural pixel width tells us how big a single source pixel renders
@@ -245,12 +263,25 @@ export function CutContourDialog() {
       bounds = { x: 0, y: 0, w: 297, h: 210 };
     }
 
+    // Clamp arm + insets so the four L-shapes never cross at the centre
+    // of a small bounding box. Each L-arm needs (arm + insetX) on its
+    // own side; two opposing marks need 2*(arm + insetX) < bounds.w to
+    // fit without overlap. Cap arm length proportionally and surface a
+    // toast when clamping kicked in so the user knows their input was
+    // adjusted.
+    const maxArmX = Math.max(2, bounds.w / 2 - regInsetX - 2);
+    const maxArmY = Math.max(2, bounds.h / 2 - regInsetY - 2);
+    const clampedArm = Math.min(regArm, maxArmX, maxArmY);
+    const clampedInsetX = Math.min(regInsetX, bounds.w / 2 - clampedArm - 2);
+    const clampedInsetY = Math.min(regInsetY, bounds.h / 2 - clampedArm - 2);
+    const clamped = clampedArm < regArm
+      || clampedInsetX < regInsetX
+      || clampedInsetY < regInsetY;
+
     // generateRegMarks takes a single `inset`, but we want independent
     // X/Y insets. Pre-shrink the bounds by (insetY - insetX) on one axis
     // so the generator's symmetric inset comes out asymmetric overall.
-    // The clearer fix is a future signature change; for now this keeps
-    // the cutContour module's API stable.
-    const insetDelta = regInsetY - regInsetX;
+    const insetDelta = clampedInsetY - clampedInsetX;
     const adjustedBounds = {
       x: bounds.x,
       y: bounds.y + insetDelta,
@@ -259,12 +290,21 @@ export function CutContourDialog() {
     };
     clearCutPaths('regmark');
     addCutPaths(generateRegMarks({
-      bounds: adjustedBounds, armLength: regArm, inset: regInsetX,
+      bounds: adjustedBounds,
+      armLength: clampedArm,
+      inset: Math.max(0, clampedInsetX),
     }));
-    toast.success(
-      `${t('4-corner registration marks added.')} ${bounds.w.toFixed(0)}×${bounds.h.toFixed(0)} mm`,
-      { title: t('Reg marks') },
-    );
+    if (clamped) {
+      toast.warn(
+        `${t('Marks would have overlapped — auto-shrunk to fit.')} ${t('Arm')}: ${clampedArm.toFixed(1)}mm`,
+        { title: t('Reg marks (clamped)') },
+      );
+    } else {
+      toast.success(
+        `${t('4-corner registration marks added.')} ${bounds.w.toFixed(0)}×${bounds.h.toFixed(0)} mm`,
+        { title: t('Reg marks') },
+      );
+    }
   };
 
   return (

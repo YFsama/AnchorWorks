@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MousePointer2, Move, Hash, Magnet, Crosshair, Target, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MousePointer2, Move, Hash, Magnet, Crosshair, Target, Maximize2, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
 import { zoomToArtboard } from '../lib/canvasEngine';
@@ -19,6 +19,8 @@ export function StatusBar() {
   const smartGuides = useEditor(s => s.smartGuidesEnabled);
   const anchorSnap = useEditor(s => s.anchorSnapEnabled);
   const artboards = useEditor(s => s.artboards);
+  const cutPathCount = useEditor(s => s.cutPaths.length);
+  const setModal = useEditor(s => s.setModal);
   // Index of the artboard the user is "on". Independent of any store flag —
   // tracks the cycle of the prev/next buttons. Stays stable across re-renders
   // unless the artboards list itself changes length.
@@ -120,6 +122,19 @@ export function StatusBar() {
               <ChevronRight size={11} aria-hidden="true" />
             </button>
           </span>
+        )}
+        {cutPathCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setModal('showCutContour', true)}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] hover:bg-panel2 transition-colors"
+            style={{ color: '#ff2e9a' }}
+            title={t('Open Cut Contour dialog')}
+            aria-label={`${cutPathCount} ${t('cut paths')}`}
+          >
+            <Scissors size={11} aria-hidden="true" />
+            <span className="tabular-nums">{cutPathCount}</span>
+          </button>
         )}
         <Badge active={gridVisible} icon={<Hash size={11} aria-hidden="true" />} label={t('GRID')} />
         <Badge active={snapEnabled} icon={<Magnet size={11} aria-hidden="true" />} label={t('SNAP')} />
