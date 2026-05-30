@@ -114,11 +114,6 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
-    env:
-      # Pinned WebView2 fixed-runtime version. Bump deliberately when you
-      # want to track a newer Chromium/WebView2 baseline; staying pinned
-      # gives reproducible portable builds across releases.
-      WEBVIEW2_VERSION: '131.0.2903.86'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -131,17 +126,36 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # WebView2 fixed-version runtime is distributed as a NuGet package.
-      # nuget.org gives a stable, scriptable URL — no developer-portal
-      # form submission required like the standalone MSI installer.
-      - name: Download WebView2 fixed runtime
+      # Microsoft publishes WebView2 fixed-version runtimes to NuGet under
+      # versioned package ids of the form
+      #   Microsoft.Web.WebView2.FixedVersionRuntime.<version>.x64
+      # Only a SUBSET of Chromium milestones get a published fixed-runtime
+      # package, so pinning a single version goes stale fast (134/131
+      # disappeared when we tried). Instead, query the NuGet v3 search API
+      # at build time and pick the highest-version x64 package available.
+      # Cost: one tiny JSON request per release.
+      - name: Download latest WebView2 fixed runtime from NuGet
         shell: pwsh
         run: |
-          $ver = $env:WEBVIEW2_VERSION
-          $pkgId = "Microsoft.Web.WebView2.FixedVersionRuntime.$ver.x64"
-          $url = "https://www.nuget.org/api/v2/package/$pkgId/$ver"
+          $queryUrl = 'https://azuresearch-usnc.nuget.org/query?q=Microsoft.Web.WebView2.FixedVersionRuntime&prerelease=false&take=200'
+          $results = Invoke-RestMethod -Uri $queryUrl
+          $x64Packages = $results.data | Where-Object { $_.id -like '*FixedVersionRuntime*.x64' }
+          if (-not $x64Packages) {
+            throw "No FixedVersionRuntime x64 packages returned by NuGet search"
+          }
+          # [Version] cast gives proper numeric comparison (131.0.2903.86
+          # vs 1.0.123 sorts correctly), unlike string ordering.
+          $latest = $x64Packages |
+            Sort-Object -Property @{ Expression = { [Version]$_.version } } -Descending |
+            Select-Object -First 1
+          $pkgId = $latest.id
+          $pkgVer = $latest.version
+          Write-Host "Selected $pkgId @ $pkgVer"
+
+          $url = "https://www.nuget.org/api/v2/package/$pkgId/$pkgVer"
           Invoke-WebRequest -Uri $url -OutFile webview2.nupkg
           Expand-Archive -Force -Path webview2.nupkg -DestinationPath webview2-temp
+
           # The NuGet package nests the runtime under build\native\<dir>.
           # Lift it up to src-tauri\ so the Tauri config below can reference
           # it via a clean relative path.
