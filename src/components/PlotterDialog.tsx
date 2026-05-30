@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { X, Download, Send, Loader2 } from 'lucide-react';
 import { useEditor } from '../store/editor';
+import { Scissors } from 'lucide-react';
 import { buildPlotterOutput, defaultPlotterOptions, sendOverSerial, type HpglDialect, type PlotterOptions } from '../lib/plotter';
 import { download } from '../lib/io';
 import { useT } from '../lib/i18n';
@@ -16,6 +17,11 @@ export function PlotterDialog() {
   const [format, setFormat] = useState<'gcode' | 'hpgl'>('gcode');
   const [preview, setPreview] = useState('');
   const [busy, setBusy] = useState(false);
+  // Surface which data source the dialog is going to ship. When cut paths
+  // are present, buildPlotterOutput routes through them instead of the
+  // canvas SVG — give the user a visible signal so they don't wonder why
+  // the dialog ships geometry that doesn't match the visible objects.
+  const cutPathCount = useEditor(s => s.cutPaths.length);
 
   // Escape close — capture phase, consistent with other dialogs.
   useEscapeClose(open, close);
@@ -112,7 +118,15 @@ export function PlotterDialog() {
 
           {/* Output preview */}
           <div className="mt-4">
-            <h3 className="field-label">{t('Preview')}</h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="field-label !mb-0">{t('Preview')}</h3>
+              {cutPathCount > 0 && (
+                <span className="flex items-center gap-1 text-[10px] text-[#ff2e9a]" title={t('Output will use cut paths instead of canvas SVG.')}>
+                  <Scissors size={10} aria-hidden="true" />
+                  {cutPathCount} {t('cut paths')}
+                </span>
+              )}
+            </div>
             <pre className="bg-panel2 border border-border rounded-sm p-2 h-44 overflow-auto text-[10px] font-mono text-ink/85">
               {preview || t('(click Generate Preview)')}
             </pre>

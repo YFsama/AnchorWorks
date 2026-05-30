@@ -4,6 +4,7 @@
  */
 
 import { exportSVG } from './io';
+import { useEditor } from '../store/editor';
 
 /**
  * HP-GL dialect selector. Real-world cutter firmwares accept HP-GL with
@@ -346,9 +347,60 @@ export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): strin
 
 /** Convenience: build for current canvas. */
 export function buildPlotterOutput(format: 'gcode' | 'hpgl', opts: PlotterOptions): string {
+  // When the user has populated cut paths (offsets, traces, regmarks),
+  // ship THOSE to the plotter instead of every visible canvas object —
+  // that's the whole point of a cutter contour suite. Multi-pass cut
+  // paths are replayed N times per the `passes` field. Falls back to
+  // the SVG flatten when no cut paths exist, so the existing "send
+  // canvas to plotter" workflow still works for users not using the
+  // contour dialog.
+  const cuts = readCutPathsFromStore();
+  if (cuts && cuts.length > 0) {
+    const polylines = cutPathsToPlotterPolylines(cuts, opts);
+    return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
+  }
   const svg = exportSVG();
   const polylines = svgToPolylines(svg, opts);
   return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
+}
+
+/**
+ * Adapter from the editor's mm-space CutPath objects to the user-unit
+ * polyline shape generateGCode / generateHPGL expect. Honours the
+ * `passes` field by replaying each polyline N times back-to-back —
+ * cutters with stubborn vinyl just need more bites at the same path.
+ */
+function cutPathsToPlotterPolylines(
+  cuts: Array<{ points: Array<[number, number]>; closed: boolean; passes?: number }>,
+  opts: PlotterOptions,
+): Array<{ points: Array<[number, number]>; closed: boolean }> {
+  // CutPath coords are in mm. plotter polylines are in `opts.unit`.
+  // When opts.unit === 'in', divide by 25.4. When 'mm', identity.
+  // Y is also paper-down here; if the caller flagged originBottomLeft
+  // we flip via `paperHeightUnits`.
+  const scale = opts.unit === 'mm' ? 1 : 1 / 25.4;
+  const out: Array<{ points: Array<[number, number]>; closed: boolean }> = [];
+  for (const c of cuts) {
+    const passes = Math.max(1, c.passes ?? 1);
+    for (let p = 0; p < passes; p++) {
+      const pts = c.points.map(([x, y]) => {
+        const ux = x * scale;
+        const uy = opts.originBottomLeft ? (opts.paperHeightUnits - y * scale) : y * scale;
+        return [ux, uy] as [number, number];
+      });
+      out.push({ points: pts, closed: c.closed });
+    }
+  }
+  return out;
+}
+
+/**
+ * Read the editor's cut-path store. The static import at the top of the
+ * file is safe — editor.ts has zero imports from plotter.ts so there's
+ * no circular dep risk.
+ */
+function readCutPathsFromStore(): Array<{ points: Array<[number, number]>; closed: boolean; passes?: number }> | null {
+  return useEditor.getState().cutPaths ?? null;
 }
 
 /** Native-shell port descriptor — mirrors the `SerialPortDescriptor`

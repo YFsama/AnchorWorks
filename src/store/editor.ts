@@ -2,6 +2,32 @@ import { create } from 'zustand';
 import type { DocSettings, FillStroke, LayerInfo, ToolId, ShadowSettings, Artboard } from '../types';
 
 /**
+ * Vinyl-cutter geometry. Lives parallel to the canvas content, NOT as a
+ * fabric object — the cutter doesn't render to the page, it only renders
+ * via the cut-path overlay and gets serialised straight to HP-GL.
+ *
+ *   - outline  : contour offset from a source fabric object
+ *   - trace    : marching-squares trace of a raster image
+ *   - regmark  : Roland-style L-shape registration mark (always 4 of them
+ *                in the corners; sourceObjectId is omitted)
+ *   - manual   : user-drawn / imported cut path (e.g. via PLT import)
+ *
+ * Points are in document mm-space (top-down Y, same as artboards/objects).
+ * The PlotterDialog handles mm → plotter-unit conversion at send time.
+ */
+export interface CutPath {
+  id: string;
+  points: Array<[number, number]>;
+  closed: boolean;
+  kind: 'outline' | 'trace' | 'regmark' | 'manual';
+  /** Source object id for outline/trace kinds — lets a future "regenerate"
+   *  flow re-run the operation when the underlying object moves. */
+  sourceObjectId?: string;
+  /** Multiple passes for thick / hard materials. 1 = single pass. */
+  passes?: number;
+}
+
+/**
  * Pick the initial theme: explicit user choice in localStorage wins, then
  * the OS `prefers-color-scheme` hint, finally a dark fallback. SSR-safe.
  */
@@ -90,7 +116,19 @@ interface EditorState {
   showRepeat: boolean;
   showPreferences: boolean;
   showKeymapEditor: boolean;
-  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor', v: boolean) => void;
+  showCutContour: boolean;
+  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour', v: boolean) => void;
+
+  // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
+  // content. Contour offsets, bitmap traces, and registration marks all
+  // end up here. Rendered as a magenta dashed overlay (CutPathLayer) and
+  // shipped to the plotter by the PlotterDialog when present.
+  cutPaths: CutPath[];
+  cutPathsVisible: boolean;
+  setCutPaths: (paths: CutPath[]) => void;
+  addCutPaths: (paths: CutPath[]) => void;
+  clearCutPaths: (kind?: CutPath['kind']) => void;
+  setCutPathsVisible: (v: boolean) => void;
 
   // Grid / snap / smart guides
   gridVisible: boolean;
@@ -185,7 +223,19 @@ export const useEditor = create<EditorState>((set) => ({
   showRepeat: false,
   showPreferences: false,
   showKeymapEditor: false,
+  showCutContour: false,
   setModal: (k, v) => set({ [k]: v } as Partial<EditorState>),
+
+  cutPaths: [],
+  cutPathsVisible: true,
+  setCutPaths: (paths) => set({ cutPaths: paths }),
+  addCutPaths: (paths) => set((st) => ({ cutPaths: [...st.cutPaths, ...paths] })),
+  clearCutPaths: (kind) => set((st) => ({
+    // Optional kind filter: clear only contour, only regmarks, etc.
+    // No-arg call wipes everything (used by "Clear All" UI affordance).
+    cutPaths: kind ? st.cutPaths.filter(p => p.kind !== kind) : [],
+  })),
+  setCutPathsVisible: (v) => set({ cutPathsVisible: v }),
 
   gridVisible: false,
   gridSize: 20,

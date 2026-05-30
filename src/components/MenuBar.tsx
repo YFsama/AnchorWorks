@@ -175,6 +175,12 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       <Dropdown label={t('Document')} items={[
         { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
         { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => setModal('showRepeat', true) },
+        { sep: true },
+        // Cut Contour suite — opens the multi-tab dialog covering vector
+        // offset, bitmap trace, and registration marks. Lives under
+        // Document because cut paths are document-level metadata
+        // (alongside artboards/symbols), not edit-level operations.
+        { label: t('Cut Contour…'), onClick: () => setModal('showCutContour', true), kbd: 'Ctrl+Shift+C' },
       ]} />
 
       <Dropdown label={t('Help')} items={[

@@ -28,6 +28,7 @@ import { initUpdaterOnBoot } from './lib/updater';
 // Code-split the heaviest dialogs / panels — they only load when opened.
 const AIPanel = lazy(() => import('./components/AIPanel').then(m => ({ default: m.AIPanel })));
 const PlotterDialog = lazy(() => import('./components/PlotterDialog').then(m => ({ default: m.PlotterDialog })));
+const CutContourDialog = lazy(() => import('./components/CutContourDialog').then(m => ({ default: m.CutContourDialog })));
 const PrintDialog = lazy(() => import('./components/PrintDialog').then(m => ({ default: m.PrintDialog })));
 const TemplatesDialog = lazy(() => import('./components/TemplatesDialog').then(m => ({ default: m.TemplatesDialog })));
 const RecoveryDialog = lazy(() => import('./components/RecoveryDialog').then(m => ({ default: m.RecoveryDialog })));
@@ -685,6 +686,7 @@ export default function App() {
   const setTool = useEditor(s => s.setTool);
   const setModal = useEditor(s => s.setModal);
   const showPlotter = useEditor(s => s.showPlotter);
+  const showCutContour = useEditor(s => s.showCutContour);
   const showPrint = useEditor(s => s.showPrint);
   const showDocSettings = useEditor(s => s.showDocSettings);
   const showTemplates = useEditor(s => s.showTemplates);
@@ -757,6 +759,14 @@ export default function App() {
         e.preventDefault();
         const { showPreferences, setModal: m } = useEditor.getState();
         m('showPreferences', !showPreferences);
+        return;
+      }
+      // Cut Contour — fast access to the offset/trace/regmark dialog. Bound
+      // to Ctrl+Shift+C; plain Ctrl+C stays as the canvas Copy action.
+      if (match('window.cutContour')) {
+        e.preventDefault();
+        const { showCutContour, setModal: m } = useEditor.getState();
+        m('showCutContour', !showCutContour);
         return;
       }
       // Legacy Ctrl+Z block also routes Ctrl+Shift+Z → Redo; we keep that
@@ -1097,6 +1107,11 @@ export default function App() {
       {showPlotter && (
         <Suspense fallback={null}>
           <PlotterDialog />
+        </Suspense>
+      )}
+      {showCutContour && (
+        <Suspense fallback={null}>
+          <CutContourDialog />
         </Suspense>
       )}
       {showPrint && (

@@ -22,6 +22,8 @@ import { exportSVGOptimized } from './io3';
 import { importSVGSmartFile } from './svgImport';
 import { buildPlotterOutput, defaultPlotterOptions } from './plotter';
 import { parsePlt, polylinesToSvg } from './pltImporter';
+import { detectRegMarks } from './cutContour';
+import { useEditor } from '../store/editor';
 import { toast } from './toast';
 import { t } from './i18n';
 
@@ -166,7 +168,35 @@ export function registerBuiltInFormats(): void {
           toast.warn(t('PLT file had no cuttable geometry.'), { title: t('Nothing imported') });
           return;
         }
-        await importSVGString(polylinesToSvg(res.polylines));
+        // Auto-detect Roland-style 4-corner registration marks BEFORE
+        // dropping the polylines onto the canvas. When found, lift them
+        // out of the editable geometry and re-create them as proper
+        // CutPath regmarks so they render in amber and survive a round-
+        // trip back to the cutter. The remaining polylines become
+        // ordinary editable paths via the existing SVG import pipeline.
+        const reg = detectRegMarks(res.polylines);
+        let polysForCanvas = res.polylines;
+        let regNote = '';
+        if (reg) {
+          const markIdxSet = new Set(reg.markIndexes);
+          polysForCanvas = res.polylines.filter((_, i) => !markIdxSet.has(i));
+          // Regenerate canonical Roland L-marks at the detected bounds —
+          // matches the generator's geometry exactly so a roundtrip
+          // (import → preview → export) doesn't drift the mark positions.
+          const editor = useEditor.getState();
+          editor.clearCutPaths('regmark');
+          editor.addCutPaths(
+            reg.markIndexes.map((i, k) => ({
+              id: `regmark-imported-${Date.now().toString(36)}-${k}`,
+              points: res.polylines[i].points,
+              closed: false,
+              kind: 'regmark' as const,
+              passes: 1,
+            })),
+          );
+          regNote = ` · ${t('4 reg marks detected')}`;
+        }
+        await importSVGString(polylinesToSvg(polysForCanvas));
         const dialectLabel = res.dialect === 'roland-camm' ? 'Roland CAMM'
           : res.dialect === 'graphtec-fc' ? 'Graphtec FC' : t('bare HP-GL');
         const pageNote = res.pageSizeMm
@@ -174,7 +204,7 @@ export function registerBuiltInFormats(): void {
           : '';
         const warnNote = res.warnings.length > 0 ? ` · ${res.warnings.length} warning(s)` : '';
         toast.success(
-          `${res.polylines.length} polylines${pageNote}${warnNote}`,
+          `${polysForCanvas.length} polylines${pageNote}${regNote}${warnNote}`,
           { title: `${t('Imported PLT')} (${dialectLabel})` },
         );
       } catch (err) {

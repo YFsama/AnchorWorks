@@ -7,6 +7,7 @@ import { useT } from '../lib/i18n';
 import { Rulers } from './Rulers';
 import { GridOverlay } from './GridOverlay';
 import { ArtboardLayer } from './ArtboardLayer';
+import { CutPathLayer } from './CutPathLayer';
 import { EraserHUD } from './EraserHUD';
 import { EmptyCanvasHint } from './EmptyCanvasHint';
 import { enhanceTouchSupport } from '../lib/touch';
@@ -129,6 +130,7 @@ export function CanvasView() {
       <canvas ref={canvasRef} aria-hidden="true" />
       {ready && <ArtboardLayer />}
       {ready && <GridOverlay />}
+      {ready && <CutPathLayer />}
       {ready && <Rulers />}
       {/* eslint-disable-next-line react-hooks/refs -- wrapRef.current here is
           consumed by EraserHUD inside a useEffect (it attaches pointer

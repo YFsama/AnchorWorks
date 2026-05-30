@@ -64,6 +64,7 @@ export const BINDINGS: ShortcutBinding[] = [
   // -------- Command palette / general --------
   { id: 'window.commandPalette', label: 'Command Palette',     defaultCombo: 'Ctrl+K' },
   { id: 'window.preferences',    label: 'Preferences…',        defaultCombo: 'Ctrl+,' },
+  { id: 'window.cutContour',     label: 'Cut Contour…',        defaultCombo: 'Ctrl+Shift+C' },
   { id: 'edit.undo',             label: 'Undo',                defaultCombo: 'Ctrl+Z' },
   { id: 'edit.redoShift',        label: 'Redo (Shift+Z)',      defaultCombo: 'Ctrl+Shift+Z' },
   { id: 'view.outline',          label: 'Outline View',        defaultCombo: 'Ctrl+Alt+Y' },
