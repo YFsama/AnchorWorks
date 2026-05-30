@@ -82,6 +82,20 @@ export function initCanvas(el: HTMLCanvasElement) {
   canvas.on('mouse:up', onMouseUp);
   canvas.on('mouse:wheel', handleWheel);
 
+  // Context-menu (right-click) bridge. Fabric's `stopContextMenu: true`
+  // (set above) calls BOTH preventDefault AND stopPropagation on the
+  // browser-level contextmenu event, so a listener on the wrapping <div>
+  // never fires. Fabric still emits its own `contextmenu` event from
+  // _basicEventHandler though — rebroadcast it as the custom event
+  // CanvasContextMenu already listens for. Single source of truth.
+  canvas.on('contextmenu', (opt) => {
+    const e = (opt as unknown as { e?: MouseEvent }).e;
+    if (!e) return;
+    window.dispatchEvent(new CustomEvent('vector:context-menu', {
+      detail: { x: e.clientX, y: e.clientY },
+    }));
+  });
+
   syncObjectCount();
 
   return canvas;

@@ -97,6 +97,12 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+  # TEMPORARILY DISABLED: the NuGet step ("Download latest WebView2 fixed
+  # runtime") failed on v0.9.2/v0.9.3 with errors we can't see remotely
+  # (need the live workflow log). Skipping the job lets the regular
+  # bundles ship while we diagnose. Re-enable by removing the `if: false`
+  # below — the actual job body is intact below.
+  #
   # Portable Windows variant — ships a self-contained .zip with the raw
   # executable plus a fixed-version WebView2 runtime alongside it. The
   # binary's webviewInstallMode is overridden via --config so the loader
@@ -111,6 +117,7 @@ jobs:
   portable-windows:
     name: Portable Windows (.zip)
     needs: bundle
+    if: false # Skip until the NuGet WebView2 download is debugged.
     runs-on: windows-latest
     permissions:
       contents: write
@@ -234,7 +241,9 @@ jobs:
 
   publish:
     name: Publish release
-    needs: [bundle, portable-windows]
+    # portable-windows omitted while it's disabled (`if: false`); add it
+    # back to needs once that job is re-enabled.
+    needs: [bundle]
     runs-on: ubuntu-latest
     permissions:
       contents: write

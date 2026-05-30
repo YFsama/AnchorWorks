@@ -106,7 +106,16 @@ function readFileAsDataURL(file: File): Promise<string> {
 
 const RASTER_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
 
-export async function importImageFile(file: File): Promise<void> {
+export async function importImageFile(
+  file: File,
+  /**
+   * Optional viewport-space cursor coords (clientX/clientY of a drop event).
+   * When provided, the imported image is centred on the corresponding canvas
+   * point so a drag-drop lands where the user actually let go of the file.
+   * Omit to fall back to "centre on visible canvas" (toolbar / menu imports).
+   */
+  dropAt?: { clientX: number; clientY: number },
+): Promise<void> {
   const canvas = getCanvas();
   if (!canvas) return;
   const dataUrl = await readFileAsDataURL(file);
@@ -125,13 +134,32 @@ export async function importImageFile(file: File): Promise<void> {
     img.scale(s);
   }
 
-  // Center on visible canvas
   const sw = (img.width ?? 0) * (img.scaleX ?? 1);
   const sh = (img.height ?? 0) * (img.scaleY ?? 1);
-  img.set({
-    left: (cw - sw) / 2,
-    top: (ch - sh) / 2,
-  });
+
+  // Drop-at-cursor: convert clientX/Y → canvas-space via the inverse
+  // viewport transform (vpt[0]/[3] = zoom, vpt[4]/[5] = pan), then
+  // subtract the canvas element's screen origin. Fabric's getPointer
+  // would do this for us but requires a true Event object — we only have
+  // numeric coords from the drop handler, so do the math directly.
+  let leftMid: number;
+  let topMid: number;
+  if (dropAt) {
+    const el = canvas.upperCanvasEl as HTMLCanvasElement | undefined;
+    const rect = el?.getBoundingClientRect();
+    const vpt = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+    const sx = dropAt.clientX - (rect?.left ?? 0);
+    const sy = dropAt.clientY - (rect?.top ?? 0);
+    const cx = (sx - vpt[4]) / vpt[0];
+    const cy = (sy - vpt[5]) / vpt[3];
+    leftMid = cx - sw / 2;
+    topMid = cy - sh / 2;
+  } else {
+    // Centre on visible canvas (toolbar / menu / paste flows).
+    leftMid = (cw - sw) / 2;
+    topMid = (ch - sh) / 2;
+  }
+  img.set({ left: leftMid, top: topMid });
   (img as fabric.FabricImage & { _src?: string })._src = dataUrl;
 
   canvas.add(img);
@@ -385,8 +413,6 @@ function sendTilesToPrint(tiles: string[], pageW: number, pageH: number, cols: n
 /* 4. Drag-and-drop                                                  */
 /* ----------------------------------------------------------------- */
 
-const ACCEPT_EXT = ['svg', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'json'];
-
 /** Attach drag/drop listeners; returns a teardown function.
  *
  * Toggles the `dragging-files` class on the host element while a drag
@@ -420,22 +446,36 @@ export function attachDragDrop(el: HTMLElement): () => void {
     el.classList.remove('dragging-files');
     if (!e.dataTransfer?.files?.length) return;
     e.preventDefault();
+    // Capture cursor position from the drop event BEFORE any awaits — by
+    // the time the async file reads complete, the original DragEvent has
+    // been recycled and clientX/Y read 0. Pass them to importImageFile so
+    // raster drops land where the user actually let go of the file
+    // (previously they always centred on the canvas, which read as "image
+    // landed on the right" because the canvas itself is offset rightward
+    // by the toolbar).
+    const dropAt = { clientX: e.clientX, clientY: e.clientY };
     const files = Array.from(e.dataTransfer.files);
+    // Cascade subsequent drops in the same gesture so multiple files
+    // don't stack exactly on top of each other — small per-file offset.
+    let cascade = 0;
     for (const f of files) {
       const ext = (f.name.split('.').pop() ?? '').toLowerCase();
-      if (!ACCEPT_EXT.includes(ext)) continue;
+      const isRaster = RASTER_EXTS.includes(ext);
+      // Honour the format registry so drag-drop for newly-registered
+      // formats (PLT, JSON, SVG) Just Works. We gate on registry-hit OR
+      // raster so unknown extensions get a no-op rather than a confusing
+      // toast for "system" drops (URL shortcuts, browser-tab drags, etc.).
+      const handler = findFormatByExt(ext);
+      if (!handler?.import && !isRaster) continue;
       try {
-        // Prefer the format registry — same SVG/JSON paths as the menu and
-        // CommandPalette, so future format additions (e.g. .ai, .pdf import)
-        // pick up drag-drop support for free by registering an `import`
-        // handler. Raster imports stay hardcoded for now because the raster
-        // pipeline goes through `importImageFile` (places an Image object on
-        // canvas) and isn't a "format" the registry models yet.
-        const handler = findFormatByExt(ext);
         if (handler?.import) {
           await handler.import(f);
-        } else if (RASTER_EXTS.includes(ext)) {
-          await importImageFile(f);
+        } else if (isRaster) {
+          await importImageFile(f, {
+            clientX: dropAt.clientX + cascade,
+            clientY: dropAt.clientY + cascade,
+          });
+          cascade += 16;
         }
       } catch (err) {
         logger.error('io', `drop import failed: ${f.name} — ${err instanceof Error ? err.message : String(err)}`);
