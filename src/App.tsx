@@ -22,6 +22,8 @@ import { getFormat } from './lib/formats';
 import { saveProjectQuick, applyProject, subscribeCurrentProjectName } from './lib/projectFile';
 import { setNativeWindowTitle } from './lib/runtime';
 import { installNativeMenuListener } from './lib/tauriMenu';
+import { useResizableWidth } from './lib/hooks/useResizableWidth';
+import { initUpdaterOnBoot } from './lib/updater';
 
 // Code-split the heaviest dialogs / panels — they only load when opened.
 const AIPanel = lazy(() => import('./components/AIPanel').then(m => ({ default: m.AIPanel })));
@@ -664,6 +666,22 @@ export default function App() {
   // Delay-mount RecoveryDialog so its chunk loads lazily after first paint.
   const [recoveryMounted, setRecoveryMounted] = useState(false);
   const [mobileAsideOpen, setMobileAsideOpen] = useState(false);
+
+  // Right sidebar width. Drag the strip on its left edge to widen/narrow;
+  // value persists to localStorage so a wider panel survives reloads.
+  // Clamp: 240 (Properties' minimum readable width) … 560 (anything more
+  // eats the canvas on a standard 1440-wide window).
+  const {
+    width: rightPanelWidth,
+    onMouseDown: onRightPanelResizeStart,
+    reset: resetRightPanelWidth,
+  } = useResizableWidth({
+    storageKey: 'vs:right-panel-w',
+    edge: 'left',
+    min: 240,
+    max: 560,
+    initial: 288, // matches the previous static w-72
+  });
   const setTool = useEditor(s => s.setTool);
   const setModal = useEditor(s => s.setModal);
   const showPlotter = useEditor(s => s.showPlotter);
@@ -685,6 +703,10 @@ export default function App() {
     setLiveRegion(liveRef.current);
     return () => setLiveRegion(null);
   }, []);
+
+  // Kick off the in-app updater workflow once per app mount. No-ops in
+  // the PWA build (handled inside initUpdaterOnBoot via isTauri()).
+  useEffect(() => { initUpdaterOnBoot(); }, []);
 
   // Apply high-contrast theme via a data attribute on <html> and persist the
   // choice to localStorage so subsequent loads honour the user's selection
@@ -1026,8 +1048,23 @@ export default function App() {
             </Suspense>
           )}
         </main>
+        {/* Drag handle: a 4px-wide hit strip on the LEFT edge of the right
+            aside. CSS positions it as a sibling so the cursor + hover tint
+            don't bleed into the aside content. Hidden on mobile (≤ 900px)
+            where the slide-over takes over. */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t('Resize right panel')}
+          tabIndex={-1}
+          className="aside-resize-handle"
+          onMouseDown={onRightPanelResizeStart}
+          onDoubleClick={resetRightPanelWidth}
+          title={t('Drag to resize · double-click to reset')}
+        />
         <aside
-          className="aside-right w-72 shrink-0 bg-panel border-l border-border overflow-y-auto flex flex-col"
+          className="aside-right shrink-0 bg-panel border-l border-border overflow-y-auto flex flex-col"
+          style={{ width: `${rightPanelWidth}px` }}
           aria-label={t('Properties and panels')}
         >
           <PropertiesPanel />

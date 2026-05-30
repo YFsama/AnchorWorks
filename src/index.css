@@ -648,8 +648,32 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
 /* Default (desktop) — hide the floating mobile toggle. */
 .aside-mobile-toggle { display: none; }
 
+/* Right-panel drag handle. Thin (4px) vertical strip that lives between the
+ * canvas <main> and the aside; mouse down on it starts the resize drag
+ * driven by useResizableWidth. The hit area visually disappears until hover
+ * so it doesn't add chrome at rest — Figma/XD pattern. */
+.aside-resize-handle {
+  width: 4px;
+  flex: none;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 120ms ease;
+  /* Border lines up with the aside's `border-l` so the divider looks
+   * continuous at rest — the handle is the divider, not a sibling beside it. */
+  border-left: 1px solid rgb(var(--color-border));
+  margin-right: -1px; /* swallow the aside's own left border to avoid a double line */
+  position: relative;
+  z-index: 1;
+}
+.aside-resize-handle:hover,
+.aside-resize-handle:active {
+  background: color-mix(in oklab, rgb(var(--color-accent)) 40%, transparent);
+}
+
 @media (max-width: 900px) {
   .aside-mobile-toggle { display: inline-flex; align-items: center; }
+  /* Mobile slide-over takes over — hide the inline handle too. */
+  .aside-resize-handle { display: none; }
   .aside-right {
     display: none;
   }
