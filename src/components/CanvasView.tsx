@@ -19,25 +19,53 @@ export function CanvasView() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !wrapRef.current) return;
     const el = canvasRef.current;
+    const wrap = wrapRef.current;
     const c = initCanvas(el);
     // Hydrate artboards from localStorage right after canvas init so the
     // overlay has the right list on first paint.
     loadArtboardsFromStorage();
     // Wire touch / pinch-zoom / two-finger pan / pen-pressure tracking.
     const detachTouch = enhanceTouchSupport(el);
-    const onResize = () => {
-      if (!wrapRef.current) return;
-      const w = wrapRef.current.clientWidth;
-      const h = wrapRef.current.clientHeight;
+
+    // rAF-coalesced reflow. Fired by both the ResizeObserver and the
+    // legacy window.resize listener; the boolean guard prevents queuing
+    // multiple rAF callbacks per frame when both signals fire together
+    // (which is what happens on OS-window resize: ResizeObserver fires
+    // as the layout settles, and `window.resize` fires for the same
+    // event a moment later).
+    let pending = false;
+    const reflow = () => {
+      pending = false;
+      const w = wrap.clientWidth;
+      const h = wrap.clientHeight;
+      if (w === 0 || h === 0) return;
       c.setDimensions({ width: w, height: h }, { backstoreOnly: false });
       zoomFit();
     };
-    requestAnimationFrame(() => { onResize(); setReady(true); });
-    window.addEventListener('resize', onResize);
+    const queueReflow = () => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(reflow);
+    };
+
+    // Initial paint after wrap has layout dimensions.
+    requestAnimationFrame(() => { reflow(); setReady(true); });
+
+    // ResizeObserver catches every cause of size change — OS window
+    // resize, sidebar drag-resize, panel toggles, mobile-aside slideovers
+    // — without each call site needing to remember to dispatch a
+    // `resize` event. Window-level listener kept too because the
+    // sidebar's drag hook fires `window.resize` directly and other
+    // consumers (Rulers, etc.) still listen for it.
+    const ro = new ResizeObserver(queueReflow);
+    ro.observe(wrap);
+    window.addEventListener('resize', queueReflow);
+
     return () => {
-      window.removeEventListener('resize', onResize);
+      ro.disconnect();
+      window.removeEventListener('resize', queueReflow);
       detachTouch();
       disposeCanvas();
       setReady(false);

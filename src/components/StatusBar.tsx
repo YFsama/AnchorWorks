@@ -50,7 +50,7 @@ export function StatusBar() {
     // The cursor coords are aria-hidden — sighted users see them update live
     // but screen readers don't get a chatter stream.
     <div
-      className="h-6 bg-panel border-t border-border flex items-center px-3 gap-4 text-[10px] text-muted select-none"
+      className="statusbar h-7 flex items-center px-3 gap-3 text-[10px] text-muted select-none"
       role="group"
       aria-label={t('Editor status')}
     >
@@ -130,7 +130,7 @@ export function StatusBar() {
   );
 }
 
-function Sep() { return <span className="text-border" aria-hidden="true">|</span>; }
+function Sep() { return <span className="statusbar-sep" aria-hidden="true" />; }
 
 function Badge({ active, icon, label }: { active: boolean; icon: React.ReactNode; label: string }) {
   const t = useT();

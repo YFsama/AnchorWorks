@@ -116,7 +116,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
     // dropdowns below) with toolbar buttons, which axe's `aria-required-children`
     // rule rightly objects to — so `role="menubar"` is re-attached to the
     // focused dropdown cluster only, not on the outer banner.
-    <header className="h-11 bg-panel border-b border-border flex items-center px-3 gap-2 text-xs" aria-label={t('Application chrome')}>
+    <header className="topbar h-11 flex items-center px-3 gap-2 text-xs" aria-label={t('Application chrome')}>
       <button
         type="button"
         onClick={() => setShowAbout(true)}
@@ -126,7 +126,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       >
         <Logo size={20} variant="full" />
       </button>
-      <div className="w-px h-5 bg-border mx-2" />
+      <span className="topbar-sep" aria-hidden="true" />
 
       <div role="menubar" aria-label={t('Application menu')} className="flex items-center gap-2">
       <Dropdown label={t('File')} width="w-64" items={[
@@ -203,11 +203,11 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       ]} />
       </div>
 
-      <div className="w-px h-5 bg-border mx-2" />
+      <span className="topbar-sep" aria-hidden="true" />
       <IconBtn title={`${t('Undo')} (Ctrl+Z)`} aria-label={t('Undo')} aria-keyshortcuts={ariaKeyshortcuts('Ctrl+Z')} onClick={() => undo()} disabled={!canUndo}><Undo2 size={14} aria-hidden="true" /></IconBtn>
       <IconBtn title={`${t('Redo')} (Ctrl+Y)`} aria-label={t('Redo')} aria-keyshortcuts={ariaKeyshortcuts('Ctrl+Y')} onClick={() => redo()} disabled={!canRedo}><Redo2 size={14} aria-hidden="true" /></IconBtn>
 
-      <div className="w-px h-5 bg-border mx-2" />
+      <span className="topbar-sep" aria-hidden="true" />
       {/* Grid / Snap / Guides — single segmented control. Each pip is independently
           toggleable; the group reads as one cluster. */}
       <div className="segmented" role="group" aria-label={t('Canvas helpers')}>
@@ -258,7 +258,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         {/* Zoom indicator — click to edit %, Enter applies, Escape cancels, blur commits.
             Right-click / shift-click fits the page. */}
         <ZoomChip zoom={zoom} t={t} />
-        <div className="w-px h-5 bg-border" />
+        <span className="topbar-sep" aria-hidden="true" />
         {/* Secondary — output actions. */}
         <button type="button" className="btn flex items-center gap-1" title={t('Send to Plotter…')} aria-label={t('Send to Plotter…')} onClick={() => setModal('showPlotter', true)}>
           <Send size={12} aria-hidden="true" />{t('Plotter')}

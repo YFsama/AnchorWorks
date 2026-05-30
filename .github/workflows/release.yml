@@ -97,12 +97,6 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-  # TEMPORARILY DISABLED: the NuGet step ("Download latest WebView2 fixed
-  # runtime") failed on v0.9.2/v0.9.3 with errors we can't see remotely
-  # (need the live workflow log). Skipping the job lets the regular
-  # bundles ship while we diagnose. Re-enable by removing the `if: false`
-  # below — the actual job body is intact below.
-  #
   # Portable Windows variant — ships a self-contained .zip with the raw
   # executable plus a fixed-version WebView2 runtime alongside it. The
   # binary's webviewInstallMode is overridden via --config so the loader
@@ -117,7 +111,6 @@ jobs:
   portable-windows:
     name: Portable Windows (.zip)
     needs: bundle
-    if: false # Skip until the NuGet WebView2 download is debugged.
     runs-on: windows-latest
     permissions:
       contents: write
@@ -133,43 +126,57 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # Microsoft publishes WebView2 fixed-version runtimes to NuGet under
-      # versioned package ids of the form
-      #   Microsoft.Web.WebView2.FixedVersionRuntime.<version>.x64
-      # Only a SUBSET of Chromium milestones get a published fixed-runtime
-      # package, so pinning a single version goes stale fast (134/131
-      # disappeared when we tried). Instead, query the NuGet v3 search API
-      # at build time and pick the highest-version x64 package available.
-      # Cost: one tiny JSON request per release.
-      - name: Download latest WebView2 fixed runtime from NuGet
+      # Microsoft publishes WebView2 fixed-version runtimes to NuGet as one
+      # package per Chromium milestone, with the version baked into the
+      # package id:  Microsoft.Web.WebView2.FixedVersionRuntime.<ver>.x64.
+      # The search API on azuresearch-usnc returned 0 results for the obvious
+      # query (the per-version packages aren't tagged like the umbrella one)
+      # so we walk a hand-curated candidate list and download the first one
+      # whose .nupkg URL resolves. Order: highest preferred version first,
+      # then fall back to older milestones. Update the list when adding new
+      # WebView2 baselines — they're listed at
+      #   https://developer.microsoft.com/microsoft-edge/webview2/
+      - name: Download a WebView2 fixed runtime that exists on NuGet
         shell: pwsh
         run: |
-          $queryUrl = 'https://azuresearch-usnc.nuget.org/query?q=Microsoft.Web.WebView2.FixedVersionRuntime&prerelease=false&take=200'
-          $results = Invoke-RestMethod -Uri $queryUrl
-          $x64Packages = $results.data | Where-Object { $_.id -like '*FixedVersionRuntime*.x64' }
-          if (-not $x64Packages) {
-            throw "No FixedVersionRuntime x64 packages returned by NuGet search"
+          $candidates = @(
+            '131.0.2903.86', '129.0.2792.79', '128.0.2739.42',
+            '124.0.2478.97', '120.0.2210.91', '109.0.1518.78'
+          )
+          $gotVer = $null
+          foreach ($ver in $candidates) {
+            $pkgId = "Microsoft.Web.WebView2.FixedVersionRuntime.$ver.x64"
+            $url = "https://www.nuget.org/api/v2/package/$pkgId/$ver"
+            Write-Host "Trying $pkgId..."
+            try {
+              # -ErrorAction Stop so a 404 surfaces as an exception we can
+              # catch (default behaviour writes a non-terminating error and
+              # silently continues to the next line, leaving an empty file).
+              Invoke-WebRequest -Uri $url -OutFile webview2.nupkg `
+                                -ErrorAction Stop -UseBasicParsing | Out-Null
+              if ((Get-Item webview2.nupkg).Length -gt 1MB) {
+                $gotVer = $ver
+                Write-Host "  -> downloaded $ver ($([Math]::Round((Get-Item webview2.nupkg).Length/1MB)) MB)"
+                break
+              } else {
+                Write-Host "  -> got empty/tiny file, treating as miss"
+              }
+            } catch {
+              Write-Host "  -> miss: $($_.Exception.Message)"
+            }
           }
-          # [Version] cast gives proper numeric comparison (131.0.2903.86
-          # vs 1.0.123 sorts correctly), unlike string ordering.
-          $latest = $x64Packages |
-            Sort-Object -Property @{ Expression = { [Version]$_.version } } -Descending |
-            Select-Object -First 1
-          $pkgId = $latest.id
-          $pkgVer = $latest.version
-          Write-Host "Selected $pkgId @ $pkgVer"
+          if (-not $gotVer) {
+            throw "All candidate WebView2 fixed-runtime versions returned 404 on nuget.org. Add a known-good version to the candidate list at the top of this step."
+          }
 
-          $url = "https://www.nuget.org/api/v2/package/$pkgId/$pkgVer"
-          Invoke-WebRequest -Uri $url -OutFile webview2.nupkg
           Expand-Archive -Force -Path webview2.nupkg -DestinationPath webview2-temp
 
-          # The NuGet package nests the runtime under build\native\<dir>.
-          # Lift it up to src-tauri\ so the Tauri config below can reference
-          # it via a clean relative path.
+          # The .nupkg nests the runtime under build\native\<dir>. Lift it
+          # to src-tauri\ so the --config webviewInstallMode path is clean.
           $runtimeDir = Get-ChildItem -Path webview2-temp\build\native -Directory `
                        -Filter "Microsoft.WebView2.FixedVersionRuntime.*" |
                        Select-Object -First 1
-          if (-not $runtimeDir) { throw "WebView2 runtime folder not found in NuGet package" }
+          if (-not $runtimeDir) { throw "WebView2 runtime folder not found in NuGet package layout" }
           Move-Item $runtimeDir.FullName -Destination src-tauri\
           $relPath = "./$($runtimeDir.Name)/"
           echo "WEBVIEW2_RELPATH=$relPath" >> $env:GITHUB_ENV
@@ -241,9 +248,7 @@ jobs:
 
   publish:
     name: Publish release
-    # portable-windows omitted while it's disabled (`if: false`); add it
-    # back to needs once that job is re-enabled.
-    needs: [bundle]
+    needs: [bundle, portable-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write

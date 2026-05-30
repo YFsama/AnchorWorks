@@ -648,6 +648,65 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
 /* Default (desktop) — hide the floating mobile toggle. */
 .aside-mobile-toggle { display: none; }
 
+/* ---------------- chrome polish ---------------------------------------- *
+ * Top header (.topbar) and bottom status bar (.statusbar) used to be plain
+ * `bg-panel + border-{b,t}-border` strips. Replace with a subtle gradient +
+ * inner-shadow detail so the chrome reads as "framing" rather than as part
+ * of the canvas itself, and so the divider lines flow visually into the
+ * panels they border instead of looking pasted on. Both use CSS vars so
+ * dark/light/high-contrast themes still drive the look.
+ */
+.topbar {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, rgb(var(--color-panel)) 92%, white 8%) 0%,
+    rgb(var(--color-panel)) 100%
+  );
+  border-bottom: 1px solid rgb(var(--color-border));
+  /* Hairline below to read as elevation over the canvas without a heavy
+   * drop shadow. Driven by the border token so it stays AA-safe across
+   * themes. */
+  box-shadow: 0 1px 0 0 color-mix(in oklab, rgb(var(--color-border)) 60%, transparent);
+}
+.topbar-sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  /* A vertical bar that fades top-and-bottom so it looks engraved instead
+   * of pasted. Reads correctly on both the topbar gradient and on the
+   * darker panel underneath. */
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgb(var(--color-border)) 30%,
+    rgb(var(--color-border)) 70%,
+    transparent 100%
+  );
+  margin: 0 8px;
+}
+.statusbar {
+  background: linear-gradient(
+    180deg,
+    rgb(var(--color-panel)) 0%,
+    color-mix(in oklab, rgb(var(--color-panel)) 92%, black 8%) 100%
+  );
+  border-top: 1px solid rgb(var(--color-border));
+  box-shadow: 0 -1px 0 0 color-mix(in oklab, rgb(var(--color-border)) 60%, transparent);
+}
+.statusbar-sep {
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgb(var(--color-border)) 25%,
+    rgb(var(--color-border)) 75%,
+    transparent 100%
+  );
+  margin: 0 4px;
+}
+
 /* Right-panel drag handle. Thin (4px) vertical strip that lives between the
  * canvas <main> and the aside; mouse down on it starts the resize drag
  * driven by useResizableWidth. The hit area visually disappears until hover
