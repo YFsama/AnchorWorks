@@ -340,6 +340,9 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // process plugin gives the JS side `relaunch()` after a successful
+        // updater install. Pairs with the in-app updater UX in src/lib/updater.ts.
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Wire the native menu. The menu has to be built after the app
             // handle exists (it owns the menu items' lifetime), so we do it

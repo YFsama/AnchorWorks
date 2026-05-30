@@ -32,6 +32,9 @@ tauri-plugin-single-instance = "2"
 # and installs in place. Signing keys are generated out-of-band via
 # `cargo tauri signer generate` and threaded into CI via secrets.
 tauri-plugin-updater = "2"
+# Needed for the in-app updater UX to call relaunch() after a successful
+# install. Pairs with `@tauri-apps/plugin-process` on the JS side.
+tauri-plugin-process = "2"
 # T3 — deep-link / custom-protocol. Lets users open
 # `anchorworks://share/<id>` URLs and have the running instance handle
 # the navigation. Registered alongside `tauri-plugin-single-instance` so

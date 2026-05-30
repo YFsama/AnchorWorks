@@ -131,6 +131,33 @@ function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
         <div style={{ fontSize: 11, lineHeight: 1.4, color: 'rgb(var(--color-ink) / 0.82)', wordBreak: 'break-word' }}>
           {toast.message}
         </div>
+        {/* Progress bar — only renders when `progress` is set. Used by
+            long-running flows (updater download) for self-contained status
+            instead of opening a separate progress dialog. */}
+        {typeof toast.progress === 'number' && (
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(toast.progress)}
+            style={{
+              marginTop: 6,
+              height: 3,
+              borderRadius: 2,
+              background: 'rgb(var(--color-border))',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.max(0, Math.min(100, toast.progress))}%`,
+                height: '100%',
+                background: KIND_COLOR[toast.kind],
+                transition: 'width 120ms linear',
+              }}
+            />
+          </div>
+        )}
       </div>
       {toast.action && (
         <button

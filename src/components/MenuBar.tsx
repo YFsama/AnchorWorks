@@ -185,6 +185,13 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Keyboard Shortcuts'), onClick: () => setModal('showShortcuts', true), kbd: '?' },
         { label: t('Customize Shortcuts…'), onClick: () => setModal('showKeymapEditor', true) },
         { sep: true },
+        // Manual updater check — auto-runs once on boot, but this entry lets
+        // users force-check (e.g. after seeing a release blog post). Wired to
+        // checkAndPrompt with `announceNoUpdate` so the user gets a confirming
+        // toast either way rather than silent success.
+        { label: t('Check for Updates…'), onClick: () => {
+          void import('../lib/updater').then(m => m.checkAndPrompt({ announceNoUpdate: true }));
+        } },
         { label: t('Light Theme'), onClick: () => setTheme(theme === 'light' ? 'dark' : 'light'), kbd: 'Ctrl+Shift+L', checked: theme === 'light' },
         { label: t('High Contrast'), onClick: () => setHighContrast(!highContrast), checked: highContrast },
         { sep: true },

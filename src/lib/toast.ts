@@ -22,9 +22,16 @@ export interface Toast {
   kind: ToastKind;
   title?: string;
   message: string;
-  /** ms before auto-dismiss; defaults to 4000 (errors: 7000). */
+  /** ms before auto-dismiss; defaults to 4000 (errors: 7000). 0 = sticky. */
   duration?: number;
   action?: ToastAction;
+  /**
+   * Optional 0..100 progress. Renders a thin horizontal bar in the toast
+   * footer; used by long-running flows (updater download, file export) that
+   * want a self-contained status indicator instead of a separate progress
+   * dialog. Set to undefined to omit the bar.
+   */
+  progress?: number;
 }
 
 type Listener = (toasts: Toast[]) => void;
@@ -85,6 +92,25 @@ function dismiss(id: string) {
   if (toasts.length !== before) emit();
 }
 
+/**
+ * Patch an existing toast in place. Used by long-running flows (updater
+ * download) that need to push progress updates without spawning a new
+ * notification each tick. No-op when the id has already been dismissed.
+ */
+function update(id: string, patch: Partial<Omit<Toast, 'id'>>): void {
+  const idx = toasts.findIndex(t => t.id === id);
+  if (idx < 0) return;
+  toasts = [...toasts.slice(0, idx), { ...toasts[idx], ...patch }, ...toasts.slice(idx + 1)];
+  // If the caller bumped duration (or set it to 0 for sticky), refresh the
+  // timer so the new value takes effect immediately.
+  if (Object.prototype.hasOwnProperty.call(patch, 'duration')) {
+    clearTimer(id);
+    const nextDuration = toasts[idx].duration ?? DEFAULT_DURATION;
+    scheduleDismiss(id, nextDuration);
+  }
+  emit();
+}
+
 function subscribeToasts(fn: Listener): () => void {
   listeners.add(fn);
   // Prime the new subscriber with the current state.
@@ -101,6 +127,7 @@ function shortHelper(kind: ToastKind) {
 
 export const toast = {
   show,
+  update,
   dismiss,
   info: shortHelper('info'),
   success: shortHelper('success'),
