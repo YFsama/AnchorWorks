@@ -27,26 +27,16 @@ permissions:
   contents: write
 
 jobs:
-  draft:
-    name: Draft release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-    steps:
-      - uses: actions/checkout@v5
-      - id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          tag_name: ${{ github.ref_name }}
-          name: Anchorworks ${{ github.ref_name }}
-          generate_release_notes: true
-
+  # Single-job pattern: each matrix entry calls tauri-action with the
+  # SAME tagName; tauri-action internally find-or-creates one release
+  # per tag and appends its bundles to it. No cross-job state, no
+  # release_id passing, no race conditions when one OS finishes faster
+  # than the others. This is the canonical pattern from tauri-action's
+  # README — the previous two-job (draft → bundle) layout broke with
+  # "Not Found - list-release-assets" because the draft id passed across
+  # jobs wasn't reliably accepted by tauri-action's upload step.
   bundle:
     name: Bundle ${{ matrix.os }}
-    needs: draft
     permissions:
       contents: write
     strategy:
@@ -98,20 +88,34 @@ jobs:
           # Until then, the .dmg ships unsigned (Gatekeeper warns on
           # first launch; users right-click → Open to bypass).
         with:
-          releaseId: ${{ needs.draft.outputs.release_id }}
+          # tagName / releaseName let tauri-action own release lifecycle:
+          # first matrix job to finish creates the draft, the others
+          # find-and-append. No cross-job release_id handoff.
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Anchorworks ${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
           args: ${{ matrix.args }}
 
   publish:
-    name: Publish release + updater manifest
+    name: Publish release
     needs: bundle
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      # Flip the draft tauri-action created from draft → published once
+      # every OS has attached its bundles. Looks up the release by tag
+      # name rather than a passed-in id so this stays decoupled from the
+      # bundle matrix.
       - name: Mark release as published
         uses: actions/github-script@v7
         with:
           script: |
             const { owner, repo } = context.repo;
-            const release_id = ${{ needs.draft.outputs.release_id }};
-            await github.rest.repos.updateRelease({ owner, repo, release_id, draft: false });
+            const tag = context.ref.replace('refs/tags/', '');
+            const { data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+            await github.rest.repos.updateRelease({
+              owner, repo, release_id: release.id, draft: false,
+            });
+            core.info(`Published release ${release.html_url}`);
