@@ -1,6 +1,6 @@
 [package]
 name = "anchorworks"
-version = "0.9.5"
+version = "0.9.6"
 description = "Anchorworks — Illustrator-class vector graphics editor"
 authors = ["YFsama <yf@rbq.ai>"]
 edition = "2021"
