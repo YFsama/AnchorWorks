@@ -5,6 +5,24 @@
 
 import { exportSVG } from './io';
 
+/**
+ * HP-GL dialect selector. Real-world cutter firmwares accept HP-GL with
+ * vendor-specific prefix/suffix commands; emitting the right ones gives
+ * cleaner corners (Roland's TB overcut), correct page setup (CT mode),
+ * and proper page-eject behaviour (!PG, FS/VS for Graphtec speed/force).
+ *
+ *   bare           - vanilla `IN; SP1; PU; PD; ...` — most pen plotters
+ *   roland-camm    - `TB25; W,H; CT1; IN; ... ; PU<eject>; !PG;`
+ *                    matches the format produced by Roland's bundled
+ *                    cutter driver and most Chinese knockoffs (Wentai,
+ *                    Artcut, Rabbit, Liyu) that target Roland-compatible
+ *                    machines.
+ *   graphtec-fc    - `IN; SP1; FS<force>; VS<speed>; PA; ... ; SP0;`
+ *                    Graphtec FC series cutters and Graphtec-compatible
+ *                    third parties (Cutting Master, Robo Master).
+ */
+export type HpglDialect = 'bare' | 'roland-camm' | 'graphtec-fc';
+
 export interface PlotterOptions {
   unit: 'mm' | 'in';
   pxPerUnit: number;     // how many SVG px equal 1 unit
@@ -15,6 +33,14 @@ export interface PlotterOptions {
   originBottomLeft: boolean;
   paperHeightUnits: number;
   curveTolerance: number; // px tolerance for flattening curves
+  /** HP-GL only — dialect picks the right wrapper commands per cutter brand. */
+  dialect: HpglDialect;
+  /** Roland TB overcut in plotter units (40/mm). 25 = 0.625mm — matches `1.plt`. */
+  rolandOvercutUnits: number;
+  /** Graphtec FS (force, gf) — 0 to skip. */
+  graphtecForce: number;
+  /** Graphtec VS (velocity, cm/s) — 0 to skip. */
+  graphtecSpeed: number;
 }
 
 export const defaultPlotterOptions: PlotterOptions = {
@@ -27,6 +53,10 @@ export const defaultPlotterOptions: PlotterOptions = {
   originBottomLeft: true,
   paperHeightUnits: 210, // A4 height in mm
   curveTolerance: 0.5,
+  dialect: 'bare',
+  rolandOvercutUnits: 25,
+  graphtecForce: 30,
+  graphtecSpeed: 20,
 };
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
@@ -245,15 +275,72 @@ export function generateGCode(polylines: Polyline[], opts: PlotterOptions): stri
 /** Generate HPGL (HP-GL pen plotter language). Units = plotter units (~1016/inch). */
 export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): string {
   const unitsPerInput = opts.unit === 'mm' ? 40 : 1016; // HPGL plotter units
-  const parts: string[] = ['IN;', 'SP1;'];
+  const dialect = opts.dialect ?? 'bare';
+
+  // Compute bounds + page footprint in plotter units. Roland uses the page
+  // size header to tell the cutter how much material to advance; if the
+  // user hasn't set one we infer from the geometry bounds.
+  let maxX = 0, maxY = 0;
+  for (const pl of polylines) for (const [x, y] of pl.points) {
+    const X = x * unitsPerInput, Y = y * unitsPerInput;
+    if (X > maxX) maxX = X; if (Y > maxY) maxY = Y;
+  }
+  const pageW = Math.max(Math.ceil(maxX) + 200, Math.round(opts.paperHeightUnits * unitsPerInput / 2));
+  const pageH = Math.max(Math.ceil(maxY) + 200, Math.round(opts.paperHeightUnits * unitsPerInput));
+
+  const parts: string[] = [];
+
+  // --- Dialect-specific header ---
+  if (dialect === 'roland-camm') {
+    // Matches the `TB25;11280,7920;CT1;` template from real Roland-flavoured
+    // cutter files. TB sets overcut depth (corner overshoot for clean
+    // tangential cuts), the bare-number statement is page size, CT1 selects
+    // cut-through mode 1. Three IN's drain any prior state from the buffer
+    // — superstitious but harmless and consistent with the reference files.
+    parts.push(`TB${opts.rolandOvercutUnits};`);
+    parts.push(`${pageW},${pageH};`);
+    parts.push('CT1;');
+    parts.push('IN;');
+    parts.push('IN;');
+    parts.push('IN;');
+    parts.push('PA;');
+  } else if (dialect === 'graphtec-fc') {
+    parts.push('IN;');
+    parts.push('SP1;');
+    if (opts.graphtecForce > 0) parts.push(`FS${opts.graphtecForce};`);
+    if (opts.graphtecSpeed > 0) parts.push(`VS${opts.graphtecSpeed};`);
+    parts.push('PA;');
+  } else {
+    parts.push('IN;');
+    parts.push('SP1;');
+  }
+
+  // --- Geometry ---
   for (const pl of polylines) {
     if (pl.points.length < 2) continue;
     const [x0, y0] = pl.points[0];
     parts.push(`PU${Math.round(x0 * unitsPerInput)},${Math.round(y0 * unitsPerInput)};`);
-    const rest = pl.points.slice(1).map(([x, y]) => `${Math.round(x * unitsPerInput)},${Math.round(y * unitsPerInput)}`).join(',');
+    const rest = pl.points.slice(1).map(([x, y]) =>
+      `${Math.round(x * unitsPerInput)},${Math.round(y * unitsPerInput)}`,
+    ).join(',');
     parts.push(`PD${rest};`);
   }
-  parts.push('PU0,0;', 'SP0;');
+
+  // --- Dialect-specific footer ---
+  if (dialect === 'roland-camm') {
+    // Park near top-right then page eject. The reference files use
+    // x = pageW + ~200 (just past the geometry) which Roland treats as the
+    // material advance position.
+    parts.push(`PU${pageW + 200},200;`);
+    parts.push('!PG;');
+  } else if (dialect === 'graphtec-fc') {
+    parts.push('PU0,0;');
+    parts.push('SP0;');
+  } else {
+    parts.push('PU0,0;');
+    parts.push('SP0;');
+  }
+
   return parts.join('\n');
 }
 

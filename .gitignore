@@ -90,3 +90,10 @@ FUSION_PROJECT_PROMPT.md
 # private dir; if you want to share the pubkey, copy it into the repo
 # under src-tauri/ (or fetch from CI secrets) rather than tracking .tauri/.
 .tauri/
+
+# Sample cutter-machine files dropped at the repo root for testing the PLT
+# importer (HP-GL, vendor binaries). User-owned test fixtures, not source.
+/*.plt
+/*.cut
+/*.aidc
+/*.pit

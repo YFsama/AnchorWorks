@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { X, Download, Send, Loader2 } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { buildPlotterOutput, defaultPlotterOptions, sendOverSerial, type PlotterOptions } from '../lib/plotter';
+import { buildPlotterOutput, defaultPlotterOptions, sendOverSerial, type HpglDialect, type PlotterOptions } from '../lib/plotter';
 import { download } from '../lib/io';
 import { useT } from '../lib/i18n';
 import { toast } from '../lib/toast';
@@ -64,9 +64,23 @@ export function PlotterDialog() {
             <Field label={t('Format')}>
               <select className="input-num" value={format} onChange={(e) => setFormat(e.target.value as 'gcode' | 'hpgl')}>
                 <option value="gcode">{t('G-code (CNC / pen plotter)')}</option>
-                <option value="hpgl">{t('HP-GL (vinyl cutter)')}</option>
+                <option value="hpgl">{t('HP-GL / PLT (vinyl cutter)')}</option>
               </select>
             </Field>
+            {format === 'hpgl' && (
+              <Field label={t('Cutter dialect')}>
+                <select
+                  className="input-num"
+                  value={opts.dialect}
+                  onChange={(e) => setOpts({ ...opts, dialect: e.target.value as HpglDialect })}
+                  title={t('Picks the wrapper commands. Bare = generic; Roland adds TB/CT/!PG; Graphtec adds FS/VS.')}
+                >
+                  <option value="bare">{t('Bare HP-GL (generic)')}</option>
+                  <option value="roland-camm">{t('Roland CAMM (TB / CT / !PG)')}</option>
+                  <option value="graphtec-fc">{t('Graphtec FC (FS / VS)')}</option>
+                </select>
+              </Field>
+            )}
             <Field label={t('Unit')}>
               <select className="input-num" value={opts.unit} onChange={(e) => setOpts({ ...opts, unit: e.target.value as 'mm' | 'in', pxPerUnit: e.target.value === 'mm' ? 3.7795 : 96 })}>
                 <option value="mm">{t('mm')}</option><option value="in">{t('inches')}</option>
@@ -115,7 +129,13 @@ export function PlotterDialog() {
             <button
               type="button"
               className="btn flex items-center gap-1"
-              onClick={() => download(`design.${format === 'gcode' ? 'gcode' : 'hpgl'}`, preview || buildPlotterOutput(format, opts), 'text/plain')}
+              onClick={() => download(
+                // Roland-flavoured output ships as .plt by convention (matches what
+                // cutter driver software expects); bare/Graphtec also typically use
+                // .plt in the wild. Keep .hpgl as a fallback for the academic case.
+                `design.${format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl')}`,
+                preview || buildPlotterOutput(format, opts), 'text/plain',
+              )}
             >
               <Download size={12} aria-hidden="true" />{t('Save File')}
             </button>

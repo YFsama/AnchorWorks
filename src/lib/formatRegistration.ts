@@ -20,6 +20,8 @@ import { download, downloadDataURL, exportPNG, importSVGString } from './io';
 import { exportDXF, exportJPG, exportJSON, exportPDF, exportPDFReal, importJSON } from './io2';
 import { exportSVGOptimized } from './io3';
 import { importSVGSmartFile } from './svgImport';
+import { buildPlotterOutput, defaultPlotterOptions } from './plotter';
+import { parsePlt, polylinesToSvg } from './pltImporter';
 import { toast } from './toast';
 import { t } from './i18n';
 
@@ -139,5 +141,46 @@ export function registerBuiltInFormats(): void {
     category: 'CAD',
     description: t('AutoCAD DXF — LINE / LWPOLYLINE entities only, curves flattened, no text or hatching.'),
     export: () => exportDXF(),
+  });
+
+  // PLT / HP-GL — vinyl cutter language. Export uses the dialect set in the
+  // Plotter dialog (saved on defaultPlotterOptions when the user changes it);
+  // import auto-detects Roland / Graphtec / bare-HPGL flavours and converts
+  // back to fabric paths via the SVG import pipeline. This is the round-trip
+  // most cutter-driver software (Roland CutStudio, Wentai, Artcut) expects.
+  registerFormat({
+    id: 'plt',
+    label: 'PLT',
+    ext: 'plt',
+    mime: 'application/vnd.hp-hpgl',
+    mode: 'both',
+    category: 'CAD',
+    keywords: 'hpgl plotter cutter vinyl roland graphtec',
+    description: t('HP-GL vinyl-cutter format — exports with the dialect from the Plotter dialog; imports Roland / Graphtec / bare HP-GL.'),
+    export: () => download('design.plt', buildPlotterOutput('hpgl', defaultPlotterOptions), 'application/vnd.hp-hpgl'),
+    import: async (input) => {
+      const text = typeof input === 'string' ? input : await input.text();
+      try {
+        const res = parsePlt(text);
+        if (res.polylines.length === 0) {
+          toast.warn(t('PLT file had no cuttable geometry.'), { title: t('Nothing imported') });
+          return;
+        }
+        await importSVGString(polylinesToSvg(res.polylines));
+        const dialectLabel = res.dialect === 'roland-camm' ? 'Roland CAMM'
+          : res.dialect === 'graphtec-fc' ? 'Graphtec FC' : t('bare HP-GL');
+        const pageNote = res.pageSizeMm
+          ? ` · ${res.pageSizeMm.w.toFixed(0)}×${res.pageSizeMm.h.toFixed(0)} mm`
+          : '';
+        const warnNote = res.warnings.length > 0 ? ` · ${res.warnings.length} warning(s)` : '';
+        toast.success(
+          `${res.polylines.length} polylines${pageNote}${warnNote}`,
+          { title: `${t('Imported PLT')} (${dialectLabel})` },
+        );
+      } catch (err) {
+        toast.error((err as Error).message, { title: t('PLT import failed') });
+        throw err;
+      }
+    },
   });
 }
