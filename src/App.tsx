@@ -39,7 +39,7 @@ const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ def
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
 import {
-  undo, redo, deleteSelection, duplicateSelection, nudgeSelection, zoomBy, zoomFit, zoomToPoint,
+  undo, redo, deleteSelection, duplicateSelection, nudgeSelection, zoomBy, zoomFit, zoomToPoint, zoomToArtboard,
   alignSelection, distributeSelection, applyStyleToSelection, groupSelection, ungroupSelection,
   resizeCanvas, setBackground,
   bringForward, sendBackward, bringToFront, sendToBack,
@@ -803,6 +803,26 @@ export default function App() {
         const c = getCanvas();
         if (c) zoomToPoint(c.getWidth() / 2, c.getHeight() / 2, 1);
         announce(t('Actual Size'));
+        return;
+      }
+      if (match('view.zoomSelection')) {
+        e.preventDefault();
+        const c = getCanvas();
+        const sel = c?.getActiveObject();
+        if (sel) {
+          const b = sel.getBoundingRect();
+          zoomToArtboard({ x: b.left, y: b.top, width: b.width, height: b.height });
+          announce(t('Zoom to Selection'));
+        } else {
+          zoomFit();
+          announce(t('Fit to Page'));
+        }
+        return;
+      }
+      if (match('window.plotter')) {
+        e.preventDefault();
+        const { showPlotter, setModal: m } = useEditor.getState();
+        m('showPlotter', !showPlotter);
         return;
       }
       if (match('file.saveProject')) {

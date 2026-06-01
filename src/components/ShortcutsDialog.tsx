@@ -49,6 +49,8 @@ const FILE_VIEW: Shortcut[] = [
   { keys: 'Ctrl+-', labelKey: 'Zoom out' },
   { keys: 'Ctrl+0', labelKey: 'Zoom fit' },
   { keys: 'Ctrl+1', labelKey: 'Actual Size' },
+  { keys: 'Ctrl+2', labelKey: 'Zoom to Selection' },
+  { keys: 'Ctrl+Shift+P', labelKey: 'Send to Plotter…' },
   { keys: 'Ctrl+Alt+Y', labelKey: 'Outline View' },
   { keys: 'Ctrl+Shift+L', labelKey: 'Toggle Theme' },
   { keys: 'Ctrl+K', labelKey: 'Command Palette' },

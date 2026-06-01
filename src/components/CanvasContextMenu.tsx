@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import * as fabric from 'fabric';
 import {
   getCanvas,
   duplicateSelection,
@@ -9,6 +10,7 @@ import {
   bringToFront,
   sendToBack,
   deleteSelection,
+  pushHistory,
 } from '../lib/canvasEngine';
 import {
   copySelection,
@@ -117,6 +119,43 @@ export function CanvasContextMenu() {
   const canGroup = activeObj?.type === 'activeselection';
   const canUngroup = activeObj?.type === 'group';
   const canPaste = hasClipboard();
+  // A single editable text object → offer inline "Edit Text".
+  const editableText = active.length === 1 &&
+    (active[0].type === 'i-text' || active[0].type === 'textbox') ? active[0] : null;
+
+  // Flip every selected object about its own centre. Works on a multi-select
+  // too — Fabric flips each member in place.
+  const flip = (axis: 'x' | 'y') => {
+    if (!c) return;
+    for (const o of active) {
+      if (axis === 'x') o.set('flipX', !o.flipX);
+      else o.set('flipY', !o.flipY);
+      o.setCoords();
+    }
+    c.requestRenderAll();
+    pushHistory();
+  };
+
+  const selectAll = () => {
+    if (!c) return;
+    const objs = c.getObjects().filter((o) => !(o as { excludeFromExport?: boolean }).excludeFromExport);
+    if (!objs.length) return;
+    c.discardActiveObject();
+    c.setActiveObject(new fabric.ActiveSelection(objs, { canvas: c }));
+    c.requestRenderAll();
+  };
+
+  const editText = () => {
+    if (!editableText) return;
+    const it = editableText as fabric.IText;
+    c?.setActiveObject(it);
+    it.enterEditing?.();
+    it.selectAll?.();
+    c?.requestRenderAll();
+  };
+
+  const openModal = (k: 'showCutContour' | 'showPlotter') =>
+    useEditor.getState().setModal(k, true);
 
   // Each item runs its action, bumps the clipboard tick (so paste enables),
   // and closes the menu. Items disabled at render time short-circuit before
@@ -155,6 +194,11 @@ export function CanvasContextMenu() {
         disabled={!canPaste}
         onClick={() => run(() => pasteFromClipboard(), canPaste)}
       />
+      <Item
+        label={t('Paste Here')}
+        disabled={!canPaste}
+        onClick={() => run(() => pasteFromClipboard({ x: pos.x, y: pos.y }), canPaste)}
+      />
       <Separator />
       <Item
         label={t('Duplicate')}
@@ -183,6 +227,17 @@ export function CanvasContextMenu() {
       />
       <Separator />
       <Item
+        label={t('Flip Horizontal')}
+        disabled={!hasSelection}
+        onClick={() => run(() => flip('x'), hasSelection)}
+      />
+      <Item
+        label={t('Flip Vertical')}
+        disabled={!hasSelection}
+        onClick={() => run(() => flip('y'), hasSelection)}
+      />
+      <Separator />
+      <Item
         label={t('Bring to Front')}
         disabled={!hasSelection}
         onClick={() => run(() => { bringToFront(); }, hasSelection)}
@@ -201,6 +256,29 @@ export function CanvasContextMenu() {
         label={t('Send to Back')}
         disabled={!hasSelection}
         onClick={() => run(() => { sendToBack(); }, hasSelection)}
+      />
+      <Separator />
+      {editableText && (
+        <Item
+          label={t('Edit Text')}
+          kbd="Enter"
+          onClick={() => run(() => editText(), true)}
+        />
+      )}
+      <Item
+        label={t('Cut Contour…')}
+        disabled={!hasSelection}
+        onClick={() => run(() => openModal('showCutContour'), hasSelection)}
+      />
+      <Item
+        label={t('Send to Plotter…')}
+        onClick={() => run(() => openModal('showPlotter'), true)}
+      />
+      <Separator />
+      <Item
+        label={t('Select All')}
+        kbd="Ctrl+A"
+        onClick={() => run(() => selectAll(), true)}
       />
     </div>
   );

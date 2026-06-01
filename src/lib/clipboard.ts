@@ -44,7 +44,7 @@ export function cutSelection(): boolean {
  * a brand new id (Fabric generates one via `assignId` in canvasEngine via the
  * `object:added` listener). Returns false if the clipboard is empty.
  */
-export async function pasteFromClipboard(): Promise<boolean> {
+export async function pasteFromClipboard(at?: { x: number; y: number }): Promise<boolean> {
   const c = getCanvas();
   if (!c || !clipboard) return false;
   const raw = Array.isArray(clipboard) ? clipboard : [clipboard];
@@ -52,14 +52,22 @@ export async function pasteFromClipboard(): Promise<boolean> {
   const enlived = (await fabric.util.enlivenObjects(raw as object[])) as fabric.FabricObject[];
   if (!enlived.length) return false;
 
-  // Compute viewport center in scene coords so paste lands wherever the user
-  // is currently looking, not where the originals were.
+  // Paste target in scene coords. With `at` (e.g. a right-click "Paste Here"),
+  // convert those window coords to canvas-local then to scene space so the
+  // paste lands under the cursor; otherwise drop it at the viewport centre so
+  // it appears wherever the user is currently looking.
   const vt = c.viewportTransform!;
   const zoom = c.getZoom();
-  const cw = c.getWidth();
-  const ch = c.getHeight();
-  const centerX = (cw / 2 - vt[4]) / zoom;
-  const centerY = (ch / 2 - vt[5]) / zoom;
+  let centerX: number, centerY: number;
+  if (at) {
+    const el = (c as unknown as { upperCanvasEl?: HTMLElement }).upperCanvasEl ?? c.getElement();
+    const rect = el.getBoundingClientRect();
+    centerX = (at.x - rect.left - vt[4]) / zoom;
+    centerY = (at.y - rect.top - vt[5]) / zoom;
+  } else {
+    centerX = (c.getWidth() / 2 - vt[4]) / zoom;
+    centerY = (c.getHeight() / 2 - vt[5]) / zoom;
+  }
 
   // Bounding center of the pasted group → translate to viewport center
   // rather than dumping every object at the same anchor.

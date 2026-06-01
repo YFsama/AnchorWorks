@@ -85,9 +85,11 @@ export const BINDINGS: ShortcutBinding[] = [
   { id: 'view.zoomOut',          label: 'Zoom Out',            defaultCombo: 'Ctrl+-' },
   { id: 'view.zoomFit',          label: 'Fit to Page',         defaultCombo: 'Ctrl+0' },
   { id: 'view.actualSize',       label: 'Actual Size',         defaultCombo: 'Ctrl+1' },
+  { id: 'view.zoomSelection',    label: 'Zoom to Selection',   defaultCombo: 'Ctrl+2' },
 
   // -------- File --------
   { id: 'file.saveProject',      label: 'Save Project',        defaultCombo: 'Ctrl+Shift+S' },
+  { id: 'window.plotter',        label: 'Send to Plotter…',    defaultCombo: 'Ctrl+Shift+P' },
   { id: 'view.toggleTheme',      label: 'Toggle Theme',        defaultCombo: 'Ctrl+Shift+L' },
   { id: 'file.open',             label: 'Open SVG / JSON…',    defaultCombo: 'Ctrl+O' },
   { id: 'file.exportSvg',        label: 'Export SVG',          defaultCombo: 'Ctrl+S' },
