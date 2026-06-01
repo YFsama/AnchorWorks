@@ -542,6 +542,86 @@ const dict: Record<string, Record<Lang, string>> = {
     en: 'USB serial works in Chrome/Edge over HTTPS or localhost via the Web Serial API.',
     zh: 'USB 串口需要在 Chrome/Edge 浏览器中通过 HTTPS 或 localhost 使用 Web Serial API。',
   },
+  'Code': { en: 'Code', zh: '代码' },
+  'Show print': { en: 'Show print', zh: '显示打印图' },
+  'Add positioning marks': { en: 'Add positioning marks', zh: '添加定位标记' },
+  'Redo marks': { en: 'Redo marks', zh: '重做定位标记' },
+  'Add 4-corner positioning marks around the artwork.': {
+    en: 'Add 4-corner positioning marks around the artwork.',
+    zh: '在图稿四角添加定位标记。',
+  },
+  'Overlay the printed artwork behind the cut lines.': {
+    en: 'Overlay the printed artwork behind the cut lines.',
+    zh: '在刻字线下方叠加打印图稿。',
+  },
+  'No cut paths yet — generate an outline, trace, or registration marks.': {
+    en: 'No cut paths yet — generate an outline, trace, or registration marks.',
+    zh: '尚无刻字路径——请先生成轮廓、描摹或定位标记。',
+  },
+  'Cut preview': { en: 'Cut preview', zh: '刻字预览' },
+  'Desktop app — direct USB sending is available.': {
+    en: 'Desktop app — direct USB sending is available.',
+    zh: '桌面应用 — 可直接通过 USB 发送。',
+  },
+  'Save the .plt/.gcode file to open in your cutter software, or send straight over USB.': {
+    en: 'Save the .plt/.gcode file to open in your cutter software, or send straight over USB.',
+    zh: '保存 .plt/.gcode 文件以在刻字软件中打开，或直接通过 USB 发送。',
+  },
+  'Save the file (works in any browser) and open it in your cutter software. Direct USB sending needs the desktop app or Chrome/Edge.': {
+    en: 'Save the file (works in any browser) and open it in your cutter software. Direct USB sending needs the desktop app or Chrome/Edge.',
+    zh: '保存文件（任何浏览器都可用）并在刻字软件中打开。直接 USB 发送需要桌面应用或 Chrome/Edge。',
+  },
+  'Direct USB sending needs the desktop app or Chrome/Edge over HTTPS / localhost. Use Save File instead.': {
+    en: 'Direct USB sending needs the desktop app or Chrome/Edge over HTTPS / localhost. Use Save File instead.',
+    zh: '直接 USB 发送需要桌面应用，或在 HTTPS / localhost 上使用 Chrome/Edge。请改用「保存文件」。',
+  },
+  'Material': { en: 'Material', zh: '材料' },
+  'Custom / manual': { en: 'Custom / manual', zh: '自定义 / 手动' },
+  'Sign vinyl (standard)': { en: 'Sign vinyl (standard)', zh: '标牌刻字膜（标准）' },
+  'Heat-transfer vinyl (HTV)': { en: 'Heat-transfer vinyl (HTV)', zh: '热转印膜（HTV）' },
+  'Sticker / label paper': { en: 'Sticker / label paper', zh: '不干胶 / 标签纸' },
+  'Cardstock': { en: 'Cardstock', zh: '卡纸' },
+  'Window tint film': { en: 'Window tint film', zh: '窗膜' },
+  'Sandblast / stencil': { en: 'Sandblast / stencil', zh: '喷砂 / 镂空模板' },
+  'Mirror (HTV)': { en: 'Mirror (HTV)', zh: '镜像（HTV）' },
+  'Mirror output horizontally — required for heat-transfer vinyl (HTV).': {
+    en: 'Mirror output horizontally — required for heat-transfer vinyl (HTV).',
+    zh: '水平镜像输出 —— 热转印膜（HTV）必需。',
+  },
+  'Optimize order': { en: 'Optimize order', zh: '优化顺序' },
+  'Reorder paths to minimise wasted travel between cuts.': {
+    en: 'Reorder paths to minimise wasted travel between cuts.',
+    zh: '重新排序路径以最小化刀头空程。',
+  },
+  'Weed border': { en: 'Weed border', zh: '排废边框' },
+  'Add a rectangular weed border around the whole job.': {
+    en: 'Add a rectangular weed border around the whole job.',
+    zh: '在整个作业周围添加矩形排废边框。',
+  },
+  'Weed border added.': { en: 'Weed border added.', zh: '已添加排废边框。' },
+  'Weeding': { en: 'Weeding', zh: '排废' },
+  'Total blade-down distance': { en: 'Total blade-down distance', zh: '落刀总距离' },
+  'Pen-up travel between cuts': { en: 'Pen-up travel between cuts', zh: '抬刀空程距离' },
+  'Estimated job time': { en: 'Estimated job time', zh: '预计作业时间' },
+  'Overcut': { en: 'Overcut', zh: '过切' },
+  'Extend closed cuts slightly past the start so corners fully release.': {
+    en: 'Extend closed cuts slightly past the start so corners fully release.',
+    zh: '让闭合路径略微超过起点收尾，使转角完全切断。',
+  },
+  'Test cut': { en: 'Test cut', zh: '测试切割' },
+  'Cut a small calibration pattern on scrap to dial in force / offset.': {
+    en: 'Cut a small calibration pattern on scrap to dial in force / offset.',
+    zh: '在废料上切一个小校准图案，用于调试压力 / 偏移。',
+  },
+  '✅ Test cut sent': { en: '✅ Test cut sent', zh: '✅ 测试切割已发送' },
+  'Cut by color': { en: 'Cut by color', zh: '按颜色分版' },
+  'muted': { en: 'muted', zh: '已静音' },
+  'Weed grid dividers (rows × columns).': {
+    en: 'Weed grid dividers (rows × columns).',
+    zh: '排废网格分隔（行 × 列）。',
+  },
+  'Weed grid rows': { en: 'Weed grid rows', zh: '排废网格行数' },
+  'Weed grid columns': { en: 'Weed grid columns', zh: '排废网格列数' },
 
   // -------- Print dialog --------
   'Page size': { en: 'Page size', zh: '页面尺寸' },
@@ -561,6 +641,10 @@ const dict: Record<string, Record<Lang, string>> = {
   'DPI': { en: 'DPI', zh: 'DPI' },
   'Background': { en: 'Background', zh: '背景' },
   'Apply': { en: 'Apply', zh: '应用' },
+  'Preset size': { en: 'Preset size', zh: '预设尺寸' },
+  'Cards & photo': { en: 'Cards & photo', zh: '卡片与照片' },
+  'Stickers & labels': { en: 'Stickers & labels', zh: '贴纸与标签' },
+  'Screen & social': { en: 'Screen & social', zh: '屏幕与社交媒体' },
 
   // -------- Status bar --------
   'GRID': { en: 'GRID', zh: '网格' },

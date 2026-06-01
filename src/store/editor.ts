@@ -25,6 +25,10 @@ export interface CutPath {
   sourceObjectId?: string;
   /** Multiple passes for thick / hard materials. 1 = single pass. */
   passes?: number;
+  /** Source fill/stroke colour (hex) for outline/trace kinds. Drives
+   *  cut-by-colour separation — multi-colour vinyl jobs cut one swatch at a
+   *  time. Undefined for regmarks / weed borders, which always cut. */
+  color?: string;
 }
 
 /**

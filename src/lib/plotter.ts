@@ -5,6 +5,7 @@
 
 import { exportSVG } from './io';
 import { useEditor } from '../store/editor';
+import { optimizeOrder, mirrorPolys, applyOvercut } from './cutOptimize';
 
 /**
  * HP-GL dialect selector. Real-world cutter firmwares accept HP-GL with
@@ -42,7 +43,39 @@ export interface PlotterOptions {
   graphtecForce: number;
   /** Graphtec VS (velocity, cm/s) — 0 to skip. */
   graphtecSpeed: number;
+  /** Mirror output horizontally — required for heat-transfer vinyl (HTV),
+   *  which is cut from the carrier side and applied face-down. */
+  mirror: boolean;
+  /** Reorder paths to minimise pen-up travel before emitting. */
+  optimize: boolean;
+  /** Overcut (mm) past each closed-path start, for clean corners. 0 = off. */
+  overcutMm: number;
 }
+
+/**
+ * Material presets — speed / force / pass recommendations sign shops keep on
+ * a laminated card next to the cutter. Selecting one fills the matching
+ * machine fields so the user isn't guessing. `mirror` flags materials cut
+ * face-down (HTV) so the dialog can auto-enable mirroring.
+ */
+export interface MaterialPreset {
+  id: string;
+  label: string;
+  feedRate: number;   // mm/min (pen plotters) — also a sane cut speed proxy
+  force: number;      // Graphtec FS, gf
+  speed: number;      // Graphtec VS, cm/s
+  overcut: number;    // recommended overcut, mm
+  mirror?: boolean;
+}
+
+export const MATERIAL_PRESETS: MaterialPreset[] = [
+  { id: 'sign-vinyl', label: 'Sign vinyl (standard)', feedRate: 400, force: 60, speed: 30, overcut: 0.25 },
+  { id: 'htv', label: 'Heat-transfer vinyl (HTV)', feedRate: 300, force: 50, speed: 25, overcut: 0.25, mirror: true },
+  { id: 'sticker', label: 'Sticker / label paper', feedRate: 300, force: 80, speed: 20, overcut: 0.3 },
+  { id: 'cardstock', label: 'Cardstock', feedRate: 200, force: 120, speed: 15, overcut: 0.5 },
+  { id: 'window-tint', label: 'Window tint film', feedRate: 300, force: 40, speed: 20, overcut: 0.2 },
+  { id: 'stencil', label: 'Sandblast / stencil', feedRate: 200, force: 150, speed: 15, overcut: 0.5 },
+];
 
 export const defaultPlotterOptions: PlotterOptions = {
   unit: 'mm',
@@ -58,6 +91,9 @@ export const defaultPlotterOptions: PlotterOptions = {
   rolandOvercutUnits: 25,
   graphtecForce: 30,
   graphtecSpeed: 20,
+  mirror: false,
+  optimize: true,
+  overcutMm: 0,
 };
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
@@ -345,8 +381,14 @@ export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): strin
   return parts.join('\n');
 }
 
-/** Convenience: build for current canvas. */
-export function buildPlotterOutput(format: 'gcode' | 'hpgl', opts: PlotterOptions): string {
+/** Convenience: build for current canvas. `cutOverride` lets the caller
+ *  ship an explicit (e.g. colour-filtered) cut-path set instead of the whole
+ *  store — used by the plotter dialog's cut-by-colour separation. */
+export function buildPlotterOutput(
+  format: 'gcode' | 'hpgl',
+  opts: PlotterOptions,
+  cutOverride?: Array<{ points: Array<[number, number]>; closed: boolean; passes?: number }>,
+): string {
   // When the user has populated cut paths (offsets, traces, regmarks),
   // ship THOSE to the plotter instead of every visible canvas object —
   // that's the whole point of a cutter contour suite. Multi-pass cut
@@ -354,13 +396,60 @@ export function buildPlotterOutput(format: 'gcode' | 'hpgl', opts: PlotterOption
   // the SVG flatten when no cut paths exist, so the existing "send
   // canvas to plotter" workflow still works for users not using the
   // contour dialog.
-  const cuts = readCutPathsFromStore();
-  if (cuts && cuts.length > 0) {
-    const polylines = cutPathsToPlotterPolylines(cuts, opts);
-    return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
+  let polylines: Array<{ points: Array<[number, number]>; closed: boolean }>;
+  if (cutOverride !== undefined) {
+    // Explicit set (e.g. colour-filtered) — honour it verbatim, never fall
+    // back to the canvas SVG, even when it's empty (all swatches muted).
+    polylines = cutPathsToPlotterPolylines(cutOverride, opts);
+  } else {
+    const cuts = readCutPathsFromStore();
+    polylines = cuts && cuts.length > 0
+      ? cutPathsToPlotterPolylines(cuts, opts)
+      : svgToPolylines(exportSVG(), opts);
   }
-  const svg = exportSVG();
-  const polylines = svgToPolylines(svg, opts);
+  // Post-process in user-unit space: travel optimisation and HTV mirroring
+  // are both invariant under the earlier uniform scale/translate, so this is
+  // the one clean place to apply them for every output path.
+  polylines = postProcess(polylines, opts);
+  return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
+}
+
+/** Apply order optimisation + mirroring per the options. Exported so the
+ *  preview/stats UI can mirror the exact geometry the machine will receive. */
+export function postProcess(
+  polylines: Array<{ points: Array<[number, number]>; closed: boolean }>,
+  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm'>,
+): Array<{ points: Array<[number, number]>; closed: boolean }> {
+  let out = polylines;
+  if (opts.optimize) out = optimizeOrder(out);
+  if (opts.overcutMm > 0) out = applyOvercut(out, opts.overcutMm);
+  if (opts.mirror) out = mirrorPolys(out, 'h');
+  return out;
+}
+
+/**
+ * A small calibration pattern — a 20mm square enclosing a 10mm triangle,
+ * parked near the origin — so the operator can dial in blade force / offset
+ * on a scrap before committing the real job. Every cutter UI has this
+ * ("test cut"); it ignores the document entirely. Honours unit + origin so
+ * it lands on the material the same way real output does.
+ */
+export function buildTestCut(format: 'gcode' | 'hpgl', opts: PlotterOptions): string {
+  const scale = opts.unit === 'mm' ? 1 : 1 / 25.4; // pattern is authored in mm
+  const ox = 10 * scale, oy = 10 * scale; // 10mm in from origin
+  const sq = 20 * scale, tri = 10 * scale;
+  const flip = (yUnits: number) => (opts.originBottomLeft ? opts.paperHeightUnits - yUnits : yUnits);
+  const square: Array<[number, number]> = [
+    [ox, flip(oy)], [ox + sq, flip(oy)], [ox + sq, flip(oy + sq)], [ox, flip(oy + sq)], [ox, flip(oy)],
+  ];
+  const cx = ox + sq / 2;
+  const triangle: Array<[number, number]> = [
+    [cx, flip(oy + (sq - tri) / 2)],
+    [cx + tri / 2, flip(oy + (sq + tri) / 2)],
+    [cx - tri / 2, flip(oy + (sq + tri) / 2)],
+    [cx, flip(oy + (sq - tri) / 2)],
+  ];
+  const polylines = [{ points: square, closed: true }, { points: triangle, closed: true }];
   return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
 }
 

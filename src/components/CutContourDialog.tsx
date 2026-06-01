@@ -77,6 +77,12 @@ export function CutContourDialog() {
     const before = cutPaths.length;
     const newPaths: CutPath[] = [];
     for (const obj of selected) {
+      // Capture the source swatch so the plotter dialog can separate cuts by
+      // colour. Prefer a real fill; fall back to stroke; ignore non-string
+      // (gradient/pattern) paints.
+      const fillc = typeof obj.fill === 'string' && obj.fill && obj.fill !== 'transparent' ? obj.fill : undefined;
+      const strokec = typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : undefined;
+      const srcColor = fillc ?? strokec;
       // Convert fabric object → SVG path → flat polylines.
       const svg = obj.toSVG();
       // Extract the `d` attr from whatever the object emitted. Falls back
@@ -123,6 +129,7 @@ export function CutContourDialog() {
             kind: 'outline',
             sourceObjectId: (obj as fabric.FabricObject & { _id?: string })._id,
             passes: offsetPasses,
+            color: srcColor,
           });
         }
       }

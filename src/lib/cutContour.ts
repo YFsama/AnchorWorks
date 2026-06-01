@@ -523,6 +523,63 @@ export function detectRegMarks(
 }
 
 /* ============================================================ */
+/* Weeding helpers                                               */
+/* ============================================================ */
+
+/**
+ * A rectangular "weed border" around the artwork — the single most-used
+ * convenience in sign shops. After cutting, the operator peels the waste
+ * vinyl from inside this border in one pull instead of picking at every
+ * edge. Sits `marginMm` outside the supplied bounds.
+ */
+export function generateWeedBorder(
+  bounds: { x: number; y: number; w: number; h: number },
+  marginMm = 3,
+): CutPath {
+  const { x, y, w, h } = bounds;
+  const m = marginMm;
+  return {
+    id: `weed-border-${Date.now().toString(36)}`,
+    points: [
+      [x - m, y - m],
+      [x + w + m, y - m],
+      [x + w + m, y + h + m],
+      [x - m, y + h + m],
+      [x - m, y - m],
+    ],
+    closed: true,
+    kind: 'manual',
+    passes: 1,
+  };
+}
+
+/**
+ * Internal weed lines: a grid of straight cuts dividing the weed border into
+ * panels so large waste areas come off in manageable pieces. `rows`/`cols`
+ * are the number of interior dividers (0 = none on that axis).
+ */
+export function generateWeedLines(
+  bounds: { x: number; y: number; w: number; h: number },
+  rows: number,
+  cols: number,
+  marginMm = 3,
+): CutPath[] {
+  const { x, y, w, h } = bounds;
+  const m = marginMm;
+  const left = x - m, right = x + w + m, top = y - m, bottom = y + h + m;
+  const out: CutPath[] = [];
+  for (let c = 1; c <= cols; c++) {
+    const cx = left + ((right - left) * c) / (cols + 1);
+    out.push({ id: `weed-v-${c}-${Date.now().toString(36)}`, points: [[cx, top], [cx, bottom]], closed: false, kind: 'manual', passes: 1 });
+  }
+  for (let r = 1; r <= rows; r++) {
+    const cy = top + ((bottom - top) * r) / (rows + 1);
+    out.push({ id: `weed-h-${r}-${Date.now().toString(36)}`, points: [[left, cy], [right, cy]], closed: false, kind: 'manual', passes: 1 });
+  }
+  return out;
+}
+
+/* ============================================================ */
 /* Path flattening helpers                                       */
 /* ============================================================ */
 
