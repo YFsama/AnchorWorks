@@ -132,73 +132,35 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # Microsoft no longer ships per-milestone WebView2 fixed-version runtimes
-      # to NuGet (the Microsoft.Web.WebView2.FixedVersionRuntime.<ver>.x64
-      # packages are gone — search and flat-container both 404). The official
-      # download page now resolves the runtime through the Edge CDP service,
-      # so we talk to that directly: ask for the current version, then ask CDP
-      # for the real CDN URL of the x64 fixed-version CAB and expand it.
+      # WebView2 runtime acquisition, the reliable way. The per-milestone
+      # fixed-version runtimes (NuGet packages, and the Edge CDP "select" API)
+      # both proved unstable in CI — Microsoft rotates versions and the
+      # endpoints 404 without notice. So the portable build no longer bundles a
+      # fixed runtime; instead the raw exe uses the SYSTEM WebView2 (shipped in
+      # Windows 11 and backported to Windows 10 21H2+, so present on virtually
+      # every supported machine), and we bundle Microsoft's Evergreen Standalone
+      # Installer — fetched from a STABLE, documented fwlink that never rotates —
+      # as a one-time offline fallback for the rare locked-down box without it.
       #
-      # This step is allowed to fail (job-level continue-on-error) — a portable
-      # zip is optional and must never block the signed installers + updater
-      # manifest the `bundle` job already produced.
-      - name: Download the WebView2 fixed-version runtime (Edge CDP)
+      # The step is still allowed to fail (job-level continue-on-error); the
+      # signed installers + updater manifest from `bundle` ship regardless.
+      - name: Download the Evergreen WebView2 runtime installer (offline fallback)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $base = 'https://msedge.api.cdp.microsoft.com/api/v1.1/internal/contents/Browser/namespaces/Default/names/msedgewebview2'
+          # Stable, Microsoft-documented Evergreen Standalone Installer (x64).
+          # Unlike the fixed-runtime packages, this fwlink does not rotate.
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/?linkid=2124701' `
+            -OutFile 'MicrosoftEdgeWebView2RuntimeInstaller.exe' -UseBasicParsing
+          $mb = [Math]::Round((Get-Item MicrosoftEdgeWebView2RuntimeInstaller.exe).Length / 1MB)
+          Write-Host "Downloaded Evergreen WebView2 installer ($mb MB)"
 
-          # 1) Current runtime version — the same value the download page's
-          #    "Select Version" dropdown defaults to.
-          $sel = Invoke-RestMethod -Method Post -Uri "$base/versions/latest?action=select" `
-                 -ContentType 'application/json' -Body '{}'
-          $ver = $sel.ContentId.Version
-          Write-Host "Latest WebView2 runtime: $ver"
-
-          # 2) Resolve the actual CDN download URL for the x64 fixed-version CAB.
-          $dl = Invoke-RestMethod -Method Post `
-                -Uri "$base/versions/$ver/files?action=GenerateDownloadInfo&foregroundPriority=true" `
-                -ContentType 'application/json' -Body '[]'
-          $cab = $dl | Where-Object { $_.FileId -like '*FixedVersionRuntime*x64.cab' } | Select-Object -First 1
-          if (-not $cab) { throw "CDP returned no x64 fixed-runtime CAB for $ver" }
-          Write-Host "CAB: $($cab.FileId) ($([Math]::Round($cab.SizeInBytes/1MB)) MB)"
-          Invoke-WebRequest -Uri $cab.Url -OutFile webview2.cab -UseBasicParsing
-
-          # 3) Expand the CAB — `expand -F:*` preserves the runtime folder
-          #    (Microsoft.WebView2.FixedVersionRuntime.<ver>.x64\…) inside it.
-          New-Item -ItemType Directory -Force -Path webview2-temp | Out-Null
-          expand webview2.cab -F:* webview2-temp | Out-Null
-
-          $runtimeDir = Get-ChildItem -Path webview2-temp -Recurse -Directory `
-                        -Filter "Microsoft.WebView2.FixedVersionRuntime.*" |
-                        Select-Object -First 1
-          if (-not $runtimeDir) { throw "WebView2 runtime folder not found in the CAB" }
-          Move-Item $runtimeDir.FullName -Destination src-tauri\
-          $relPath = "./$($runtimeDir.Name)/"
-          echo "WEBVIEW2_RELPATH=$relPath" >> $env:GITHUB_ENV
-          echo "WEBVIEW2_DIRNAME=$($runtimeDir.Name)" >> $env:GITHUB_ENV
-
-      # Override webviewInstallMode at build time so the produced binary
-      # carries the fixed-runtime relative path baked in.  --bundles app
-      # asks Tauri to produce only the raw executable (no installer); we
-      # zip it ourselves below alongside the WebView2 folder.
+      # --bundles app asks Tauri to produce just the raw executable (no
+      # installer). The exe links against whatever WebView2 the host provides
+      # at launch (system install, or the bundled installer run once).
       - name: Build portable bundle
         shell: pwsh
-        run: |
-          $cfg = @{
-            bundle = @{
-              windows = @{
-                webviewInstallMode = @{
-                  type = 'fixedRuntime'
-                  path = $env:WEBVIEW2_RELPATH
-                }
-              }
-            }
-          } | ConvertTo-Json -Depth 10 -Compress
-          # ConvertTo-Json on a single-key object emits non-array JSON
-          # already, but tauri's --config wants a path or a string; pass it
-          # via stdin-style argument so PowerShell doesn't word-split.
-          npx tauri build --target x86_64-pc-windows-msvc --bundles app --config "$cfg"
+        run: npx tauri build --target x86_64-pc-windows-msvc --bundles app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
@@ -210,25 +172,27 @@ jobs:
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
           Copy-Item "src-tauri\target\x86_64-pc-windows-msvc\release\anchorworks.exe" `
                     -Destination "$dist\Anchorworks.exe"
-          Copy-Item -Recurse "src-tauri\$env:WEBVIEW2_DIRNAME" -Destination "$dist\"
+          Copy-Item "MicrosoftEdgeWebView2RuntimeInstaller.exe" `
+                    -Destination "$dist\Install-WebView2-Runtime.exe"
           # Self-documenting README so users who unzip into a random folder
           # know what they're looking at without checking the GitHub page.
           @"
           Anchorworks $ver — Portable Edition
           ====================================
 
-          Unzip anywhere and run Anchorworks.exe. No install, no admin
-          rights, no internet required at first launch (a fixed-version
-          WebView2 runtime is included alongside the exe).
+          Unzip anywhere and run Anchorworks.exe — no install, no admin rights.
+
+          WebView2 runtime:
+            Windows 11 and Windows 10 (21H2+) already include the Microsoft Edge
+            WebView2 runtime, so Anchorworks.exe just works out of the box.
+
+            If it reports that WebView2 is missing (rare — only on stripped-down
+            or very old Windows), run Install-WebView2-Runtime.exe once. That
+            installer is self-contained and needs no internet connection.
 
           What's inside:
-            Anchorworks.exe                          — the application
-            $env:WEBVIEW2_DIRNAME\  — bundled Edge WebView2 runtime
-
-          Keep the WebView2 folder next to the exe; the loader looks for
-          it via a relative path. Moving the exe out of this directory
-          will make it fall back to the system WebView2 install (which
-          may not be present on locked-down boxes).
+            Anchorworks.exe              — the application
+            Install-WebView2-Runtime.exe — offline WebView2 runtime installer
           "@ | Out-File -Encoding utf8 "$dist\README.txt"
           Compress-Archive -Path "$dist\*" -DestinationPath "$dist.zip"
           echo "PORTABLE_ZIP=$dist.zip" >> $env:GITHUB_ENV
