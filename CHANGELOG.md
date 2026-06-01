@@ -4,6 +4,19 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] — 2026-06-01
+
+### Fixed
+- **Release CI**: the Windows portable `.zip` job could never fetch a
+  WebView2 fixed-version runtime — the `Microsoft.Web.WebView2.FixedVersionRuntime.<ver>.x64`
+  NuGet packages no longer exist (search + flat-container both 404), so its
+  hard-coded candidate list always failed and blocked the whole release at the
+  draft stage. The runtime is now fetched from the Edge CDP service the official
+  download page uses (resolve current version → get the x64 CAB's CDN URL →
+  `expand`), and the portable job is marked `continue-on-error` so a future
+  runtime-download breakage can never again hold back the signed installers and
+  the auto-updater `latest.json` manifest.
+
 ## [0.10.0] — 2026-06-01
 
 A print-and-cut release: the vinyl-cutter pipeline grows to near parity with
