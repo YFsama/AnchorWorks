@@ -112,6 +112,12 @@ jobs:
     name: Portable Windows (.zip)
     needs: bundle
     runs-on: windows-latest
+    # Best-effort: the portable zip is a nice-to-have for offline / no-admin
+    # boxes. If the WebView2 runtime download ever breaks again (Microsoft
+    # rotates CDN/version availability frequently), this must NOT hold back
+    # the real release — `continue-on-error` makes a failure here count as
+    # success for the downstream `publish` job's `needs`.
+    continue-on-error: true
     permissions:
       contents: write
     steps:
@@ -126,57 +132,47 @@ jobs:
         with:
           workspaces: src-tauri
 
-      # Microsoft publishes WebView2 fixed-version runtimes to NuGet as one
-      # package per Chromium milestone, with the version baked into the
-      # package id:  Microsoft.Web.WebView2.FixedVersionRuntime.<ver>.x64.
-      # The search API on azuresearch-usnc returned 0 results for the obvious
-      # query (the per-version packages aren't tagged like the umbrella one)
-      # so we walk a hand-curated candidate list and download the first one
-      # whose .nupkg URL resolves. Order: highest preferred version first,
-      # then fall back to older milestones. Update the list when adding new
-      # WebView2 baselines — they're listed at
-      #   https://developer.microsoft.com/microsoft-edge/webview2/
-      - name: Download a WebView2 fixed runtime that exists on NuGet
+      # Microsoft no longer ships per-milestone WebView2 fixed-version runtimes
+      # to NuGet (the Microsoft.Web.WebView2.FixedVersionRuntime.<ver>.x64
+      # packages are gone — search and flat-container both 404). The official
+      # download page now resolves the runtime through the Edge CDP service,
+      # so we talk to that directly: ask for the current version, then ask CDP
+      # for the real CDN URL of the x64 fixed-version CAB and expand it.
+      #
+      # This step is allowed to fail (job-level continue-on-error) — a portable
+      # zip is optional and must never block the signed installers + updater
+      # manifest the `bundle` job already produced.
+      - name: Download the WebView2 fixed-version runtime (Edge CDP)
         shell: pwsh
         run: |
-          $candidates = @(
-            '131.0.2903.86', '129.0.2792.79', '128.0.2739.42',
-            '124.0.2478.97', '120.0.2210.91', '109.0.1518.78'
-          )
-          $gotVer = $null
-          foreach ($ver in $candidates) {
-            $pkgId = "Microsoft.Web.WebView2.FixedVersionRuntime.$ver.x64"
-            $url = "https://www.nuget.org/api/v2/package/$pkgId/$ver"
-            Write-Host "Trying $pkgId..."
-            try {
-              # -ErrorAction Stop so a 404 surfaces as an exception we can
-              # catch (default behaviour writes a non-terminating error and
-              # silently continues to the next line, leaving an empty file).
-              Invoke-WebRequest -Uri $url -OutFile webview2.nupkg `
-                                -ErrorAction Stop -UseBasicParsing | Out-Null
-              if ((Get-Item webview2.nupkg).Length -gt 1MB) {
-                $gotVer = $ver
-                Write-Host "  -> downloaded $ver ($([Math]::Round((Get-Item webview2.nupkg).Length/1MB)) MB)"
-                break
-              } else {
-                Write-Host "  -> got empty/tiny file, treating as miss"
-              }
-            } catch {
-              Write-Host "  -> miss: $($_.Exception.Message)"
-            }
-          }
-          if (-not $gotVer) {
-            throw "All candidate WebView2 fixed-runtime versions returned 404 on nuget.org. Add a known-good version to the candidate list at the top of this step."
-          }
+          $ErrorActionPreference = 'Stop'
+          $base = 'https://msedge.api.cdp.microsoft.com/api/v1.1/internal/contents/Browser/namespaces/Default/names/msedgewebview2'
 
-          Expand-Archive -Force -Path webview2.nupkg -DestinationPath webview2-temp
+          # 1) Current runtime version — the same value the download page's
+          #    "Select Version" dropdown defaults to.
+          $sel = Invoke-RestMethod -Method Post -Uri "$base/versions/latest?action=select" `
+                 -ContentType 'application/json' -Body '{}'
+          $ver = $sel.ContentId.Version
+          Write-Host "Latest WebView2 runtime: $ver"
 
-          # The .nupkg nests the runtime under build\native\<dir>. Lift it
-          # to src-tauri\ so the --config webviewInstallMode path is clean.
-          $runtimeDir = Get-ChildItem -Path webview2-temp\build\native -Directory `
-                       -Filter "Microsoft.WebView2.FixedVersionRuntime.*" |
-                       Select-Object -First 1
-          if (-not $runtimeDir) { throw "WebView2 runtime folder not found in NuGet package layout" }
+          # 2) Resolve the actual CDN download URL for the x64 fixed-version CAB.
+          $dl = Invoke-RestMethod -Method Post `
+                -Uri "$base/versions/$ver/files?action=GenerateDownloadInfo&foregroundPriority=true" `
+                -ContentType 'application/json' -Body '[]'
+          $cab = $dl | Where-Object { $_.FileId -like '*FixedVersionRuntime*x64.cab' } | Select-Object -First 1
+          if (-not $cab) { throw "CDP returned no x64 fixed-runtime CAB for $ver" }
+          Write-Host "CAB: $($cab.FileId) ($([Math]::Round($cab.SizeInBytes/1MB)) MB)"
+          Invoke-WebRequest -Uri $cab.Url -OutFile webview2.cab -UseBasicParsing
+
+          # 3) Expand the CAB — `expand -F:*` preserves the runtime folder
+          #    (Microsoft.WebView2.FixedVersionRuntime.<ver>.x64\…) inside it.
+          New-Item -ItemType Directory -Force -Path webview2-temp | Out-Null
+          expand webview2.cab -F:* webview2-temp | Out-Null
+
+          $runtimeDir = Get-ChildItem -Path webview2-temp -Recurse -Directory `
+                        -Filter "Microsoft.WebView2.FixedVersionRuntime.*" |
+                        Select-Object -First 1
+          if (-not $runtimeDir) { throw "WebView2 runtime folder not found in the CAB" }
           Move-Item $runtimeDir.FullName -Destination src-tauri\
           $relPath = "./$($runtimeDir.Name)/"
           echo "WEBVIEW2_RELPATH=$relPath" >> $env:GITHUB_ENV
