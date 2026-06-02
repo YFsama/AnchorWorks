@@ -26,6 +26,8 @@ export interface AppPreferences {
   /** Arrow-key nudge distance in px (Shift = 10×). Illustrator's Keyboard
    *  Increment. */
   keyboardIncrementPx: number;
+  /** Grid spacing in px (snap-to-grid + grid overlay). */
+  gridSizePx: number;
 }
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -34,6 +36,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   defaultDocBackground: '#ffffff',
   autosaveIntervalMs: 30000,
   keyboardIncrementPx: 1,
+  gridSizePx: 20,
 };
 
 /**
@@ -78,6 +81,12 @@ export function getKeyboardIncrement(): number {
   return typeof v === 'number' && v > 0 ? v : DEFAULT_PREFERENCES.keyboardIncrementPx;
 }
 
+/** Saved grid spacing in px. */
+export function getGridSize(): number {
+  const v = loadPreferences().gridSizePx;
+  return typeof v === 'number' && v >= 2 ? v : DEFAULT_PREFERENCES.gridSizePx;
+}
+
 /** Coerce numeric / string fields back into sensible ranges. */
 function sanitize(p: Partial<AppPreferences>): Partial<AppPreferences> {
   const out: Partial<AppPreferences> = {};
@@ -95,6 +104,9 @@ function sanitize(p: Partial<AppPreferences>): Partial<AppPreferences> {
   }
   if (typeof p.keyboardIncrementPx === 'number' && isFinite(p.keyboardIncrementPx) && p.keyboardIncrementPx > 0) {
     out.keyboardIncrementPx = Math.min(100, p.keyboardIncrementPx);
+  }
+  if (typeof p.gridSizePx === 'number' && isFinite(p.gridSizePx) && p.gridSizePx >= 2) {
+    out.gridSizePx = Math.round(Math.min(500, p.gridSizePx));
   }
   return out;
 }

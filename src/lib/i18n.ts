@@ -1026,6 +1026,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Horizontal': { en: 'Horizontal', zh: '水平' },
   'Vertical': { en: 'Vertical', zh: '垂直' },
   'Keyboard increment (px)': { en: 'Keyboard increment (px)', zh: '键盘微移增量 (px)' },
+  'Grid size (px)': { en: 'Grid size (px)', zh: '网格大小 (px)' },
   'Banner Grommets': { en: 'Banner Grommets', zh: '横幅气眼' },
   'Banner Grommets…': { en: 'Banner Grommets…', zh: '横幅气眼…' },
   'grommets added': { en: 'grommets added', zh: '个气眼已添加' },

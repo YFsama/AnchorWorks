@@ -342,6 +342,18 @@ function GeneralTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
           onChange={(e) => patch.prefs({ keyboardIncrementPx: Math.max(0.1, Math.min(100, +e.target.value || 1)) })}
         />
       </Field>
+
+      <Field label={t('Grid size (px)')}>
+        <input
+          type="number"
+          min={2}
+          max={500}
+          step={1}
+          className="input-num"
+          value={draft.prefs.gridSizePx}
+          onChange={(e) => { const v = Math.max(2, Math.min(500, Math.round(+e.target.value || 20))); patch.prefs({ gridSizePx: v }); useEditor.getState().setGridSize(v); }}
+        />
+      </Field>
     </div>
   );
 }

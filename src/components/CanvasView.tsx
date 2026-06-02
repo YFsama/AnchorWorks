@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { initCanvas, disposeCanvas, setTool, zoomFit } from '../lib/canvasEngine';
 import { attachDragDrop } from '../lib/io3';
 import { loadArtboardsFromStorage } from '../lib/artboards';
+import { getGridSize } from '../lib/preferences';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
 import { Rulers } from './Rulers';
@@ -30,6 +31,8 @@ export function CanvasView() {
     // Hydrate artboards from localStorage right after canvas init so the
     // overlay has the right list on first paint.
     loadArtboardsFromStorage();
+    // Apply the saved grid spacing to the store.
+    useEditor.getState().setGridSize(getGridSize());
     // Wire touch / pinch-zoom / two-finger pan / pen-pressure tracking.
     const detachTouch = enhanceTouchSupport(el);
 

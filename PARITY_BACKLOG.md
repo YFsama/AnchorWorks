@@ -478,3 +478,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Hide Others — selectionOps.ts hideOthers() hides every object not in the
       selection (Illustrator Object→Hide→Other) for focused editing; Edit menu +
       command palette (Show All reveals them). 2026-06-03.
+- [x] Configurable grid size — preferences.ts gridSizePx + getGridSize(); a
+      Preferences "Grid size (px)" field updates the store live and persists, and
+      CanvasView applies the saved value on boot (the grid was hardcoded 20px with
+      no UI). 2026-06-03.
