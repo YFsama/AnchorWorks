@@ -323,3 +323,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       selected object's bbox into rows×cols rectangles with a mm gutter (Illustrator
       Object→Path→Split Into Grid), distinct from RepeatDialog's duplicate-grid;
       SplitGridDialog + Document menu + command palette. +3 tests. 2026-06-02.
+- [x] Arrowheads — arrowheads.ts arrowTriangle() (pure) + addArrowheads() append a
+      filled triangular head (sized from stroke width, in the stroke colour) to the
+      start/end/both endpoints of selected open paths/lines (sign/dimension arrows);
+      Document menu + command palette. +2 tests. 2026-06-02.

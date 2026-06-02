@@ -8,6 +8,7 @@ import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
+import { addArrowheads } from '../lib/arrowheads';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -238,6 +239,8 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // surfaced here for menu-bar discoverability.
         { label: t('Add Anchor Points'), onClick: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
         { label: t('Outline Stroke to Fill'), onClick: () => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); } },
+        { label: t('Add Arrowhead (End)'), onClick: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
+        { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
         { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
         { label: t('Simplify Path…'), onClick: () => setModal('showSimplify', true) },
         { label: t('Round Corners…'), onClick: () => setModal('showRoundCorners', true) },
