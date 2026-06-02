@@ -53,8 +53,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Text on Arc / circle** — `applyTextOnArc(flip)` in textPath.ts (analytic
       per-glyph placement on an auto-fit circle, ∩ up / ∪ down); Character panel
       buttons + command palette. 2026-06-02.
-- [ ] **Multi-outline (contour text effect)** — N stacked offset outlines around
-      text/shape with per-ring colour & width (classic sign look). New effect.
+- [x] **Multi-outline (contour text effect)** — outlineEffect.ts addOutlineEffect()
+      stacks 1–4 stroke-silhouette clones behind any object (works on text without
+      vectorising) via OutlineEffectDialog; per-ring colour, uniform width. Command
+      palette + right-click. 2026-06-02.
 - [ ] **Letter spacing (tracking) + line height (leading)** controls in the
       Character panel (charSpacing / lineHeight on IText).
 - [ ] **Align to key object / align to artboard** — alignment reference selector
