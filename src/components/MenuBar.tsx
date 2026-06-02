@@ -5,6 +5,7 @@ import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, aut
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
+import { addAnchorsToSelection } from '../lib/addAnchors';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
 import { getFormat } from '../lib/formats';
@@ -213,6 +214,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { sep: true },
         // Path-effect dialogs — also in the command palette / right-click;
         // surfaced here for menu-bar discoverability.
+        { label: t('Add Anchor Points'), onClick: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
         { label: t('Simplify Path…'), onClick: () => setModal('showSimplify', true) },
         { label: t('Round Corners…'), onClick: () => setModal('showRoundCorners', true) },
         { label: t('Offset Path…'), onClick: () => setModal('showOffsetPath', true) },

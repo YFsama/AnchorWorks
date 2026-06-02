@@ -914,6 +914,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Ridges': { en: 'Ridges', zh: '波纹数' },
   'Smooth (wave)': { en: 'Smooth (wave)', zh: '平滑(波浪)' },
   'shapes zig-zagged': { en: 'shapes zig-zagged', zh: '个形状已锯齿化' },
+  'Add Anchor Points': { en: 'Add Anchor Points', zh: '添加锚点' },
+  'paths subdivided': { en: 'paths subdivided', zh: '条路径已细分' },
   'Roughen': { en: 'Roughen', zh: '粗糙化' },
   'Roughen…': { en: 'Roughen…', zh: '粗糙化…' },
   'Size (mm)': { en: 'Size (mm)', zh: '幅度 (mm)' },

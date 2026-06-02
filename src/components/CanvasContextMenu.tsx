@@ -30,6 +30,7 @@ import { useEditor } from '../store/editor';
 import { buildOutlineCutPaths, weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
 import { rotateSelection } from '../lib/transformOps';
+import { addAnchorsToSelection } from '../lib/addAnchors';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -387,6 +388,11 @@ export function CanvasContextMenu() {
         label={t('Rhinestone Template…')}
         disabled={!hasSelection}
         onClick={() => run(() => openModal('showRhinestone'), hasSelection)}
+      />
+      <Item
+        label={t('Add Anchor Points')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)}
       />
       <Item
         label={t('Simplify Path…')}

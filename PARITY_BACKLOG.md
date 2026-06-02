@@ -265,3 +265,8 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       winds + decay, stroke-only) as a 3rd StarDialog tab; extracted pure
       starVertices/polygonVertices/spiralVertices and added __tests__/shapes.test.ts
       (6 tests: radii, top-tip, clamps, spiral monotonic decay). 2026-06-02.
+- [x] Add Anchor Points — addAnchorsToSelection() (addAnchors.ts) +
+      subdivideAllSegments() (pathEdit.ts) split every L/C/Q segment of each
+      selected path at its midpoint, faithfully (de Casteljau) doubling anchors
+      (Illustrator Object→Path→Add Anchor Points); Document menu + command palette
+      + right-click. 2026-06-02.

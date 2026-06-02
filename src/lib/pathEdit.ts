@@ -620,6 +620,24 @@ function subdivideSegment(path: fabric.Path, segIdx: number, t: number) {
 }
 
 /**
+ * Add an anchor at the midpoint of every drawable segment of `path`
+ * (Illustrator Object→Path→Add Anchor Points). Reuses subdivideSegment's
+ * faithful L/C/Q split, walking backward so each splice keeps earlier indices
+ * valid. Returns the number of anchors added.
+ */
+export function subdivideAllSegments(path: fabric.Path): number {
+  let added = 0;
+  for (let i = path.path.length - 1; i >= 1; i--) {
+    const cmd = path.path[i] as unknown as (string | number)[];
+    if (cmd[0] === 'L' || cmd[0] === 'C' || cmd[0] === 'Q') {
+      subdivideSegment(path, i, 0.5);
+      added++;
+    }
+  }
+  return added;
+}
+
+/**
  * Exit any active edit session and remove handles.
  */
 export function exitPathEdit(canvas: fabric.Canvas) {

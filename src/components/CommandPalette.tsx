@@ -24,6 +24,7 @@ import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { reversePathSelection } from '../lib/pathReverse';
+import { addAnchorsToSelection } from '../lib/addAnchors';
 import { createOutlinesFromText } from '../lib/textToOutline';
 import { pasteFromClipboard } from '../lib/clipboard';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
@@ -245,6 +246,7 @@ export function CommandPalette({
     { id: 'path.simplify',     label: t('Simplify Path…'),     category: t('Arrange'), keywords: 'simplify reduce anchor points douglas peucker smooth', icon: PenTool, run: () => setModal('showSimplify', true) },
     { id: 'path.roundCorners', label: t('Round Corners…'),     category: t('Arrange'), keywords: 'round corners fillet radius soften stylize', icon: PenTool, run: () => setModal('showRoundCorners', true) },
     { id: 'path.offset',       label: t('Offset Path…'),       category: t('Arrange'), keywords: 'offset path parallel inset outset expand contour', icon: PenTool, run: () => setModal('showOffsetPath', true) },
+    { id: 'path.addAnchors',   label: t('Add Anchor Points'),  category: t('Arrange'), keywords: 'add anchor points subdivide nodes densify path', icon: PenTool, run: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
     { id: 'path.roughen',      label: t('Roughen…'),           category: t('Arrange'), keywords: 'roughen distort jitter rough distressed hand drawn', icon: PenTool, run: () => setModal('showRoughen', true) },
     { id: 'path.zigzag',       label: t('Zig Zag…'),           category: t('Arrange'), keywords: 'zigzag zig zag wave distort ridges scallop border', icon: PenTool, run: () => setModal('showZigzag', true) },
     { id: 'path.twist',        label: t('Twist…'),             category: t('Arrange'), keywords: 'twist twirl swirl spiral distort rotate', icon: PenTool, run: () => setModal('showTwist', true) },
