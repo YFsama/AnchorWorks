@@ -449,3 +449,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       dragged object's edges/centre to the first artboard's left/centre/right +
       top/centre/bottom (under the Smart Guides toggle), so centring/edge-aligning to
       the page snaps. 2026-06-03.
+- [x] Artboard snap guide lines — the artboard-frame snap now records the matched
+      page line (smartGuides.ts artGuides) and pushes it into the emitted guide
+      overlay, so the blue feedback line shows when you hit a page edge/centre.
+      2026-06-03.

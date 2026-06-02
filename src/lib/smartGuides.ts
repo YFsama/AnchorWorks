@@ -79,7 +79,8 @@ export function applySmartSnap(canvas: fabric.Canvas, target: FabricObject): voi
 
   // Artboard frame — snap the target's edges/centre to the first artboard's
   // left/centre/right + top/centre/bottom, so centring or edge-aligning to the
-  // page snaps cleanly.
+  // page snaps cleanly. Snapped lines are recorded for the visible overlay.
+  const artGuides: Guide[] = [];
   if (st.smartGuidesEnabled && st.artboards.length > 0) {
     const a = st.artboards[0];
     const ab = target.getBoundingRect();
@@ -87,12 +88,12 @@ export function applySmartSnap(canvas: fabric.Canvas, target: FabricObject): voi
     const tys = [ab.top, ab.top + ab.height / 2, ab.top + ab.height];
     const axs = [a.x, a.x + a.width / 2, a.x + a.width];
     const ays = [a.y, a.y + a.height / 2, a.y + a.height];
-    let bx: number | null = null, bxd = SMART_GUIDE_TOLERANCE;
-    let by: number | null = null, byd = SMART_GUIDE_TOLERANCE;
-    for (const ax of axs) for (const tx of txs) { const d = ax - tx; if (Math.abs(d) <= bxd) { bxd = Math.abs(d); bx = d; } }
-    for (const ay of ays) for (const ty of tys) { const d = ay - ty; if (Math.abs(d) <= byd) { byd = Math.abs(d); by = d; } }
-    if (bx !== null) target.set({ left: (target.left ?? 0) + bx });
-    if (by !== null) target.set({ top: (target.top ?? 0) + by });
+    let bx: number | null = null, bxd = SMART_GUIDE_TOLERANCE, bestAx = 0;
+    let by: number | null = null, byd = SMART_GUIDE_TOLERANCE, bestAy = 0;
+    for (const ax of axs) for (const tx of txs) { const d = ax - tx; if (Math.abs(d) <= bxd) { bxd = Math.abs(d); bx = d; bestAx = ax; } }
+    for (const ay of ays) for (const ty of tys) { const d = ay - ty; if (Math.abs(d) <= byd) { byd = Math.abs(d); by = d; bestAy = ay; } }
+    if (bx !== null) { target.set({ left: (target.left ?? 0) + bx }); artGuides.push({ x1: bestAx, y1: a.y, x2: bestAx, y2: a.y + a.height, kind: 'edge' }); }
+    if (by !== null) { target.set({ top: (target.top ?? 0) + by }); artGuides.push({ x1: a.x, y1: bestAy, x2: a.x + a.width, y2: bestAy, kind: 'edge' }); }
   }
 
   if (!st.smartGuidesEnabled) {
@@ -124,7 +125,7 @@ export function applySmartSnap(canvas: fabric.Canvas, target: FabricObject): voi
   let bestDX: { delta: number; value: number; otherValue: number } | null = null;
   let bestDY: { delta: number; value: number; otherValue: number } | null = null;
 
-  const guides: Guide[] = [];
+  const guides: Guide[] = [...artGuides];
 
   for (const o of candidates) {
     const b = o.getBoundingRect();
