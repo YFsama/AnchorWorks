@@ -820,6 +820,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Flip': { en: 'Flip', zh: '翻转' },
   'Transform…': { en: 'Transform…', zh: '变换…' },
   'Join Paths': { en: 'Join Paths', zh: '连接路径' },
+  'Reverse Path Direction': { en: 'Reverse Path Direction', zh: '反转路径方向' },
+  'paths reversed': { en: 'paths reversed', zh: '条路径已反转' },
   'Swap Fill / Stroke': { en: 'Swap Fill / Stroke', zh: '互换填充与描边' },
   'Default Fill / Stroke': { en: 'Default Fill / Stroke', zh: '默认填充与描边' },
   'Swap / Default Fill & Stroke': { en: 'Swap / Default Fill & Stroke', zh: '互换 / 默认 填充与描边' },
