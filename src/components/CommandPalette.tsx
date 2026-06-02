@@ -22,7 +22,7 @@ import { toast } from '../lib/toast';
 import { setOutlineMode, isOutlineMode } from '../lib/outlineView';
 import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
-import { weldOutline } from '../lib/contourFromSelection';
+import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { applyStrokeAlign } from '../lib/strokeAlign';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
 import { listTools } from '../lib/tools/types';
@@ -218,6 +218,16 @@ export function CommandPalette({
       ed.addCutPaths(paths);
       ed.setCutPathsVisible(true);
       toast.success(`${t('Welded into')} ${paths.length} ${t('cut paths')}`, { title: t('Weld') });
+    } },
+    { id: 'cut.outlineStroke',  label: t('Outline Stroke'),    category: t('Arrange'), keywords: 'stroke outline expand cut edges', icon: PenTool, run: () => {
+      const objs = getCanvas()?.getActiveObjects() ?? [];
+      if (!objs.length) { toast.warn(t('Select one or more shapes first.')); return; }
+      const paths = outlineStrokeToCutPaths(objs);
+      if (!paths.length) { toast.warn(t('Select shapes that have a stroke first.')); return; }
+      const ed = useEditor.getState();
+      ed.addCutPaths(paths);
+      ed.setCutPathsVisible(true);
+      toast.success(`${paths.length} ${t('cut paths')}`, { title: t('Outline Stroke') });
     } },
     { id: 'stroke.alignCenter', label: `${t('Stroke alignment')} — ${t('Center')}`, category: t('Arrange'), keywords: 'stroke align center default', icon: AlignCenter, run: () => applyStrokeAlign('center') },
     { id: 'stroke.alignInside', label: `${t('Stroke alignment')} — ${t('Inside')}`, category: t('Arrange'), keywords: 'stroke align inside inner inset', icon: AlignCenter, run: () => applyStrokeAlign('inside') },

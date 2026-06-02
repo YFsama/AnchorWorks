@@ -19,7 +19,7 @@ import {
   hasClipboard,
 } from '../lib/clipboard';
 import { useEditor } from '../store/editor';
-import { buildOutlineCutPaths, weldOutline } from '../lib/contourFromSelection';
+import { buildOutlineCutPaths, weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -189,6 +189,20 @@ export function CanvasContextMenu() {
     toast.success(`${t('Welded into')} ${paths.length} ${t('cut paths')}`, { title: t('Weld') });
   };
 
+  // Outline Stroke — cut lines along both edges of the selection's stroke.
+  const outlineStroke = () => {
+    if (!active.length) return;
+    const paths = outlineStrokeToCutPaths(active);
+    if (!paths.length) {
+      toast.warn(t('Select shapes that have a stroke first.'), { title: t('Outline Stroke') });
+      return;
+    }
+    const ed = useEditor.getState();
+    ed.addCutPaths(paths);
+    ed.setCutPathsVisible(true);
+    toast.success(`${paths.length} ${t('cut paths')}`, { title: t('Outline Stroke') });
+  };
+
   // Each item runs its action, bumps the clipboard tick (so paste enables),
   // and closes the menu. Items disabled at render time short-circuit before
   // their handler runs.
@@ -306,6 +320,11 @@ export function CanvasContextMenu() {
         label={t('Weld')}
         disabled={!hasSelection}
         onClick={() => run(() => weld(), hasSelection)}
+      />
+      <Item
+        label={t('Outline Stroke')}
+        disabled={!hasSelection}
+        onClick={() => run(() => outlineStroke(), hasSelection)}
       />
       <Item
         label={t('Cut Contour…')}

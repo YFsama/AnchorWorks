@@ -782,6 +782,11 @@ const dict: Record<string, Record<Lang, string>> = {
   'Create Contour': { en: 'Create Contour', zh: '创建轮廓' },
   'Weld': { en: 'Weld', zh: '焊接合并' },
   'Welded into': { en: 'Welded into', zh: '已焊接为' },
+  'Outline Stroke': { en: 'Outline Stroke', zh: '描边转轮廓' },
+  'Select shapes that have a stroke first.': {
+    en: 'Select shapes that have a stroke first.',
+    zh: '请先选中带描边的图形。',
+  },
   'FPS target: 60 (canvas re-renders on demand)': {
     en: 'FPS target: 60 (canvas re-renders on demand)',
     zh: 'FPS 目标：60（画布按需重绘）',

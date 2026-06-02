@@ -86,6 +86,47 @@ export function buildOutlineCutPaths(
 }
 
 /**
+ * Outline Stroke (Illustrator Object→Path→Outline Stroke, cutter flavour):
+ * turn each selected object's stroke into the cut lines a blade would follow
+ * along BOTH edges of the stroke band. Closed outlines yield an outer + inner
+ * ring (offset ±½ stroke); open outlines yield a single closed band (left edge
+ * forward, right edge back). Stroke width is read in px and converted to mm.
+ * Objects with no stroke are skipped.
+ */
+export function outlineStrokeToCutPaths(objects: fabric.FabricObject[]): CutPath[] {
+  const out: CutPath[] = [];
+  const mk = (points: Array<[number, number]>, color?: string): CutPath => ({
+    id: `stroke-${Date.now().toString(36)}-${out.length}`,
+    points,
+    closed: true,
+    kind: 'outline',
+    passes: 1,
+    color,
+  });
+  for (const obj of objects) {
+    const swPx = (obj.strokeWidth ?? 0) * Math.max(obj.scaleX ?? 1, obj.scaleY ?? 1);
+    if (swPx <= 0) continue;
+    const halfMm = (swPx / 2) / MM_TO_PX;
+    const strokeColor = typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : undefined;
+    for (const p of buildOutlineCutPaths([obj], 0, 1)) {
+      const pts = p.points;
+      if (pts.length < 2) continue;
+      if (p.closed) {
+        for (const r of offsetPolyline(pts, halfMm, true)) out.push(mk(r, strokeColor));
+        for (const r of offsetPolyline(pts, -halfMm, true)) out.push(mk(r, strokeColor));
+      } else {
+        const left = offsetPolyline(pts, halfMm, false)[0] ?? pts;
+        const right = offsetPolyline(pts, -halfMm, false)[0] ?? pts;
+        const loop = [...left, ...right.slice().reverse()];
+        if (loop.length >= 2) loop.push(loop[0]);
+        out.push(mk(loop, strokeColor));
+      }
+    }
+  }
+  return out;
+}
+
+/**
  * Weld (SignMaster "Weld" / Illustrator Pathfinder Unite, for the cutter):
  * flatten the selection's outlines and boolean-union every closed region into
  * the fewest possible cut paths, so overlapping letters/shapes cut as one
