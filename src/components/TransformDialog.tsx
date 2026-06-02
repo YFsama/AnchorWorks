@@ -22,6 +22,7 @@ export function TransformDialog() {
   const [scale, setScale] = useState(100);
   const [rotate, setRotate] = useState(0);
   const [copy, setCopy] = useState(false);
+  const [each, setEach] = useState(false);
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -29,7 +30,7 @@ export function TransformDialog() {
 
   const apply = async () => {
     if (!getCanvas()?.getActiveObject()) { toast.warn(t('Select something to transform.'), { title: t('Transform') }); return; }
-    const ok = await applyTransform({ dx, dy, scale: scale / 100, rotate, copy });
+    const ok = await applyTransform({ dx, dy, scale: scale / 100, rotate, copy, each });
     if (ok) toast.success(copy ? t('Transformed copy') : t('Transformed'), { title: t('Transform') });
     close();
   };
@@ -68,6 +69,10 @@ export function TransformDialog() {
         <label className="flex items-center gap-2 mt-2 text-xs cursor-pointer">
           <input type="checkbox" checked={copy} onChange={(e) => setCopy(e.target.checked)} />
           {t('Apply to a copy')}
+        </label>
+        <label className="flex items-center gap-2 mt-1 text-xs cursor-pointer" title={t('Pivot each object on its own centre instead of the selection centre.')}>
+          <input type="checkbox" checked={each} onChange={(e) => setEach(e.target.checked)} />
+          {t('Transform each')}
         </label>
 
         <div className="flex justify-end gap-2 mt-4">

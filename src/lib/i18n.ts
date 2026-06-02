@@ -824,6 +824,11 @@ const dict: Record<string, Record<Lang, string>> = {
   'Scale': { en: 'Scale', zh: '缩放' },
   'Rotate': { en: 'Rotate', zh: '旋转' },
   'Apply to a copy': { en: 'Apply to a copy', zh: '应用到副本' },
+  'Transform each': { en: 'Transform each', zh: '逐个变换' },
+  'Pivot each object on its own centre instead of the selection centre.': {
+    en: 'Pivot each object on its own centre instead of the selection centre.',
+    zh: '让每个对象绕自身中心变换，而非选区中心。',
+  },
   'Transformed': { en: 'Transformed', zh: '已变换' },
   'Transformed copy': { en: 'Transformed copy', zh: '已变换副本' },
   'Select something to transform.': { en: 'Select something to transform.', zh: '请先选中要变换的对象。' },

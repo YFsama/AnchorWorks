@@ -136,3 +136,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       2026-06-02.
 - [x] Doc sync — add the Measure tool (M) to the Shortcuts dialog + boot hint,
       which were missing the new tool. 2026-06-02.
+- [x] Transform Each — TransformDialog "Transform each" checkbox + applyTransform
+      `each` (transformOps.ts) pivots every object on its own centre (Illustrator
+      Transform Each), completing the Transform feature. 2026-06-02.
