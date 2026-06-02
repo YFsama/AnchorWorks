@@ -8,6 +8,8 @@ import {
   AlignEndHorizontal,
   AlignHorizontalSpaceAround,
   AlignVerticalSpaceAround,
+  AlignHorizontalDistributeCenter,
+  AlignVerticalDistributeCenter,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -120,12 +122,18 @@ export function AlignPanel() {
              * left four empty cells on the right, giving the row a
              * lopsided "menu items hugging the left edge" feel. Two equal
              * half-width cells reads as a balanced pair. */}
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid grid-cols-4 gap-1">
               <Btn title={t('Distribute horizontally (equal spacing)')} disabled={!enoughForDistribute} onClick={() => distributeSelection('horizontal')}>
                 <AlignHorizontalSpaceAround size={14} aria-hidden="true" />
               </Btn>
               <Btn title={t('Distribute vertically (equal spacing)')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical')}>
                 <AlignVerticalSpaceAround size={14} aria-hidden="true" />
+              </Btn>
+              <Btn title={t('Distribute horizontal centers')} disabled={!enoughForDistribute} onClick={() => distributeSelection('horizontal', 'center')}>
+                <AlignHorizontalDistributeCenter size={14} aria-hidden="true" />
+              </Btn>
+              <Btn title={t('Distribute vertical centers')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical', 'center')}>
+                <AlignVerticalDistributeCenter size={14} aria-hidden="true" />
               </Btn>
             </div>
             {/* Exact spacing — gap in mm between consecutive objects. */}

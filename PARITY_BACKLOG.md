@@ -393,3 +393,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       the selection's skewX/skewY about its centre (clamped ±85°) — Illustrator
       Object→Transform→Shear; ShearDialog (angle + axis) + Edit menu + command
       palette. 2026-06-03.
+- [x] Distribute centers — distributeSelection(dir, 'center') (alignDistribute.ts
+      distributeCentres()) equalises centre-to-centre spacing (equal pitch), the
+      Illustrator distribute mode distinct from the existing equal-gap; two new
+      Align-panel buttons. 2026-06-03.

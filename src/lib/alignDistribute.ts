@@ -170,12 +170,15 @@ export function distributeSpacing(dir: DistributeDir, gapMm: number): void {
 }
 
 /**
- * Distribute the active selection so the gaps between consecutive objects
- * (along the given axis) are equal. Requires 3+ objects.
+ * Distribute the active selection along the given axis. Requires 3+ objects.
+ * `by` chooses the metric (Illustrator's two distribute modes):
+ *   - 'gap'    — equalise the empty space between consecutive objects.
+ *   - 'center' — equalise the spacing between object centres (equal pitch).
  *
  * "horizontal" distributes left→right, "vertical" distributes top→bottom.
  */
-export function distributeSelection(dir: DistributeDir): void {
+export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' = 'gap'): void {
+  if (by === 'center') { distributeCentres(dir); return; }
   const canvas = getCanvas();
   if (!canvas) return;
   const objs = canvas.getActiveObjects();
@@ -212,6 +215,32 @@ export function distributeSelection(dir: DistributeDir): void {
       cursor += r.rect.height + gap;
     });
   }
+  canvas.requestRenderAll();
+  pushHistory();
+}
+
+/** Equalise the spacing between object centres along `dir` (equal pitch). */
+function distributeCentres(dir: DistributeDir): void {
+  const canvas = getCanvas();
+  if (!canvas) return;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 3) return;
+  const horiz = dir === 'horizontal';
+  const items = objs.map((o) => {
+    const r = o.getBoundingRect();
+    return { obj: o, centre: horiz ? r.left + r.width / 2 : r.top + r.height / 2 };
+  });
+  items.sort((a, b) => a.centre - b.centre);
+  const first = items[0].centre;
+  const last = items[items.length - 1].centre;
+  const step = (last - first) / (items.length - 1);
+  items.forEach((it, i) => {
+    if (i === 0 || i === items.length - 1) return;
+    const delta = (first + i * step) - it.centre;
+    if (horiz) it.obj.set({ left: (it.obj.left ?? 0) + delta });
+    else it.obj.set({ top: (it.obj.top ?? 0) + delta });
+    it.obj.setCoords();
+  });
   canvas.requestRenderAll();
   pushHistory();
 }

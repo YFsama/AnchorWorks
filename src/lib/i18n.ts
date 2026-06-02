@@ -989,6 +989,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Outline Stroke to Fill': { en: 'Outline Stroke to Fill', zh: '描边转填充' },
   'strokes outlined': { en: 'strokes outlined', zh: '处描边已转填充' },
   'Crop': { en: 'Crop', zh: '裁剪' },
+  'Distribute horizontal centers': { en: 'Distribute horizontal centers', zh: '水平居中等距分布' },
+  'Distribute vertical centers': { en: 'Distribute vertical centers', zh: '垂直居中等距分布' },
   'Shear': { en: 'Shear', zh: '倾斜' },
   'Shear…': { en: 'Shear…', zh: '倾斜…' },
   'Shear angle': { en: 'Shear angle', zh: '倾斜角度' },
