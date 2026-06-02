@@ -8,6 +8,7 @@
 import * as fabric from 'fabric';
 import { useEditor } from '../../store/editor';
 import { getCanvas, pushHistory } from '../canvasEngine';
+import { arrowTriangle } from '../arrowheads';
 
 const MM_TO_PX = 3.7795;
 
@@ -50,13 +51,19 @@ export function commitDimension(): boolean {
   if (distMm < 0.1) return false;
 
   const line = new fabric.Line([m.x1, m.y1, m.x2, m.y2], { stroke: '#22d3ee', strokeWidth: 1 });
+  // Arrowheads at both ends so it reads as a proper dimension line.
+  const dir: [number, number] = [m.x2 - m.x1, m.y2 - m.y1];
+  const mkHead = (tri: [number, number][]) =>
+    new fabric.Polygon(tri.map(([x, y]) => ({ x, y })), { fill: '#22d3ee', stroke: '', strokeWidth: 0 });
+  const headEnd = mkHead(arrowTriangle([m.x2, m.y2], dir, 10, 7));
+  const headStart = mkHead(arrowTriangle([m.x1, m.y1], [-dir[0], -dir[1]], 10, 7));
   const label = new fabric.Text(`${distMm.toFixed(1)} mm`, {
     left: (m.x1 + m.x2) / 2, top: (m.y1 + m.y2) / 2 - 12,
     originX: 'center', originY: 'center',
     fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12,
     fill: '#22d3ee', backgroundColor: 'rgba(11,18,32,0.85)',
   });
-  const group = new fabric.Group([line, label]);
+  const group = new fabric.Group([line, headStart, headEnd, label]);
   canvas.add(group);
   canvas.setActiveObject(group);
   useEditor.getState().setMeasure(null);

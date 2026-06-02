@@ -355,3 +355,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       the selection into an offscreen StaticCanvas cropped to its bbox; exportSelection
       SVG()/PNG() download just the selected art (Illustrator Export Selection); File
       menu + command palette. 2026-06-03.
+- [x] Dimension line arrowheads — commitDimension() (measureTool.ts) now groups two
+      arrowTriangle() heads (reused from arrowheads.ts) at both endpoints with the
+      line + mm label, so a pinned measurement reads as a proper dimension line.
+      2026-06-03.
