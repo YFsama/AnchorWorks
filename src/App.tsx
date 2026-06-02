@@ -39,6 +39,7 @@ const TilePrintDialog = lazy(() => import('./components/TilePrintDialog').then(m
 const OutlineEffectDialog = lazy(() => import('./components/OutlineEffectDialog').then(m => ({ default: m.OutlineEffectDialog })));
 const RecolorDialog = lazy(() => import('./components/RecolorDialog').then(m => ({ default: m.RecolorDialog })));
 const VariableDataDialog = lazy(() => import('./components/VariableDataDialog').then(m => ({ default: m.VariableDataDialog })));
+const RhinestoneDialog = lazy(() => import('./components/RhinestoneDialog').then(m => ({ default: m.RhinestoneDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
@@ -699,6 +700,7 @@ export default function App() {
   const showOutline = useEditor(s => s.showOutline);
   const showRecolor = useEditor(s => s.showRecolor);
   const showVariableData = useEditor(s => s.showVariableData);
+  const showRhinestone = useEditor(s => s.showRhinestone);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const highContrast = useEditor(s => s.highContrast);
@@ -1180,6 +1182,11 @@ export default function App() {
       {showVariableData && (
         <Suspense fallback={null}>
           <VariableDataDialog />
+        </Suspense>
+      )}
+      {showRhinestone && (
+        <Suspense fallback={null}>
+          <RhinestoneDialog />
         </Suspense>
       )}
       {showPreferences && (
