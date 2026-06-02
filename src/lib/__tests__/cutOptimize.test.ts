@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  optimizeOrder, mirrorPolys, cutStats, estimateSeconds, formatDuration, bounds, applyOvercut, type PolyLite,
+  optimizeOrder, mirrorPolys, cutStats, estimateSeconds, formatDuration, bounds, applyOvercut, reversePolys, type PolyLite,
 } from '../cutOptimize';
 
 const seg = (a: [number, number], b: [number, number]): PolyLite => ({ points: [a, b], closed: false });
@@ -70,6 +70,14 @@ describe('cutOptimize', () => {
 
     const open = seg([0, 0], [10, 0]);
     expect(applyOvercut([open], 2)[0].points).toEqual(open.points); // untouched
+  });
+
+  it('reversePolys flips point order, preserves closed + length', () => {
+    const polys: PolyLite[] = [{ points: [[0, 0], [1, 0], [2, 5]], closed: true }];
+    const [r] = reversePolys(polys);
+    expect(r.points).toEqual([[2, 5], [1, 0], [0, 0]]);
+    expect(r.closed).toBe(true);
+    expect(cutStats([r]).cutLen).toBeCloseTo(cutStats(polys).cutLen, 6);
   });
 
   it('overcut of 0 is a no-op', () => {

@@ -298,6 +298,11 @@ export function PlotterDialog() {
               <Route size={13} aria-hidden="true" />
               {t('Optimize order')}
             </label>
+            <label className="flex items-center gap-2 text-xs text-ink cursor-pointer col-span-2" title={t('Reverse the blade-travel direction of every path.')}>
+              <input type="checkbox" checked={opts.reverse} onChange={(e) => setOpts({ ...opts, reverse: e.target.checked })} />
+              <FlipHorizontal2 size={13} aria-hidden="true" />
+              {t('Reverse direction')}
+            </label>
             <Field label={`${t('Overcut')} (mm)`}>
               <input
                 type="number" step={0.05} min={0} max={5} className="input-num"

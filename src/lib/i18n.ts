@@ -912,6 +912,11 @@ const dict: Record<string, Record<Lang, string>> = {
   'Select something first.': { en: 'Select something first.', zh: '请先选中对象。' },
   'Lock Guides': { en: 'Lock Guides', zh: '锁定参考线' },
   'Clear Guides': { en: 'Clear Guides', zh: '清除参考线' },
+  'Reverse direction': { en: 'Reverse direction', zh: '反转方向' },
+  'Reverse the blade-travel direction of every path.': {
+    en: 'Reverse the blade-travel direction of every path.',
+    zh: '反转每条路径的刀头行进方向。',
+  },
   'Cut order': { en: 'Cut order', zh: '切割顺序' },
   'Number the cut paths in travel order with a start arrow.': {
     en: 'Number the cut paths in travel order with a start arrow.',

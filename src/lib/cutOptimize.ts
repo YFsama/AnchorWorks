@@ -45,6 +45,12 @@ export function mirrorPolys(polys: PolyLite[], axis: 'h' | 'v'): PolyLite[] {
   }));
 }
 
+/** Reverse the point order of every polyline (flips the blade-travel
+ *  direction; some materials/blades corner cleaner one way). */
+export function reversePolys(polys: PolyLite[]): PolyLite[] {
+  return polys.map(p => ({ closed: p.closed, points: p.points.slice().reverse() }));
+}
+
 /** Hard cap above which we skip the O(n²) ordering pass to stay responsive. */
 export const OPTIMIZE_LIMIT = 1500;
 

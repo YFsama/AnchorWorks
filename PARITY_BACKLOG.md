@@ -169,3 +169,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Distribute by spacing — distributeSpacing() (alignDistribute.ts) lays the
       selection out with an exact mm gap (Illustrator Distribute Spacing value);
       Align-panel spacing input + H/V buttons. 2026-06-02.
+- [x] Reverse cut direction — reversePolys() (cutOptimize.ts) + plotter `reverse`
+      option flip every path's blade-travel direction; Plotter-dialog checkbox.
+      +1 unit test. 2026-06-02.

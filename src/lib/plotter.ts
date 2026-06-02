@@ -5,7 +5,7 @@
 
 import { exportSVG } from './io';
 import { useEditor } from '../store/editor';
-import { optimizeOrder, mirrorPolys, applyOvercut } from './cutOptimize';
+import { optimizeOrder, mirrorPolys, applyOvercut, reversePolys } from './cutOptimize';
 
 /**
  * HP-GL dialect selector. Real-world cutter firmwares accept HP-GL with
@@ -50,6 +50,8 @@ export interface PlotterOptions {
   optimize: boolean;
   /** Overcut (mm) past each closed-path start, for clean corners. 0 = off. */
   overcutMm: number;
+  /** Reverse the cut direction of every path. */
+  reverse: boolean;
 }
 
 /**
@@ -94,6 +96,7 @@ export const defaultPlotterOptions: PlotterOptions = {
   mirror: false,
   optimize: true,
   overcutMm: 0,
+  reverse: false,
 };
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
@@ -418,10 +421,11 @@ export function buildPlotterOutput(
  *  preview/stats UI can mirror the exact geometry the machine will receive. */
 export function postProcess(
   polylines: Array<{ points: Array<[number, number]>; closed: boolean }>,
-  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm'>,
+  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm' | 'reverse'>,
 ): Array<{ points: Array<[number, number]>; closed: boolean }> {
   let out = polylines;
   if (opts.optimize) out = optimizeOrder(out);
+  if (opts.reverse) out = reversePolys(out);
   if (opts.overcutMm > 0) out = applyOvercut(out, opts.overcutMm);
   if (opts.mirror) out = mirrorPolys(out, 'h');
   return out;
