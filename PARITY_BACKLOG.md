@@ -274,3 +274,8 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       changeCaseSelection() (works across a multi-text selection, adds Sentence
       case); Character panel now uses it (+4th button) and 4 commands added to the
       palette. Was single-object, panel-only, no sentence case. +3 tests. 2026-06-02.
+- [x] Clipping Mask surfaces — the existing masks.ts applyClipMask()/
+      releaseClipMask() were command-palette-only; wired Make/Release Clipping
+      Mask into the Edit menu, canvas right-click, and Ctrl+7 / Ctrl+Alt+7 keymap
+      + App handlers (no new logic — a dup clipMask.ts was caught and dropped).
+      2026-06-02.

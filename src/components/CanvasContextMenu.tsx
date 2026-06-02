@@ -31,6 +31,7 @@ import { buildOutlineCutPaths, weldOutline, outlineStrokeToCutPaths } from '../l
 import { joinSelection } from '../lib/pathJoin';
 import { rotateSelection } from '../lib/transformOps';
 import { addAnchorsToSelection } from '../lib/addAnchors';
+import { applyClipMask, releaseClipMask } from '../lib/masks';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -131,6 +132,8 @@ export function CanvasContextMenu() {
   const activeObj = c?.getActiveObject() ?? null;
   const canGroup = activeObj?.type === 'activeselection';
   const canUngroup = activeObj?.type === 'group';
+  const canClip = activeObj?.type === 'activeselection';
+  const canReleaseClip = !!(activeObj as { clipPath?: unknown } | undefined)?.clipPath;
   const canPaste = hasClipboard();
   const pathCount = active.filter(o => o.type === 'path').length;
   // A single editable text object → offer inline "Edit Text".
@@ -284,6 +287,18 @@ export function CanvasContextMenu() {
         kbd="Ctrl+Shift+G"
         disabled={!canUngroup}
         onClick={() => run(() => { ungroupSelection(); }, canUngroup)}
+      />
+      <Item
+        label={t('Make Clipping Mask')}
+        kbd="Ctrl+7"
+        disabled={!canClip}
+        onClick={() => run(() => { applyClipMask(); }, canClip)}
+      />
+      <Item
+        label={t('Release Clipping Mask')}
+        kbd="Ctrl+Alt+7"
+        disabled={!canReleaseClip}
+        onClick={() => run(() => { releaseClipMask(); }, canReleaseClip)}
       />
       <Separator />
       <Item

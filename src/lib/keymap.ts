@@ -81,6 +81,8 @@ export const BINDINGS: ShortcutBinding[] = [
   // -------- Group --------
   { id: 'edit.ungroup',          label: 'Ungroup',             defaultCombo: 'Ctrl+Shift+G' },
   { id: 'edit.group',            label: 'Group',               defaultCombo: 'Ctrl+G' },
+  { id: 'edit.clipMask',         label: 'Make Clipping Mask',  defaultCombo: 'Ctrl+7' },
+  { id: 'edit.releaseClip',      label: 'Release Clipping Mask', defaultCombo: 'Ctrl+Alt+7' },
 
   // -------- Zoom --------
   { id: 'view.zoomIn',           label: 'Zoom In',             defaultCombo: 'Ctrl+=' },

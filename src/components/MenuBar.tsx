@@ -6,6 +6,7 @@ import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
+import { applyClipMask, releaseClipMask } from '../lib/masks';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
 import { getFormat } from '../lib/formats';
@@ -169,6 +170,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Flip Horizontal'), onClick: () => flipSelection('x'), kbd: 'Shift+H' },
         { label: t('Flip Vertical'), onClick: () => flipSelection('y'), kbd: 'Shift+V' },
         { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: 'Ctrl+J' },
+        { sep: true },
+        { label: t('Make Clipping Mask'), onClick: () => { if (!applyClipMask()) toast.warn(t('Select 2 or more objects first.')); }, kbd: 'Ctrl+7' },
+        { label: t('Release Clipping Mask'), onClick: () => { if (!releaseClipMask()) toast.warn(t('Select a clipping group first.')); }, kbd: 'Ctrl+Alt+7' },
         { sep: true },
         { label: t('Lock Selection'), onClick: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
         { label: t('Unlock All'), onClick: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
