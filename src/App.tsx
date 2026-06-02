@@ -991,7 +991,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('keydown', onSpaceDown);
     window.addEventListener('keyup', onSpaceUp);
-    logger.info('app', 'Anchorworks ready. Press V/R/E/L/G/P/B/X/T/H/Z to switch tools. Hold Space to pan.');
+    logger.info('app', 'Anchorworks ready. Press V/R/E/L/G/P/B/X/T/H/Z/M to switch tools. Hold Space to pan.');
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keydown', onSpaceDown);

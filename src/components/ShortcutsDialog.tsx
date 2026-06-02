@@ -22,6 +22,7 @@ const TOOLS: Shortcut[] = [
   { keys: 'T', labelKey: 'Text' },
   { keys: 'H', labelKey: 'Hand' },
   { keys: 'Z', labelKey: 'Zoom' },
+  { keys: 'M', labelKey: 'Measure' },
   { keys: 'Space (hold)', labelKey: 'Temporary Hand (pan)' },
 ];
 

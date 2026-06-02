@@ -128,3 +128,5 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Persist user guides — editor.ts loadGuides()/persistGuides() save guides to
       localStorage (vector.guides) so they survive a reload, like artboards.
       2026-06-02.
+- [x] Doc sync — add the Measure tool (M) to the Shortcuts dialog + boot hint,
+      which were missing the new tool. 2026-06-02.
