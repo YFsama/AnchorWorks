@@ -431,3 +431,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Shift-constrain while drawing — shapeDrawUpdate(sp, constrain) (shapeDrawTool.ts)
       makes Shift draw rect→square / ellipse→circle (equal extents) and snap a line
       to the nearest 45°; registerTools passes the event's shiftKey. 2026-06-03.
+- [x] Shift-snap rotation — canvasEngine.ts object:rotating handler snaps the
+      angle to 15° increments while Shift is held (Illustrator behaviour); additive,
+      no effect without Shift. 2026-06-03.

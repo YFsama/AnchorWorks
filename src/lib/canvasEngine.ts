@@ -69,6 +69,14 @@ export function initCanvas(el: HTMLCanvasElement) {
   canvas.on('object:modified', () => pushHistory());
   canvas.on('object:removed', () => { pushHistory(); syncObjectCount(); });
   canvas.on('object:moving', (e) => { if (e.target) applySmartSnap(canvas!, e.target); });
+  // Shift while rotating snaps to 15° increments (Illustrator behaviour).
+  canvas.on('object:rotating', (e) => {
+    const ev = e.e as { shiftKey?: boolean } | undefined;
+    if (ev?.shiftKey && e.target) {
+      const snapped = Math.round((e.target.angle ?? 0) / 15) * 15;
+      e.target.set({ angle: ((snapped % 360) + 360) % 360 });
+    }
+  });
 
   canvas.on('selection:created', updateSelection);
   canvas.on('selection:updated', updateSelection);
