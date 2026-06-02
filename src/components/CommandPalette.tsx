@@ -27,6 +27,7 @@ import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { fitArtboardToContent } from '../lib/fitArtboard';
+import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { createOutlinesFromText } from '../lib/textToOutline';
@@ -200,6 +201,8 @@ export function CommandPalette({
     // `exportPDFReal` directly because it passes a full options object;
     // the no-args default path is what migrates to the registry.
     { id: 'file.exportPng',   label: t('Export PNG (2×)'),     category: t('File'), keywords: getFormat('png')?.keywords,        icon: FileImage,  run: () => { void getFormat('png')?.export?.(); } },
+    { id: 'file.exportSelSvg', label: t('Export Selection as SVG'), category: t('File'), keywords: 'export selection svg cropped only selected', icon: Save, run: () => { void exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+    { id: 'file.exportSelPng', label: t('Export Selection as PNG'), category: t('File'), keywords: 'export selection png cropped only selected', icon: FileImage, run: () => { void exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
     { id: 'file.exportJpg',   label: t('Export JPG (2×)'),     category: t('File'), keywords: getFormat('jpg')?.keywords,        icon: FileImage,  run: () => { void getFormat('jpg')?.export?.(); } },
     { id: 'file.exportPdf',   label: t('Export PDF'),          category: t('File'), keywords: getFormat('pdf')?.keywords,        icon: FileText,   run: () => { void getFormat('pdf')?.export?.(); } },
     { id: 'file.exportPdfV',  label: t('Export PDF (Vector)'), category: t('File'), keywords: getFormat('pdf-vector')?.keywords, icon: FileText,   run: () => { void getFormat('pdf-vector')?.export?.(); } },

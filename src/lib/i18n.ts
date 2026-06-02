@@ -849,6 +849,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Distort & Transform': { en: 'Distort & Transform', zh: '扭曲和变换' },
   'Edit Colors': { en: 'Edit Colors', zh: '编辑颜色' },
   'Sign Effects': { en: 'Sign Effects', zh: '标牌效果' },
+  'Export Selection as SVG': { en: 'Export Selection as SVG', zh: '导出所选为 SVG' },
+  'Export Selection as PNG': { en: 'Export Selection as PNG', zh: '导出所选为 PNG' },
   'Fit Artboard to Artwork': { en: 'Fit Artboard to Artwork', zh: '画板适配内容' },
   'Fit Artboard to Selection': { en: 'Fit Artboard to Selection', zh: '画板适配所选' },
   'Nothing to fit.': { en: 'Nothing to fit.', zh: '没有可适配的内容。' },

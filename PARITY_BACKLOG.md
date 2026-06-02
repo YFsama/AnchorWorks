@@ -351,3 +351,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Break Text into Letters/Lines, Text on Arc (Up/Down), Change Case submenu, and
       Find & Replace — text ops were scattered across the Character panel + palette
       with no menu-bar home (Illustrator's Type menu). 2026-06-03.
+- [x] Export Selection as SVG / PNG — exportSelection.ts renderSelection() clones
+      the selection into an offscreen StaticCanvas cropped to its bbox; exportSelection
+      SVG()/PNG() download just the selected art (Illustrator Export Selection); File
+      menu + command palette. 2026-06-03.

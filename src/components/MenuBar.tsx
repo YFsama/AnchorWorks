@@ -14,6 +14,7 @@ import { createOutlinesFromText } from '../lib/textToOutline';
 import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { changeCaseSelection } from '../lib/textCase';
 import { applyTextOnArc } from '../lib/textPath';
+import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -157,6 +158,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Export PDF (Vector)'), onClick: () => { void getFormat('pdf-vector')?.export?.(); } },
         { label: t('Export DXF (paths)'), onClick: () => { void getFormat('dxf')?.export?.(); } },
         { label: t('Export JSON'), onClick: () => { void getFormat('json')?.export?.(); } },
+        { sep: true },
+        { label: t('Export Selection as SVG'), onClick: () => { void exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+        { label: t('Export Selection as PNG'), onClick: () => { void exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
         { sep: true },
         { label: t('Print…'), onClick: () => setModal('showPrint', true), kbd: 'Ctrl+P' },
         { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true) },
