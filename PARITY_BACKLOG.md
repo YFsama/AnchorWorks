@@ -315,3 +315,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (clipboard.ts) that bring-to-fronts / send-to-backs the in-place paste
       (Illustrator Ctrl+F / Ctrl+B); keymap + App handlers, command palette, and
       right-click next to Paste in Place. 2026-06-02.
+- [x] Group/Ungroup + Arrange in the menu bar — added Group / Ungroup and Bring to
+      Front / Forward / Send Backward / to Back to the Edit menu (MenuBar.tsx);
+      these were right-click/shortcut/palette-only, absent from the top menu.
+      2026-06-02.

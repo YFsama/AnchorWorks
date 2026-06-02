@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, groupSelection, ungroupSelection, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
@@ -174,6 +174,13 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Flip Horizontal'), onClick: () => flipSelection('x'), kbd: 'Shift+H' },
         { label: t('Flip Vertical'), onClick: () => flipSelection('y'), kbd: 'Shift+V' },
         { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: 'Ctrl+J' },
+        { sep: true },
+        { label: t('Group'), onClick: () => { groupSelection(); }, kbd: 'Ctrl+G' },
+        { label: t('Ungroup'), onClick: () => { ungroupSelection(); }, kbd: 'Ctrl+Shift+G' },
+        { label: t('Bring to Front'), onClick: () => bringToFront() },
+        { label: t('Bring Forward'), onClick: () => bringForward(), kbd: 'Ctrl+]' },
+        { label: t('Send Backward'), onClick: () => sendBackward(), kbd: 'Ctrl+[' },
+        { label: t('Send to Back'), onClick: () => sendToBack() },
         { sep: true },
         { label: t('Make Clipping Mask'), onClick: () => { if (!applyClipMask()) toast.warn(t('Select 2 or more objects first.')); }, kbd: 'Ctrl+7' },
         { label: t('Release Clipping Mask'), onClick: () => { if (!releaseClipMask()) toast.warn(t('Select a clipping group first.')); }, kbd: 'Ctrl+Alt+7' },
