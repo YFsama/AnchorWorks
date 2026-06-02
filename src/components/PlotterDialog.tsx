@@ -29,6 +29,7 @@ export function PlotterDialog() {
   // raw G-code / HP-GL text for the machine.
   const [previewMode, setPreviewMode] = useState<'outline' | 'code'>('outline');
   const [showPrint, setShowPrint] = useState(true);
+  const [showOrder, setShowOrder] = useState(false);
   const [materialId, setMaterialId] = useState('');
   // Cut-by-colour: which source swatches are muted (excluded from this job).
   const [mutedColors, setMutedColors] = useState<Set<string>>(() => new Set());
@@ -327,6 +328,7 @@ export function PlotterDialog() {
                 cutPaths={previewPaths}
                 showPrint={showPrint}
                 mirror={opts.mirror}
+                showOrder={showOrder}
                 className="w-full h-56 bg-panel2 border border-border rounded-sm"
               />
             ) : (
@@ -386,6 +388,13 @@ export function PlotterDialog() {
                   <input type="checkbox" checked={showPrint} onChange={(e) => setShowPrint(e.target.checked)} />
                   <ImageIcon size={11} aria-hidden="true" />
                   {t('Show print')}
+                </label>
+              )}
+              {previewMode === 'outline' && (
+                <label className="flex items-center gap-1 cursor-pointer text-muted hover:text-ink" title={t('Number the cut paths in travel order with a start arrow.')}>
+                  <input type="checkbox" checked={showOrder} onChange={(e) => setShowOrder(e.target.checked)} />
+                  <Route size={11} aria-hidden="true" />
+                  {t('Cut order')}
                 </label>
               )}
               {previewMode === 'code' && (

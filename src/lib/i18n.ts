@@ -812,6 +812,11 @@ const dict: Record<string, Record<Lang, string>> = {
   'outline(s) added': { en: 'outline(s) added', zh: '个轮廓已添加' },
   'Align to': { en: 'Align to', zh: '对齐基准' },
   'Artboard': { en: 'Artboard', zh: '画板' },
+  'Cut order': { en: 'Cut order', zh: '切割顺序' },
+  'Number the cut paths in travel order with a start arrow.': {
+    en: 'Number the cut paths in travel order with a start arrow.',
+    zh: '按行进顺序给切割路径编号并标注起点箭头。',
+  },
   'Select shapes that have a stroke first.': {
     en: 'Select shapes that have a stroke first.',
     zh: '请先选中带描边的图形。',

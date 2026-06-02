@@ -1,9 +1,12 @@
 import { useMemo } from 'react';
 import { getCanvas } from '../lib/canvasEngine';
+import { optimizeOrder } from '../lib/cutOptimize';
 import { useT } from '../lib/i18n';
 import type { CutPath } from '../store/editor';
 
 const MM_TO_PX = 3.7795; // 96dpi convention used across the cutter pipeline
+/** Above this many outlines the numbered badges become noise — skip them. */
+const ORDER_BADGE_LIMIT = 60;
 
 interface CutPreviewProps {
   cutPaths: CutPath[];
@@ -13,6 +16,9 @@ interface CutPreviewProps {
   /** Mirror the cut geometry horizontally (HTV preview). The print overlay
    *  stays put — only the blade path flips, which is what the machine does. */
   mirror?: boolean;
+  /** Overlay cut-order numbers + a start arrow per path (same greedy order the
+   *  output uses) so the operator can see the travel sequence. */
+  showOrder?: boolean;
   className?: string;
 }
 
@@ -29,7 +35,7 @@ interface Bounds { minX: number; minY: number; w: number; h: number }
  * strokes use `vector-effect: non-scaling-stroke` so line weights stay
  * crisp at any preview scale instead of vanishing on a small sticker.
  */
-export function CutPreview({ cutPaths, showPrint = false, mirror = false, className }: CutPreviewProps) {
+export function CutPreview({ cutPaths, showPrint = false, mirror = false, showOrder = false, className }: CutPreviewProps) {
   const t = useT();
   // Rasterise the canvas once per render-input change. Tainted-canvas
   // (cross-origin image) safely degrades to "no print overlay".
@@ -74,6 +80,13 @@ export function CutPreview({ cutPaths, showPrint = false, mirror = false, classN
   const regmarks = cutPaths.filter(p => p.kind === 'regmark');
 
   const toPts = (path: CutPath) => path.points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
+
+  // Cut-order overlay: order the outlines exactly the way the output does
+  // (greedy travel optimise) and place a numbered badge + start arrow on each.
+  const badgeR = Math.max(2, Math.max(bounds.w, bounds.h) * 0.018);
+  const order = (showOrder && outlines.length > 0 && outlines.length <= ORDER_BADGE_LIMIT)
+    ? optimizeOrder(outlines.map(p => ({ points: p.points, closed: p.closed })))
+    : [];
 
   return (
     <svg
@@ -141,6 +154,29 @@ export function CutPreview({ cutPaths, showPrint = false, mirror = false, classN
             fill="#ff9a1f"
             vectorEffect="non-scaling-stroke"
           />
+        );
+      })}
+
+      {/* Cut-order overlay — start arrow + numbered badge per path. */}
+      {order.map((p, i) => {
+        const a = p.points[0];
+        const b = p.points[1] ?? a;
+        if (!a) return null;
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        const len = Math.hypot(dx, dy) || 1;
+        const ux = dx / len, uy = dy / len;
+        const tip: [number, number] = [a[0] + ux * badgeR * 3, a[1] + uy * badgeR * 3];
+        // Arrowhead triangle at the tip.
+        const aw = badgeR * 1.1;
+        const px = -uy, py = ux; // perpendicular
+        const head = `${tip[0]},${tip[1]} ${tip[0] - ux * aw + px * aw * 0.6},${tip[1] - uy * aw + py * aw * 0.6} ${tip[0] - ux * aw - px * aw * 0.6},${tip[1] - uy * aw - py * aw * 0.6}`;
+        return (
+          <g key={`ord-${i}`}>
+            <line x1={a[0]} y1={a[1]} x2={tip[0]} y2={tip[1]} stroke="#22d3ee" strokeWidth={1.3} vectorEffect="non-scaling-stroke" strokeLinecap="round" />
+            <polygon points={head} fill="#22d3ee" />
+            <circle cx={a[0]} cy={a[1]} r={badgeR} fill="#0b1220" stroke="#22d3ee" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            <text x={a[0]} y={a[1]} fontSize={badgeR * 1.5} fill="#22d3ee" textAnchor="middle" dominantBaseline="central" fontFamily="sans-serif">{i + 1}</text>
+          </g>
         );
       })}
       </g>
