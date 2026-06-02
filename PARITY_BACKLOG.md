@@ -111,5 +111,14 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       drops Ø-sized stones every N mm along the selection outline as cut-path
       circles; RhinestoneDialog (SS presets). Command palette + right-click.
       2026-06-02.
-- [ ] **Gradient mesh** (freeform multi-point gradient).
-- [ ] **Isolation mode** (double-click group to edit-in-place).
+- [~] **Gradient mesh** — BLOCKED: SVG/Fabric have no mesh-gradient primitive
+      (SVG2 mesh isn't shipped in browsers); a real implementation needs a bespoke
+      patch renderer. Out of scope for a surgical change — dedicated effort.
+- [~] **Isolation mode** — BLOCKED: Fabric v6 has no clean in-place group-child
+      editing (`interactive`/`subTargetCheck` aren't in the typings, no dblclick
+      infra); a faithful version needs significant bespoke interaction work.
+
+## Operation-convenience refinements (when the actionable backlog is blocked)
+- [x] Surface the new sign/effect operations (Multi-outline, Recolor, Rhinestone,
+      Variable Data, Auto-arrange/Nest) in the Document menu — previously command
+      palette + right-click only. 2026-06-02.

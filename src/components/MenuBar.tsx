@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection } from '../lib/canvasEngine';
+import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
 import { getFormat } from '../lib/formats';
 import { resetOnboarding } from '../lib/onboarding';
@@ -174,6 +175,18 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // Document because cut paths are document-level metadata
         // (alongside artboards/symbols), not edit-level operations.
         { label: t('Cut Contour…'), onClick: () => setModal('showCutContour', true), kbd: 'Ctrl+Shift+C' },
+        { sep: true },
+        // Sign / effect operations — also reachable via right-click + command
+        // palette; surfaced here for menu-bar discoverability.
+        { label: t('Multi-outline…'), onClick: () => setModal('showOutline', true) },
+        { label: t('Recolor Artwork…'), onClick: () => setModal('showRecolor', true) },
+        { label: t('Rhinestone Template…'), onClick: () => setModal('showRhinestone', true) },
+        { label: t('Variable Data…'), onClick: () => setModal('showVariableData', true) },
+        { label: t('Auto-arrange (Nest)'), onClick: () => {
+          const n = autoArrangeSelection();
+          if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
+          else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
+        } },
       ]} />
 
       <Dropdown label={t('Help')} items={[
