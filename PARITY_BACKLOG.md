@@ -157,3 +157,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Paste in Place — pasteFromClipboard(at, inPlace) keeps the copied coords
       (Illustrator Ctrl+Shift+V); keymap + App, right-click, command palette.
       2026-06-02.
+- [x] Make Guides from Selection — makeGuidesFromSelection() (selectionOps.ts)
+      drops ruler guides at each selected object's bbox edges (Illustrator
+      Make Guides); View menu + command palette. 2026-06-02.

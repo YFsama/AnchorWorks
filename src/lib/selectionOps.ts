@@ -19,6 +19,7 @@
 
 import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
+import { useEditor } from '../store/editor';
 
 type FabricObject = fabric.FabricObject;
 
@@ -157,6 +158,29 @@ export function showAll(): number {
   if (n > 0) {
     canvas.requestRenderAll();
     pushHistory();
+  }
+  return n;
+}
+
+/**
+ * Make guides from the selection (Illustrator View→Guides→Make Guides): drop a
+ * persistent ruler guide at each selected object's four bounding-box edges. The
+ * objects are kept (not consumed). Returns the number of guides added.
+ */
+export function makeGuidesFromSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length === 0) return 0;
+  const addGuide = useEditor.getState().addUserGuide;
+  let n = 0;
+  for (const o of objs) {
+    const r = o.getBoundingRect();
+    addGuide('v', r.left);
+    addGuide('v', r.left + r.width);
+    addGuide('h', r.top);
+    addGuide('h', r.top + r.height);
+    n += 4;
   }
   return n;
 }

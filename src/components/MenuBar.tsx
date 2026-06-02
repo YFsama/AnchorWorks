@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
@@ -173,6 +173,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { sep: true },
         { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: 'Ctrl+Alt+Y', checked: outlineMode },
         { sep: true },
+        { label: t('Make Guides from Selection'), onClick: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
         { label: t('Lock Guides'), onClick: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked), checked: guidesLocked },
         { label: t('Clear Guides'), onClick: () => useEditor.getState().clearUserGuides() },
       ]} />

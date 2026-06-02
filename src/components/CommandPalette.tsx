@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll, swapFillStroke,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll, swapFillStroke, makeGuidesFromSelection,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -272,6 +272,7 @@ export function CommandPalette({
     { id: 'view.zoomOut', label: t('Zoom Out'),    category: t('View'), shortcut: 'Ctrl+-', icon: Minus,     run: () => zoomBy(1 / 1.25) },
     { id: 'view.fit',     label: t('Fit to Page'), category: t('View'), shortcut: 'Ctrl+0', icon: Maximize2, run: () => zoomFit() },
     { id: 'view.outline', label: t('Outline View'), category: t('View'), shortcut: 'Ctrl+Alt+Y', keywords: 'wireframe geometry preview', icon: PenTool, run: () => setOutlineMode(!isOutlineMode()) },
+    { id: 'view.makeGuides', label: t('Make Guides from Selection'), category: t('View'), keywords: 'guide make convert selection bounds ruler', icon: Grid3X3, run: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
     { id: 'view.clearGuides', label: t('Clear Guides'), category: t('View'), keywords: 'guide ruler remove delete', icon: Grid3X3, run: () => useEditor.getState().clearUserGuides() },
     { id: 'view.lockGuides', label: t('Lock Guides'), category: t('View'), keywords: 'guide ruler lock freeze', icon: Grid3X3, run: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked) },
     { id: 'view.debug',   label: t('Toggle Debug'), category: t('View'), keywords: 'logs panel inspect',     icon: Bug,       run: onToggleDebug },
