@@ -44,7 +44,7 @@ export function cutSelection(): boolean {
  * a brand new id (Fabric generates one via `assignId` in canvasEngine via the
  * `object:added` listener). Returns false if the clipboard is empty.
  */
-export async function pasteFromClipboard(at?: { x: number; y: number }): Promise<boolean> {
+export async function pasteFromClipboard(at?: { x: number; y: number }, inPlace = false): Promise<boolean> {
   const c = getCanvas();
   if (!c || !clipboard) return false;
   const raw = Array.isArray(clipboard) ? clipboard : [clipboard];
@@ -81,8 +81,10 @@ export async function pasteFromClipboard(at?: { x: number; y: number }): Promise
   const maxY = Math.max(...bottoms);
   const groupCx = (minX + maxX) / 2;
   const groupCy = (minY + maxY) / 2;
-  const dx = centerX - groupCx;
-  const dy = centerY - groupCy;
+  // Paste in Place keeps the copied coordinates (no translation), so the paste
+  // lands exactly where it was copied — across artboards, layers, documents.
+  const dx = inPlace ? 0 : centerX - groupCx;
+  const dy = inPlace ? 0 : centerY - groupCy;
 
   c.discardActiveObject();
   for (const o of enlived) {

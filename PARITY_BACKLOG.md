@@ -154,3 +154,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Pathfinder Minus Back + palette — booleanOp gains 'minus-back' (front −
       back); Align-panel button + all 5 boolean ops added to the command palette
       (were panel-only). 2026-06-02.
+- [x] Paste in Place — pasteFromClipboard(at, inPlace) keeps the copied coords
+      (Illustrator Ctrl+Shift+V); keymap + App, right-click, command palette.
+      2026-06-02.

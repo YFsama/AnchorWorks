@@ -775,6 +775,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Download diagnostics': { en: 'Download diagnostics', zh: '下载诊断信息' },
   'Diagnostics copied': { en: 'Diagnostics copied', zh: '诊断信息已复制' },
   'Paste Here': { en: 'Paste Here', zh: '粘贴到此处' },
+  'Paste in Place': { en: 'Paste in Place', zh: '原位粘贴' },
   'Flip Horizontal': { en: 'Flip Horizontal', zh: '水平翻转' },
   'Flip Vertical': { en: 'Flip Vertical', zh: '垂直翻转' },
   'Edit Text': { en: 'Edit Text', zh: '编辑文字' },
