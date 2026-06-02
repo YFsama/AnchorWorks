@@ -415,3 +415,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (front-overlapped) parts then unites surviving same-fill pieces into one
       compound path each (Illustrator Pathfinder Merge), for flattening same-colour
       sign regions; Edit→Pathfinder submenu + command palette. 2026-06-03.
+- [x] Right-click submenu — CanvasContextMenu.tsx SubMenu (edge-aware left/right
+      flyout) folds the 7 path-effect items into a "Path Effects" submenu, cutting
+      the overgrown right-click menu's length. 2026-06-03.

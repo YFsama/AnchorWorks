@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import * as fabric from 'fabric';
 import {
   getCanvas,
@@ -132,6 +133,9 @@ export function CanvasContextMenu() {
   const activeObj = c?.getActiveObject() ?? null;
   const canGroup = activeObj?.type === 'activeselection';
   const canUngroup = activeObj?.type === 'group';
+  // Submenus fly out to the right unless the menu sits too close to the right
+  // edge, in which case they open leftward so they stay on-screen.
+  const openLeft = adjustedPos.x + MENU_WIDTH + 230 > (typeof window !== 'undefined' ? window.innerWidth : 99999);
   const canClip = activeObj?.type === 'activeselection';
   const canReleaseClip = !!(activeObj as { clipPath?: unknown } | undefined)?.clipPath;
   const canReleaseCompound = activeObj?.type === 'path';
@@ -430,46 +434,20 @@ export function CanvasContextMenu() {
         onClick={() => run(() => openModal('showRhinestone'), hasSelection)}
       />
       <Item
-        label={t('Add Anchor Points')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)}
-      />
-      <Item
-        label={t('Simplify Path…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showSimplify'), hasSelection)}
-      />
-      <Item
         label={t('Join Paths')}
         kbd="Ctrl+J"
         disabled={pathCount !== 1 && pathCount !== 2}
         onClick={() => run(() => { joinSelection(); }, pathCount === 1 || pathCount === 2)}
       />
-      <Item
-        label={t('Round Corners…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showRoundCorners'), hasSelection)}
-      />
-      <Item
-        label={t('Offset Path…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showOffsetPath'), hasSelection)}
-      />
-      <Item
-        label={t('Roughen…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showRoughen'), hasSelection)}
-      />
-      <Item
-        label={t('Zig Zag…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showZigzag'), hasSelection)}
-      />
-      <Item
-        label={t('Twist…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showTwist'), hasSelection)}
-      />
+      <SubMenu label={t('Path Effects')} openLeft={openLeft} disabled={!hasSelection}>
+        <Item label={t('Add Anchor Points')} disabled={!hasSelection} onClick={() => run(() => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
+        <Item label={t('Simplify Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showSimplify'), hasSelection)} />
+        <Item label={t('Round Corners…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoundCorners'), hasSelection)} />
+        <Item label={t('Offset Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOffsetPath'), hasSelection)} />
+        <Item label={t('Roughen…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoughen'), hasSelection)} />
+        <Item label={t('Zig Zag…')} disabled={!hasSelection} onClick={() => run(() => openModal('showZigzag'), hasSelection)} />
+        <Item label={t('Twist…')} disabled={!hasSelection} onClick={() => run(() => openModal('showTwist'), hasSelection)} />
+      </SubMenu>
       <Item
         label={t('Cut Contour…')}
         disabled={!hasSelection}
@@ -533,6 +511,35 @@ function Item({
 
 function Separator() {
   return <div className="my-1 border-t border-border" role="separator" />;
+}
+
+/** A right-click menu row that reveals a nested flyout panel on hover/focus.
+ *  `openLeft` flips the flyout to the left when the menu hugs the right edge. */
+function SubMenu({ label, openLeft, disabled, children }: { label: string; openLeft: boolean; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="relative group/sub">
+      <button
+        type="button"
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-label={label}
+        disabled={disabled}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
+      >
+        <span>{label}</span>
+        <ChevronRight size={12} aria-hidden="true" className="text-muted" />
+      </button>
+      {!disabled && (
+        <div
+          className={`absolute top-0 -mt-1 ${openLeft ? 'right-full' : 'left-full'} bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-all z-[1001] w-56 py-1`}
+          role="menu"
+          aria-label={label}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
