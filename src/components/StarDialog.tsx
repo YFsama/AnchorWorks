@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { X, Star } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { insertStar, insertRegularPolygon } from '../lib/shapes';
+import { insertStar, insertRegularPolygon, insertSpiral } from '../lib/shapes';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
@@ -15,17 +15,21 @@ export function StarDialog() {
   const t = useT();
   const open = useEditor(s => s.showStar);
   const close = useCallback(() => useEditor.getState().setModal('showStar', false), []);
-  const [mode, setMode] = useState<'star' | 'polygon'>('star');
+  const [mode, setMode] = useState<'star' | 'polygon' | 'spiral'>('star');
   const [points, setPoints] = useState(5);
   const [ratio, setRatio] = useState(0.45);
+  const [turns, setTurns] = useState(3);
+  const [decay, setDecay] = useState(0.8);
 
   useEscapeClose(open, close);
   useFocusRestore(open);
   if (!open) return null;
 
   const apply = () => {
-    const ok = mode === 'star' ? insertStar(points, ratio) : insertRegularPolygon(points);
-    if (ok) toast.success(t(mode === 'star' ? 'Star added' : 'Polygon added'), { title: t('Star / Polygon') });
+    const ok = mode === 'star' ? insertStar(points, ratio)
+      : mode === 'polygon' ? insertRegularPolygon(points)
+      : insertSpiral(turns, decay);
+    if (ok) toast.success(t(mode === 'star' ? 'Star added' : mode === 'polygon' ? 'Polygon added' : 'Spiral added'), { title: t('Star / Polygon') });
     close();
   };
 
@@ -48,18 +52,34 @@ export function StarDialog() {
         <div className="flex gap-1 mb-3" role="tablist">
           <button type="button" role="tab" aria-selected={mode === 'star'} className={mode === 'star' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setMode('star')}>{t('Star')}</button>
           <button type="button" role="tab" aria-selected={mode === 'polygon'} className={mode === 'polygon' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setMode('polygon')}>{t('Polygon')}</button>
+          <button type="button" role="tab" aria-selected={mode === 'spiral'} className={mode === 'spiral' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setMode('spiral')}>{t('Spiral')}</button>
         </div>
 
-        <label className="block">
-          <div className="field-label flex items-center justify-between"><span>{mode === 'star' ? t('Points') : t('Sides')}</span><span className="text-ink tabular-nums">{points}</span></div>
-          <input type="range" min={3} max={20} step={1} value={points} onChange={(e) => setPoints(parseInt(e.target.value, 10))} className="w-full" aria-label={mode === 'star' ? t('Points') : t('Sides')} />
-        </label>
+        {mode !== 'spiral' && (
+          <label className="block">
+            <div className="field-label flex items-center justify-between"><span>{mode === 'star' ? t('Points') : t('Sides')}</span><span className="text-ink tabular-nums">{points}</span></div>
+            <input type="range" min={3} max={20} step={1} value={points} onChange={(e) => setPoints(parseInt(e.target.value, 10))} className="w-full" aria-label={mode === 'star' ? t('Points') : t('Sides')} />
+          </label>
+        )}
 
         {mode === 'star' && (
           <label className="block mt-2">
             <div className="field-label flex items-center justify-between"><span>{t('Inner radius')}</span><span className="text-ink tabular-nums">{Math.round(ratio * 100)}%</span></div>
             <input type="range" min={0.05} max={0.95} step={0.01} value={ratio} onChange={(e) => setRatio(parseFloat(e.target.value))} className="w-full" aria-label={t('Inner radius')} />
           </label>
+        )}
+
+        {mode === 'spiral' && (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <div className="field-label flex items-center justify-between"><span>{t('Winds')}</span><span className="text-ink tabular-nums">{turns}</span></div>
+              <input type="range" min={1} max={10} step={1} value={turns} onChange={(e) => setTurns(parseInt(e.target.value, 10))} className="w-full" aria-label={t('Winds')} />
+            </label>
+            <label className="block">
+              <div className="field-label flex items-center justify-between"><span>{t('Decay')}</span><span className="text-ink tabular-nums">{Math.round(decay * 100)}%</span></div>
+              <input type="range" min={0.1} max={0.99} step={0.01} value={decay} onChange={(e) => setDecay(parseFloat(e.target.value))} className="w-full" aria-label={t('Decay')} />
+            </label>
+          </div>
         )}
 
         <div className="flex justify-end gap-2 mt-3">

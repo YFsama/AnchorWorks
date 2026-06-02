@@ -261,3 +261,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       build a parametric star (points + inner-radius ratio) or regular polygon
       centred on the document (Illustrator Star/Polygon tools); StarDialog (mode
       tabs) + Document menu + command palette (Insert). 2026-06-02.
+- [x] Spiral generator + shape tests — shapes.ts insertSpiral() (open log-spiral,
+      winds + decay, stroke-only) as a 3rd StarDialog tab; extracted pure
+      starVertices/polygonVertices/spiralVertices and added __tests__/shapes.test.ts
+      (6 tests: radii, top-tip, clamps, spiral monotonic decay). 2026-06-02.
