@@ -89,8 +89,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       MeasureLayer.tsx draw a click-drag segment with a px/mm/angle readout; never
       mutates the document. Auto-listed in toolbar/palette/keymap. (Persistent
       dimension annotations are a follow-up.) 2026-06-02.
-- [ ] **Recolor artwork** — remap all colours in the selection through a small
-      swatch-to-swatch table (Illustrator: Recolor Artwork).
+- [x] **Recolor artwork** — collectSelectionColors()/recolorSelection() in
+      selectionApply.ts (walks groups, remaps solid fills+strokes); RecolorDialog
+      swatch table. Command palette + right-click. 2026-06-02.
 - [ ] **Serial / variable data** — generate N copies with an incrementing number
       or a list (SignMaster badges/numbering).
 - [ ] **PLT import colour restore** — carry pen/colour info from imported PLT so
