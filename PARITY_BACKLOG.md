@@ -482,3 +482,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Preferences "Grid size (px)" field updates the store live and persists, and
       CanvasView applies the saved value on boot (the grid was hardcoded 20px with
       no UI). 2026-06-03.
+- [x] Eyedropper copies type — eyedropperTool.ts readTextStyle() + paint() now also
+      transfer font family/size/weight/style/tracking/leading/align/underline between
+      text objects (Illustrator's eyedropper carries type attributes). 2026-06-03.

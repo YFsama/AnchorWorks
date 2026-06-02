@@ -19,6 +19,10 @@ import type { ToolMouseCtx } from './types';
 /** Appearance properties an eyedropper transfers. */
 type Appearance = Pick<fabric.FabricObject, 'fill' | 'stroke' | 'strokeWidth' | 'opacity'>;
 
+const TEXT_TYPES = new Set(['i-text', 'text', 'textbox']);
+const TEXT_KEYS = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'charSpacing', 'lineHeight', 'textAlign', 'underline', 'linethrough'] as const;
+type TextStyle = Record<string, unknown>;
+
 /** Objects that were selected when the tool went active — the paint targets. */
 let recipients: fabric.FabricObject[] = [];
 
@@ -56,11 +60,26 @@ function readAppearance(source: fabric.FabricObject): Appearance {
   };
 }
 
-/** Paint a set of objects (descending groups) with one appearance. */
-function paint(objs: fabric.FabricObject[], look: Appearance): void {
+/** Read type attributes off the first text leaf of `source`, or null if none. */
+function readTextStyle(source: fabric.FabricObject): TextStyle | null {
+  for (const o of walk(source)) {
+    if (TEXT_TYPES.has(o.type ?? '')) {
+      const rec = o as unknown as Record<string, unknown>;
+      const out: TextStyle = {};
+      for (const k of TEXT_KEYS) out[k] = rec[k];
+      return out;
+    }
+  }
+  return null;
+}
+
+/** Paint a set of objects (descending groups) with one appearance; also copy
+ *  `textStyle` onto any text recipients (Illustrator's eyedropper carries type). */
+function paint(objs: fabric.FabricObject[], look: Appearance, textStyle: TextStyle | null): void {
   for (const r of objs) {
     for (const o of walk(r)) {
       o.set(look);
+      if (textStyle && TEXT_TYPES.has(o.type ?? '')) o.set(textStyle);
       o.setCoords();
     }
   }
@@ -85,7 +104,7 @@ export function eyedropperPick(ctx: ToolMouseCtx): void {
       toast.warn(t('Select objects first, then click one to copy its look.'));
       return;
     }
-    paint([source], readAppearance(live[0]));
+    paint([source], readAppearance(live[0]), readTextStyle(live[0]));
     canvas.requestRenderAll();
     pushHistory();
     toast.success(t('Appearance applied'));
@@ -98,7 +117,7 @@ export function eyedropperPick(ctx: ToolMouseCtx): void {
     return;
   }
 
-  paint(targets, readAppearance(source));
+  paint(targets, readAppearance(source), readTextStyle(source));
   canvas.discardActiveObject();
   canvas.setActiveObject(
     targets.length === 1 ? targets[0] : new fabric.ActiveSelection(targets, { canvas }),
