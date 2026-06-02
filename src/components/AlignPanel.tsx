@@ -22,7 +22,13 @@ export function AlignPanel() {
   const [open, setOpen] = useState(true);
   const selCount = useEditor(s => s.selectionIds.length);
   const selectionSummary = useEditor(s => s.selectionSummary);
-  const enoughForAlign = selCount >= 2;
+  const artboardCount = useEditor(s => s.artboards.length);
+  const [alignRef, setAlignRef] = useState<'selection' | 'artboard'>('selection');
+  // Aligning to the artboard works on a single object; aligning to the
+  // selection's own bounds needs 2+.
+  const enoughForAlign = alignRef === 'artboard'
+    ? (selCount >= 1 && artboardCount >= 1)
+    : selCount >= 2;
   const enoughForDistribute = selCount >= 3;
   const enoughForBool = selCount >= 2;
   // Clip mask needs 2+ selected; compound needs 2+ (any objects we can rasterise
@@ -52,24 +58,36 @@ export function AlignPanel() {
       {open && (
         <div id="align-panel-body" className="px-3 pb-3 space-y-3">
           <div>
-            <h4 className="field-label">{t('Align')}</h4>
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="field-label !mb-0">{t('Align')}</h4>
+              <select
+                className="input-num !h-6 !py-0 !text-[10px] !w-auto"
+                value={alignRef}
+                onChange={(e) => setAlignRef(e.target.value as 'selection' | 'artboard')}
+                title={t('Align to')}
+                aria-label={t('Align to')}
+              >
+                <option value="selection">{t('Selection')}</option>
+                <option value="artboard">{t('Artboard')}</option>
+              </select>
+            </div>
             <div className="grid grid-cols-6 gap-1">
-              <Btn title={t('Align left')} disabled={!enoughForAlign} onClick={() => alignSelection('left')}>
+              <Btn title={t('Align left')} disabled={!enoughForAlign} onClick={() => alignSelection('left', alignRef)}>
                 <AlignStartVertical size={14} aria-hidden="true" />
               </Btn>
-              <Btn title={t('Align center horizontally')} disabled={!enoughForAlign} onClick={() => alignSelection('centerH')}>
+              <Btn title={t('Align center horizontally')} disabled={!enoughForAlign} onClick={() => alignSelection('centerH', alignRef)}>
                 <AlignCenterVertical size={14} aria-hidden="true" />
               </Btn>
-              <Btn title={t('Align right')} disabled={!enoughForAlign} onClick={() => alignSelection('right')}>
+              <Btn title={t('Align right')} disabled={!enoughForAlign} onClick={() => alignSelection('right', alignRef)}>
                 <AlignEndVertical size={14} aria-hidden="true" />
               </Btn>
-              <Btn title={t('Align top')} disabled={!enoughForAlign} onClick={() => alignSelection('top')}>
+              <Btn title={t('Align top')} disabled={!enoughForAlign} onClick={() => alignSelection('top', alignRef)}>
                 <AlignStartHorizontal size={14} aria-hidden="true" />
               </Btn>
-              <Btn title={t('Align center vertically')} disabled={!enoughForAlign} onClick={() => alignSelection('centerV')}>
+              <Btn title={t('Align center vertically')} disabled={!enoughForAlign} onClick={() => alignSelection('centerV', alignRef)}>
                 <AlignCenterHorizontal size={14} aria-hidden="true" />
               </Btn>
-              <Btn title={t('Align bottom')} disabled={!enoughForAlign} onClick={() => alignSelection('bottom')}>
+              <Btn title={t('Align bottom')} disabled={!enoughForAlign} onClick={() => alignSelection('bottom', alignRef)}>
                 <AlignEndHorizontal size={14} aria-hidden="true" />
               </Btn>
             </div>

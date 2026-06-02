@@ -14,33 +14,49 @@
  */
 
 import { getCanvas, pushHistory } from './canvasEngine';
+import { useEditor } from '../store/editor';
 
 export type AlignAxis = 'left' | 'centerH' | 'right' | 'top' | 'centerV' | 'bottom';
 export type DistributeDir = 'horizontal' | 'vertical';
+/** What the alignment snaps to — the selection's own bounds, or the artboard. */
+export type AlignRef = 'selection' | 'artboard';
 
 /**
- * Align the active selection along the given axis. Requires 2+ objects.
- * Uses each object's bounding rect against the union bounds of the selection.
+ * Align the active selection along the given axis. `ref` chooses the reference
+ * frame (Illustrator's "Align To"):
+ *   - 'selection' — the union bounds of the selected objects (needs 2+).
+ *   - 'artboard'  — the first artboard's rect (works on a single object too).
  */
-export function alignSelection(axis: AlignAxis): void {
+export function alignSelection(axis: AlignAxis, ref: AlignRef = 'selection'): void {
   const canvas = getCanvas();
   if (!canvas) return;
   const objs = canvas.getActiveObjects();
-  if (objs.length < 2) return;
-  const bounds = objs.map(o => o.getBoundingRect());
-  const minLeft = Math.min(...bounds.map(b => b.left));
-  const maxRight = Math.max(...bounds.map(b => b.left + b.width));
-  const minTop = Math.min(...bounds.map(b => b.top));
-  const maxBottom = Math.max(...bounds.map(b => b.top + b.height));
-  objs.forEach((o, i) => {
-    const b = bounds[i];
+  if (objs.length === 0) return;
+
+  let refLeft: number, refRight: number, refTop: number, refBottom: number;
+  if (ref === 'artboard') {
+    const abs = useEditor.getState().artboards;
+    if (abs.length === 0) return;
+    const a = abs[0];
+    refLeft = a.x; refRight = a.x + a.width; refTop = a.y; refBottom = a.y + a.height;
+  } else {
+    if (objs.length < 2) return;
+    const b = objs.map(o => o.getBoundingRect());
+    refLeft = Math.min(...b.map(r => r.left));
+    refRight = Math.max(...b.map(r => r.left + r.width));
+    refTop = Math.min(...b.map(r => r.top));
+    refBottom = Math.max(...b.map(r => r.top + r.height));
+  }
+
+  objs.forEach((o) => {
+    const b = o.getBoundingRect();
     let dx = 0, dy = 0;
-    if (axis === 'left') dx = minLeft - b.left;
-    else if (axis === 'right') dx = maxRight - (b.left + b.width);
-    else if (axis === 'centerH') dx = (minLeft + maxRight) / 2 - (b.left + b.width / 2);
-    else if (axis === 'top') dy = minTop - b.top;
-    else if (axis === 'bottom') dy = maxBottom - (b.top + b.height);
-    else if (axis === 'centerV') dy = (minTop + maxBottom) / 2 - (b.top + b.height / 2);
+    if (axis === 'left') dx = refLeft - b.left;
+    else if (axis === 'right') dx = refRight - (b.left + b.width);
+    else if (axis === 'centerH') dx = (refLeft + refRight) / 2 - (b.left + b.width / 2);
+    else if (axis === 'top') dy = refTop - b.top;
+    else if (axis === 'bottom') dy = refBottom - (b.top + b.height);
+    else if (axis === 'centerV') dy = (refTop + refBottom) / 2 - (b.top + b.height / 2);
     o.set({ left: (o.left ?? 0) + dx, top: (o.top ?? 0) + dy });
     o.setCoords();
   });

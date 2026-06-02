@@ -810,6 +810,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Outer ring': { en: 'Outer ring', zh: '外圈' },
   'Ring': { en: 'Ring', zh: '圈' },
   'outline(s) added': { en: 'outline(s) added', zh: '个轮廓已添加' },
+  'Align to': { en: 'Align to', zh: '对齐基准' },
+  'Artboard': { en: 'Artboard', zh: '画板' },
   'Select shapes that have a stroke first.': {
     en: 'Select shapes that have a stroke first.',
     zh: '请先选中带描边的图形。',
