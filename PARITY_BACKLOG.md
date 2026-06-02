@@ -151,3 +151,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Swap Fill/Stroke — swapFillStroke() (selectionApply.ts) exchanges the
       selection's fill & stroke colours (Illustrator Shift+X); keymap + App +
       command palette. 2026-06-02.
+- [x] Pathfinder Minus Back + palette — booleanOp gains 'minus-back' (front −
+      back); Align-panel button + all 5 boolean ops added to the command palette
+      (were panel-only). 2026-06-02.

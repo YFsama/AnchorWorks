@@ -132,6 +132,9 @@ export function AlignPanel() {
               <TextBtn title={t('Intersection of shapes')} disabled={!enoughForBool} onClick={() => booleanOp('intersect')}>{t('Intersect')}</TextBtn>
               <TextBtn title={t('Exclude overlapping area')} disabled={!enoughForBool} onClick={() => booleanOp('exclude')}>{t('Exclude')}</TextBtn>
             </div>
+            <div className="grid grid-cols-1 gap-1 mt-1">
+              <TextBtn title={t('Subtract back shape from front')} disabled={!enoughForBool} onClick={() => booleanOp('minus-back')}>{t('Minus Back')}</TextBtn>
+            </div>
           </div>
 
           <div>

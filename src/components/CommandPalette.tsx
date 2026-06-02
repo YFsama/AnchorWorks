@@ -22,6 +22,7 @@ import { toast } from '../lib/toast';
 import { setOutlineMode, isOutlineMode } from '../lib/outlineView';
 import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
+import { booleanOp } from '../lib/booleanOps';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
 import { applyTextOnArc } from '../lib/textPath';
@@ -230,6 +231,11 @@ export function CommandPalette({
     { id: 'arrange.compFree',  label: t('Release Compound'),   category: t('Arrange'), keywords: 'split decompose paths', icon: PenTool,      run: () => { releaseCompoundPath(); } },
     { id: 'path.simplify',     label: t('Simplify Path…'),     category: t('Arrange'), keywords: 'simplify reduce anchor points douglas peucker smooth', icon: PenTool, run: () => setModal('showSimplify', true) },
     { id: 'path.join',         label: t('Join Paths'),         category: t('Arrange'), shortcut: 'Ctrl+J', keywords: 'join connect close path endpoints merge', icon: PenTool, run: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); } },
+    { id: 'bool.union',     label: t('Union'),     category: t('Arrange'), keywords: 'pathfinder boolean unite merge combine', icon: Wand2, run: () => { void booleanOp('union'); } },
+    { id: 'bool.subtract',  label: t('Subtract'),  category: t('Arrange'), keywords: 'pathfinder boolean minus front difference', icon: Wand2, run: () => { void booleanOp('subtract'); } },
+    { id: 'bool.intersect', label: t('Intersect'), category: t('Arrange'), keywords: 'pathfinder boolean intersection overlap', icon: Wand2, run: () => { void booleanOp('intersect'); } },
+    { id: 'bool.exclude',   label: t('Exclude'),   category: t('Arrange'), keywords: 'pathfinder boolean xor exclude', icon: Wand2, run: () => { void booleanOp('exclude'); } },
+    { id: 'bool.minusBack', label: t('Minus Back'), category: t('Arrange'), keywords: 'pathfinder boolean minus back subtract', icon: Wand2, run: () => { void booleanOp('minus-back'); } },
     { id: 'cut.weld',          label: t('Weld'),               category: t('Arrange'), keywords: 'merge union combine cut weld overlap sign', icon: Wand2, run: () => {
       const objs = getCanvas()?.getActiveObjects() ?? [];
       if (!objs.length) { toast.warn(t('Select one or more shapes first.')); return; }

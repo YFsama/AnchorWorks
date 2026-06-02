@@ -817,6 +817,10 @@ const dict: Record<string, Record<Lang, string>> = {
   'Transform…': { en: 'Transform…', zh: '变换…' },
   'Join Paths': { en: 'Join Paths', zh: '连接路径' },
   'Swap Fill / Stroke': { en: 'Swap Fill / Stroke', zh: '互换填充与描边' },
+  'Minus Back': { en: 'Minus Back', zh: '减去后方' },
+  'Subtract back shape from front': {
+    en: 'Subtract back shape from front', zh: '从前面的图形中减去后面的图形',
+  },
   'selected': { en: 'selected', zh: '个已选中' },
   'Hide Selection': { en: 'Hide Selection', zh: '隐藏所选' },
   'Show All': { en: 'Show All', zh: '全部显示' },

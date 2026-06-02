@@ -23,7 +23,7 @@ import ClippingWorker from './workers/clipping.worker.ts?worker';
 
 type FabricObject = fabric.FabricObject;
 
-export type BoolOp = 'union' | 'subtract' | 'intersect' | 'exclude';
+export type BoolOp = 'union' | 'subtract' | 'intersect' | 'exclude' | 'minus-back';
 
 const FLATTEN_TOLERANCE = 1; // ~1px sampling step
 
@@ -343,11 +343,14 @@ export async function booleanOp(op: BoolOp): Promise<fabric.Path | null> {
 
   // polygon-clipping expects MultiPolygon-compatible (Polygon or MultiPolygon).
   // A single polygon is "Ring[]" — pass rings as the outer polygon's ring list.
-  const subjGeom: Ring[][] = [subjectRings as Ring[]];
-  const clipGeom: Ring[][] = [clipRings as Ring[]];
+  // Minus Back subtracts the BACK shape from the FRONT (front − back), so we
+  // swap the operands vs Subtract (which does bottom − top) and difference them.
+  const minusBack = op === 'minus-back';
+  const subjGeom: Ring[][] = [(minusBack ? clipRings : subjectRings) as Ring[]];
+  const clipGeom: Ring[][] = [(minusBack ? subjectRings : clipRings) as Ring[]];
 
   const workerOp: WorkerOp =
-    op === 'subtract' ? 'difference' :
+    op === 'subtract' || minusBack ? 'difference' :
     op === 'intersect' ? 'intersection' :
     op === 'exclude' ? 'xor' : 'union';
 
@@ -379,13 +382,15 @@ export async function booleanOp(op: BoolOp): Promise<fabric.Path | null> {
   const d = multiPolygonToPathD(result);
   if (!d) return null;
 
-  // Inherit visual properties from the bottom (subject) object so the result
-  // looks like a continuation of the larger shape.
+  // Inherit visual properties from the surviving shape: the front (clip) for
+  // Minus Back, otherwise the bottom (subject) so the result reads as a
+  // continuation of the larger shape.
+  const styleSrc = minusBack ? clip : subject;
   const path = new fabric.Path(d, {
-    fill: (subject.fill as string) ?? '#3d9bff',
-    stroke: (subject.stroke as string) ?? '',
-    strokeWidth: subject.strokeWidth ?? 0,
-    opacity: subject.opacity ?? 1,
+    fill: (styleSrc.fill as string) ?? '#3d9bff',
+    stroke: (styleSrc.stroke as string) ?? '',
+    strokeWidth: styleSrc.strokeWidth ?? 0,
+    opacity: styleSrc.opacity ?? 1,
   });
 
   // Remove the two operands and add the new path.
