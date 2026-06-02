@@ -428,3 +428,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Right-click Sign Effects submenu — folded Multi-outline / Recolor Artwork /
       Auto-arrange / Rhinestone into a "Sign Effects" flyout in CanvasContextMenu,
       further shortening the right-click menu. 2026-06-03.
+- [x] Shift-constrain while drawing — shapeDrawUpdate(sp, constrain) (shapeDrawTool.ts)
+      makes Shift draw rect→square / ellipse→circle (equal extents) and snap a line
+      to the nearest 45°; registerTools passes the event's shiftKey. 2026-06-03.

@@ -59,10 +59,17 @@ export function shapeDrawBegin(tool: ShapeTool, sp: { x: number; y: number }): v
 
 /** mousemove — resize the in-progress shape to span from `drawStart` to
  *  `sp` (snapped). Per-frame mutation; one render request at the end. */
-export function shapeDrawUpdate(sp: { x: number; y: number }): void {
+export function shapeDrawUpdate(sp: { x: number; y: number }, constrain = false): void {
   const canvas = getCanvas();
   if (!canvas || !isDrawing || !drawTarget || !drawStart || !drawingTool) return;
-  const dp = maybeSnap(sp);
+  let dp = maybeSnap(sp);
+  // Shift constrains rect→square / ellipse→circle (equal extents) and a line to
+  // the nearest 45°.
+  if (constrain && drawingTool !== 'line') {
+    const dx = dp.x - drawStart.x, dy = dp.y - drawStart.y;
+    const s = Math.max(Math.abs(dx), Math.abs(dy));
+    dp = { x: drawStart.x + (dx < 0 ? -s : s), y: drawStart.y + (dy < 0 ? -s : s) };
+  }
   if (drawingTool === 'rect') {
     const r = drawTarget as fabric.Rect;
     r.set({
@@ -84,7 +91,15 @@ export function shapeDrawUpdate(sp: { x: number; y: number }): void {
     });
   } else {
     const l = drawTarget as fabric.Line;
-    l.set({ x2: dp.x, y2: dp.y });
+    let ex = dp.x, ey = dp.y;
+    if (constrain) {
+      const dx = dp.x - drawStart.x, dy = dp.y - drawStart.y;
+      const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+      const len = Math.hypot(dx, dy);
+      ex = drawStart.x + Math.cos(ang) * len;
+      ey = drawStart.y + Math.sin(ang) * len;
+    }
+    l.set({ x2: ex, y2: ey });
   }
   drawTarget.setCoords();
   canvas.requestRenderAll();

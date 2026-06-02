@@ -98,7 +98,7 @@ export function registerBuiltInTools(): void {
     shortcut: 'R',
     cursor: 'crosshair',
     onMouseDown: (ctx) => shapeDrawBegin('rect', ctx.sp),
-    onMouseMove: (ctx) => { if (isShapeDrawActive()) shapeDrawUpdate(ctx.sp); },
+    onMouseMove: (ctx) => { if (isShapeDrawActive()) shapeDrawUpdate(ctx.sp, (ctx.raw.e as MouseEvent).shiftKey); },
     onMouseUp: () => { if (isShapeDrawActive()) shapeDrawEnd(); },
   });
   registerTool({
@@ -108,7 +108,7 @@ export function registerBuiltInTools(): void {
     shortcut: 'E',
     cursor: 'crosshair',
     onMouseDown: (ctx) => shapeDrawBegin('ellipse', ctx.sp),
-    onMouseMove: (ctx) => { if (isShapeDrawActive()) shapeDrawUpdate(ctx.sp); },
+    onMouseMove: (ctx) => { if (isShapeDrawActive()) shapeDrawUpdate(ctx.sp, (ctx.raw.e as MouseEvent).shiftKey); },
     onMouseUp: () => { if (isShapeDrawActive()) shapeDrawEnd(); },
   });
   registerTool({
@@ -118,7 +118,7 @@ export function registerBuiltInTools(): void {
     shortcut: 'L',
     cursor: 'crosshair',
     onMouseDown: (ctx) => shapeDrawBegin('line', ctx.sp),
-    onMouseMove: (ctx) => { if (isShapeDrawActive()) shapeDrawUpdate(ctx.sp); },
+    onMouseMove: (ctx) => { if (isShapeDrawActive()) shapeDrawUpdate(ctx.sp, (ctx.raw.e as MouseEvent).shiftKey); },
     onMouseUp: () => { if (isShapeDrawActive()) shapeDrawEnd(); },
   });
   registerTool({
