@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MousePointer2, Move, Hash, Magnet, Crosshair, Target, Maximize2, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
-import { zoomToArtboard } from '../lib/canvasEngine';
+import { zoomToArtboard, zoomToPercent } from '../lib/canvasEngine';
 import { getTool } from '../lib/tools/types';
 
 export function StatusBar() {
@@ -67,7 +67,7 @@ export function StatusBar() {
         <span className="ml-1">Y</span> <span className="text-ink">{cursorY}</span>
       </span>
       <Sep />
-      <span className="tabular-nums" aria-label={`${t('Zoom')} ${Math.round(zoom * 100)}%`}>{t('Zoom')} <span className="text-ink">{Math.round(zoom * 100)}%</span></span>
+      <ZoomField zoom={zoom} label={t('Zoom')} />
       <Sep />
       <span className="tabular-nums" aria-label={`${t('Objects')} ${objectCount}`}>{t('Objects')} <span className="text-ink">{objectCount}</span></span>
       <Sep />
@@ -157,6 +157,52 @@ export function StatusBar() {
 }
 
 function Sep() { return <span className="statusbar-sep" aria-hidden="true" />; }
+
+/** Click-to-edit zoom percentage — type a number + Enter to jump to that zoom
+ *  (Illustrator / SignMaster status-bar zoom field), centred on the viewport. */
+function ZoomField({ zoom, label }: { zoom: number; label: string }) {
+  const t = useT();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const pct = Math.round(zoom * 100);
+
+  const commit = () => {
+    const v = parseFloat(draft);
+    if (Number.isFinite(v) && v > 0) zoomToPercent(v);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        inputMode="numeric"
+        autoFocus
+        defaultValue={String(pct)}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => { setDraft(String(pct)); e.target.select(); }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          else if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+        }}
+        className="w-12 px-1 text-[10px] tabular-nums text-ink bg-panel2 border border-accent rounded outline-none"
+        aria-label={t('Set zoom percentage')}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="tabular-nums hover:text-ink transition-colors"
+      title={t('Set zoom percentage')}
+      aria-label={`${label} ${pct}%`}
+    >
+      {label} <span className="text-ink">{pct}%</span>
+    </button>
+  );
+}
 
 function Badge({ active, icon, label }: { active: boolean; icon: React.ReactNode; label: string }) {
   const t = useT();

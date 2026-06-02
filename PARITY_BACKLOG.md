@@ -236,3 +236,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Quick rotate 90°/180° — rotateSelection(deg) (transformOps.ts) wraps
       applyTransform to spin the selection about its centre; Rotate 90° CW/CCW +
       180° in the Edit menu, command palette, and right-click (CW/CCW). 2026-06-02.
+- [x] Editable zoom field — StatusBar.tsx ZoomField turns the read-only zoom
+      readout into a click-to-edit input; viewport.ts zoomToPercent() jumps to a
+      typed % centred on the viewport (Illustrator/SignMaster status-bar zoom).
+      2026-06-02.

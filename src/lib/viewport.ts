@@ -83,6 +83,16 @@ export function zoomBy(factor: number): void {
   zoomToPoint(c.x, c.y, canvas.getZoom() * factor);
 }
 
+/** Set an absolute zoom level (1 = 100%), keeping the scene centred — backs the
+ *  editable zoom field in the status bar. The input percentage is clamped to the
+ *  same MIN/MAX as every other zoom path. */
+export function zoomToPercent(pct: number): void {
+  const canvas = getCanvas();
+  if (!canvas || !Number.isFinite(pct)) return;
+  const c = canvas.getCenterPoint();
+  zoomToPoint(c.x, c.y, pct / 100);
+}
+
 /** Fit the document bounds to the visible canvas with `FIT_PADDING` margin. */
 export function zoomFit(): void {
   const canvas = getCanvas();

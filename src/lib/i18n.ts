@@ -152,6 +152,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Text': { en: 'Text', zh: '文本' },
   'Hand': { en: 'Hand', zh: '抓手' },
   'Zoom': { en: 'Zoom', zh: '缩放' },
+  'Set zoom percentage': { en: 'Set zoom percentage', zh: '设置缩放百分比' },
 
   // -------- Properties panel: section headers --------
   'Appearance': { en: 'Appearance', zh: '外观' },
