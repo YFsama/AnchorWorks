@@ -830,6 +830,8 @@ export default function App() {
       if (match('edit.group')) { e.preventDefault(); groupSelection(); pushHistory(); announce(t('Group')); return; }
       if (match('edit.clipMask')) { e.preventDefault(); if (applyClipMask()) { pushHistory(); announce(t('Make Clipping Mask')); } else toast.warn(t('Select 2 or more objects first.')); return; }
       if (match('edit.releaseClip')) { e.preventDefault(); if (releaseClipMask()) { pushHistory(); announce(t('Release Clipping Mask')); } else toast.warn(t('Select a clipping group first.')); return; }
+      if (match('edit.compoundPath')) { e.preventDefault(); if (makeCompoundPath()) announce(t('Make Compound Path')); else toast.warn(t('Select 2 or more objects first.')); return; }
+      if (match('edit.releaseCompound')) { e.preventDefault(); if (releaseCompoundPath()) announce(t('Release Compound Path')); else toast.warn(t('Select a compound path first.')); return; }
       if (match('view.zoomIn')) { e.preventDefault(); zoomBy(1.25); announce(t('Zoom In')); return; }
       if (match('view.zoomOut')) { e.preventDefault(); zoomBy(1 / 1.25); announce(t('Zoom Out')); return; }
       if (match('view.zoomFit')) { e.preventDefault(); zoomFit(); announce(t('Fit to Page')); return; }

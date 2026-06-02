@@ -279,3 +279,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Mask into the Edit menu, canvas right-click, and Ctrl+7 / Ctrl+Alt+7 keymap
       + App handlers (no new logic — a dup clipMask.ts was caught and dropped).
       2026-06-02.
+- [x] Compound Path surfaces — same treatment for masks.ts makeCompoundPath()/
+      releaseCompoundPath() (were palette-only): Edit menu, canvas right-click, and
+      Ctrl+8 / Ctrl+Alt+8 keymap + App handlers. 2026-06-02.
