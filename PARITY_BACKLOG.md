@@ -459,3 +459,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Character panel live sync — adjustFontSize now calls updateSelection() and the
       panel's syncKey includes the summary w×h, so an external font-size change
       refreshes the panel's font-size field instead of going stale. 2026-06-03.
+- [x] Tracking / leading shortcuts — adjustTracking()/adjustLeading() (textCase.ts);
+      Alt+←/→ nudges letter-spacing and Alt+↑/↓ line-height on a selected text object
+      (Illustrator), falling through to arrow-nudge otherwise. App arrow handler.
+      2026-06-03.

@@ -111,7 +111,7 @@ import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
 import { joinSelection } from './lib/pathJoin';
 import { repeatTransform } from './lib/transformOps';
-import { adjustFontSize } from './lib/textCase';
+import { adjustFontSize, adjustTracking, adjustLeading } from './lib/textCase';
 import { getKeyboardIncrement } from './lib/preferences';
 import { commitDimension } from './lib/tools/measureTool';
 
@@ -1020,7 +1020,21 @@ export default function App() {
       // Excluded from BINDINGS: arrow nudge — four keys + Shift multiplier
       // can't be expressed as a single rebindable combo.
       const arrowMap: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-      if (arrowMap[e.key]) { e.preventDefault(); const [dx, dy] = arrowMap[e.key]; const inc = getKeyboardIncrement(); const step = e.shiftKey ? inc * 10 : inc; nudgeSelection(dx * step, dy * step); return; }
+      if (arrowMap[e.key]) {
+        e.preventDefault();
+        const [dx, dy] = arrowMap[e.key];
+        // Alt+arrow on a text object adjusts tracking (←/→) or leading (↑/↓),
+        // Illustrator-style; otherwise arrows nudge the selection.
+        if (e.altKey) {
+          const a = getCanvas()?.getActiveObject();
+          if (a && (a.type === 'i-text' || a.type === 'text' || a.type === 'textbox')) {
+            if (dx !== 0) { adjustTracking(dx * 25); announce(t('Tracking')); }
+            else { adjustLeading(-dy * 0.05); announce(t('Leading')); }
+            return;
+          }
+        }
+        const inc = getKeyboardIncrement(); const step = e.shiftKey ? inc * 10 : inc; nudgeSelection(dx * step, dy * step); return;
+      }
       // Tool shortcuts — each is its own binding so users can rebind them.
       // Wrapped in !cmd to preserve the original "letter tool requires no
       // modifier" rule (otherwise Ctrl+S etc. would also hit 's').

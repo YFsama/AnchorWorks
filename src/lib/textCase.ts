@@ -55,6 +55,42 @@ export function adjustFontSize(delta: number): number {
   return texts.length;
 }
 
+/** Nudge letter-spacing (tracking, 1/1000 em) of every selected text object by
+ *  `delta`. Returns the number changed (Illustrator's Alt+←/→). */
+export function adjustTracking(delta: number): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const texts = canvas.getActiveObjects().filter((o) => isTextType(o.type)) as fabric.IText[];
+  if (texts.length === 0) return 0;
+  for (const t of texts) {
+    const cur = (t as unknown as { charSpacing?: number }).charSpacing ?? 0;
+    t.set({ charSpacing: Math.max(-200, Math.min(1000, cur + delta)) });
+    t.setCoords();
+  }
+  canvas.requestRenderAll();
+  pushHistory();
+  updateSelection();
+  return texts.length;
+}
+
+/** Nudge line-height (leading, a multiplier) of every selected text object by
+ *  `delta`. Returns the number changed (Illustrator's Alt+↑/↓). */
+export function adjustLeading(delta: number): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const texts = canvas.getActiveObjects().filter((o) => isTextType(o.type)) as fabric.IText[];
+  if (texts.length === 0) return 0;
+  for (const t of texts) {
+    const cur = (t as unknown as { lineHeight?: number }).lineHeight ?? 1.16;
+    t.set({ lineHeight: Math.max(0.2, Math.min(4, +(cur + delta).toFixed(3))) });
+    t.setCoords();
+  }
+  canvas.requestRenderAll();
+  pushHistory();
+  updateSelection();
+  return texts.length;
+}
+
 /** Change the case of every selected text object. Returns the number changed. */
 export function changeCaseSelection(mode: CaseMode): number {
   const canvas = getCanvas();
