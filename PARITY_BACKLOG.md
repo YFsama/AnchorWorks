@@ -248,3 +248,8 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (smooth) wave, `ridges` waves over the path (Illustrator Distort→Zig Zag);
       ZigzagDialog (size/ridges/smooth) + Document menu + palette + right-click.
       2026-06-02.
+- [x] Twist effect — twistSelection() (twist.ts) densifies then rotates each path
+      point about the object's centre by an angle that scales with its radius
+      (Illustrator Distort→Twist), completing the Distort & Transform trio with
+      Roughen/Zig Zag; TwistDialog (angle) + Document menu + palette + right-click.
+      2026-06-02.

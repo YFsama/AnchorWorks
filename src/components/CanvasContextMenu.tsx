@@ -157,7 +157,7 @@ export function CanvasContextMenu() {
     c?.requestRenderAll();
   };
 
-  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag') =>
+  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag' | 'showTwist') =>
     useEditor.getState().setModal(k, true);
 
   const nest = () => {
@@ -418,6 +418,11 @@ export function CanvasContextMenu() {
         label={t('Zig Zag…')}
         disabled={!hasSelection}
         onClick={() => run(() => openModal('showZigzag'), hasSelection)}
+      />
+      <Item
+        label={t('Twist…')}
+        disabled={!hasSelection}
+        onClick={() => run(() => openModal('showTwist'), hasSelection)}
       />
       <Item
         label={t('Cut Contour…')}

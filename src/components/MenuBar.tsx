@@ -217,6 +217,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Offset Path…'), onClick: () => setModal('showOffsetPath', true) },
         { label: t('Roughen…'), onClick: () => setModal('showRoughen', true) },
         { label: t('Zig Zag…'), onClick: () => setModal('showZigzag', true) },
+        { label: t('Twist…'), onClick: () => setModal('showTwist', true) },
         { label: t('Reverse Path Direction'), onClick: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
         { label: t('Blend…'), onClick: () => setModal('showBlend', true) },
       ]} />
