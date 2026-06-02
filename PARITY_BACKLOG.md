@@ -35,13 +35,14 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Weld / Merge for cut** — `weldOutline()` in contourFromSelection.ts
       (polygon-clipping union of selection outlines → cut paths); wired into the
       right-click menu + command palette ("Weld"). 2026-06-02.
-- [ ] **Convert Text to Outlines** — vectorise IText/Textbox to a Path (per-glyph
-      via the font's path data), so text can be contour-cut and ships in SVG/PLT
-      without the font. (Illustrator: Type→Create Outlines.) NOTE: needs font
-      vectorisation (opentype.js + font bytes) — heavier, schedule a careful run.
-- [ ] **Outline Stroke** — convert a stroked path into a filled outline path of
-      the stroke width (so the cutter cuts both edges). (Illustrator: Object→Path
-      →Outline Stroke.) Reuse offsetPolyline for ± half-width; mind caps/joins.
+- [~] **Convert Text to Outlines** — BLOCKED: needs a font-vectorisation dep
+      (opentype.js) + access to font bytes (custom-font ArrayBuffers we keep;
+      Google fonts fetched by URL; system fonts can't be embedded). Adding a
+      dependency shouldn't happen silently in the autonomous loop — surface to
+      the user for a dedicated run / approval, then implement Type→Create Outlines.
+- [x] **Outline Stroke** — `outlineStrokeToCutPaths()` in contourFromSelection.ts
+      (offset ±½ stroke into cut lines on both band edges; closed→outer+inner ring,
+      open→closed band); right-click menu + command palette. 2026-06-02.
 - [ ] **Tiling / paneling for cut & print** — split an oversized job into panels
       sized to the material width with an overlap, numbered, previewable. Extend
       io3 tilePrint into a cut-aware paneling dialog.
