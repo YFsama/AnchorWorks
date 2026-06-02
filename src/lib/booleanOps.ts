@@ -510,3 +510,54 @@ export function trimSelection(): number {
   pushHistory();
   return kept.length;
 }
+
+/**
+ * Pathfinder Crop — the frontmost selected object is a crop frame; every object
+ * behind it is clipped to the parts inside the frame (keeping its own fill), and
+ * the frame itself is discarded. Returns the number of cropped pieces kept.
+ */
+export function cropSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 2) return 0;
+  const allObjs = canvas.getObjects();
+  const sorted = [...objs].sort((a, b) => allObjs.indexOf(a) - allObjs.indexOf(b));
+  const frame = sorted[sorted.length - 1];   // front = crop frame
+  const backs = sorted.slice(0, -1);
+  const frameRings = objectToRings(frame);
+  if (!frameRings) return 0;
+  const frameGeom: Ring[][] = [frameRings as Ring[]];
+
+  const kept: fabric.FabricObject[] = [];
+  for (const back of backs) {
+    const backRings = objectToRings(back);
+    if (!backRings) continue;
+    let inter: MultiPolygon;
+    try {
+      inter = polygonClipping.intersection([backRings as Ring[]] as MultiPolygon, frameGeom as MultiPolygon);
+    } catch (err) {
+      logger.error('boolean', `crop failed: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    canvas.remove(back);
+    const d = inter.length ? multiPolygonToPathD(inter) : '';
+    if (d) {
+      const piece = new fabric.Path(d, {
+        fill: (back.fill as string) ?? '#3d9bff',
+        stroke: (back.stroke as string) ?? '',
+        strokeWidth: back.strokeWidth ?? 0,
+        opacity: back.opacity ?? 1,
+      });
+      canvas.add(piece);
+      kept.push(piece);
+    }
+  }
+  canvas.remove(frame); // the crop frame is consumed
+  if (kept.length === 0) { canvas.requestRenderAll(); return 0; }
+  canvas.discardActiveObject();
+  canvas.setActiveObject(kept.length === 1 ? kept[0] : new fabric.ActiveSelection(kept, { canvas }));
+  canvas.requestRenderAll();
+  pushHistory();
+  return kept.length;
+}

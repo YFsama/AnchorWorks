@@ -381,3 +381,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       offscreen 2×-zoomed StaticCanvas, then replaces it with a single embedded PNG
       FabricImage at the same on-screen size (Illustrator Object→Rasterize); Document
       Path submenu + command palette. 2026-06-03.
+- [x] Pathfinder Crop — cropSelection() (booleanOps.ts) intersects every back
+      object with the frontmost (crop frame), keeping each piece's own fill and
+      discarding the frame (Illustrator Pathfinder Crop); Edit→Pathfinder submenu +
+      command palette. 2026-06-03.
