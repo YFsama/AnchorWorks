@@ -207,6 +207,7 @@ export function CommandPalette({
     { id: 'arrange.forward',   label: t('Bring Forward'),      category: t('Arrange'), keywords: 'order z-index up',     icon: ChevronUp,    run: () => bringForward() },
     { id: 'arrange.back',      label: t('Send Backward'),      category: t('Arrange'), keywords: 'order z-index down',   icon: ChevronDown,  run: () => sendBackward() },
     { id: 'arrange.bottom',    label: t('Send to Back'),       category: t('Arrange'), keywords: 'order z-index bottom', icon: ChevronsDown, run: () => sendToBack() },
+    { id: 'arrange.transform', label: t('Transform…'),          category: t('Arrange'), keywords: 'transform move scale rotate numeric exact copy reflect', icon: Wand2, run: () => setModal('showTransform', true) },
     { id: 'arrange.flipH',     label: t('Flip Horizontal'),     category: t('Arrange'), shortcut: 'Shift+H', keywords: 'flip mirror reflect horizontal', icon: Wand2, run: () => flipSelection('x') },
     { id: 'arrange.flipV',     label: t('Flip Vertical'),       category: t('Arrange'), shortcut: 'Shift+V', keywords: 'flip mirror reflect vertical', icon: Wand2, run: () => flipSelection('y') },
     { id: 'arrange.repeat',    label: t('Repeat (Grid / Radial / Mirror)…'), category: t('Arrange'), keywords: 'array duplicate pattern radial mirror', icon: Grid3X3, run: () => setModal('showRepeat', true) },

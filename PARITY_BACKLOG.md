@@ -74,8 +74,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Flip Horizontal / Vertical** — flipSelection() in selectionOps.ts; wired
       into Edit menu, command palette, Align panel "Flip" row, Shift+H / Shift+V
       shortcuts (keymap + App), and the existing right-click. 2026-06-02.
-- [ ] **Transform dialog** — rotate / scale (by % or absolute) / move by exact
-      numeric values, with "copy" option. (Illustrator: Object→Transform.)
+- [x] **Transform dialog** — transformOps.ts applyTransform() moves/scales/rotates
+      the selection by exact values about its centre, with an optional copy;
+      TransformDialog; Edit menu + command palette. 2026-06-02.
 - [ ] **Join paths** — connect two open-path endpoints into one path
       (Illustrator: Ctrl+J).
 

@@ -41,6 +41,7 @@ const RecolorDialog = lazy(() => import('./components/RecolorDialog').then(m => 
 const VariableDataDialog = lazy(() => import('./components/VariableDataDialog').then(m => ({ default: m.VariableDataDialog })));
 const RhinestoneDialog = lazy(() => import('./components/RhinestoneDialog').then(m => ({ default: m.RhinestoneDialog })));
 const SimplifyDialog = lazy(() => import('./components/SimplifyDialog').then(m => ({ default: m.SimplifyDialog })));
+const TransformDialog = lazy(() => import('./components/TransformDialog').then(m => ({ default: m.TransformDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
@@ -703,6 +704,7 @@ export default function App() {
   const showVariableData = useEditor(s => s.showVariableData);
   const showRhinestone = useEditor(s => s.showRhinestone);
   const showSimplify = useEditor(s => s.showSimplify);
+  const showTransform = useEditor(s => s.showTransform);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const highContrast = useEditor(s => s.highContrast);
@@ -1196,6 +1198,11 @@ export default function App() {
       {showSimplify && (
         <Suspense fallback={null}>
           <SimplifyDialog />
+        </Suspense>
+      )}
+      {showTransform && (
+        <Suspense fallback={null}>
+          <TransformDialog />
         </Suspense>
       )}
       {showPreferences && (

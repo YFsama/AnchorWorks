@@ -154,6 +154,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Undo'), onClick: () => undo(), disabled: !canUndo, kbd: 'Ctrl+Z' },
         { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: 'Ctrl+Y' },
         { sep: true },
+        { label: t('Transform…'), onClick: () => setModal('showTransform', true) },
         { label: t('Flip Horizontal'), onClick: () => flipSelection('x'), kbd: 'Shift+H' },
         { label: t('Flip Vertical'), onClick: () => flipSelection('y'), kbd: 'Shift+V' },
       ]} />
