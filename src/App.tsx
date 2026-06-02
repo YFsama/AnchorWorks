@@ -111,6 +111,7 @@ import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
 import { joinSelection } from './lib/pathJoin';
 import { repeatTransform } from './lib/transformOps';
+import { adjustFontSize } from './lib/textCase';
 import { getKeyboardIncrement } from './lib/preferences';
 import { commitDimension } from './lib/tools/measureTool';
 
@@ -954,6 +955,8 @@ export default function App() {
         }
         return;
       }
+      if (match('text.fontSizeUp')) { e.preventDefault(); if (adjustFontSize(2)) announce(t('Increase Font Size')); return; }
+      if (match('text.fontSizeDown')) { e.preventDefault(); if (adjustFontSize(-2)) announce(t('Decrease Font Size')); return; }
       if (match('edit.selectNextAbove')) { e.preventDefault(); if (selectObjectInStack('up')) announce(t('Select Next Object Above')); return; }
       if (match('edit.selectNextBelow')) { e.preventDefault(); if (selectObjectInStack('down')) announce(t('Select Next Object Below')); return; }
       if (match('edit.deselectAll')) {

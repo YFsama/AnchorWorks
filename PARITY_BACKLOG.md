@@ -453,3 +453,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       page line (smartGuides.ts artGuides) and pushes it into the emitted guide
       overlay, so the blue feedback line shows when you hit a page edge/centre.
       2026-06-03.
+- [x] Font-size shortcuts — adjustFontSize(delta) (textCase.ts) bumps every selected
+      text object's fontSize by ±2px; bound to Ctrl+> / Ctrl+< (keymap + App) and the
+      command palette (Illustrator's Increase/Decrease Font Size). 2026-06-03.

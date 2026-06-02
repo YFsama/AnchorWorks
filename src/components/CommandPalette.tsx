@@ -32,7 +32,7 @@ import { rasterizeSelection } from '../lib/rasterize';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { createOutlinesFromText } from '../lib/textToOutline';
-import { changeCaseSelection } from '../lib/textCase';
+import { changeCaseSelection, adjustFontSize } from '../lib/textCase';
 import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { pasteFromClipboard } from '../lib/clipboard';
@@ -312,6 +312,8 @@ export function CommandPalette({
     { id: 'text.caseLower',    label: t('lowercase'),          category: t('Arrange'), keywords: 'change case lowercase text', icon: Type, run: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.caseTitle',    label: t('Title Case'),         category: t('Arrange'), keywords: 'change case title capitalise each word text', icon: Type, run: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.caseSentence', label: t('Sentence case'),      category: t('Arrange'), keywords: 'change case sentence capitalise text', icon: Type, run: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.fontSizeUp',   label: t('Increase Font Size'), category: t('Arrange'), shortcut: 'Ctrl+>', keywords: 'font size increase bigger larger text', icon: Type, run: () => { if (!adjustFontSize(2)) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.fontSizeDown', label: t('Decrease Font Size'), category: t('Arrange'), shortcut: 'Ctrl+<', keywords: 'font size decrease smaller text', icon: Type, run: () => { if (!adjustFontSize(-2)) toast.warn(t('Select a text object first.')); } },
     { id: 'text.arcUp',   label: `${t('Text on Arc')} ∩`, category: t('Arrange'), keywords: 'text arc curve circle badge seal up arch', icon: Type, run: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'text.arcDown', label: `${t('Text on Arc')} ∪`, category: t('Arrange'), keywords: 'text arc curve circle badge seal down arch', icon: Type, run: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'cut.outlineStroke',  label: t('Outline Stroke'),    category: t('Arrange'), keywords: 'stroke outline expand cut edges', icon: PenTool, run: () => {

@@ -36,6 +36,23 @@ export function canChangeCase(): boolean {
   return !!c && c.getActiveObjects().some((o) => isTextType(o.type));
 }
 
+/** Nudge the font size of every selected text object by `delta` px (clamped to
+ *  ≥1). Returns the number changed (Illustrator's Ctrl+Shift+> / <). */
+export function adjustFontSize(delta: number): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const texts = canvas.getActiveObjects().filter((o) => isTextType(o.type)) as fabric.IText[];
+  if (texts.length === 0) return 0;
+  for (const t of texts) {
+    const cur = (t as unknown as { fontSize?: number }).fontSize ?? 16;
+    t.set({ fontSize: Math.max(1, cur + delta) });
+    t.setCoords();
+  }
+  canvas.requestRenderAll();
+  pushHistory();
+  return texts.length;
+}
+
 /** Change the case of every selected text object. Returns the number changed. */
 export function changeCaseSelection(mode: CaseMode): number {
   const canvas = getCanvas();
