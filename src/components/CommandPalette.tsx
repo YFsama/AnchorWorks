@@ -41,6 +41,7 @@ import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { applyTextOnArc } from '../lib/textPath';
 import { applyStrokeAlign } from '../lib/strokeAlign';
+import { toggleUniformStroke } from '../lib/effects';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
 import { listTools } from '../lib/tools/types';
 import * as fabric from 'fabric';
@@ -336,6 +337,7 @@ export function CommandPalette({
     { id: 'path.outlineStrokeFill', label: t('Outline Stroke to Fill'), category: t('Arrange'), keywords: 'outline stroke fill expand convert shape solid', icon: PenTool, run: () => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); } },
     { id: 'path.arrowEnd',     label: t('Add Arrowhead (End)'), category: t('Arrange'), keywords: 'arrowhead arrow end line dimension annotation', icon: PenTool, run: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
     { id: 'path.arrowBoth',    label: t('Add Arrowheads (Both)'), category: t('Arrange'), keywords: 'arrowhead arrow both ends line dimension annotation', icon: PenTool, run: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
+    { id: 'stroke.uniform', label: t('Constant Stroke Width'), category: t('Arrange'), keywords: 'stroke uniform constant scale width cut line', icon: AlignCenter, run: () => { const s = toggleUniformStroke(); if (s === null) toast.warn(t('Select an object first.')); else toast.success(s ? t('Stroke width is now constant') : t('Stroke width now scales')); } },
     { id: 'stroke.alignCenter', label: `${t('Stroke alignment')} — ${t('Center')}`, category: t('Arrange'), keywords: 'stroke align center default', icon: AlignCenter, run: () => applyStrokeAlign('center') },
     { id: 'stroke.alignInside', label: `${t('Stroke alignment')} — ${t('Inside')}`, category: t('Arrange'), keywords: 'stroke align inside inner inset', icon: AlignCenter, run: () => applyStrokeAlign('inside') },
     { id: 'stroke.alignOutside', label: `${t('Stroke alignment')} — ${t('Outside')}`, category: t('Arrange'), keywords: 'stroke align outside outer outset', icon: AlignCenter, run: () => applyStrokeAlign('outside') },

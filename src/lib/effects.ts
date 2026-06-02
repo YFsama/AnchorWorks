@@ -152,6 +152,24 @@ export function applyBlendModeToSelection(mode: GlobalCompositeOperation) {
   pushHistory();
 }
 
+/**
+ * Toggle constant stroke width on the selection — `strokeUniform: true` keeps a
+ * stroke (and cut line) at the same px width no matter how the object is scaled
+ * (Illustrator's "Scale Strokes & Effects" off). Flips based on the active
+ * object's current state. Returns the new state, or null if nothing selected.
+ */
+export function toggleUniformStroke(): boolean | null {
+  const canvas = getCanvas();
+  if (!canvas) return null;
+  const objs = canvas.getActiveObjects();
+  if (!objs.length) return null;
+  const next = !((canvas.getActiveObject() as { strokeUniform?: boolean })?.strokeUniform);
+  objs.forEach((o) => { (o as { strokeUniform?: boolean }).strokeUniform = next; o.setCoords(); });
+  canvas.requestRenderAll();
+  pushHistory();
+  return next;
+}
+
 // ---------- Color helpers (HSL math for palette generation) ----------
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {

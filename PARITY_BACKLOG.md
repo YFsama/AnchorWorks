@@ -495,3 +495,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Center on Artboard — centerOnArtboard() (alignDistribute.ts) centres each
       selected object on the first artboard on both axes in one shot; command palette.
       2026-06-03.
+- [x] Constant Stroke Width — effects.ts toggleUniformStroke() flips strokeUniform on
+      the selection so strokes/cut lines keep a fixed px width when scaled
+      (Illustrator "Scale Strokes & Effects" off); command palette. 2026-06-03.
