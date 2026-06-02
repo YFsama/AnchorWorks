@@ -36,6 +36,25 @@ export function rotateSelection(deg: number): Promise<boolean> {
   return applyTransform({ dx: 0, dy: 0, scale: 1, rotate: deg, copy: false, each: false });
 }
 
+/**
+ * Shear (Illustrator Object→Transform→Shear) — skew the active selection by
+ * `angleDeg` along the given axis, about its centre. Returns true on success.
+ */
+export function shearSelection(angleDeg: number, axis: 'horizontal' | 'vertical'): boolean {
+  const canvas = getCanvas();
+  const a = canvas?.getActiveObject();
+  if (!canvas || !a || angleDeg === 0) return false;
+  const ang = Math.max(-85, Math.min(85, angleDeg));
+  const centre = a.getCenterPoint();
+  if (axis === 'horizontal') a.skewX = Math.max(-85, Math.min(85, (a.skewX ?? 0) + ang));
+  else a.skewY = Math.max(-85, Math.min(85, (a.skewY ?? 0) + ang));
+  a.setPositionByOrigin(centre, 'center', 'center');
+  a.setCoords();
+  canvas.requestRenderAll();
+  pushHistory();
+  return true;
+}
+
 /** The last transform applied, for Transform Again (Illustrator's step-and-repeat). */
 let lastTransform: TransformParams | null = null;
 

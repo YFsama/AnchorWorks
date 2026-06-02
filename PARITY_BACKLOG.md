@@ -389,3 +389,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       getKeyboardIncrement(); the arrow-key nudge in App.tsx now reads it (Shift =
       10×) instead of a hardcoded 1px, with a Preferences field (Illustrator's
       Keyboard Increment). 2026-06-03.
+- [x] Shear / Skew transform — transformOps.ts shearSelection(angle, axis) skews
+      the selection's skewX/skewY about its centre (clamped ±85°) — Illustrator
+      Object→Transform→Shear; ShearDialog (angle + axis) + Edit menu + command
+      palette. 2026-06-03.
