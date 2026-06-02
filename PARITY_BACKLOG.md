@@ -418,3 +418,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Right-click submenu — CanvasContextMenu.tsx SubMenu (edge-aware left/right
       flyout) folds the 7 path-effect items into a "Path Effects" submenu, cutting
       the overgrown right-click menu's length. 2026-06-03.
+- [x] Pathfinder in right-click — added a Pathfinder submenu to the canvas
+      right-click (Union/Subtract/Intersect/Exclude/Minus Back + Divide/Trim/Merge/
+      Crop), enabled for 2+ selected; high-frequency boolean ops were menu-bar/
+      palette-only on right-click before. 2026-06-03.

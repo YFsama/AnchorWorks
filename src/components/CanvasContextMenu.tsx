@@ -31,6 +31,7 @@ import { useEditor } from '../store/editor';
 import { buildOutlineCutPaths, weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
 import { rotateSelection } from '../lib/transformOps';
+import { booleanOp, divideSelection, trimSelection, mergeSelection, cropSelection } from '../lib/booleanOps';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -136,6 +137,7 @@ export function CanvasContextMenu() {
   // Submenus fly out to the right unless the menu sits too close to the right
   // edge, in which case they open leftward so they stay on-screen.
   const openLeft = adjustedPos.x + MENU_WIDTH + 230 > (typeof window !== 'undefined' ? window.innerWidth : 99999);
+  const canBool = active.length >= 2;
   const canClip = activeObj?.type === 'activeselection';
   const canReleaseClip = !!(activeObj as { clipPath?: unknown } | undefined)?.clipPath;
   const canReleaseCompound = activeObj?.type === 'path';
@@ -329,6 +331,18 @@ export function CanvasContextMenu() {
         disabled={!canReleaseCompound}
         onClick={() => run(() => { releaseCompoundPath(); }, canReleaseCompound)}
       />
+      <SubMenu label={t('Pathfinder')} openLeft={openLeft} disabled={!canBool}>
+        <Item label={t('Union')} disabled={!canBool} onClick={() => run(() => { void booleanOp('union'); }, canBool)} />
+        <Item label={t('Subtract')} disabled={!canBool} onClick={() => run(() => { void booleanOp('subtract'); }, canBool)} />
+        <Item label={t('Intersect')} disabled={!canBool} onClick={() => run(() => { void booleanOp('intersect'); }, canBool)} />
+        <Item label={t('Exclude')} disabled={!canBool} onClick={() => run(() => { void booleanOp('exclude'); }, canBool)} />
+        <Item label={t('Minus Back')} disabled={!canBool} onClick={() => run(() => { void booleanOp('minus-back'); }, canBool)} />
+        <Separator />
+        <Item label={t('Divide')} disabled={!canBool} onClick={() => run(() => { divideSelection(); }, canBool)} />
+        <Item label={t('Trim')} disabled={!canBool} onClick={() => run(() => { trimSelection(); }, canBool)} />
+        <Item label={t('Merge')} disabled={!canBool} onClick={() => run(() => { mergeSelection(); }, canBool)} />
+        <Item label={t('Crop')} disabled={!canBool} onClick={() => run(() => { cropSelection(); }, canBool)} />
+      </SubMenu>
       <Separator />
       <Item
         label={t('Flip Horizontal')}
