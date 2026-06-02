@@ -251,6 +251,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Anchor Snap'), onClick: () => setAnchorSnapEnabled(!anchorSnapEnabled), checked: anchorSnapEnabled },
         { sep: true },
         { label: t('Make Guides from Selection'), onClick: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
+        { label: t('Margin Guides…'), onClick: () => setModal('showMarginGuides', true) },
         { label: t('Lock Guides'), onClick: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked), checked: guidesLocked },
         { label: t('Clear Guides'), onClick: () => useEditor.getState().clearUserGuides() },
       ]} />

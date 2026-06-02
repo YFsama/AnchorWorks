@@ -245,6 +245,25 @@ export function makeGuidesFromSelection(): number {
   return n;
 }
 
+/**
+ * Drop four ruler guides inset by `marginMm` from the first artboard's edges —
+ * a safe-area / margin frame for layout. Returns the number of guides added.
+ */
+export function makeMarginGuides(marginMm: number): number {
+  const MM_TO_PX = 3.7795;
+  const abs = useEditor.getState().artboards;
+  if (abs.length === 0) return 0;
+  const a = abs[0];
+  const m = Math.max(0, marginMm) * MM_TO_PX;
+  if (m * 2 >= a.width || m * 2 >= a.height) return 0;
+  const addGuide = useEditor.getState().addUserGuide;
+  addGuide('v', a.x + m);
+  addGuide('v', a.x + a.width - m);
+  addGuide('h', a.y + m);
+  addGuide('h', a.y + a.height - m);
+  return 4;
+}
+
 /** Flip every selected object about its own centre. `'x'` mirrors horizontally,
  *  `'y'` vertically (Illustrator's Object→Transform→Reflect). */
 export function flipSelection(axis: 'x' | 'y'): void {

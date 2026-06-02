@@ -422,3 +422,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       right-click (Union/Subtract/Intersect/Exclude/Minus Back + Divide/Trim/Merge/
       Crop), enabled for 2+ selected; high-frequency boolean ops were menu-bar/
       palette-only on right-click before. 2026-06-03.
+- [x] Margin guides — selectionOps.ts makeMarginGuides(mm) drops a safe-area frame
+      of 4 ruler guides inset from the first artboard's edges; MarginGuidesDialog +
+      View menu + command palette. 2026-06-03.

@@ -338,6 +338,7 @@ export function CommandPalette({
     { id: 'artboard.fitSelection', label: t('Fit Artboard to Selection'), category: t('View'), keywords: 'fit artboard selection crop resize', icon: Maximize2, run: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
     { id: 'view.outline', label: t('Outline View'), category: t('View'), shortcut: 'Ctrl+Alt+Y', keywords: 'wireframe geometry preview', icon: PenTool, run: () => setOutlineMode(!isOutlineMode()) },
     { id: 'view.makeGuides', label: t('Make Guides from Selection'), category: t('View'), keywords: 'guide make convert selection bounds ruler', icon: Grid3X3, run: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
+    { id: 'view.marginGuides', label: t('Margin Guides…'), category: t('View'), keywords: 'margin guides safe area frame inset artboard', icon: Grid3X3, run: () => setModal('showMarginGuides', true) },
     { id: 'view.clearGuides', label: t('Clear Guides'), category: t('View'), keywords: 'guide ruler remove delete', icon: Grid3X3, run: () => useEditor.getState().clearUserGuides() },
     { id: 'view.lockGuides', label: t('Lock Guides'), category: t('View'), keywords: 'guide ruler lock freeze', icon: Grid3X3, run: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked) },
     { id: 'view.debug',   label: t('Toggle Debug'), category: t('View'), keywords: 'logs panel inspect',     icon: Bug,       run: onToggleDebug },
