@@ -19,6 +19,7 @@ export function CanvasView() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const tool = useEditor(s => s.tool);
+  const rulersVisible = useEditor(s => s.rulersVisible);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -135,7 +136,7 @@ export function CanvasView() {
       {ready && <CutPathLayer />}
       {ready && <GuidesLayer />}
       {ready && <MeasureLayer />}
-      {ready && <Rulers />}
+      {ready && rulersVisible && <Rulers />}
       {/* eslint-disable-next-line react-hooks/refs -- wrapRef.current here is
           consumed by EraserHUD inside a useEffect (it attaches pointer
           listeners to the host element). Reading the ref during render to

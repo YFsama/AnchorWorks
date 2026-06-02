@@ -212,11 +212,14 @@ interface EditorState {
   // command end-points) of other objects on the canvas. Orthogonal to grid
   // snap and smart-edge guides; layered on top during onObjectMoving.
   anchorSnapEnabled: boolean;
+  /** Whether the canvas rulers are shown. */
+  rulersVisible: boolean;
   setGridVisible: (v: boolean) => void;
   setGridSize: (n: number) => void;
   setSnapEnabled: (v: boolean) => void;
   setSmartGuidesEnabled: (v: boolean) => void;
   setAnchorSnapEnabled: (v: boolean) => void;
+  setRulersVisible: (v: boolean) => void;
 
   // Cursor position (document coords)
   cursorX: number;
@@ -359,11 +362,13 @@ export const useEditor = create<EditorState>((set) => ({
   snapEnabled: false,
   smartGuidesEnabled: true,
   anchorSnapEnabled: true,
+  rulersVisible: true,
   setGridVisible: (v) => set({ gridVisible: v }),
   setGridSize: (n) => set({ gridSize: Math.max(2, Math.min(500, n)) }),
   setSnapEnabled: (v) => set({ snapEnabled: v }),
   setSmartGuidesEnabled: (v) => set({ smartGuidesEnabled: v }),
   setAnchorSnapEnabled: (v) => set({ anchorSnapEnabled: v }),
+  setRulersVisible: (v) => set({ rulersVisible: v }),
 
   cursorX: 0,
   cursorY: 0,

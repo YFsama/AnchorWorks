@@ -466,3 +466,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Tracking/leading in palette — surfaced Increase/Decrease Tracking & Leading
       as four command-palette entries (with their Alt+arrow shortcut hints) so the
       keyboard-only adjusters are discoverable. 2026-06-03.
+- [x] Show/Hide Rulers — store rulersVisible flag (default true) gates the Rulers
+      overlay in CanvasView; View-menu checkbox + command palette toggle it
+      (Illustrator View→Rulers), for more canvas room. 2026-06-03.

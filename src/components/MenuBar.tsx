@@ -84,6 +84,8 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   const smartGuidesEnabled = useEditor(s => s.smartGuidesEnabled);
   const anchorSnapEnabled = useEditor(s => s.anchorSnapEnabled);
   const guidesLocked = useEditor(s => s.guidesLocked);
+  const rulersVisible = useEditor(s => s.rulersVisible);
+  const setRulersVisible = useEditor(s => s.setRulersVisible);
   const setGridVisible = useEditor(s => s.setGridVisible);
   const setSnapEnabled = useEditor(s => s.setSnapEnabled);
   const setSmartGuidesEnabled = useEditor(s => s.setSmartGuidesEnabled);
@@ -245,6 +247,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { sep: true },
         { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: 'Ctrl+Alt+Y', checked: outlineMode },
         { sep: true },
+        { label: t('Show Rulers'), onClick: () => setRulersVisible(!rulersVisible), checked: rulersVisible },
         { label: t('Show Grid'), onClick: () => setGridVisible(!gridVisible), checked: gridVisible },
         { label: t('Snap to Grid'), onClick: () => setSnapEnabled(!snapEnabled), checked: snapEnabled },
         { label: t('Smart Guides'), onClick: () => setSmartGuidesEnabled(!smartGuidesEnabled), checked: smartGuidesEnabled },
