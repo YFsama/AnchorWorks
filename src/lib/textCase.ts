@@ -6,6 +6,7 @@
  */
 import type * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
+import { updateSelection } from './selectionApply';
 
 export type CaseMode = 'upper' | 'lower' | 'title' | 'sentence';
 
@@ -50,6 +51,7 @@ export function adjustFontSize(delta: number): number {
   }
   canvas.requestRenderAll();
   pushHistory();
+  updateSelection(); // refresh the summary (size grew) so panels re-read
   return texts.length;
 }
 

@@ -157,7 +157,9 @@ export function CharacterPanel() {
   // changes. selectionSummary alone is missing text fields, so we read
   // directly from the live active object. Render-time prev-key comparison
   // avoids the setState-in-effect anti-pattern (would cascade renders).
-  const syncKey = `${idKey}|${selectionSummary?.type ?? ''}`;
+  // Include width/height so an external font-size change (e.g. the Ctrl+> / <
+  // shortcut) — which grows the text bbox and bumps the summary — re-reads here.
+  const syncKey = `${idKey}|${selectionSummary?.type ?? ''}|${selectionSummary?.width ?? ''}x${selectionSummary?.height ?? ''}`;
   const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
   if (prevSyncKey !== syncKey) {
     setPrevSyncKey(syncKey);

@@ -456,3 +456,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Font-size shortcuts — adjustFontSize(delta) (textCase.ts) bumps every selected
       text object's fontSize by ±2px; bound to Ctrl+> / Ctrl+< (keymap + App) and the
       command palette (Illustrator's Increase/Decrease Font Size). 2026-06-03.
+- [x] Character panel live sync — adjustFontSize now calls updateSelection() and the
+      panel's syncKey includes the summary w×h, so an external font-size change
+      refreshes the panel's font-size field instead of going stale. 2026-06-03.
