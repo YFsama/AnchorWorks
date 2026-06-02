@@ -6,6 +6,7 @@ import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
+import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
@@ -211,6 +212,8 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // palette; surfaced here for menu-bar discoverability.
         { label: t('Multi-outline…'), onClick: () => setModal('showOutline', true) },
         { label: t('Recolor Artwork…'), onClick: () => setModal('showRecolor', true) },
+        { label: t('Invert Colors'), onClick: () => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+        { label: t('Convert to Grayscale'), onClick: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
         { label: t('Rhinestone Template…'), onClick: () => setModal('showRhinestone', true) },
         { label: t('Variable Data…'), onClick: () => setModal('showVariableData', true) },
         { label: t('Auto-arrange (Nest)'), onClick: () => {

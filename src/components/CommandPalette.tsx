@@ -27,6 +27,7 @@ import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { createOutlinesFromText } from '../lib/textToOutline';
 import { changeCaseSelection } from '../lib/textCase';
+import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { pasteFromClipboard } from '../lib/clipboard';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
@@ -231,6 +232,8 @@ export function CommandPalette({
     { id: 'arrange.rotate180', label: t('Rotate 180°'),        category: t('Arrange'), keywords: 'rotate 180 flip half turn upside down', icon: RotateCw, run: () => { void rotateSelection(180); } },
     { id: 'arrange.blend',     label: t('Blend…'),             category: t('Arrange'), keywords: 'blend morph interpolate steps between gradient shapes', icon: Wand2, run: () => setModal('showBlend', true) },
     { id: 'color.swapFillStroke', label: t('Swap Fill / Stroke'), category: t('Arrange'), shortcut: 'Shift+X', keywords: 'swap exchange fill stroke colour color', icon: Palette, run: () => { if (!swapFillStroke()) toast.warn(t('Select an object first.')); } },
+    { id: 'color.invert',      label: t('Invert Colors'),      category: t('Arrange'), keywords: 'invert colours negative edit colors', icon: Palette, run: () => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+    { id: 'color.grayscale',   label: t('Convert to Grayscale'), category: t('Arrange'), keywords: 'grayscale greyscale desaturate gray edit colors', icon: Palette, run: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
     { id: 'color.defaultColors',  label: t('Default Fill / Stroke'), category: t('Arrange'), shortcut: 'D', keywords: 'default colours reset white fill black stroke', icon: Palette, run: () => defaultColors() },
     { id: 'arrange.flipH',     label: t('Flip Horizontal'),     category: t('Arrange'), shortcut: 'Shift+H', keywords: 'flip mirror reflect horizontal', icon: Wand2, run: () => flipSelection('x') },
     { id: 'arrange.flipV',     label: t('Flip Vertical'),       category: t('Arrange'), shortcut: 'Shift+V', keywords: 'flip mirror reflect vertical', icon: Wand2, run: () => flipSelection('y') },

@@ -286,3 +286,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       walk every text object (incl. group children) and replace all occurrences
       (case-sensitive toggle, live match count); FindReplaceDialog + Edit menu +
       command palette (Illustrator Edit→Find and Replace). 2026-06-02.
+- [x] Invert Colors / Convert to Grayscale — colorAdjust.ts invertColorsSelection()
+      / grayscaleColorsSelection() remap every solid hex/rgb fill+stroke in the
+      selection (incl. groups) per-channel (Illustrator Edit→Edit Colors); Document
+      menu + command palette. +5 tests (parse/invert/luminance). 2026-06-02.
