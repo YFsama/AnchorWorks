@@ -813,6 +813,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Align to': { en: 'Align to', zh: '对齐基准' },
   'Artboard': { en: 'Artboard', zh: '画板' },
   'Measure': { en: 'Measure', zh: '测量' },
+  'Flip': { en: 'Flip', zh: '翻转' },
+  'Flip Horizontal / Vertical': { en: 'Flip Horizontal / Vertical', zh: '水平 / 垂直翻转' },
   'Simplify Path': { en: 'Simplify Path', zh: '简化路径' },
   'Simplify Path…': { en: 'Simplify Path…', zh: '简化路径…' },
   'Tolerance (px)': { en: 'Tolerance (px)', zh: '容差 (px)' },

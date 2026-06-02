@@ -10,8 +10,8 @@ import {
   bringToFront,
   sendToBack,
   deleteSelection,
-  pushHistory,
   autoArrangeSelection,
+  flipSelection,
 } from '../lib/canvasEngine';
 import {
   copySelection,
@@ -126,18 +126,8 @@ export function CanvasContextMenu() {
   const editableText = active.length === 1 &&
     (active[0].type === 'i-text' || active[0].type === 'textbox') ? active[0] : null;
 
-  // Flip every selected object about its own centre. Works on a multi-select
-  // too — Fabric flips each member in place.
-  const flip = (axis: 'x' | 'y') => {
-    if (!c) return;
-    for (const o of active) {
-      if (axis === 'x') o.set('flipX', !o.flipX);
-      else o.set('flipY', !o.flipY);
-      o.setCoords();
-    }
-    c.requestRenderAll();
-    pushHistory();
-  };
+  // Flip is shared with the menu / command palette / shortcut (flipSelection).
+  const flip = (axis: 'x' | 'y') => flipSelection(axis);
 
   const selectAll = () => {
     if (!c) return;

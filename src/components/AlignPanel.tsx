@@ -11,7 +11,8 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { alignSelection, distributeSelection } from '../lib/canvasEngine';
+import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
+import { alignSelection, distributeSelection, flipSelection } from '../lib/canvasEngine';
 import { booleanOp } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { useEditor } from '../store/editor';
@@ -107,6 +108,18 @@ export function AlignPanel() {
               </Btn>
               <Btn title={t('Distribute vertically (equal spacing)')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical')}>
                 <AlignVerticalSpaceAround size={14} aria-hidden="true" />
+              </Btn>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="field-label">{t('Flip')}</h4>
+            <div className="grid grid-cols-2 gap-1">
+              <Btn title={`${t('Flip Horizontal')} (Shift+H)`} disabled={selCount < 1} onClick={() => flipSelection('x')}>
+                <FlipHorizontal2 size={14} aria-hidden="true" />
+              </Btn>
+              <Btn title={`${t('Flip Vertical')} (Shift+V)`} disabled={selCount < 1} onClick={() => flipSelection('y')}>
+                <FlipVertical2 size={14} aria-hidden="true" />
               </Btn>
             </div>
           </div>

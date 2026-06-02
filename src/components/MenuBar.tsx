@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection } from '../lib/canvasEngine';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
 import { getFormat } from '../lib/formats';
@@ -153,6 +153,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       <Dropdown label={t('Edit')} items={[
         { label: t('Undo'), onClick: () => undo(), disabled: !canUndo, kbd: 'Ctrl+Z' },
         { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: 'Ctrl+Y' },
+        { sep: true },
+        { label: t('Flip Horizontal'), onClick: () => flipSelection('x'), kbd: 'Shift+H' },
+        { label: t('Flip Vertical'), onClick: () => flipSelection('y'), kbd: 'Shift+V' },
       ]} />
 
       <Dropdown label={t('View')} items={[

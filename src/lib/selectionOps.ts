@@ -62,3 +62,20 @@ export function nudgeSelection(dx: number, dy: number): void {
     pushHistory();
   }
 }
+
+/** Flip every selected object about its own centre. `'x'` mirrors horizontally,
+ *  `'y'` vertically (Illustrator's Object→Transform→Reflect). */
+export function flipSelection(axis: 'x' | 'y'): void {
+  const canvas = getCanvas();
+  if (!canvas) return;
+  const objs = canvas.getActiveObjects();
+  objs.forEach((o: FabricObject) => {
+    if (axis === 'x') o.set('flipX', !o.flipX);
+    else o.set('flipY', !o.flipY);
+    o.setCoords();
+  });
+  if (objs.length) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+}

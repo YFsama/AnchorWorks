@@ -71,8 +71,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       selected path, Douglas-Peucker-reduces it at a px tolerance, and rebuilds it
       (absolute-`d` → new fabric.Path, like boolean ops); SimplifyDialog tolerance
       slider; command palette + right-click. 2026-06-02.
-- [ ] **Flip Horizontal / Vertical** as first-class Object commands (menu +
-      shortcut + Transform panel), not just the right-click entry.
+- [x] **Flip Horizontal / Vertical** — flipSelection() in selectionOps.ts; wired
+      into Edit menu, command palette, Align panel "Flip" row, Shift+H / Shift+V
+      shortcuts (keymap + App), and the existing right-click. 2026-06-02.
 - [ ] **Transform dialog** — rotate / scale (by % or absolute) / move by exact
       numeric values, with "copy" option. (Illustrator: Object→Transform.)
 - [ ] **Join paths** — connect two open-path endpoints into one path

@@ -104,6 +104,8 @@ export const BINDINGS: ShortcutBinding[] = [
 
   // -------- Selection --------
   { id: 'edit.selectAll',        label: 'Select All',          defaultCombo: 'Ctrl+A' },
+  { id: 'edit.flipH',            label: 'Flip Horizontal',     defaultCombo: 'Shift+H' },
+  { id: 'edit.flipV',            label: 'Flip Vertical',       defaultCombo: 'Shift+V' },
 
   // -------- Help / dialogs --------
   { id: 'help.shortcuts',        label: 'Keyboard Shortcuts',  defaultCombo: '?' },

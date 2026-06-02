@@ -45,7 +45,7 @@ const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ def
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
 import {
-  undo, redo, deleteSelection, duplicateSelection, nudgeSelection, zoomBy, zoomFit, zoomToPoint, zoomToArtboard,
+  undo, redo, deleteSelection, duplicateSelection, nudgeSelection, flipSelection, zoomBy, zoomFit, zoomToPoint, zoomToArtboard,
   alignSelection, distributeSelection, applyStyleToSelection, groupSelection, ungroupSelection,
   resizeCanvas, setBackground,
   bringForward, sendBackward, bringToFront, sendToBack,
@@ -886,6 +886,8 @@ export default function App() {
         else { sendBackward(); announce(t('Send Backward')); }
         return;
       }
+      if (match('edit.flipH')) { e.preventDefault(); flipSelection('x'); announce(t('Flip Horizontal')); return; }
+      if (match('edit.flipV')) { e.preventDefault(); flipSelection('y'); announce(t('Flip Vertical')); return; }
       if (match('edit.selectAll')) {
         e.preventDefault();
         const c = getCanvas();
