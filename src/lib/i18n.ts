@@ -825,6 +825,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Measure': { en: 'Measure', zh: '测量' },
   'Eyedropper': { en: 'Eyedropper', zh: '吸管' },
   'Appearance copied': { en: 'Appearance copied', zh: '已复制外观' },
+  'Appearance applied': { en: 'Appearance applied', zh: '已应用外观' },
   'Select objects first, then click one to copy its look.': { en: 'Select objects first, then click one to copy its look.', zh: '请先选中对象,再点击另一个对象以复制其外观。' },
   'Dimension added': { en: 'Dimension added', zh: '尺寸标注已添加' },
   'Pin measurement as dimension': { en: 'Pin measurement as dimension', zh: '将测量固定为尺寸标注' },

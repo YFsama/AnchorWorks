@@ -56,25 +56,49 @@ function readAppearance(source: fabric.FabricObject): Appearance {
   };
 }
 
-/** Sample the clicked object and paint the remembered recipients with it. */
-export function eyedropperPick(ctx: ToolMouseCtx): void {
-  const { canvas } = ctx;
-  const source = canvas.findTarget(ctx.raw.e) as fabric.FabricObject | undefined;
-  if (!source) return;
-
-  const targets = recipients.filter((r) => r !== source && canvas.getObjects().includes(r));
-  if (targets.length === 0) {
-    toast.warn(t('Select objects first, then click one to copy its look.'));
-    return;
-  }
-
-  const look = readAppearance(source);
-  for (const r of targets) {
+/** Paint a set of objects (descending groups) with one appearance. */
+function paint(objs: fabric.FabricObject[], look: Appearance): void {
+  for (const r of objs) {
     for (const o of walk(r)) {
       o.set(look);
       o.setCoords();
     }
   }
+}
+
+/**
+ * Click samples the clicked object's appearance onto the remembered selection.
+ * Alt/Option-click does the reverse — applies the current selection's
+ * appearance onto the clicked object (Illustrator's eyedropper modifier).
+ */
+export function eyedropperPick(ctx: ToolMouseCtx): void {
+  const { canvas } = ctx;
+  const source = canvas.findTarget(ctx.raw.e) as fabric.FabricObject | undefined;
+  if (!source) return;
+  const alt = (ctx.raw.e as MouseEvent).altKey;
+
+  const live = recipients.filter((r) => canvas.getObjects().includes(r));
+
+  if (alt) {
+    // Reverse: copy the selection's look onto the clicked object.
+    if (live.length === 0) {
+      toast.warn(t('Select objects first, then click one to copy its look.'));
+      return;
+    }
+    paint([source], readAppearance(live[0]));
+    canvas.requestRenderAll();
+    pushHistory();
+    toast.success(t('Appearance applied'));
+    return;
+  }
+
+  const targets = live.filter((r) => r !== source);
+  if (targets.length === 0) {
+    toast.warn(t('Select objects first, then click one to copy its look.'));
+    return;
+  }
+
+  paint(targets, readAppearance(source));
   canvas.discardActiveObject();
   canvas.setActiveObject(
     targets.length === 1 ? targets[0] : new fabric.ActiveSelection(targets, { canvas }),

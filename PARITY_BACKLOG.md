@@ -229,3 +229,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Lock/Hide in right-click — surfaced Lock Selection / Unlock All / Hide
       Selection / Show All (+ Deselect All) in CanvasContextMenu.tsx; these
       high-frequency ops existed only in the Edit menu before. 2026-06-02.
+- [x] Eyedropper Alt-click — eyedropperPick() (eyedropperTool.ts) now branches on
+      altKey: Alt/Option-click applies the current selection's appearance onto the
+      clicked object (Illustrator's reverse eyedropper), completing the I tool.
+      2026-06-02.
