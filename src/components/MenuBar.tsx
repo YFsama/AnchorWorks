@@ -169,6 +169,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Deselect All'), onClick: () => { deselectAll(); }, kbd: 'Ctrl+Shift+A' },
         { sep: true },
         { label: t('Transform…'), onClick: () => setModal('showTransform', true) },
+        { label: t('Resize…'), onClick: () => setModal('showResize', true) },
         { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: 'Ctrl+Alt+D' },
         { label: t('Rotate 90° CW'), onClick: () => { void rotateSelection(90); } },
         { label: t('Rotate 90° CCW'), onClick: () => { void rotateSelection(-90); } },

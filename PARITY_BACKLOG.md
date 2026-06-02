@@ -343,3 +343,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (named Tailwind group/sub); the ~30-item Document menu is regrouped into
       Insert / Path / Distort & Transform / Edit Colors / Sign Effects submenus
       so it's navigable again (operation-convenience). 2026-06-03.
+- [x] Resize to exact size (mm) — scaleToSize.ts scaleSelectionToSize() scales the
+      selection (object/group/multi) so its bbox matches a target W/H in mm about
+      its centre, with optional aspect lock; ResizeDialog (prefilled, live ratio) +
+      Edit menu + command palette. Fills the px-only single-object W/H gap. 2026-06-03.

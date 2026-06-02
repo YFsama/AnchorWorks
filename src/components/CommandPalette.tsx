@@ -235,6 +235,7 @@ export function CommandPalette({
     { id: 'arrange.back',      label: t('Send Backward'),      category: t('Arrange'), keywords: 'order z-index down',   icon: ChevronDown,  run: () => sendBackward() },
     { id: 'arrange.bottom',    label: t('Send to Back'),       category: t('Arrange'), keywords: 'order z-index bottom', icon: ChevronsDown, run: () => sendToBack() },
     { id: 'arrange.transform', label: t('Transform…'),          category: t('Arrange'), keywords: 'transform move scale rotate numeric exact copy reflect', icon: Wand2, run: () => setModal('showTransform', true) },
+    { id: 'arrange.resize',    label: t('Resize…'),            category: t('Arrange'), keywords: 'resize scale exact size mm width height dimensions', icon: Wand2, run: () => setModal('showResize', true) },
     { id: 'arrange.transformAgain', label: t('Transform Again'), category: t('Arrange'), shortcut: 'Ctrl+Alt+D', keywords: 'transform again repeat step and repeat array duplicate last', icon: Wand2, run: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); } },
     { id: 'arrange.rotateCW',  label: t('Rotate 90° CW'),      category: t('Arrange'), keywords: 'rotate 90 clockwise right turn', icon: RotateCw, run: () => { void rotateSelection(90); } },
     { id: 'arrange.rotateCCW', label: t('Rotate 90° CCW'),     category: t('Arrange'), keywords: 'rotate 90 counter clockwise anticlockwise left turn', icon: RotateCcw, run: () => { void rotateSelection(-90); } },
