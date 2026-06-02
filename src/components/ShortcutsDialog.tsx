@@ -23,6 +23,7 @@ const TOOLS: Shortcut[] = [
   { keys: 'H', labelKey: 'Hand' },
   { keys: 'Z', labelKey: 'Zoom' },
   { keys: 'M', labelKey: 'Measure' },
+  { keys: 'M, then Enter', labelKey: 'Pin measurement as dimension' },
   { keys: 'Space (hold)', labelKey: 'Temporary Hand (pan)' },
 ];
 

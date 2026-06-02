@@ -96,6 +96,7 @@ import { importImageFile } from './lib/io3';
 import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
 import { joinSelection } from './lib/pathJoin';
+import { commitDimension } from './lib/tools/measureTool';
 
 // Register a built-in "Skill" so the AI can call it as a tool.
 registerSkill({
@@ -928,6 +929,10 @@ export default function App() {
       }
       if (e.key === 'Enter' && useEditor.getState().tool === 'pen' && !e.isComposing) {
         if (penEnter()) { e.preventDefault(); announce(t('Close path')); return; }
+      }
+      // Measure tool: Enter pins the live measurement as a dimension annotation.
+      if (e.key === 'Enter' && useEditor.getState().tool === 'measure' && !e.isComposing) {
+        if (commitDimension()) { e.preventDefault(); announce(t('Dimension added')); return; }
       }
       // Excluded from BINDINGS: Escape has conditional preventDefault so dialog
       // close handlers still see the key when nothing is selected.

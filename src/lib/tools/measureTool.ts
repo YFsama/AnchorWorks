@@ -5,7 +5,11 @@
  * MeasureLayer; the numeric readout is shown on the segment + in the overlay.
  * Nothing is added to the document — measuring never mutates the artwork.
  */
+import * as fabric from 'fabric';
 import { useEditor } from '../../store/editor';
+import { getCanvas, pushHistory } from '../canvasEngine';
+
+const MM_TO_PX = 3.7795;
 
 let dragging = false;
 let startX = 0;
@@ -30,4 +34,34 @@ export function measureEnd(): void {
 export function measureClear(): void {
   dragging = false;
   useEditor.getState().setMeasure(null);
+}
+
+/**
+ * Commit the live measurement as a persistent dimension annotation — a grouped
+ * line + mm label dropped on the canvas (selectable, exportable), so a shop
+ * drawing keeps its measurements. Clears the live segment. Returns false when
+ * there's nothing to commit.
+ */
+export function commitDimension(): boolean {
+  const m = useEditor.getState().measure;
+  const canvas = getCanvas();
+  if (!m || !canvas) return false;
+  const distMm = Math.hypot(m.x2 - m.x1, m.y2 - m.y1) / MM_TO_PX;
+  if (distMm < 0.1) return false;
+
+  const line = new fabric.Line([m.x1, m.y1, m.x2, m.y2], { stroke: '#22d3ee', strokeWidth: 1 });
+  const label = new fabric.Text(`${distMm.toFixed(1)} mm`, {
+    left: (m.x1 + m.x2) / 2, top: (m.y1 + m.y2) / 2 - 12,
+    originX: 'center', originY: 'center',
+    fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12,
+    fill: '#22d3ee', backgroundColor: 'rgba(11,18,32,0.85)',
+  });
+  const group = new fabric.Group([line, label]);
+  canvas.add(group);
+  canvas.setActiveObject(group);
+  useEditor.getState().setMeasure(null);
+  dragging = false;
+  canvas.requestRenderAll();
+  pushHistory();
+  return true;
 }

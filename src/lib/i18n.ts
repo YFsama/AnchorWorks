@@ -823,6 +823,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Space vertically by value': { en: 'Space vertically by value', zh: '按数值垂直分布间距' },
   'Artboard': { en: 'Artboard', zh: '画板' },
   'Measure': { en: 'Measure', zh: '测量' },
+  'Dimension added': { en: 'Dimension added', zh: '尺寸标注已添加' },
+  'Pin measurement as dimension': { en: 'Pin measurement as dimension', zh: '将测量固定为尺寸标注' },
   'Flip': { en: 'Flip', zh: '翻转' },
   'Transform…': { en: 'Transform…', zh: '变换…' },
   'Blend': { en: 'Blend', zh: '混合' },

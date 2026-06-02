@@ -201,3 +201,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Cut bridges / tabs — bridgePolyline()/addBridges() (bridges.ts) break
       closed cut paths with uncut gaps so pieces/stencil islands stay attached
       (SignMaster Bridge); Plotter-dialog count×gap + button. +3 tests. 2026-06-02.
+- [x] Persistent dimensions — commitDimension() (measureTool.ts): Enter pins the
+      Measure tool's live segment as a grouped line+mm-label object on the canvas
+      (the measure tool's noted follow-up). 2026-06-02.
