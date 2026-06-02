@@ -434,3 +434,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Shift-snap rotation — canvasEngine.ts object:rotating handler snaps the
       angle to 15° increments while Shift is held (Illustrator behaviour); additive,
       no effect without Shift. 2026-06-03.
+- [x] Alt-drag duplicate — canvasEngine.ts arms an altPending clone on alt+mousedown
+      over a single object and drops the copy at the drag-start position on the first
+      object:moving (cleared on mouseup, so an alt-click alone never duplicates) —
+      Illustrator's Alt-drag. 2026-06-03.

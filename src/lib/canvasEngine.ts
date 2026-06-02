@@ -68,7 +68,11 @@ export function initCanvas(el: HTMLCanvasElement) {
   canvas.on('object:added', (e) => { if (e.target) assignObjectId(e.target); pushHistory(); syncObjectCount(); });
   canvas.on('object:modified', () => pushHistory());
   canvas.on('object:removed', () => { pushHistory(); syncObjectCount(); });
-  canvas.on('object:moving', (e) => { if (e.target) applySmartSnap(canvas!, e.target); });
+  canvas.on('object:moving', (e) => {
+    // Fire a pending Alt-drag duplicate on the first move of the dragged object.
+    if (altPending && e.target === altPending.obj) { const p = altPending; altPending = null; void altCloneInPlace(canvas!, p); }
+    if (e.target) applySmartSnap(canvas!, e.target);
+  });
   // Shift while rotating snaps to 15° increments (Illustrator behaviour).
   canvas.on('object:rotating', (e) => {
     const ev = e.e as { shiftKey?: boolean } | undefined;
@@ -185,9 +189,29 @@ function onMouseDown(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
     return;
   }
 
+  // Alt-drag duplicate (Illustrator): hold Alt and *drag* a single selected
+  // object to leave a copy behind. We only arm it here; the clone is dropped on
+  // the first move (so an alt-click without dragging doesn't duplicate).
+  if (mouseEvt.altKey && e.target && (activeTool === 'select' || activeTool === 'directSelect')) {
+    const a = canvas.getActiveObject();
+    if (a && a.type !== 'activeselection') altPending = { obj: a, left: a.left ?? 0, top: a.top ?? 0 };
+  }
+
   // Everything else routes through the tool registry — including eraser
   // (onMouseDown calls `eraserBegin`) and hand (onMouseDown calls `panBegin`).
   getTool(activeTool)?.onMouseDown?.({ sp, vp, raw: e, canvas });
+}
+
+/** Pending Alt-drag duplicate, armed on mouse:down, fired on first move. */
+let altPending: { obj: fabric.FabricObject; left: number; top: number } | null = null;
+
+/** Drop a copy of the armed object at its drag-start position. */
+async function altCloneInPlace(c: fabric.Canvas, pending: { obj: fabric.FabricObject; left: number; top: number }) {
+  const clone = await pending.obj.clone();
+  clone.set({ left: pending.left, top: pending.top });
+  clone.setCoords();
+  c.add(clone);
+  c.requestRenderAll();
 }
 
 function onMouseMove(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
@@ -214,6 +238,7 @@ function onMouseMove(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
 
 function onMouseUp(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
   if (!canvas) return;
+  altPending = null; // a plain alt-click (no drag) never duplicates
   emitGuides([]); // clear any smart guide overlays
   // Pan session has engine-internal state, settle first. Cursor restores to
   // the active tool's declared cursor — `grab` for hand, `crosshair` for rect /
