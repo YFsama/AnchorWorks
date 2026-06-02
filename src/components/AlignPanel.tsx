@@ -14,7 +14,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
-import { alignSelection, distributeSelection, distributeSpacing, flipSelection, setKeyObject } from '../lib/canvasEngine';
+import { alignSelection, distributeSelection, distributeInArtboard, distributeSpacing, flipSelection, setKeyObject } from '../lib/canvasEngine';
 import { toast } from '../lib/toast';
 import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
@@ -123,10 +123,10 @@ export function AlignPanel() {
              * lopsided "menu items hugging the left edge" feel. Two equal
              * half-width cells reads as a balanced pair. */}
             <div className="grid grid-cols-4 gap-1">
-              <Btn title={t('Distribute horizontally (equal spacing)')} disabled={!enoughForDistribute} onClick={() => distributeSelection('horizontal')}>
+              <Btn title={t('Distribute horizontally (equal spacing)')} disabled={alignRef === 'artboard' ? !enoughForAlign : !enoughForDistribute} onClick={() => alignRef === 'artboard' ? distributeInArtboard('horizontal') : distributeSelection('horizontal')}>
                 <AlignHorizontalSpaceAround size={14} aria-hidden="true" />
               </Btn>
-              <Btn title={t('Distribute vertically (equal spacing)')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical')}>
+              <Btn title={t('Distribute vertically (equal spacing)')} disabled={alignRef === 'artboard' ? !enoughForAlign : !enoughForDistribute} onClick={() => alignRef === 'artboard' ? distributeInArtboard('vertical') : distributeSelection('vertical')}>
                 <AlignVerticalSpaceAround size={14} aria-hidden="true" />
               </Btn>
               <Btn title={t('Distribute horizontal centers')} disabled={!enoughForDistribute} onClick={() => distributeSelection('horizontal', 'center')}>

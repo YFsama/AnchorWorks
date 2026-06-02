@@ -244,3 +244,40 @@ function distributeCentres(dir: DistributeDir): void {
   canvas.requestRenderAll();
   pushHistory();
 }
+
+/**
+ * Distribute the selection across the first artboard with equal gaps, including
+ * the two edge margins (Illustrator's Distribute + Align To Artboard). Needs 1+
+ * objects and an artboard.
+ */
+export function distributeInArtboard(dir: DistributeDir): void {
+  const canvas = getCanvas();
+  if (!canvas) return;
+  const objs = canvas.getActiveObjects();
+  if (objs.length === 0) return;
+  const abs = useEditor.getState().artboards;
+  if (abs.length === 0) return;
+  const a = abs[0];
+  const horiz = dir === 'horizontal';
+
+  const items = objs.map((o) => ({ obj: o, rect: o.getBoundingRect() }));
+  items.sort((x, y) => horiz ? x.rect.left - y.rect.left : x.rect.top - y.rect.top);
+  const span = horiz ? a.width : a.height;
+  const origin = horiz ? a.x : a.y;
+  const totalSize = items.reduce((s, it) => s + (horiz ? it.rect.width : it.rect.height), 0);
+  const gap = (span - totalSize) / (items.length + 1);
+
+  let cursor = origin + gap;
+  for (const it of items) {
+    if (horiz) {
+      it.obj.set({ left: (it.obj.left ?? 0) + (cursor - it.rect.left) });
+      cursor += it.rect.width + gap;
+    } else {
+      it.obj.set({ top: (it.obj.top ?? 0) + (cursor - it.rect.top) });
+      cursor += it.rect.height + gap;
+    }
+    it.obj.setCoords();
+  }
+  canvas.requestRenderAll();
+  pushHistory();
+}

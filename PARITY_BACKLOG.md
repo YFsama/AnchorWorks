@@ -488,3 +488,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Select All Text Objects — selectionOps.ts selectByType()/selectAllText() select
       every text object on the canvas (Illustrator Select→Object→Text Objects), for
       batch restyling; command palette. 2026-06-03.
+- [x] Distribute to artboard — distributeInArtboard(dir) (alignDistribute.ts) spreads
+      the selection across the first artboard with equal gaps incl. edge margins;
+      the Align panel's equal-spacing buttons use it when Align-To is set to Artboard
+      (Illustrator Distribute + Align To Artboard). 2026-06-03.
