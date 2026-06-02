@@ -81,8 +81,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Cut-order visualisation** — CutPreview `showOrder` prop overlays numbered
       badges + start arrows in the same greedy travel order the output uses;
       "Cut order" toggle in the Plotter dialog. 2026-06-02.
-- [ ] **User guides from rulers** — drag from the ruler to drop snap guides;
-      lock/clear guides. (Illustrator core.)
+- [x] **User guides from rulers** — drag off the top/left ruler to drop a
+      persistent guide (Rulers.tsx startGuide); GuidesLayer.tsx renders them +
+      the live drag; store userGuides/guidesLocked; Lock/Clear Guides in View
+      menu + command palette. (Snap-to-guide is a follow-up.) 2026-06-02.
 - [ ] **Dimension / measure tool** — click-drag to read distance/angle; optional
       persistent dimension annotations.
 - [ ] **Recolor artwork** — remap all colours in the selection through a small
