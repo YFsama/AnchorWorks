@@ -475,3 +475,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Recently used fonts — FontPicker.tsx loadRecentFonts()/pushRecentFont()
       (localStorage vector.recentFonts, cap 6) + a "Recently used" section at the top
       of the font list when not searching. 2026-06-03.
+- [x] Hide Others — selectionOps.ts hideOthers() hides every object not in the
+      selection (Illustrator Object→Hide→Other) for focused editing; Edit menu +
+      command palette (Show All reveals them). 2026-06-03.

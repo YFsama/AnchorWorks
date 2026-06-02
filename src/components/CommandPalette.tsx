@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, zoomToPercent, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, deselectAll, selectObjectInStack,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, deselectAll, selectObjectInStack,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -233,6 +233,7 @@ export function CommandPalette({
     { id: 'edit.lock',        label: t('Lock Selection'),      category: t('Edit'), keywords: 'lock freeze protect immovable', icon: MousePointerClick, run: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
     { id: 'edit.unlockAll',   label: t('Unlock All'),          category: t('Edit'), keywords: 'unlock release all', icon: MousePointerClick, run: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
     { id: 'edit.hide',        label: t('Hide Selection'),      category: t('Edit'), keywords: 'hide invisible conceal', icon: MousePointerClick, run: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },
+    { id: 'edit.hideOthers',  label: t('Hide Others'),         category: t('Edit'), keywords: 'hide others isolate focus conceal rest', icon: MousePointerClick, run: () => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); } },
     { id: 'edit.showAll',     label: t('Show All'),            category: t('Edit'), keywords: 'show reveal all hidden', icon: MousePointerClick, run: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); } },
 
     // ---------- Arrange ----------

@@ -157,6 +157,24 @@ export function hideSelection(): number {
   return objs.length;
 }
 
+/**
+ * Hide every object NOT in the current selection (Illustrator Object→Hide→Other),
+ * to focus on the selected art. Returns the number hidden.
+ */
+export function hideOthers(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const keep = new Set(canvas.getActiveObjects());
+  if (keep.size === 0) return 0;
+  let n = 0;
+  for (const o of canvas.getObjects()) {
+    if (keep.has(o) || (o as { excludeFromExport?: boolean }).excludeFromExport) continue;
+    if (o.visible !== false) { o.set({ visible: false }); n++; }
+  }
+  if (n > 0) { canvas.requestRenderAll(); pushHistory(); }
+  return n;
+}
+
 /** Reveal every hidden object (Object→Show All). Returns the count revealed. */
 export function showAll(): number {
   const canvas = getCanvas();

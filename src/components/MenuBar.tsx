@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check, ChevronRight } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, groupSelection, ungroupSelection, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, groupSelection, ungroupSelection, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
@@ -219,6 +219,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Lock Selection'), onClick: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
         { label: t('Unlock All'), onClick: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
         { label: t('Hide Selection'), onClick: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },
+        { label: t('Hide Others'), onClick: () => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); } },
         { label: t('Show All'), onClick: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); } },
       ]} />
 
