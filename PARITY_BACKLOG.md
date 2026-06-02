@@ -166,3 +166,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Default Fill/Stroke — defaultColors() (selectionApply.ts) resets to white
       fill / black stroke (Illustrator "D"); D shortcut (keymap+App) + command
       palette. 2026-06-02.
+- [x] Distribute by spacing — distributeSpacing() (alignDistribute.ts) lays the
+      selection out with an exact mm gap (Illustrator Distribute Spacing value);
+      Align-panel spacing input + H/V buttons. 2026-06-02.

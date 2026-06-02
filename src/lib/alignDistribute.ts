@@ -108,6 +108,43 @@ export function autoArrangeSelection(gapMm = 5): number {
 }
 
 /**
+ * Distribute the selection with an EXACT gap (mm) between consecutive objects,
+ * keeping the first object fixed (Illustrator's Align→Distribute Spacing with a
+ * value). Great for laying out stickers / labels a precise distance apart for
+ * cutting. Requires 2+ objects.
+ */
+export function distributeSpacing(dir: DistributeDir, gapMm: number): void {
+  const canvas = getCanvas();
+  if (!canvas) return;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 2) return;
+  const gap = Math.max(0, gapMm) * MM_TO_PX;
+  const rects = objs.map(o => ({ obj: o, rect: o.getBoundingRect() }));
+
+  if (dir === 'horizontal') {
+    rects.sort((a, b) => a.rect.left - b.rect.left);
+    let cursor = rects[0].rect.left + rects[0].rect.width + gap;
+    for (let i = 1; i < rects.length; i++) {
+      const r = rects[i];
+      r.obj.set({ left: (r.obj.left ?? 0) + (cursor - r.rect.left) });
+      r.obj.setCoords();
+      cursor += r.rect.width + gap;
+    }
+  } else {
+    rects.sort((a, b) => a.rect.top - b.rect.top);
+    let cursor = rects[0].rect.top + rects[0].rect.height + gap;
+    for (let i = 1; i < rects.length; i++) {
+      const r = rects[i];
+      r.obj.set({ top: (r.obj.top ?? 0) + (cursor - r.rect.top) });
+      r.obj.setCoords();
+      cursor += r.rect.height + gap;
+    }
+  }
+  canvas.requestRenderAll();
+  pushHistory();
+}
+
+/**
  * Distribute the active selection so the gaps between consecutive objects
  * (along the given axis) are equal. Requires 3+ objects.
  *

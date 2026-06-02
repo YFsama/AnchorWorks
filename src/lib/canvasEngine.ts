@@ -271,4 +271,4 @@ import { pushHistory, refreshHistoryFlags } from './historyOps';
 
 // Align + distribute operations extracted to alignDistribute.ts (task #20).
 // Re-exported here so AlignPanel + App.tsx imports stay unchanged.
-export { alignSelection, distributeSelection, autoArrangeSelection, type AlignAxis, type DistributeDir } from './alignDistribute';
+export { alignSelection, distributeSelection, distributeSpacing, autoArrangeSelection, type AlignAxis, type DistributeDir } from './alignDistribute';

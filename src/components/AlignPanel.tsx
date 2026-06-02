@@ -12,7 +12,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
-import { alignSelection, distributeSelection, flipSelection } from '../lib/canvasEngine';
+import { alignSelection, distributeSelection, distributeSpacing, flipSelection } from '../lib/canvasEngine';
 import { booleanOp } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { useEditor } from '../store/editor';
@@ -25,6 +25,7 @@ export function AlignPanel() {
   const selectionSummary = useEditor(s => s.selectionSummary);
   const artboardCount = useEditor(s => s.artboards.length);
   const [alignRef, setAlignRef] = useState<'selection' | 'artboard'>('selection');
+  const [spacingMm, setSpacingMm] = useState(5);
   // Aligning to the artboard works on a single object; aligning to the
   // selection's own bounds needs 2+.
   const enoughForAlign = alignRef === 'artboard'
@@ -107,6 +108,23 @@ export function AlignPanel() {
                 <AlignHorizontalSpaceAround size={14} aria-hidden="true" />
               </Btn>
               <Btn title={t('Distribute vertically (equal spacing)')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical')}>
+                <AlignVerticalSpaceAround size={14} aria-hidden="true" />
+              </Btn>
+            </div>
+            {/* Exact spacing — gap in mm between consecutive objects. */}
+            <div className="flex items-center gap-1 mt-1">
+              <input
+                type="number" min={0} step={0.5}
+                value={spacingMm}
+                onChange={(e) => setSpacingMm(Math.max(0, parseFloat(e.target.value) || 0))}
+                className="input-num !h-6 !py-0 !text-[10px] w-14"
+                aria-label={t('Spacing (mm)')}
+                title={t('Exact gap between objects (mm)')}
+              />
+              <Btn title={t('Space horizontally by value')} disabled={selCount < 2} onClick={() => distributeSpacing('horizontal', spacingMm)}>
+                <AlignHorizontalSpaceAround size={14} aria-hidden="true" />
+              </Btn>
+              <Btn title={t('Space vertically by value')} disabled={selCount < 2} onClick={() => distributeSpacing('vertical', spacingMm)}>
                 <AlignVerticalSpaceAround size={14} aria-hidden="true" />
               </Btn>
             </div>
