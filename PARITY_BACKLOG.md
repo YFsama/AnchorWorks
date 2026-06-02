@@ -122,3 +122,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Surface the new sign/effect operations (Multi-outline, Recolor, Rhinestone,
       Variable Data, Auto-arrange/Nest) in the Document menu — previously command
       palette + right-click only. 2026-06-02.
+- [x] Snap-to-guides — applySmartSnap() (smartGuides.ts) now snaps a dragged
+      object's edges/centre to ruler-dragged user guides (under the Smart Guides
+      toggle), completing the guides feature. 2026-06-02.

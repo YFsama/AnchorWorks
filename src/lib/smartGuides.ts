@@ -58,6 +58,25 @@ export function applySmartSnap(canvas: fabric.Canvas, target: FabricObject): voi
     target.set({ left: Math.round(left / g) * g, top: Math.round(top / g) * g });
   }
 
+  // User guides — snap the nearest edge/centre of the target to a ruler-dragged
+  // guide line (under the same Smart Guides toggle as object snapping).
+  if (st.smartGuidesEnabled && st.userGuides.length > 0) {
+    const tb = target.getBoundingRect();
+    const xs = [tb.left, tb.left + tb.width / 2, tb.left + tb.width];
+    const ys = [tb.top, tb.top + tb.height / 2, tb.top + tb.height];
+    let bestX: number | null = null, bestXd = SMART_GUIDE_TOLERANCE;
+    let bestY: number | null = null, bestYd = SMART_GUIDE_TOLERANCE;
+    for (const g of st.userGuides) {
+      if (g.axis === 'v') {
+        for (const x of xs) { const d = g.pos - x; if (Math.abs(d) <= bestXd) { bestXd = Math.abs(d); bestX = d; } }
+      } else {
+        for (const y of ys) { const d = g.pos - y; if (Math.abs(d) <= bestYd) { bestYd = Math.abs(d); bestY = d; } }
+      }
+    }
+    if (bestX !== null) target.set({ left: (target.left ?? 0) + bestX });
+    if (bestY !== null) target.set({ top: (target.top ?? 0) + bestY });
+  }
+
   if (!st.smartGuidesEnabled) {
     emitGuides([]);
     return;
