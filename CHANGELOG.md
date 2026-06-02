@@ -4,6 +4,25 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.3] — 2026-06-02
+
+### Added
+- **One-click contour**: right-click a selection → *Create Contour* drops a
+  default 2 mm offset cut line with no dialog. The dialog stays for tuning.
+- **Print preview**: the Print dialog now shows a live WYSIWYG preview — page,
+  margins, artwork fit, and any crop/registration marks — matching exactly what
+  `printer.ts` outputs.
+- **Plotter preview without cut paths**: *Send to Plotter* now previews the
+  geometry that will actually export (the canvas outlines) instead of an empty
+  state, and the job estimate counts it too.
+- **Version chip**: the build version is always visible in the status bar.
+
+### Changed
+- **Single menu bar on Windows/Linux**: the native Tauri menu is now attached
+  only on macOS (where it lives in the system menu bar). On Windows/Linux the
+  in-window top bar is the sole menu surface — no more duplicated strip under
+  the title bar. Web/PWA unaffected.
+
 ## [0.10.2] — 2026-06-02
 
 ### Fixed
