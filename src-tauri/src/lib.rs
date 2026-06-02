@@ -344,16 +344,29 @@ pub fn run() {
         // updater install. Pairs with the in-app updater UX in src/lib/updater.ts.
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            // Wire the native menu. The menu has to be built after the app
-            // handle exists (it owns the menu items' lifetime), so we do it
-            // in `setup` rather than via the builder's `.menu()` shortcut.
-            let menu = build_app_menu(app.handle())?;
-            app.set_menu(menu)?;
-            // On every menu activation, broadcast the item id to the
-            // frontend. The TS handler in `tauriMenu.ts` maps id → action.
-            app.on_menu_event(|app, event| {
-                let _ = app.emit("menu-action", event.id().as_ref().to_string());
-            });
+            // Menu surface policy — avoid a double menu bar.
+            //
+            // The in-window HTML top bar (MenuBar.tsx) is the app's primary
+            // menu on Windows/Linux. A native menu there renders as a second
+            // strip right under the title bar, duplicating every File/Edit/…
+            // entry. So we only attach the native menu on macOS, where it
+            // lives in the system menu bar at the TOP OF THE SCREEN (not in
+            // the window) — no duplication, and it preserves the expected
+            // macOS app menu (Quit/Services) + global accelerators.
+            #[cfg(target_os = "macos")]
+            {
+                // Built after the app handle exists (it owns the items' lifetime).
+                let menu = build_app_menu(app.handle())?;
+                app.set_menu(menu)?;
+                // Broadcast each activation's item id; tauriMenu.ts maps id → action.
+                app.on_menu_event(|app, event| {
+                    let _ = app.emit("menu-action", event.id().as_ref().to_string());
+                });
+            }
+            // On Windows/Linux the block above is compiled out; consume `app`
+            // so it doesn't read as an unused closure parameter.
+            #[cfg(not(target_os = "macos"))]
+            let _ = &app;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

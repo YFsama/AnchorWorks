@@ -140,6 +140,17 @@ export function StatusBar() {
         <Badge active={snapEnabled} icon={<Magnet size={11} aria-hidden="true" />} label={t('SNAP')} />
         <Badge active={smartGuides} icon={<Crosshair size={11} aria-hidden="true" />} label={t('GUIDES')} />
         <Badge active={anchorSnap} icon={<Target size={11} aria-hidden="true" />} label={t('ANCHOR')} />
+        <Sep />
+        {/* Always-visible build version — opens About for full credits. */}
+        <button
+          type="button"
+          onClick={() => useEditor.getState().setModal('showHelpCenter', true)}
+          className="tabular-nums text-muted hover:text-ink transition-colors"
+          title={`Anchorworks v${__APP_VERSION__}`}
+          aria-label={`Anchorworks ${t('Version')} ${__APP_VERSION__}`}
+        >
+          v{__APP_VERSION__}
+        </button>
       </div>
     </div>
   );

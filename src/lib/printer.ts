@@ -8,7 +8,7 @@ export interface PrintOptions {
   marginMm: number;
 }
 
-const PAGE_DIMS_MM: Record<PrintOptions['pageSize'], [number, number]> = {
+export const PAGE_DIMS_MM: Record<PrintOptions['pageSize'], [number, number]> = {
   A4: [210, 297],
   A3: [297, 420],
   Letter: [216, 279],

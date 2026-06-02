@@ -3,7 +3,9 @@ import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIc
 import { useEditor } from '../store/editor';
 import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type PlotterOptions } from '../lib/plotter';
 import { generateRegMarks, generateWeedBorder, generateWeedLines } from '../lib/cutContour';
+import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { optimizeOrder, cutStats, estimateSeconds, formatDuration, type PolyLite } from '../lib/cutOptimize';
+import { getCanvas } from '../lib/canvasEngine';
 import { download } from '../lib/io';
 import { isTauri } from '../lib/runtime';
 import { useT } from '../lib/i18n';
@@ -54,12 +56,23 @@ export function PlotterDialog() {
     [cutPaths, mutedColors],
   );
 
+  // What the preview + stats draw. With cut paths present, that's the active
+  // (colour-filtered) set. With NONE, the plotter exports the canvas geometry
+  // itself — so preview THAT (each object's outline, zero offset) instead of
+  // showing an empty "no cut paths" state for a job that will in fact cut.
+  const previewPaths = useMemo(() => {
+    if (cutPathCount > 0) return activePaths;
+    const c = getCanvas();
+    const objs = c?.getObjects().filter(o => !(o as { excludeFromExport?: boolean }).excludeFromExport) ?? [];
+    return buildOutlineCutPaths(objs, 0, 1);
+  }, [cutPathCount, activePaths]);
+
   // Live job estimate — the numbers a sign shop checks before feeding a
   // metre of vinyl. Built in mm-space from the cut paths (passes expanded),
   // ordered the same way the output will be so travel/time are honest.
   const stats = useMemo(() => {
     let polys: PolyLite[] = [];
-    for (const c of activePaths) {
+    for (const c of previewPaths) {
       const passes = Math.max(1, c.passes ?? 1);
       for (let i = 0; i < passes; i++) polys.push({ points: c.points, closed: c.closed });
     }
@@ -68,7 +81,7 @@ export function PlotterDialog() {
     const feedMmMin = opts.unit === 'mm' ? opts.feedRate : opts.feedRate * 25.4;
     const travelMmMin = opts.unit === 'mm' ? opts.travelRate : opts.travelRate * 25.4;
     return { ...s, seconds: estimateSeconds(s, feedMmMin, travelMmMin) };
-  }, [activePaths, opts.optimize, opts.feedRate, opts.travelRate, opts.unit]);
+  }, [previewPaths, opts.optimize, opts.feedRate, opts.travelRate, opts.unit]);
 
   // Escape close — capture phase, consistent with other dialogs.
   useEscapeClose(open, close);
@@ -311,7 +324,7 @@ export function PlotterDialog() {
 
             {previewMode === 'outline' ? (
               <CutPreview
-                cutPaths={activePaths}
+                cutPaths={previewPaths}
                 showPrint={showPrint}
                 mirror={opts.mirror}
                 className="w-full h-56 bg-panel2 border border-border rounded-sm"
@@ -323,7 +336,7 @@ export function PlotterDialog() {
             )}
 
             {/* Job estimate — cut length, travel saved by ordering, time. */}
-            {cutPathCount > 0 && (
+            {previewPaths.length > 0 && (
               <div className="flex items-center gap-3 mt-2 text-[10px] text-muted tabular-nums">
                 <span className="flex items-center gap-1" title={t('Total blade-down distance')}>
                   <Ruler size={11} aria-hidden="true" />

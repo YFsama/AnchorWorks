@@ -9,12 +9,11 @@ import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { getCanvas } from '../lib/canvasEngine';
 import {
-  offsetPolyline,
   traceBitmap,
   generateRegMarks,
-  flattenSvgPath,
   defaultTraceOptions,
 } from '../lib/cutContour';
+import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { toast } from '../lib/toast';
 
 const MM_TO_PX = 3.7795; // 96dpi convention used everywhere else
@@ -75,65 +74,7 @@ export function CutContourDialog() {
       return;
     }
     const before = cutPaths.length;
-    const newPaths: CutPath[] = [];
-    for (const obj of selected) {
-      // Capture the source swatch so the plotter dialog can separate cuts by
-      // colour. Prefer a real fill; fall back to stroke; ignore non-string
-      // (gradient/pattern) paints.
-      const fillc = typeof obj.fill === 'string' && obj.fill && obj.fill !== 'transparent' ? obj.fill : undefined;
-      const strokec = typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : undefined;
-      const srcColor = fillc ?? strokec;
-      // Convert fabric object → SVG path → flat polylines.
-      const svg = obj.toSVG();
-      // Extract the `d` attr from whatever the object emitted. Falls back
-      // to converting from x/y/width/height for primitives.
-      const dMatch = svg.match(/\sd="([^"]+)"/);
-      let polylines: Array<{ points: Array<[number, number]>; closed: boolean }>;
-      if (dMatch) {
-        polylines = flattenSvgPath(dMatch[1], 0.5);
-      } else {
-        // Primitive shape (rect / circle / etc.) — derive a bounding box.
-        const r = obj.getBoundingRect();
-        polylines = [{
-          points: [
-            [r.left, r.top],
-            [r.left + r.width, r.top],
-            [r.left + r.width, r.top + r.height],
-            [r.left, r.top + r.height],
-            [r.left, r.top],
-          ],
-          closed: true,
-        }];
-      }
-      // Apply the object's own transform to polyline coordinates.
-      const matrix = obj.calcTransformMatrix();
-      const ax = (obj.width ?? 0) / 2;
-      const ay = (obj.height ?? 0) / 2;
-      for (const pl of polylines) {
-        const transformed: Array<[number, number]> = [];
-        for (const [px, py] of pl.points) {
-          const cx = px - ax;
-          const cy = py - ay;
-          const tx = matrix[0] * cx + matrix[2] * cy + matrix[4];
-          const ty = matrix[1] * cx + matrix[3] * cy + matrix[5];
-          transformed.push([tx / MM_TO_PX, ty / MM_TO_PX]);
-        }
-        // Offset operation. Returns a list (single offset can split into
-        // multiple polygons when the inward offset crosses itself).
-        const off = offsetPolyline(transformed, offsetMm, pl.closed);
-        for (const polyOut of off) {
-          newPaths.push({
-            id: `outline-${Date.now().toString(36)}-${newPaths.length}`,
-            points: polyOut,
-            closed: pl.closed,
-            kind: 'outline',
-            sourceObjectId: (obj as fabric.FabricObject & { _id?: string })._id,
-            passes: offsetPasses,
-            color: srcColor,
-          });
-        }
-      }
-    }
+    const newPaths = buildOutlineCutPaths(selected, offsetMm, offsetPasses);
     if (newPaths.length === 0) {
       toast.warn(t('No geometry was produced — try a smaller offset distance.'), { title: t('Empty contour') });
       return;

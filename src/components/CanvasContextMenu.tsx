@@ -19,6 +19,8 @@ import {
   hasClipboard,
 } from '../lib/clipboard';
 import { useEditor } from '../store/editor';
+import { buildOutlineCutPaths } from '../lib/contourFromSelection';
+import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
 
@@ -157,6 +159,22 @@ export function CanvasContextMenu() {
   const openModal = (k: 'showCutContour' | 'showPlotter') =>
     useEditor.getState().setModal(k, true);
 
+  // One-click contour — generate a default 2 mm offset cut line around the
+  // selection and show it, no dialog. The dialog ("Cut Contour…") stays for
+  // tuning offset / passes / trace / reg-marks.
+  const oneClickContour = () => {
+    if (!active.length) return;
+    const paths = buildOutlineCutPaths(active, 2, 1);
+    if (!paths.length) {
+      toast.warn(t('No geometry was produced — try a smaller offset distance.'), { title: t('Empty contour') });
+      return;
+    }
+    const ed = useEditor.getState();
+    ed.addCutPaths(paths);
+    ed.setCutPathsVisible(true);
+    toast.success(`${paths.length} ${t('contour(s) added')}`, { title: t('Contour generated') });
+  };
+
   // Each item runs its action, bumps the clipboard tick (so paste enables),
   // and closes the menu. Items disabled at render time short-circuit before
   // their handler runs.
@@ -265,6 +283,11 @@ export function CanvasContextMenu() {
           onClick={() => run(() => editText(), true)}
         />
       )}
+      <Item
+        label={t('Create Contour')}
+        disabled={!hasSelection}
+        onClick={() => run(() => oneClickContour(), hasSelection)}
+      />
       <Item
         label={t('Cut Contour…')}
         disabled={!hasSelection}

@@ -4,6 +4,7 @@ import { useEditor } from '../store/editor';
 import { printCanvas, type PrintOptions } from '../lib/printer';
 import { exportPDFReal } from '../lib/io2';
 import { defaultPrintPrep, type PrintPrep } from '../lib/printPrep';
+import { PrintPreview } from './PrintPreview';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
@@ -40,11 +41,13 @@ export function PrintDialog() {
       aria-modal="true"
       aria-labelledby="print-dialog-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[360px] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[680px] max-w-[95%] p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h2 id="print-dialog-title" className="dialog-title">{t('Print')}</h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
+        <div className="flex gap-4">
+        <div className="w-[320px] shrink-0">
         <Field label={t('Page size')}>
           <select className="input-num" value={opts.pageSize} onChange={(e) => setOpts({ ...opts, pageSize: e.target.value as PrintOptions['pageSize'] })}>
             <option>A4</option><option>A3</option><option>Letter</option><option>Legal</option>
@@ -124,6 +127,19 @@ export function PrintDialog() {
             title={t('Save as vector PDF (skips the system print dialog)')}
           ><FileText size={12} aria-hidden="true" /> PDF</button>
           <button type="button" className="btn-primary flex items-center gap-1" onClick={handlePrint}><Printer size={12} aria-hidden="true" /> {t('Print')}</button>
+        </div>
+        </div>
+
+        {/* Live WYSIWYG preview of the page, margins, fit + any prep marks. */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="field-label">{t('Preview')}</div>
+          <PrintPreview
+            opts={opts}
+            prep={prepActive ? prep : undefined}
+            refreshKey={open}
+            className="w-full flex-1 min-h-[280px] bg-panel2 border border-border rounded-sm"
+          />
+        </div>
         </div>
       </div>
     </div>

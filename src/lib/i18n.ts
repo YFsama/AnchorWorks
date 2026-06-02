@@ -779,6 +779,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Flip Vertical': { en: 'Flip Vertical', zh: '垂直翻转' },
   'Edit Text': { en: 'Edit Text', zh: '编辑文字' },
   'Zoom to Selection': { en: 'Zoom to Selection', zh: '缩放到选区' },
+  'Create Contour': { en: 'Create Contour', zh: '创建轮廓' },
   'FPS target: 60 (canvas re-renders on demand)': {
     en: 'FPS target: 60 (canvas re-renders on demand)',
     zh: 'FPS 目标：60（画布按需重绘）',
