@@ -23,6 +23,8 @@ import {
 import { useEditor } from '../store/editor';
 import { getCanvas, pushHistory } from '../lib/canvasEngine';
 import { applyTextOnPath, canApplyTextOnPath, applyTextOnArc, canApplyTextOnArc } from '../lib/textPath';
+import { createOutlinesFromText, canCreateOutlines } from '../lib/textToOutline';
+import { toast } from '../lib/toast';
 import { registerSkill } from '../lib/mcp';
 import { useT } from '../lib/i18n';
 
@@ -225,6 +227,7 @@ export function CharacterPanel() {
   const tracking = props.charSpacing;
   const onPathEnabled = canApplyTextOnPath();
   const onArcEnabled = canApplyTextOnArc();
+  const outlinesEnabled = canCreateOutlines();
 
   return (
     <div className="panel-section p-3">
@@ -376,6 +379,17 @@ export function CharacterPanel() {
           {t('Arc')} ∪
         </button>
       </div>
+
+      {/* Create Outlines — trace the glyphs into an editable, font-independent path. */}
+      <button
+        type="button"
+        disabled={!outlinesEnabled}
+        onClick={() => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); }); }}
+        title={outlinesEnabled ? t('Convert text to editable outline paths (font-independent).') : t('Select a single text object to enable')}
+        className="btn w-full mt-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {t('Create Outlines')}
+      </button>
     </div>
   );
 }

@@ -792,6 +792,12 @@ const dict: Record<string, Record<Lang, string>> = {
   },
   'pages': { en: 'pages', zh: '页' },
   'Tile preview': { en: 'Tile preview', zh: '拼版预览' },
+  'Create Outlines': { en: 'Create Outlines', zh: '创建轮廓（文字转曲线）' },
+  'Text converted to outlines': { en: 'Text converted to outlines', zh: '文字已转为轮廓' },
+  'Convert text to editable outline paths (font-independent).': {
+    en: 'Convert text to editable outline paths (font-independent).',
+    zh: '将文字转为可编辑的轮廓路径（不依赖字体）。',
+  },
   'Text on Arc': { en: 'Text on Arc', zh: '弧形文字' },
   'Arc': { en: 'Arc', zh: '弧形' },
   'Curve the text upward along an arc': {

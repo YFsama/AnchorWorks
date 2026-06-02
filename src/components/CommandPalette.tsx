@@ -24,6 +24,7 @@ import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { reversePathSelection } from '../lib/pathReverse';
+import { createOutlinesFromText } from '../lib/textToOutline';
 import { pasteFromClipboard } from '../lib/clipboard';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
@@ -259,6 +260,7 @@ export function CommandPalette({
     { id: 'effect.recolor', label: t('Recolor Artwork…'),     category: t('Arrange'), keywords: 'recolor remap colors swatch replace palette', icon: Palette, run: () => setModal('showRecolor', true) },
     { id: 'text.variableData', label: t('Variable Data…'),    category: t('Arrange'), keywords: 'serial number numbering badge variable data merge sequence list', icon: Type, run: () => setModal('showVariableData', true) },
     { id: 'cut.rhinestone',   label: t('Rhinestone Template…'), category: t('Arrange'), keywords: 'rhinestone hotfix stone bling dots template outline', icon: Wand2, run: () => setModal('showRhinestone', true) },
+    { id: 'text.createOutlines', label: t('Create Outlines'), category: t('Arrange'), keywords: 'text outlines vectorise convert curves create outline cut', icon: Type, run: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); } },
     { id: 'text.arcUp',   label: `${t('Text on Arc')} ∩`, category: t('Arrange'), keywords: 'text arc curve circle badge seal up arch', icon: Type, run: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'text.arcDown', label: `${t('Text on Arc')} ∪`, category: t('Arrange'), keywords: 'text arc curve circle badge seal down arch', icon: Type, run: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'cut.outlineStroke',  label: t('Outline Stroke'),    category: t('Arrange'), keywords: 'stroke outline expand cut edges', icon: PenTool, run: () => {

@@ -35,11 +35,13 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Weld / Merge for cut** — `weldOutline()` in contourFromSelection.ts
       (polygon-clipping union of selection outlines → cut paths); wired into the
       right-click menu + command palette ("Weld"). 2026-06-02.
-- [~] **Convert Text to Outlines** — BLOCKED: needs a font-vectorisation dep
-      (opentype.js) + access to font bytes (custom-font ArrayBuffers we keep;
-      Google fonts fetched by URL; system fonts can't be embedded). Adding a
-      dependency shouldn't happen silently in the autonomous loop — surface to
-      the user for a dedicated run / approval, then implement Type→Create Outlines.
+- [x] **Convert Text to Outlines** — UNBLOCKED without a dependency:
+      createOutlinesFromText() (textToOutline.ts) rasterises the text to a
+      supersampled offscreen canvas and traces it with traceBitmap into an
+      even-odd compound fabric.Path (works for ANY font — system/Google/custom —
+      since it goes through the renderer, not font bytes). Character panel button
+      + command palette. Raster-traced (Simplify thins it), not glyph-bezier.
+      2026-06-02.
 - [x] **Outline Stroke** — `outlineStrokeToCutPaths()` in contourFromSelection.ts
       (offset ±½ stroke into cut lines on both band edges; closed→outer+inner ring,
       open→closed band); right-click menu + command palette. 2026-06-02.
