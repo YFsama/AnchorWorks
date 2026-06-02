@@ -190,6 +190,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
 
       <Dropdown label={t('Document')} items={[
         { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
+        { label: t('Star / Polygon…'), onClick: () => setModal('showStar', true) },
         { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => setModal('showRepeat', true) },
         { sep: true },
         // Cut Contour suite — opens the multi-tab dialog covering vector

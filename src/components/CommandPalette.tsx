@@ -6,7 +6,7 @@ import {
   ChevronsUp, ChevronUp, ChevronDown, ChevronsDown,
   Plus, Minus, Maximize2, Bug,
   Settings2, Keyboard, HelpCircle, Sparkles, BookOpen,
-  Wand2, Palette, AlignCenter, Grid3X3, SunMoon, Type, RotateCw, RotateCcw,
+  Wand2, Palette, AlignCenter, Grid3X3, SunMoon, Type, RotateCw, RotateCcw, Star,
   type LucideIcon,
 } from 'lucide-react';
 import { useEditor } from '../store/editor';
@@ -248,6 +248,7 @@ export function CommandPalette({
     { id: 'path.roughen',      label: t('Roughen…'),           category: t('Arrange'), keywords: 'roughen distort jitter rough distressed hand drawn', icon: PenTool, run: () => setModal('showRoughen', true) },
     { id: 'path.zigzag',       label: t('Zig Zag…'),           category: t('Arrange'), keywords: 'zigzag zig zag wave distort ridges scallop border', icon: PenTool, run: () => setModal('showZigzag', true) },
     { id: 'path.twist',        label: t('Twist…'),             category: t('Arrange'), keywords: 'twist twirl swirl spiral distort rotate', icon: PenTool, run: () => setModal('showTwist', true) },
+    { id: 'insert.star',       label: t('Star / Polygon…'),    category: t('Insert'), keywords: 'star polygon shape burst pentagon hexagon insert create', icon: Star, run: () => setModal('showStar', true) },
     { id: 'path.join',         label: t('Join Paths'),         category: t('Arrange'), shortcut: 'Ctrl+J', keywords: 'join connect close path endpoints merge', icon: PenTool, run: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); } },
     { id: 'path.reverse',      label: t('Reverse Path Direction'), category: t('Arrange'), keywords: 'reverse path direction winding flip order', icon: PenTool, run: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
     { id: 'bool.union',     label: t('Union'),     category: t('Arrange'), keywords: 'pathfinder boolean unite merge combine', icon: Wand2, run: () => { void booleanOp('union'); } },

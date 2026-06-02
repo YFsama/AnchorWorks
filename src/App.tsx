@@ -48,6 +48,7 @@ const BlendDialog = lazy(() => import('./components/BlendDialog').then(m => ({ d
 const RoughenDialog = lazy(() => import('./components/RoughenDialog').then(m => ({ default: m.RoughenDialog })));
 const ZigzagDialog = lazy(() => import('./components/ZigzagDialog').then(m => ({ default: m.ZigzagDialog })));
 const TwistDialog = lazy(() => import('./components/TwistDialog').then(m => ({ default: m.TwistDialog })));
+const StarDialog = lazy(() => import('./components/StarDialog').then(m => ({ default: m.StarDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
@@ -720,6 +721,7 @@ export default function App() {
   const showRoughen = useEditor(s => s.showRoughen);
   const showZigzag = useEditor(s => s.showZigzag);
   const showTwist = useEditor(s => s.showTwist);
+  const showStar = useEditor(s => s.showStar);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const highContrast = useEditor(s => s.highContrast);
@@ -1267,6 +1269,11 @@ export default function App() {
       {showTwist && (
         <Suspense fallback={null}>
           <TwistDialog />
+        </Suspense>
+      )}
+      {showStar && (
+        <Suspense fallback={null}>
+          <StarDialog />
         </Suspense>
       )}
       {showPreferences && (
