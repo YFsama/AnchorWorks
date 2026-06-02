@@ -4,6 +4,19 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.2] — 2026-06-02
+
+### Fixed
+- **Release CI (portable Windows)**: the Edge CDP runtime-download approach
+  from 0.10.1 still 404'd in CI. Stop chasing a fixed-version runtime entirely:
+  the portable `.exe` now links against the **system WebView2** (shipped in
+  Windows 11 and backported to Windows 10 21H2+, so present on virtually every
+  supported machine), and the zip bundles Microsoft's **Evergreen Standalone
+  Installer** — fetched from a stable, documented fwlink that never rotates —
+  as a one-time offline fallback. No version guessing, no CDP, no NuGet. (The
+  signed installers and auto-updater were already unaffected, since the
+  portable job is `continue-on-error`.)
+
 ## [0.10.1] — 2026-06-01
 
 ### Fixed
