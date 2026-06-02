@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -206,6 +206,8 @@ export function CommandPalette({
     { id: 'edit.selectSameStroke', label: t('Select Same Stroke'), category: t('Edit'), keywords: 'select same stroke colour color match', icon: MousePointerClick, run: () => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
     { id: 'edit.lock',        label: t('Lock Selection'),      category: t('Edit'), keywords: 'lock freeze protect immovable', icon: MousePointerClick, run: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
     { id: 'edit.unlockAll',   label: t('Unlock All'),          category: t('Edit'), keywords: 'unlock release all', icon: MousePointerClick, run: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
+    { id: 'edit.hide',        label: t('Hide Selection'),      category: t('Edit'), keywords: 'hide invisible conceal', icon: MousePointerClick, run: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },
+    { id: 'edit.showAll',     label: t('Show All'),            category: t('Edit'), keywords: 'show reveal all hidden', icon: MousePointerClick, run: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); } },
 
     // ---------- Arrange ----------
     { id: 'arrange.front',     label: t('Bring to Front'),     category: t('Arrange'), keywords: 'order z-index top',    icon: ChevronsUp,   run: () => bringToFront() },

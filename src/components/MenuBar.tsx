@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
@@ -162,6 +162,8 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { sep: true },
         { label: t('Lock Selection'), onClick: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
         { label: t('Unlock All'), onClick: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
+        { label: t('Hide Selection'), onClick: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },
+        { label: t('Show All'), onClick: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); } },
       ]} />
 
       <Dropdown label={t('View')} items={[

@@ -145,3 +145,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Lock / Unlock — lockSelection()/unlockAll() (selectionOps.ts) lock move/
       scale/rotate (matches the Layers-panel lock, serialises); Edit menu +
       command palette. 2026-06-02.
+- [x] Hide / Show All — hideSelection()/showAll() (selectionOps.ts) toggle
+      `visible` (matches the Layers-panel eye, serialises); Edit menu + command
+      palette. 2026-06-02.

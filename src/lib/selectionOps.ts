@@ -128,6 +128,39 @@ export function unlockAll(): number {
   return n;
 }
 
+/**
+ * Hide the active selection (Illustrator Object→Hide). Sets `visible: false`,
+ * matching the Layers-panel eye toggle and serialising with the project.
+ * Returns the count hidden.
+ */
+export function hideSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  for (const o of objs) o.set({ visible: false });
+  if (objs.length) {
+    canvas.discardActiveObject();
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return objs.length;
+}
+
+/** Reveal every hidden object (Object→Show All). Returns the count revealed. */
+export function showAll(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  let n = 0;
+  for (const o of canvas.getObjects()) {
+    if (o.visible === false) { o.set({ visible: true }); n++; }
+  }
+  if (n > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return n;
+}
+
 /** Flip every selected object about its own centre. `'x'` mirrors horizontally,
  *  `'y'` vertically (Illustrator's Object→Transform→Reflect). */
 export function flipSelection(axis: 'x' | 'y'): void {
