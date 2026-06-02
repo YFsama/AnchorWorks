@@ -50,8 +50,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 
 ## P1 — sign text effects & layout
 
-- [ ] **Text on Arc / circle** — circular baseline (top & bottom arcs) for
-      badge/seal text, not just linear path sampling. Extend textPath.ts.
+- [x] **Text on Arc / circle** — `applyTextOnArc(flip)` in textPath.ts (analytic
+      per-glyph placement on an auto-fit circle, ∩ up / ∪ down); Character panel
+      buttons + command palette. 2026-06-02.
 - [ ] **Multi-outline (contour text effect)** — N stacked offset outlines around
       text/shape with per-ring colour & width (classic sign look). New effect.
 - [ ] **Letter spacing (tracking) + line height (leading)** controls in the
