@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // `dist` / `src-tauri/target` are build output (the latter holds generated
+  // tauri-codegen JS). Playwright e2e fixtures legitimately use the `use`-fixture
+  // argument, which the React-hooks rule mis-flags; that scaffolding isn't app
+  // code. None of these belong in the app lint pass.
+  globalIgnores(['dist', 'src-tauri/target', 'tests/e2e']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

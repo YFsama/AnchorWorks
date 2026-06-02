@@ -45,7 +45,9 @@ export function useResizableWidth(opts: {
   // latest values without re-binding listeners every render.
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const widthRef = useRef(width);
-  widthRef.current = width;
+  // Keep the ref in sync after each render (not during it) so the drag closures
+  // read the latest width without re-binding listeners.
+  useEffect(() => { widthRef.current = width; });
 
   const persist = useCallback((w: number) => {
     if (!storageKey) return;

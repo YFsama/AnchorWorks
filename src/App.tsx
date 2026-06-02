@@ -97,6 +97,7 @@ import { importImageFile } from './lib/io3';
 import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
 import { joinSelection } from './lib/pathJoin';
+import { repeatTransform } from './lib/transformOps';
 import { commitDimension } from './lib/tools/measureTool';
 
 // Register a built-in "Skill" so the AI can call it as a tool.
@@ -809,6 +810,7 @@ export default function App() {
       }
       if (match('edit.redo')) { e.preventDefault(); redo(); announce(t('Redo')); return; }
       if (match('edit.duplicate')) { e.preventDefault(); duplicateSelection(); announce(t('Duplicate')); return; }
+      if (match('edit.transformAgain')) { e.preventDefault(); repeatTransform().then((ok) => { if (ok) announce(t('Transform Again')); }); return; }
       // Clipboard: copy/cut/paste go through the in-app clipboard exported by
       // CanvasContextMenu — the system clipboard can't carry Fabric objects.
       if (match('edit.copy')) { e.preventDefault(); if (copySelection()) announce(t('Copy')); return; }

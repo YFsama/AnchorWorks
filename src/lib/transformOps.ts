@@ -30,6 +30,24 @@ function transformAboutCentre(target: fabric.FabricObject, p: TransformParams): 
   target.setCoords();
 }
 
+/** The last transform applied, for Transform Again (Illustrator's step-and-repeat). */
+let lastTransform: TransformParams | null = null;
+
+/** True once a numeric transform has been applied this session. */
+export function canRepeatTransform(): boolean {
+  return lastTransform !== null;
+}
+
+/**
+ * Re-apply the most recent transform to the current selection — Illustrator's
+ * Transform Again. With `copy` on the remembered params this step-and-repeats a
+ * row/ring of clones; otherwise it re-nudges/scales/rotates the live selection.
+ */
+export async function repeatTransform(): Promise<boolean> {
+  if (!lastTransform) return false;
+  return applyTransform(lastTransform);
+}
+
 export async function applyTransform(p: TransformParams): Promise<boolean> {
   const canvas = getCanvas();
   if (!canvas) return false;
@@ -55,6 +73,7 @@ export async function applyTransform(p: TransformParams): Promise<boolean> {
     else canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas }));
     canvas.requestRenderAll();
     pushHistory();
+    lastTransform = { ...p };
     return true;
   }
 
@@ -73,5 +92,6 @@ export async function applyTransform(p: TransformParams): Promise<boolean> {
   transformAboutCentre(target, p);
   canvas.requestRenderAll();
   pushHistory();
+  lastTransform = { ...p };
   return true;
 }

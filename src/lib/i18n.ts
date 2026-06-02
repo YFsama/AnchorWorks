@@ -827,6 +827,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Pin measurement as dimension': { en: 'Pin measurement as dimension', zh: '将测量固定为尺寸标注' },
   'Flip': { en: 'Flip', zh: '翻转' },
   'Transform…': { en: 'Transform…', zh: '变换…' },
+  'Transform Again': { en: 'Transform Again', zh: '再次变换' },
+  'Apply a Transform first.': { en: 'Apply a Transform first.', zh: '请先执行一次变换。' },
   'Blend': { en: 'Blend', zh: '混合' },
   'Blend…': { en: 'Blend…', zh: '混合…' },
   'Steps': { en: 'Steps', zh: '步数' },

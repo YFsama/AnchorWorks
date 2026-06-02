@@ -3,6 +3,7 @@ import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Ha
 import { useEditor } from '../store/editor';
 import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
+import { repeatTransform } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
@@ -157,6 +158,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: 'Ctrl+Y' },
         { sep: true },
         { label: t('Transform…'), onClick: () => setModal('showTransform', true) },
+        { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: 'Ctrl+Shift+D' },
         { label: t('Flip Horizontal'), onClick: () => flipSelection('x'), kbd: 'Shift+H' },
         { label: t('Flip Vertical'), onClick: () => flipSelection('y'), kbd: 'Shift+V' },
         { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: 'Ctrl+J' },

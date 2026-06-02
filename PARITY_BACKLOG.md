@@ -210,3 +210,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Roughen in right-click — added the Roughen… item to CanvasContextMenu.tsx
       next to Simplify/Round Corners/Offset Path, so every path effect shares all
       three surfaces (menu / palette / right-click). 2026-06-02.
+- [x] Transform Again — transformOps.ts remembers the last applyTransform() params
+      (lastTransform) and repeatTransform() re-applies them (Illustrator's
+      step-and-repeat / array); Ctrl+Shift+D keymap + Edit menu + command palette.
+      Also restored a green `eslint .`: ignore src-tauri/target build output +
+      tests/e2e fixtures, and fixed a pre-existing ref-update-during-render in
+      useResizableWidth.ts. 2026-06-02.
