@@ -22,7 +22,7 @@ import { toast } from '../lib/toast';
 import { setOutlineMode, isOutlineMode } from '../lib/outlineView';
 import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
-import { booleanOp, divideSelection } from '../lib/booleanOps';
+import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { pasteFromClipboard } from '../lib/clipboard';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
@@ -243,6 +243,7 @@ export function CommandPalette({
     { id: 'bool.exclude',   label: t('Exclude'),   category: t('Arrange'), keywords: 'pathfinder boolean xor exclude', icon: Wand2, run: () => { void booleanOp('exclude'); } },
     { id: 'bool.minusBack', label: t('Minus Back'), category: t('Arrange'), keywords: 'pathfinder boolean minus back subtract', icon: Wand2, run: () => { void booleanOp('minus-back'); } },
     { id: 'bool.divide',    label: t('Divide'),     category: t('Arrange'), keywords: 'pathfinder boolean divide split regions', icon: Wand2, run: () => { divideSelection(); } },
+    { id: 'bool.trim',      label: t('Trim'),       category: t('Arrange'), keywords: 'pathfinder boolean trim hidden remove', icon: Wand2, run: () => { trimSelection(); } },
     { id: 'cut.weld',          label: t('Weld'),               category: t('Arrange'), keywords: 'merge union combine cut weld overlap sign', icon: Wand2, run: () => {
       const objs = getCanvas()?.getActiveObjects() ?? [];
       if (!objs.length) { toast.warn(t('Select one or more shapes first.')); return; }

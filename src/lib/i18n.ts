@@ -828,6 +828,10 @@ const dict: Record<string, Record<Lang, string>> = {
   'Split shapes into all their regions': {
     en: 'Split shapes into all their regions', zh: '将形状拆分为各个区域',
   },
+  'Trim': { en: 'Trim', zh: '修边' },
+  'Front shape trims the back; both kept': {
+    en: 'Front shape trims the back; both kept', zh: '前面形状裁切后面；两者均保留',
+  },
   'Subtract back shape from front': {
     en: 'Subtract back shape from front', zh: '从前面的图形中减去后面的图形',
   },

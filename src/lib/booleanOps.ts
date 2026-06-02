@@ -460,3 +460,53 @@ export function divideSelection(): number {
   pushHistory();
   return created.length;
 }
+
+/**
+ * Trim (Illustrator Pathfinder Trim) — the front shape stays whole; the back
+ * shape has the part hidden behind the front removed. Both remain as separate
+ * objects keeping their own fills (no merging of like colours). Returns the
+ * number of resulting objects (1 if the back is fully covered).
+ */
+export function trimSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 2) return 0;
+  const allObjs = canvas.getObjects();
+  const sorted = [...objs].sort((a, b) => allObjs.indexOf(a) - allObjs.indexOf(b));
+  const subject = sorted[sorted.length - 2]; // back
+  const clip = sorted[sorted.length - 1];    // front (kept whole)
+  const subjectRings = objectToRings(subject);
+  const clipRings = objectToRings(clip);
+  if (!subjectRings || !clipRings) return 0;
+  const subjGeom: Ring[][] = [subjectRings as Ring[]];
+  const clipGeom: Ring[][] = [clipRings as Ring[]];
+
+  let backRemainder: MultiPolygon;
+  try {
+    backRemainder = polygonClipping.difference(subjGeom as MultiPolygon, clipGeom as MultiPolygon);
+  } catch (err) {
+    logger.error('boolean', `trim failed: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+
+  // Replace the back shape with its trimmed remainder (front is left untouched).
+  canvas.remove(subject);
+  const kept: fabric.FabricObject[] = [clip];
+  const d = backRemainder.length ? multiPolygonToPathD(backRemainder) : '';
+  if (d) {
+    const trimmed = new fabric.Path(d, {
+      fill: (subject.fill as string) ?? '#3d9bff',
+      stroke: (subject.stroke as string) ?? '',
+      strokeWidth: subject.strokeWidth ?? 0,
+      opacity: subject.opacity ?? 1,
+    });
+    canvas.add(trimmed);
+    kept.unshift(trimmed);
+  }
+  canvas.discardActiveObject();
+  canvas.setActiveObject(kept.length === 1 ? kept[0] : new fabric.ActiveSelection(kept, { canvas }));
+  canvas.requestRenderAll();
+  pushHistory();
+  return kept.length;
+}

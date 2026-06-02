@@ -184,3 +184,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Pathfinder Divide — divideSelection() (booleanOps.ts) splits two shapes
       into A−B / B−A / A∩B pieces (Illustrator Pathfinder Divide); Align-panel
       button + command palette. 2026-06-02.
+- [x] Pathfinder Trim — trimSelection() (booleanOps.ts) keeps the front whole and
+      removes the front-covered part of the back, both separate (Illustrator
+      Pathfinder Trim); Align-panel button + command palette. 2026-06-02.
