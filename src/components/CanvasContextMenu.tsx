@@ -29,6 +29,7 @@ import {
 import { useEditor } from '../store/editor';
 import { buildOutlineCutPaths, weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
+import { rotateSelection } from '../lib/transformOps';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -293,6 +294,16 @@ export function CanvasContextMenu() {
         label={t('Flip Vertical')}
         disabled={!hasSelection}
         onClick={() => run(() => flip('y'), hasSelection)}
+      />
+      <Item
+        label={t('Rotate 90° CW')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { void rotateSelection(90); }, hasSelection)}
+      />
+      <Item
+        label={t('Rotate 90° CCW')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { void rotateSelection(-90); }, hasSelection)}
       />
       <Separator />
       <Item

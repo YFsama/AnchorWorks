@@ -233,3 +233,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       altKey: Alt/Option-click applies the current selection's appearance onto the
       clicked object (Illustrator's reverse eyedropper), completing the I tool.
       2026-06-02.
+- [x] Quick rotate 90°/180° — rotateSelection(deg) (transformOps.ts) wraps
+      applyTransform to spin the selection about its centre; Rotate 90° CW/CCW +
+      180° in the Edit menu, command palette, and right-click (CW/CCW). 2026-06-02.

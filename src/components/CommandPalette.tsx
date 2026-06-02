@@ -6,7 +6,7 @@ import {
   ChevronsUp, ChevronUp, ChevronDown, ChevronsDown,
   Plus, Minus, Maximize2, Bug,
   Settings2, Keyboard, HelpCircle, Sparkles, BookOpen,
-  Wand2, Palette, AlignCenter, Grid3X3, SunMoon, Type,
+  Wand2, Palette, AlignCenter, Grid3X3, SunMoon, Type, RotateCw, RotateCcw,
   type LucideIcon,
 } from 'lucide-react';
 import { useEditor } from '../store/editor';
@@ -28,7 +28,7 @@ import { createOutlinesFromText } from '../lib/textToOutline';
 import { pasteFromClipboard } from '../lib/clipboard';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
-import { repeatTransform } from '../lib/transformOps';
+import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { applyTextOnArc } from '../lib/textPath';
 import { applyStrokeAlign } from '../lib/strokeAlign';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -224,6 +224,9 @@ export function CommandPalette({
     { id: 'arrange.bottom',    label: t('Send to Back'),       category: t('Arrange'), keywords: 'order z-index bottom', icon: ChevronsDown, run: () => sendToBack() },
     { id: 'arrange.transform', label: t('Transform…'),          category: t('Arrange'), keywords: 'transform move scale rotate numeric exact copy reflect', icon: Wand2, run: () => setModal('showTransform', true) },
     { id: 'arrange.transformAgain', label: t('Transform Again'), category: t('Arrange'), shortcut: 'Ctrl+Alt+D', keywords: 'transform again repeat step and repeat array duplicate last', icon: Wand2, run: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); } },
+    { id: 'arrange.rotateCW',  label: t('Rotate 90° CW'),      category: t('Arrange'), keywords: 'rotate 90 clockwise right turn', icon: RotateCw, run: () => { void rotateSelection(90); } },
+    { id: 'arrange.rotateCCW', label: t('Rotate 90° CCW'),     category: t('Arrange'), keywords: 'rotate 90 counter clockwise anticlockwise left turn', icon: RotateCcw, run: () => { void rotateSelection(-90); } },
+    { id: 'arrange.rotate180', label: t('Rotate 180°'),        category: t('Arrange'), keywords: 'rotate 180 flip half turn upside down', icon: RotateCw, run: () => { void rotateSelection(180); } },
     { id: 'arrange.blend',     label: t('Blend…'),             category: t('Arrange'), keywords: 'blend morph interpolate steps between gradient shapes', icon: Wand2, run: () => setModal('showBlend', true) },
     { id: 'color.swapFillStroke', label: t('Swap Fill / Stroke'), category: t('Arrange'), shortcut: 'Shift+X', keywords: 'swap exchange fill stroke colour color', icon: Palette, run: () => { if (!swapFillStroke()) toast.warn(t('Select an object first.')); } },
     { id: 'color.defaultColors',  label: t('Default Fill / Stroke'), category: t('Arrange'), shortcut: 'D', keywords: 'default colours reset white fill black stroke', icon: Palette, run: () => defaultColors() },

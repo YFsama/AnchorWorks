@@ -30,6 +30,12 @@ function transformAboutCentre(target: fabric.FabricObject, p: TransformParams): 
   target.setCoords();
 }
 
+/** Rotate the selection about its centre by a fixed angle (quick 90°/180°
+ *  rotate). Thin wrapper over applyTransform so it also feeds Transform Again. */
+export function rotateSelection(deg: number): Promise<boolean> {
+  return applyTransform({ dx: 0, dy: 0, scale: 1, rotate: deg, copy: false, each: false });
+}
+
 /** The last transform applied, for Transform Again (Illustrator's step-and-repeat). */
 let lastTransform: TransformParams | null = null;
 
