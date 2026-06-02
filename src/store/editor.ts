@@ -159,7 +159,8 @@ interface EditorState {
   showTransform: boolean;
   showRoundCorners: boolean;
   showOffsetPath: boolean;
-  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath', v: boolean) => void;
+  showBlend: boolean;
+  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -291,6 +292,7 @@ export const useEditor = create<EditorState>((set) => ({
   showTransform: false,
   showRoundCorners: false,
   showOffsetPath: false,
+  showBlend: false,
   setModal: (k, v) => set({ [k]: v } as Partial<EditorState>),
 
   cutPaths: [],

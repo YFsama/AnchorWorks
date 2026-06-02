@@ -192,3 +192,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Reverse Path Direction — reversePathSelection() (pathReverse.ts) flips each
       selected path's winding (Illustrator Object→Path→Reverse Path Direction);
       command palette. 2026-06-02.
+- [x] Blend — blendSelection() (blend.ts) inserts N interpolated copies between
+      two objects (position/scale/rotation/opacity/colour) — Illustrator
+      Object→Blend; BlendDialog + command palette. 2026-06-02.
