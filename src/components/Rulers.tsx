@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { getCanvas, subscribeViewport } from '../lib/canvasEngine';
+import { useEditor } from '../store/editor';
 import { readToken as cssVar, readTokenAlpha as cssVarA } from '../lib/tokens';
 
 const RULER_SIZE = 20; // px thickness of each ruler strip
@@ -73,6 +74,44 @@ export function Rulers() {
     };
   }, []);
 
+  // Pull a new guide off a ruler. Top ruler → horizontal guide (varies in Y);
+  // left ruler → vertical guide (varies in X). Tracks the pointer globally and
+  // commits on release once it's dragged onto the canvas (past the ruler strip).
+  const startGuide = useCallback((axis: 'h' | 'v') => (e: React.PointerEvent) => {
+    const c = getCanvas();
+    if (!c || useEditor.getState().guidesLocked) return;
+    e.preventDefault();
+    const el = (c as unknown as { upperCanvasEl?: HTMLElement }).upperCanvasEl ?? c.getElement();
+    let lastX = e.clientX, lastY = e.clientY;
+    const scenePos = (clientX: number, clientY: number) => {
+      const rect = el.getBoundingClientRect();
+      const vt = c.viewportTransform!;
+      const zoom = c.getZoom();
+      return axis === 'h'
+        ? (clientY - rect.top - vt[5]) / zoom
+        : (clientX - rect.left - vt[4]) / zoom;
+    };
+    const move = (ev: PointerEvent) => {
+      lastX = ev.clientX; lastY = ev.clientY;
+      useEditor.getState().setGuideDrag({ axis, pos: scenePos(ev.clientX, ev.clientY) });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      const drag = useEditor.getState().guideDrag;
+      useEditor.getState().setGuideDrag(null);
+      const rect = el.getBoundingClientRect();
+      // Only commit if released over the canvas, not back on the ruler strip.
+      const onCanvas = axis === 'h'
+        ? lastY > rect.top + RULER_SIZE
+        : lastX > rect.left + RULER_SIZE;
+      if (drag && onCanvas) useEditor.getState().addUserGuide(drag.axis, drag.pos);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    move(e.nativeEvent);
+  }, []);
+
   return (
     <>
       {/* Corner square covering the top-left intersection of the rulers */}
@@ -88,13 +127,15 @@ export function Rulers() {
       />
       <canvas
         ref={topRef}
-        className="absolute top-0 z-10 pointer-events-none"
-        style={{ left: RULER_SIZE, borderBottom: '1px solid rgb(var(--color-border))' }}
+        onPointerDown={startGuide('h')}
+        className="absolute top-0 z-10"
+        style={{ left: RULER_SIZE, borderBottom: '1px solid rgb(var(--color-border))', cursor: 'row-resize' }}
       />
       <canvas
         ref={leftRef}
-        className="absolute left-0 z-10 pointer-events-none"
-        style={{ top: RULER_SIZE, borderRight: '1px solid rgb(var(--color-border))' }}
+        onPointerDown={startGuide('v')}
+        className="absolute left-0 z-10"
+        style={{ top: RULER_SIZE, borderRight: '1px solid rgb(var(--color-border))', cursor: 'col-resize' }}
       />
     </>
   );

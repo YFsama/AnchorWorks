@@ -812,6 +812,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'outline(s) added': { en: 'outline(s) added', zh: '个轮廓已添加' },
   'Align to': { en: 'Align to', zh: '对齐基准' },
   'Artboard': { en: 'Artboard', zh: '画板' },
+  'Lock Guides': { en: 'Lock Guides', zh: '锁定参考线' },
+  'Clear Guides': { en: 'Clear Guides', zh: '清除参考线' },
   'Cut order': { en: 'Cut order', zh: '切割顺序' },
   'Number the cut paths in travel order with a start arrow.': {
     en: 'Number the cut paths in travel order with a start arrow.',

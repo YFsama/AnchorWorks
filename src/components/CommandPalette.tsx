@@ -243,6 +243,8 @@ export function CommandPalette({
     { id: 'view.zoomOut', label: t('Zoom Out'),    category: t('View'), shortcut: 'Ctrl+-', icon: Minus,     run: () => zoomBy(1 / 1.25) },
     { id: 'view.fit',     label: t('Fit to Page'), category: t('View'), shortcut: 'Ctrl+0', icon: Maximize2, run: () => zoomFit() },
     { id: 'view.outline', label: t('Outline View'), category: t('View'), shortcut: 'Ctrl+Alt+Y', keywords: 'wireframe geometry preview', icon: PenTool, run: () => setOutlineMode(!isOutlineMode()) },
+    { id: 'view.clearGuides', label: t('Clear Guides'), category: t('View'), keywords: 'guide ruler remove delete', icon: Grid3X3, run: () => useEditor.getState().clearUserGuides() },
+    { id: 'view.lockGuides', label: t('Lock Guides'), category: t('View'), keywords: 'guide ruler lock freeze', icon: Grid3X3, run: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked) },
     { id: 'view.debug',   label: t('Toggle Debug'), category: t('View'), keywords: 'logs panel inspect',     icon: Bug,       run: onToggleDebug },
 
     // ---------- Window ----------

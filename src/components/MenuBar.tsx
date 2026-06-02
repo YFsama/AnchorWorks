@@ -65,6 +65,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   const snapEnabled = useEditor(s => s.snapEnabled);
   const smartGuidesEnabled = useEditor(s => s.smartGuidesEnabled);
   const anchorSnapEnabled = useEditor(s => s.anchorSnapEnabled);
+  const guidesLocked = useEditor(s => s.guidesLocked);
   const setGridVisible = useEditor(s => s.setGridVisible);
   const setSnapEnabled = useEditor(s => s.setSnapEnabled);
   const setSmartGuidesEnabled = useEditor(s => s.setSmartGuidesEnabled);
@@ -159,6 +160,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Fit to Page'), onClick: () => zoomFit(), kbd: '0' },
         { sep: true },
         { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: 'Ctrl+Alt+Y', checked: outlineMode },
+        { sep: true },
+        { label: t('Lock Guides'), onClick: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked), checked: guidesLocked },
+        { label: t('Clear Guides'), onClick: () => useEditor.getState().clearUserGuides() },
       ]} />
 
       <Dropdown label={t('Document')} items={[

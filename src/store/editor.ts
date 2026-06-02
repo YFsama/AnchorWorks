@@ -15,6 +15,13 @@ import type { DocSettings, FillStroke, LayerInfo, ToolId, ShadowSettings, Artboa
  * Points are in document mm-space (top-down Y, same as artboards/objects).
  * The PlotterDialog handles mm → plotter-unit conversion at send time.
  */
+export interface UserGuide {
+  id: string;
+  axis: 'h' | 'v';
+  /** Scene-space position: Y for a horizontal guide, X for a vertical one. */
+  pos: number;
+}
+
 export interface CutPath {
   id: string;
   points: Array<[number, number]>;
@@ -136,6 +143,18 @@ interface EditorState {
   clearCutPaths: (kind?: CutPath['kind']) => void;
   setCutPathsVisible: (v: boolean) => void;
 
+  // User guides — persistent ruler-dragged guide lines (scene-space position).
+  // `axis: 'h'` is a horizontal line varying in Y; 'v' is vertical varying in X.
+  // `guideDrag` holds the live drag preview while pulling a new guide off a ruler.
+  userGuides: UserGuide[];
+  guidesLocked: boolean;
+  guideDrag: { axis: 'h' | 'v'; pos: number } | null;
+  addUserGuide: (axis: 'h' | 'v', pos: number) => void;
+  removeUserGuide: (id: string) => void;
+  clearUserGuides: () => void;
+  setGuidesLocked: (v: boolean) => void;
+  setGuideDrag: (d: { axis: 'h' | 'v'; pos: number } | null) => void;
+
   // Grid / snap / smart guides
   gridVisible: boolean;
   gridSize: number;
@@ -244,6 +263,17 @@ export const useEditor = create<EditorState>((set) => ({
     cutPaths: kind ? st.cutPaths.filter(p => p.kind !== kind) : [],
   })),
   setCutPathsVisible: (v) => set({ cutPathsVisible: v }),
+
+  userGuides: [],
+  guidesLocked: false,
+  guideDrag: null,
+  addUserGuide: (axis, pos) => set((st) => ({
+    userGuides: [...st.userGuides, { id: `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, axis, pos }],
+  })),
+  removeUserGuide: (id) => set((st) => ({ userGuides: st.userGuides.filter(g => g.id !== id) })),
+  clearUserGuides: () => set({ userGuides: [] }),
+  setGuidesLocked: (v) => set({ guidesLocked: v }),
+  setGuideDrag: (d) => set({ guideDrag: d }),
 
   gridVisible: false,
   gridSize: 20,
