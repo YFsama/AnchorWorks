@@ -36,13 +36,14 @@ import {
   shapeDrawUpdate,
   shapeDrawEnd,
 } from './shapeDrawTool';
+import { measureBegin, measureUpdate, measureEnd, measureClear } from './measureTool';
 import { useEditor } from '../../store/editor';
 import { zoomToPoint } from '../viewport';
 import { enterPathEdit, exitPathEdit } from '../pathEdit';
 import { PressureBrush } from '../pressureBrush';
 import { panBegin } from '../panSession';
 import {
-  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Type, Hand, ZoomIn,
+  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Type, Hand, ZoomIn, Ruler,
 } from 'lucide-react';
 
 let initialized = false;
@@ -244,5 +245,21 @@ export function registerBuiltInTools(): void {
       const factor = (ctx.raw.e as MouseEvent).altKey ? 1 / 1.25 : 1.25;
       zoomToPoint(ctx.vp.x, ctx.vp.y, ctx.canvas.getZoom() * factor);
     },
+  });
+
+  // Measure — click-drag to read distance + angle. Never mutates the document;
+  // the live segment is rendered by MeasureLayer from the store.
+  registerTool({
+    id: 'measure',
+    label: 'Measure',
+    icon: Ruler,
+    shortcut: 'M',
+    keywords: 'ruler distance angle dimension measure',
+    cursor: 'crosshair',
+    selectable: false,
+    onMouseDown: (ctx) => measureBegin(ctx.sp.x, ctx.sp.y),
+    onMouseMove: (ctx) => measureUpdate(ctx.sp.x, ctx.sp.y),
+    onMouseUp: () => measureEnd(),
+    onDeactivate: () => measureClear(),
   });
 }

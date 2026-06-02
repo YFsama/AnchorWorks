@@ -155,6 +155,10 @@ interface EditorState {
   setGuidesLocked: (v: boolean) => void;
   setGuideDrag: (d: { axis: 'h' | 'v'; pos: number } | null) => void;
 
+  // Measure tool — the live measurement segment in scene coords, or null.
+  measure: { x1: number; y1: number; x2: number; y2: number } | null;
+  setMeasure: (m: { x1: number; y1: number; x2: number; y2: number } | null) => void;
+
   // Grid / snap / smart guides
   gridVisible: boolean;
   gridSize: number;
@@ -274,6 +278,9 @@ export const useEditor = create<EditorState>((set) => ({
   clearUserGuides: () => set({ userGuides: [] }),
   setGuidesLocked: (v) => set({ guidesLocked: v }),
   setGuideDrag: (d) => set({ guideDrag: d }),
+
+  measure: null,
+  setMeasure: (m) => set({ measure: m }),
 
   gridVisible: false,
   gridSize: 20,

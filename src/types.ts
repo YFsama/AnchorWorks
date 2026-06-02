@@ -10,7 +10,8 @@ export type ToolId =
   | 'eraser'
   | 'text'
   | 'hand'
-  | 'zoom';
+  | 'zoom'
+  | 'measure';
 
 export interface LayerInfo {
   id: string;
