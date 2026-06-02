@@ -463,3 +463,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Alt+←/→ nudges letter-spacing and Alt+↑/↓ line-height on a selected text object
       (Illustrator), falling through to arrow-nudge otherwise. App arrow handler.
       2026-06-03.
+- [x] Tracking/leading in palette — surfaced Increase/Decrease Tracking & Leading
+      as four command-palette entries (with their Alt+arrow shortcut hints) so the
+      keyboard-only adjusters are discoverable. 2026-06-03.

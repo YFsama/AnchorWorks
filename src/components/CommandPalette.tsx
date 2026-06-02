@@ -32,7 +32,7 @@ import { rasterizeSelection } from '../lib/rasterize';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { createOutlinesFromText } from '../lib/textToOutline';
-import { changeCaseSelection, adjustFontSize } from '../lib/textCase';
+import { changeCaseSelection, adjustFontSize, adjustTracking, adjustLeading } from '../lib/textCase';
 import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { pasteFromClipboard } from '../lib/clipboard';
@@ -314,6 +314,10 @@ export function CommandPalette({
     { id: 'text.caseSentence', label: t('Sentence case'),      category: t('Arrange'), keywords: 'change case sentence capitalise text', icon: Type, run: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.fontSizeUp',   label: t('Increase Font Size'), category: t('Arrange'), shortcut: 'Ctrl+>', keywords: 'font size increase bigger larger text', icon: Type, run: () => { if (!adjustFontSize(2)) toast.warn(t('Select a text object first.')); } },
     { id: 'text.fontSizeDown', label: t('Decrease Font Size'), category: t('Arrange'), shortcut: 'Ctrl+<', keywords: 'font size decrease smaller text', icon: Type, run: () => { if (!adjustFontSize(-2)) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.trackingUp',   label: t('Increase Tracking'), category: t('Arrange'), shortcut: 'Alt+→', keywords: 'tracking letter spacing increase wider kerning text', icon: Type, run: () => { if (!adjustTracking(25)) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.trackingDown', label: t('Decrease Tracking'), category: t('Arrange'), shortcut: 'Alt+←', keywords: 'tracking letter spacing decrease tighter kerning text', icon: Type, run: () => { if (!adjustTracking(-25)) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.leadingUp',    label: t('Increase Leading'), category: t('Arrange'), shortcut: 'Alt+↑', keywords: 'leading line height spacing increase looser text', icon: Type, run: () => { if (!adjustLeading(0.05)) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.leadingDown',  label: t('Decrease Leading'), category: t('Arrange'), shortcut: 'Alt+↓', keywords: 'leading line height spacing decrease tighter text', icon: Type, run: () => { if (!adjustLeading(-0.05)) toast.warn(t('Select a text object first.')); } },
     { id: 'text.arcUp',   label: `${t('Text on Arc')} ∩`, category: t('Arrange'), keywords: 'text arc curve circle badge seal up arch', icon: Type, run: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'text.arcDown', label: `${t('Text on Arc')} ∪`, category: t('Arrange'), keywords: 'text arc curve circle badge seal down arch', icon: Type, run: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'cut.outlineStroke',  label: t('Outline Stroke'),    category: t('Arrange'), keywords: 'stroke outline expand cut edges', icon: PenTool, run: () => {
