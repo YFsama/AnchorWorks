@@ -77,8 +77,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Transform dialog** — transformOps.ts applyTransform() moves/scales/rotates
       the selection by exact values about its centre, with an optional copy;
       TransformDialog; Edit menu + command palette. 2026-06-02.
-- [ ] **Join paths** — connect two open-path endpoints into one path
-      (Illustrator: Ctrl+J).
+- [x] **Join paths** — pathJoin.ts joinSelection() connects the nearest endpoints
+      of 2 selected open paths into one (or closes 1); rebuilt as a new
+      fabric.Path. Ctrl+J (keymap+App), Edit menu, command palette, right-click.
+      2026-06-02. — P1 path/transform group complete.
 
 ## P2 — workflow convenience & SignMaster extras
 

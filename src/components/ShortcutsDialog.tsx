@@ -35,6 +35,7 @@ const ACTIONS: Shortcut[] = [
   { keys: 'Ctrl+C / Ctrl+X / Ctrl+V', labelKey: 'Copy / Cut / Paste' },
   { keys: 'Ctrl+G / Ctrl+Shift+G', labelKey: 'Group / Ungroup' },
   { keys: 'Shift+H / Shift+V', labelKey: 'Flip Horizontal / Vertical' },
+  { keys: 'Ctrl+J', labelKey: 'Join Paths' },
   { keys: 'Ctrl+] / Ctrl+[', labelKey: 'Bring Forward / Send Backward' },
   { keys: 'Ctrl+Shift+] / Ctrl+Shift+[', labelKey: 'Bring to Front / Send to Back' },
   { keys: 'Delete / Backspace', labelKey: 'Delete selection' },

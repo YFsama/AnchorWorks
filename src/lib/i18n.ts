@@ -815,6 +815,11 @@ const dict: Record<string, Record<Lang, string>> = {
   'Measure': { en: 'Measure', zh: '测量' },
   'Flip': { en: 'Flip', zh: '翻转' },
   'Transform…': { en: 'Transform…', zh: '变换…' },
+  'Join Paths': { en: 'Join Paths', zh: '连接路径' },
+  'Select 1 open path to close, or 2 to join.': {
+    en: 'Select 1 open path to close, or 2 to join.',
+    zh: '选中 1 条开放路径可闭合，或选 2 条以连接。',
+  },
   'Move': { en: 'Move', zh: '移动' },
   'Scale': { en: 'Scale', zh: '缩放' },
   'Rotate': { en: 'Rotate', zh: '旋转' },

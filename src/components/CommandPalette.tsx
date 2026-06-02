@@ -23,6 +23,7 @@ import { setOutlineMode, isOutlineMode } from '../lib/outlineView';
 import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
+import { joinSelection } from '../lib/pathJoin';
 import { applyTextOnArc } from '../lib/textPath';
 import { applyStrokeAlign } from '../lib/strokeAlign';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -221,6 +222,7 @@ export function CommandPalette({
     { id: 'arrange.compMake',  label: t('Compound Path'),      category: t('Arrange'), keywords: 'merge paths combine even-odd', icon: PenTool, run: () => { makeCompoundPath(); } },
     { id: 'arrange.compFree',  label: t('Release Compound'),   category: t('Arrange'), keywords: 'split decompose paths', icon: PenTool,      run: () => { releaseCompoundPath(); } },
     { id: 'path.simplify',     label: t('Simplify Path…'),     category: t('Arrange'), keywords: 'simplify reduce anchor points douglas peucker smooth', icon: PenTool, run: () => setModal('showSimplify', true) },
+    { id: 'path.join',         label: t('Join Paths'),         category: t('Arrange'), shortcut: 'Ctrl+J', keywords: 'join connect close path endpoints merge', icon: PenTool, run: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); } },
     { id: 'cut.weld',          label: t('Weld'),               category: t('Arrange'), keywords: 'merge union combine cut weld overlap sign', icon: Wand2, run: () => {
       const objs = getCanvas()?.getActiveObjects() ?? [];
       if (!objs.length) { toast.warn(t('Select one or more shapes first.')); return; }

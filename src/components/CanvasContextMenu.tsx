@@ -21,6 +21,7 @@ import {
 } from '../lib/clipboard';
 import { useEditor } from '../store/editor';
 import { buildOutlineCutPaths, weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
+import { joinSelection } from '../lib/pathJoin';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -122,6 +123,7 @@ export function CanvasContextMenu() {
   const canGroup = activeObj?.type === 'activeselection';
   const canUngroup = activeObj?.type === 'group';
   const canPaste = hasClipboard();
+  const pathCount = active.filter(o => o.type === 'path').length;
   // A single editable text object → offer inline "Edit Text".
   const editableText = active.length === 1 &&
     (active[0].type === 'i-text' || active[0].type === 'textbox') ? active[0] : null;
@@ -347,6 +349,12 @@ export function CanvasContextMenu() {
         label={t('Simplify Path…')}
         disabled={!hasSelection}
         onClick={() => run(() => openModal('showSimplify'), hasSelection)}
+      />
+      <Item
+        label={t('Join Paths')}
+        kbd="Ctrl+J"
+        disabled={pathCount !== 1 && pathCount !== 2}
+        onClick={() => run(() => { joinSelection(); }, pathCount === 1 || pathCount === 2)}
       />
       <Item
         label={t('Cut Contour…')}

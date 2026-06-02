@@ -92,6 +92,7 @@ import { showConfirm } from './lib/confirm';
 import { importImageFile } from './lib/io3';
 import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
+import { joinSelection } from './lib/pathJoin';
 
 // Register a built-in "Skill" so the AI can call it as a tool.
 registerSkill({
@@ -890,6 +891,7 @@ export default function App() {
       }
       if (match('edit.flipH')) { e.preventDefault(); flipSelection('x'); announce(t('Flip Horizontal')); return; }
       if (match('edit.flipV')) { e.preventDefault(); flipSelection('y'); announce(t('Flip Vertical')); return; }
+      if (match('edit.join')) { e.preventDefault(); if (joinSelection()) announce(t('Join Paths')); else toast.warn(t('Select 1 open path to close, or 2 to join.')); return; }
       if (match('edit.selectAll')) {
         e.preventDefault();
         const c = getCanvas();
