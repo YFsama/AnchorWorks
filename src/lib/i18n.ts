@@ -824,6 +824,10 @@ const dict: Record<string, Record<Lang, string>> = {
   'Default Fill / Stroke': { en: 'Default Fill / Stroke', zh: '默认填充与描边' },
   'Swap / Default Fill & Stroke': { en: 'Swap / Default Fill & Stroke', zh: '互换 / 默认 填充与描边' },
   'Minus Back': { en: 'Minus Back', zh: '减去后方' },
+  'Divide': { en: 'Divide', zh: '分割' },
+  'Split shapes into all their regions': {
+    en: 'Split shapes into all their regions', zh: '将形状拆分为各个区域',
+  },
   'Subtract back shape from front': {
     en: 'Subtract back shape from front', zh: '从前面的图形中减去后面的图形',
   },

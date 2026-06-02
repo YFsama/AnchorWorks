@@ -181,3 +181,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Offset Path — offsetPathSelection() (offsetPath.ts) adds a parallel offset
       copy (±mm, original kept) via offsetPolyline (Illustrator Object→Path→Offset
       Path); OffsetPathDialog + command palette + right-click. 2026-06-02.
+- [x] Pathfinder Divide — divideSelection() (booleanOps.ts) splits two shapes
+      into A−B / B−A / A∩B pieces (Illustrator Pathfinder Divide); Align-panel
+      button + command palette. 2026-06-02.

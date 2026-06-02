@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
 import { alignSelection, distributeSelection, distributeSpacing, flipSelection } from '../lib/canvasEngine';
-import { booleanOp } from '../lib/booleanOps';
+import { booleanOp, divideSelection } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
@@ -150,8 +150,9 @@ export function AlignPanel() {
               <TextBtn title={t('Intersection of shapes')} disabled={!enoughForBool} onClick={() => booleanOp('intersect')}>{t('Intersect')}</TextBtn>
               <TextBtn title={t('Exclude overlapping area')} disabled={!enoughForBool} onClick={() => booleanOp('exclude')}>{t('Exclude')}</TextBtn>
             </div>
-            <div className="grid grid-cols-1 gap-1 mt-1">
+            <div className="grid grid-cols-2 gap-1 mt-1">
               <TextBtn title={t('Subtract back shape from front')} disabled={!enoughForBool} onClick={() => booleanOp('minus-back')}>{t('Minus Back')}</TextBtn>
+              <TextBtn title={t('Split shapes into all their regions')} disabled={!enoughForBool} onClick={() => { divideSelection(); }}>{t('Divide')}</TextBtn>
             </div>
           </div>
 

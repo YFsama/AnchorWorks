@@ -402,3 +402,61 @@ export async function booleanOp(op: BoolOp): Promise<fabric.Path | null> {
   pushHistory();
   return path;
 }
+
+/**
+ * Divide (Illustrator Pathfinder Divide) — split the two selected shapes into
+ * their distinct regions: A−B, B−A, and A∩B, each a separate path inheriting
+ * the matching source style. Runs on the main thread (divide is for a handful
+ * of simple shapes). Returns the number of pieces produced.
+ */
+export function divideSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 2) return 0;
+  const allObjs = canvas.getObjects();
+  const sorted = [...objs].sort((a, b) => allObjs.indexOf(a) - allObjs.indexOf(b));
+  const subject = sorted[sorted.length - 2];
+  const clip = sorted[sorted.length - 1];
+  const subjectRings = objectToRings(subject);
+  const clipRings = objectToRings(clip);
+  if (!subjectRings || !clipRings) return 0;
+  const subjGeom: Ring[][] = [subjectRings as Ring[]];
+  const clipGeom: Ring[][] = [clipRings as Ring[]];
+
+  const regions: Array<{ mp: MultiPolygon; src: FabricObject }> = [];
+  try {
+    const aMinusB = polygonClipping.difference(subjGeom as MultiPolygon, clipGeom as MultiPolygon);
+    const bMinusA = polygonClipping.difference(clipGeom as MultiPolygon, subjGeom as MultiPolygon);
+    const inter = polygonClipping.intersection(subjGeom as MultiPolygon, clipGeom as MultiPolygon);
+    if (aMinusB.length) regions.push({ mp: aMinusB, src: subject });
+    if (bMinusA.length) regions.push({ mp: bMinusA, src: clip });
+    if (inter.length) regions.push({ mp: inter, src: clip }); // overlap reads as the top shape
+  } catch (err) {
+    logger.error('boolean', `divide failed: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+  if (regions.length === 0) return 0;
+
+  const created: fabric.Path[] = [];
+  for (const { mp, src } of regions) {
+    const d = multiPolygonToPathD(mp);
+    if (!d) continue;
+    created.push(new fabric.Path(d, {
+      fill: (src.fill as string) ?? '#3d9bff',
+      stroke: (src.stroke as string) ?? '',
+      strokeWidth: src.strokeWidth ?? 0,
+      opacity: src.opacity ?? 1,
+    }));
+  }
+  if (created.length === 0) return 0;
+
+  canvas.remove(subject);
+  canvas.remove(clip);
+  for (const p of created) canvas.add(p);
+  canvas.discardActiveObject();
+  canvas.setActiveObject(created.length === 1 ? created[0] : new fabric.ActiveSelection(created, { canvas }));
+  canvas.requestRenderAll();
+  pushHistory();
+  return created.length;
+}
