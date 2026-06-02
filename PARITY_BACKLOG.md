@@ -125,3 +125,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Snap-to-guides — applySmartSnap() (smartGuides.ts) now snaps a dragged
       object's edges/centre to ruler-dragged user guides (under the Smart Guides
       toggle), completing the guides feature. 2026-06-02.
+- [x] Persist user guides — editor.ts loadGuides()/persistGuides() save guides to
+      localStorage (vector.guides) so they survive a reload, like artboards.
+      2026-06-02.

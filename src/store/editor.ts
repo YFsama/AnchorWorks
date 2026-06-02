@@ -55,6 +55,28 @@ function readInitialTheme(): 'dark' | 'light' {
   return 'dark';
 }
 
+const GUIDES_KEY = 'vector.guides';
+
+/** Load persisted user guides (SSR-safe, tolerant of corrupt data). */
+function loadGuides(): UserGuide[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(GUIDES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((g) => g && (g.axis === 'h' || g.axis === 'v') && Number.isFinite(g.pos))
+      .map((g) => ({ id: String(g.id ?? `g-${Math.random().toString(36).slice(2, 8)}`), axis: g.axis as 'h' | 'v', pos: Number(g.pos) }));
+  } catch { return []; }
+}
+
+/** Persist user guides so they survive a reload (like artboards). */
+function persistGuides(list: UserGuide[]): void {
+  if (typeof window === 'undefined') return;
+  try { window.localStorage.setItem(GUIDES_KEY, JSON.stringify(list)); } catch { /* quota/blocked */ }
+}
+
 function readInitialHighContrast(): boolean {
   if (typeof window === 'undefined') return false;
   try {
@@ -274,14 +296,20 @@ export const useEditor = create<EditorState>((set) => ({
   })),
   setCutPathsVisible: (v) => set({ cutPathsVisible: v }),
 
-  userGuides: [],
+  userGuides: loadGuides(),
   guidesLocked: false,
   guideDrag: null,
-  addUserGuide: (axis, pos) => set((st) => ({
-    userGuides: [...st.userGuides, { id: `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, axis, pos }],
-  })),
-  removeUserGuide: (id) => set((st) => ({ userGuides: st.userGuides.filter(g => g.id !== id) })),
-  clearUserGuides: () => set({ userGuides: [] }),
+  addUserGuide: (axis, pos) => set((st) => {
+    const next = [...st.userGuides, { id: `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, axis, pos }];
+    persistGuides(next);
+    return { userGuides: next };
+  }),
+  removeUserGuide: (id) => set((st) => {
+    const next = st.userGuides.filter(g => g.id !== id);
+    persistGuides(next);
+    return { userGuides: next };
+  }),
+  clearUserGuides: () => { persistGuides([]); set({ userGuides: [] }); },
   setGuidesLocked: (v) => set({ guidesLocked: v }),
   setGuideDrag: (d) => set({ guideDrag: d }),
 
