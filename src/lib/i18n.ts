@@ -802,6 +802,14 @@ const dict: Record<string, Record<Lang, string>> = {
   'Select a single text object to enable': {
     en: 'Select a single text object to enable', zh: '请选中单个文字对象以启用',
   },
+  'Multi-outline': { en: 'Multi-outline', zh: '多重轮廓' },
+  'Multi-outline…': { en: 'Multi-outline…', zh: '多重轮廓…' },
+  'Outlines': { en: 'Outlines', zh: '轮廓数' },
+  'Width per ring (mm)': { en: 'Width per ring (mm)', zh: '每圈宽度 (mm)' },
+  'Inner ring': { en: 'Inner ring', zh: '内圈' },
+  'Outer ring': { en: 'Outer ring', zh: '外圈' },
+  'Ring': { en: 'Ring', zh: '圈' },
+  'outline(s) added': { en: 'outline(s) added', zh: '个轮廓已添加' },
   'Select shapes that have a stroke first.': {
     en: 'Select shapes that have a stroke first.',
     zh: '请先选中带描边的图形。',

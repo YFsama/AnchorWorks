@@ -122,7 +122,8 @@ interface EditorState {
   showKeymapEditor: boolean;
   showCutContour: boolean;
   showTilePrint: boolean;
-  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint', v: boolean) => void;
+  showOutline: boolean;
+  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -230,6 +231,7 @@ export const useEditor = create<EditorState>((set) => ({
   showKeymapEditor: false,
   showCutContour: false,
   showTilePrint: false,
+  showOutline: false,
   setModal: (k, v) => set({ [k]: v } as Partial<EditorState>),
 
   cutPaths: [],
