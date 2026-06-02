@@ -401,3 +401,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       selection into an arc/banner over a shared x-frame (parabolic Y shift,
       Illustrator Effect→Warp→Arc), distinct from Text-on-Arc; WarpDialog (bend) +
       Distort submenu + command palette. +3 tests. 2026-06-03.
+- [x] Warp styles — generalised to warpPoints()/warpSelection(bend, style) with
+      Arc / Rise / Flag / Wave profiles (warp.ts); WarpDialog gains a style radio
+      group (Illustrator's Warp styles). +2 tests. 2026-06-03.

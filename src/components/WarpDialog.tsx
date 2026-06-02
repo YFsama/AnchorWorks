@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { X, Rainbow } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { warpArcSelection } from '../lib/warp';
+import { warpSelection, type WarpStyle } from '../lib/warp';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
@@ -16,13 +16,21 @@ export function WarpDialog() {
   const open = useEditor(s => s.showWarp);
   const close = useCallback(() => useEditor.getState().setModal('showWarp', false), []);
   const [bend, setBend] = useState(40);
+  const [style, setStyle] = useState<WarpStyle>('arc');
 
   useEscapeClose(open, close);
   useFocusRestore(open);
   if (!open) return null;
 
+  const STYLES: { id: WarpStyle; label: string }[] = [
+    { id: 'arc', label: t('Arc') },
+    { id: 'rise', label: t('Rise') },
+    { id: 'flag', label: t('Flag') },
+    { id: 'wave', label: t('Wave') },
+  ];
+
   const apply = () => {
-    const n = warpArcSelection(bend);
+    const n = warpSelection(bend, style);
     if (n > 0) toast.success(`${n} ${t('shapes warped')}`, { title: t('Arc Warp') });
     else toast.warn(t('Select one or more paths/shapes first.'), { title: t('Arc Warp') });
     close();
@@ -42,6 +50,12 @@ export function WarpDialog() {
             <Rainbow size={14} aria-hidden="true" /> {t('Arc Warp')}
           </h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-1 mb-3" role="radiogroup" aria-label={t('Style')}>
+          {STYLES.map((s) => (
+            <button key={s.id} type="button" role="radio" aria-checked={style === s.id} className={style === s.id ? 'btn-primary' : 'btn'} onClick={() => setStyle(s.id)}>{s.label}</button>
+          ))}
         </div>
 
         <label className="block">

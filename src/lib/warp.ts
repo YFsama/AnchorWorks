@@ -17,15 +17,31 @@ function toD(pts: Pt[], closed: boolean): string {
   return closed ? `${d} Z` : d;
 }
 
-/** Shift each point's Y by `bend·width·½·parabola(x)` — peak at the frame centre. */
-export function warpArcPoints(pts: Pt[], minX: number, width: number, bend: number): Pt[] {
+export type WarpStyle = 'arc' | 'rise' | 'flag' | 'wave';
+
+/** Vertical-displacement profile per style, as a function of nx ∈ [0,1]. */
+function profile(nx: number, style: WarpStyle): number {
+  switch (style) {
+    case 'arc': return 4 * nx * (1 - nx);          // hump, 0 at both edges
+    case 'rise': return nx;                         // ramp 0→1 (one end lifts)
+    case 'flag': return Math.sin(2 * Math.PI * nx); // one full wave
+    case 'wave': return Math.sin(4 * Math.PI * nx); // two waves
+  }
+}
+
+/** Shift each point's Y by `bend·width·½·profile(x)` for the chosen style. */
+export function warpPoints(pts: Pt[], minX: number, width: number, bend: number, style: WarpStyle): Pt[] {
   if (width <= 0) return pts.slice();
   const depth = bend * width * 0.5;
   return pts.map(([x, y]) => {
     const nx = Math.max(0, Math.min(1, (x - minX) / width));
-    const p = 4 * nx * (1 - nx);
-    return [x, y - depth * p] as Pt;
+    return [x, y - depth * profile(nx, style)] as Pt;
   });
+}
+
+/** Back-compat arc-only helper (Arc style). */
+export function warpArcPoints(pts: Pt[], minX: number, width: number, bend: number): Pt[] {
+  return warpPoints(pts, minX, width, bend, 'arc');
 }
 
 function densify(pts: Pt[]): Pt[] {
@@ -50,8 +66,8 @@ export function canWarp(): boolean {
   return !!c && c.getActiveObjects().some(o => SHAPES.has(o.type ?? ''));
 }
 
-/** Arc-warp every selected path/shape by `bendPct` in [-100, 100]. */
-export function warpArcSelection(bendPct: number): number {
+/** Warp every selected path/shape by `bendPct` in [-100, 100] using `style`. */
+export function warpSelection(bendPct: number, style: WarpStyle = 'arc'): number {
   const canvas = getCanvas();
   if (!canvas || bendPct === 0) return 0;
   const objs = canvas.getActiveObjects().filter(o => SHAPES.has(o.type ?? ''));
@@ -77,7 +93,7 @@ export function warpArcSelection(bendPct: number): number {
   for (const { obj, loops } of gathered) {
     const parts: string[] = [];
     for (const { pts, closed } of loops) {
-      const warped = warpArcPoints(pts, minX, width, bend);
+      const warped = warpPoints(pts, minX, width, bend, style);
       if (warped.length >= 2) parts.push(toD(warped, closed));
     }
     if (parts.length === 0) continue;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { warpArcPoints } from '../warp';
+import { warpArcPoints, warpPoints } from '../warp';
 
 type Pt = [number, number];
 
@@ -22,5 +22,17 @@ describe('warpArcPoints', () => {
   it('never moves X and is a no-op for zero width', () => {
     const out = warpArcPoints([[5, 5]], 0, 0, 1);
     expect(out).toEqual([[5, 5]]);
+  });
+});
+
+describe('warpPoints styles', () => {
+  it('rise ramps linearly (centre at half depth)', () => {
+    const out = warpPoints([[50, 0]], 0, 100, 1, 'rise'); // nx=0.5 → profile 0.5
+    expect(out[0][1]).toBeCloseTo(-25, 6); // -(depth=50)*0.5
+  });
+  it('flag is a full sine: zero at the ends and the middle', () => {
+    expect(warpPoints([[0, 0]], 0, 100, 1, 'flag')[0][1]).toBeCloseTo(0, 6);
+    expect(warpPoints([[50, 0]], 0, 100, 1, 'flag')[0][1]).toBeCloseTo(0, 6);
+    expect(warpPoints([[25, 0]], 0, 100, 1, 'flag')[0][1]).toBeCloseTo(-50, 6); // sin(π/2)=1
   });
 });
