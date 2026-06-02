@@ -32,16 +32,16 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 
 ## P0 — sign-making essentials (cut/print correctness)
 
+- [x] **Weld / Merge for cut** — `weldOutline()` in contourFromSelection.ts
+      (polygon-clipping union of selection outlines → cut paths); wired into the
+      right-click menu + command palette ("Weld"). 2026-06-02.
 - [ ] **Convert Text to Outlines** — vectorise IText/Textbox to a Path (per-glyph
-      via the font's path data / `getPathData`), so text can be contour-cut and
-      ships in SVG/PLT without the font. Add to right-click + Edit menu + command
-      palette. (Illustrator: Type→Create Outlines, Cmd+Shift+O.)
+      via the font's path data), so text can be contour-cut and ships in SVG/PLT
+      without the font. (Illustrator: Type→Create Outlines.) NOTE: needs font
+      vectorisation (opentype.js + font bytes) — heavier, schedule a careful run.
 - [ ] **Outline Stroke** — convert a stroked path into a filled outline path of
       the stroke width (so the cutter cuts both edges). (Illustrator: Object→Path
-      →Outline Stroke.) Reuse offsetPolyline for ± half-width.
-- [ ] **Weld / Merge for cut** — flatten the selection's overlapping outlines into
-      a single union cut path (SignMaster "Weld"). Expose as a button in the cut
-      contour flow; reuse booleanOp union but operate on cut-path geometry.
+      →Outline Stroke.) Reuse offsetPolyline for ± half-width; mind caps/joins.
 - [ ] **Tiling / paneling for cut & print** — split an oversized job into panels
       sized to the material width with an overlap, numbered, previewable. Extend
       io3 tilePrint into a cut-aware paneling dialog.
