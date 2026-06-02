@@ -77,6 +77,24 @@ export function applySmartSnap(canvas: fabric.Canvas, target: FabricObject): voi
     if (bestY !== null) target.set({ top: (target.top ?? 0) + bestY });
   }
 
+  // Artboard frame — snap the target's edges/centre to the first artboard's
+  // left/centre/right + top/centre/bottom, so centring or edge-aligning to the
+  // page snaps cleanly.
+  if (st.smartGuidesEnabled && st.artboards.length > 0) {
+    const a = st.artboards[0];
+    const ab = target.getBoundingRect();
+    const txs = [ab.left, ab.left + ab.width / 2, ab.left + ab.width];
+    const tys = [ab.top, ab.top + ab.height / 2, ab.top + ab.height];
+    const axs = [a.x, a.x + a.width / 2, a.x + a.width];
+    const ays = [a.y, a.y + a.height / 2, a.y + a.height];
+    let bx: number | null = null, bxd = SMART_GUIDE_TOLERANCE;
+    let by: number | null = null, byd = SMART_GUIDE_TOLERANCE;
+    for (const ax of axs) for (const tx of txs) { const d = ax - tx; if (Math.abs(d) <= bxd) { bxd = Math.abs(d); bx = d; } }
+    for (const ay of ays) for (const ty of tys) { const d = ay - ty; if (Math.abs(d) <= byd) { byd = Math.abs(d); by = d; } }
+    if (bx !== null) target.set({ left: (target.left ?? 0) + bx });
+    if (by !== null) target.set({ top: (target.top ?? 0) + by });
+  }
+
   if (!st.smartGuidesEnabled) {
     emitGuides([]);
     return;

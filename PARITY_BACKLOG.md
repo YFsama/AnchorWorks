@@ -445,3 +445,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       walks the z-order to select the adjacent object (Illustrator Select→Next Object
       Above/Below, Ctrl+Alt+] / [); keymap + App + command palette. Avoids hijacking
       Tab (preserves a11y focus nav). 2026-06-03.
+- [x] Snap to artboard frame — applySmartSnap() (smartGuides.ts) now also snaps a
+      dragged object's edges/centre to the first artboard's left/centre/right +
+      top/centre/bottom (under the Smart Guides toggle), so centring/edge-aligning to
+      the page snaps. 2026-06-03.
