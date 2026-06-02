@@ -17,6 +17,7 @@ import { applyTextOnArc } from '../lib/textPath';
 import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
 import { booleanOp, divideSelection, trimSelection, cropSelection } from '../lib/booleanOps';
 import { rasterizeSelection } from '../lib/rasterize';
+import { grommetsFromSelection } from '../lib/grommets';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -301,6 +302,11 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Sign Effects'), sub: [
           { label: t('Multi-outline…'), onClick: () => setModal('showOutline', true) },
           { label: t('Rhinestone Template…'), onClick: () => setModal('showRhinestone', true) },
+          { label: t('Add Banner Grommets'), onClick: () => {
+            const paths = grommetsFromSelection();
+            if (paths.length) { const ed = useEditor.getState(); ed.addCutPaths(paths); ed.setCutPathsVisible(true); toast.success(`${paths.length} ${t('grommets added')}`); }
+            else toast.warn(t('Select something first.'));
+          } },
           { label: t('Variable Data…'), onClick: () => setModal('showVariableData', true) },
           { label: t('Auto-arrange (Nest)'), onClick: () => {
             const n = autoArrangeSelection();

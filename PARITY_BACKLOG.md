@@ -404,3 +404,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Warp styles — generalised to warpPoints()/warpSelection(bend, style) with
       Arc / Rise / Flag / Wave profiles (warp.ts); WarpDialog gains a style radio
       group (Illustrator's Warp styles). +2 tests. 2026-06-03.
+- [x] Banner grommets — grommets.ts grommetsFromSelection() rings the selection
+      bbox's inset perimeter with evenly-spaced grommet-hole cut circles (corners +
+      edges, gap-capped) for vinyl-banner finishing (SignMaster); Sign Effects
+      submenu + command palette. 2026-06-03.
