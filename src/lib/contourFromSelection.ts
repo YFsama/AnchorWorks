@@ -10,6 +10,7 @@
  */
 
 import * as fabric from 'fabric';
+import polygonClipping from 'polygon-clipping';
 import { offsetPolyline, flattenSvgPath } from './cutContour';
 import type { CutPath } from '../store/editor';
 
@@ -82,4 +83,36 @@ export function buildOutlineCutPaths(
     }
   }
   return out;
+}
+
+/**
+ * Weld (SignMaster "Weld" / Illustrator Pathfinder Unite, for the cutter):
+ * flatten the selection's outlines and boolean-union every closed region into
+ * the fewest possible cut paths, so overlapping letters/shapes cut as one
+ * continuous line instead of crossing each other. Open polylines (no area)
+ * pass through unchanged. Returns mm-space cut paths ready for the store.
+ */
+export function weldOutline(objects: fabric.FabricObject[]): CutPath[] {
+  const flat = buildOutlineCutPaths(objects, 0, 1);
+  const closed = flat.filter(p => p.closed && p.points.length >= 4);
+  const open = flat.filter(p => !(p.closed && p.points.length >= 4));
+  if (closed.length < 1) return flat;
+
+  // Each closed cut path becomes a single-ring Polygon; union folds them into a
+  // MultiPolygon whose outer rings are the welded outlines (holes dropped — a
+  // cutter follows outlines, not fills).
+  const polys = closed.map(p => [p.points.map(([x, y]) => [x, y] as [number, number])]);
+  try {
+    const merged = polygonClipping.union(polys[0], ...polys.slice(1));
+    const welded: CutPath[] = merged.map((polygon, i) => ({
+      id: `weld-${Date.now().toString(36)}-${i}`,
+      points: polygon[0].map(([x, y]) => [x, y] as [number, number]),
+      closed: true,
+      kind: 'outline',
+      passes: 1,
+    }));
+    return [...welded, ...open];
+  } catch {
+    return flat; // degenerate geometry — fall back to the un-welded outlines
+  }
 }

@@ -19,7 +19,7 @@ import {
   hasClipboard,
 } from '../lib/clipboard';
 import { useEditor } from '../store/editor';
-import { buildOutlineCutPaths } from '../lib/contourFromSelection';
+import { buildOutlineCutPaths, weldOutline } from '../lib/contourFromSelection';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
@@ -175,6 +175,20 @@ export function CanvasContextMenu() {
     toast.success(`${paths.length} ${t('contour(s) added')}`, { title: t('Contour generated') });
   };
 
+  // Weld — union overlapping outlines into the fewest cut paths (SignMaster).
+  const weld = () => {
+    if (!active.length) return;
+    const paths = weldOutline(active);
+    if (!paths.length) {
+      toast.warn(t('No geometry was produced — try a smaller offset distance.'), { title: t('Weld') });
+      return;
+    }
+    const ed = useEditor.getState();
+    ed.addCutPaths(paths);
+    ed.setCutPathsVisible(true);
+    toast.success(`${t('Welded into')} ${paths.length} ${t('cut paths')}`, { title: t('Weld') });
+  };
+
   // Each item runs its action, bumps the clipboard tick (so paste enables),
   // and closes the menu. Items disabled at render time short-circuit before
   // their handler runs.
@@ -287,6 +301,11 @@ export function CanvasContextMenu() {
         label={t('Create Contour')}
         disabled={!hasSelection}
         onClick={() => run(() => oneClickContour(), hasSelection)}
+      />
+      <Item
+        label={t('Weld')}
+        disabled={!hasSelection}
+        onClick={() => run(() => weld(), hasSelection)}
       />
       <Item
         label={t('Cut Contour…')}
