@@ -498,3 +498,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Constant Stroke Width — effects.ts toggleUniformStroke() flips strokeUniform on
       the selection so strokes/cut lines keep a fixed px width when scaled
       (Illustrator "Scale Strokes & Effects" off); command palette. 2026-06-03.
+- [x] Export All Artboards (SVG) — artboards.ts exportAllArtboardsAsFiles() downloads
+      each artboard as its own SVG via the async full-fidelity render (replacing the
+      unused/incomplete sync exportAllArtboardsSVG); File menu + command palette.
+      2026-06-03.

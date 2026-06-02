@@ -14,6 +14,7 @@
 import * as fabric from 'fabric';
 import { getCanvas } from './canvasEngine';
 import { useEditor } from '../store/editor';
+import { download } from './io';
 import type { Artboard } from '../types';
 
 const STORAGE_KEY = 'vector.artboards';
@@ -259,6 +260,23 @@ export async function exportArtboardSVGAsync(id: string): Promise<string> {
 /** Synchronous list-export, calling exportArtboardSVG for each artboard. */
 export function exportAllArtboardsSVG(): string[] {
   return getArtboards().map((a) => exportArtboardSVG(a.id));
+}
+
+/**
+ * Download every artboard as a separate SVG file (one per artboard), using the
+ * async full-fidelity render. Returns the number exported.
+ */
+export async function exportAllArtboardsAsFiles(): Promise<number> {
+  const abs = getArtboards();
+  let n = 0;
+  for (const a of abs) {
+    const svg = await exportArtboardSVGAsync(a.id);
+    if (!svg) continue;
+    const safe = (a.name || `artboard-${n + 1}`).replace(/[^\w.-]+/g, '_');
+    download(`${safe}.svg`, svg);
+    n++;
+  }
+  return n;
 }
 
 /**
