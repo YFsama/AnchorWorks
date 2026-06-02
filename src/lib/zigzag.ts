@@ -28,7 +28,7 @@ function triangle(phase: number): number {
  * `size * wave(arcLength)`. `ridges` full waves are spread over the whole path;
  * smooth → sine, otherwise → triangle (sharp corners).
  */
-function zigzagPolyline(pts: Pt[], closed: boolean, sizePx: number, ridges: number, smooth: boolean): Pt[] {
+export function zigzagPolyline(pts: Pt[], closed: boolean, sizePx: number, ridges: number, smooth: boolean): Pt[] {
   if (pts.length < 2 || ridges < 1) return pts.slice();
 
   // Densify so tangents/waves are smooth regardless of the source resolution.

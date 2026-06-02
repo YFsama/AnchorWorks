@@ -253,3 +253,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (Illustrator Distort→Twist), completing the Distort & Transform trio with
       Roughen/Zig Zag; TwistDialog (angle) + Document menu + palette + right-click.
       2026-06-02.
+- [x] Distort unit tests — exported the pure roughenPolyline/zigzagPolyline/
+      twistPolyline helpers and added __tests__/distort.test.ts (8 tests) asserting
+      closed-loop preservation, bounded jitter, displacement, no-op guards, and
+      twist's distance-preserving rotation. Guards the new geometry. 2026-06-02.

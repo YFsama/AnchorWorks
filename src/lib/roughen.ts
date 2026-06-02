@@ -18,7 +18,7 @@ function toD(pts: Pt[], closed: boolean): string {
 }
 
 /** Densify to ~`detailPx` spacing then jitter each point by up to `sizePx`. */
-function roughenPolyline(pts: Pt[], closed: boolean, sizePx: number, detailPx: number): Pt[] {
+export function roughenPolyline(pts: Pt[], closed: boolean, sizePx: number, detailPx: number): Pt[] {
   if (pts.length < 2) return pts.slice();
   const dense: Pt[] = [pts[0]];
   for (let i = 1; i < pts.length; i++) {

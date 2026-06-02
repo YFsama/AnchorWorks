@@ -38,7 +38,7 @@ function densify(pts: Pt[]): Pt[] {
  * Rotate each point around `cx,cy` by `maxRad * (dist/R)` — the centre barely
  * moves while the outer edge rotates the full angle, producing the twist.
  */
-function twistPolyline(pts: Pt[], closed: boolean, cx: number, cy: number, r: number, maxRad: number): Pt[] {
+export function twistPolyline(pts: Pt[], closed: boolean, cx: number, cy: number, r: number, maxRad: number): Pt[] {
   if (pts.length < 2 || r <= 0) return pts.slice();
   const out = pts.map(([x, y]) => {
     const dx = x - cx, dy = y - cy;
