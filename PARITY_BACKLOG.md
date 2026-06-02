@@ -294,3 +294,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       HSL saturation (−100..+100%) via new rgbToHsl/hslToRgb/saturateRGB
       (Illustrator Edit→Edit Colors→Saturate); SaturateDialog slider + Document menu
       + command palette. +3 tests (HSL round-trip, factor 0/1). 2026-06-02.
+- [x] Clean Up — cleanUp.ts cleanUpDocument() removes empty text objects, stray
+      single-anchor paths, and zero-size objects (Illustrator Object→Path→Clean Up),
+      handy after imports; Document menu + command palette. 2026-06-02.
