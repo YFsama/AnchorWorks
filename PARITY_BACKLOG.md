@@ -441,3 +441,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Double-click path to edit — canvasEngine.ts mouse:dblclick on a path switches
       to Direct Select and enterPathEdit() (Illustrator double-click-to-edit); text
       keeps Fabric's native dblclick-to-edit. 2026-06-03.
+- [x] Select Next Object Above/Below — selectObjectInStack(dir) (selectionOps.ts)
+      walks the z-order to select the adjacent object (Illustrator Select→Next Object
+      Above/Below, Ctrl+Alt+] / [); keymap + App + command palette. Avoids hijacking
+      Tab (preserves a11y focus nav). 2026-06-03.

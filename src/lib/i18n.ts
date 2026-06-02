@@ -911,6 +911,10 @@ const dict: Record<string, Record<Lang, string>> = {
   'Select Inverse': { en: 'Select Inverse', zh: '反向选择' },
   'Select Same Fill': { en: 'Select Same Fill', zh: '选择相同填充' },
   'Select Same Stroke': { en: 'Select Same Stroke', zh: '选择相同描边' },
+  'Select Next Object Above': { en: 'Select Next Object Above', zh: '选择上层对象' },
+  'Select Next Object Below': { en: 'Select Next Object Below', zh: '选择下层对象' },
+  'Nothing above.': { en: 'Nothing above.', zh: '上方没有对象。' },
+  'Nothing below.': { en: 'Nothing below.', zh: '下方没有对象。' },
   'Select Same Stroke Weight': { en: 'Select Same Stroke Weight', zh: '选择相同描边粗细' },
   'Select Same Opacity': { en: 'Select Same Opacity', zh: '选择相同不透明度' },
   'Select an object with a solid colour first.': {

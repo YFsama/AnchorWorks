@@ -193,6 +193,35 @@ export function selectInverse(): number {
   return others.length;
 }
 
+/**
+ * Select the next object above / below the current single selection in stacking
+ * order (Illustrator Select→Next Object Above / Below). With nothing selected,
+ * picks the top ('up') or bottom ('down') object. Returns true if it moved.
+ */
+export function selectObjectInStack(dir: 'up' | 'down'): boolean {
+  const canvas = getCanvas();
+  if (!canvas) return false;
+  const objs = canvas.getObjects().filter((o) =>
+    !(o as { excludeFromExport?: boolean }).excludeFromExport
+    && o.visible !== false
+    && o.selectable !== false);
+  if (objs.length === 0) return false;
+
+  const active = canvas.getActiveObject();
+  let idx: number;
+  if (!active || active.type === 'activeselection') {
+    idx = dir === 'up' ? objs.length - 1 : 0;
+  } else {
+    const cur = objs.indexOf(active);
+    if (cur === -1) { idx = dir === 'up' ? objs.length - 1 : 0; }
+    else { idx = dir === 'up' ? cur + 1 : cur - 1; if (idx < 0 || idx >= objs.length) return false; }
+  }
+  canvas.discardActiveObject();
+  canvas.setActiveObject(objs[idx]);
+  canvas.requestRenderAll();
+  return true;
+}
+
 /** Select every selectable object on the canvas (Illustrator Select→All).
  *  Returns the number selected. */
 export function selectAllObjects(): number {

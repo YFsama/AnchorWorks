@@ -66,7 +66,7 @@ import {
   undo, redo, deleteSelection, duplicateSelection, nudgeSelection, flipSelection, zoomBy, zoomFit, zoomToPoint, zoomToArtboard,
   alignSelection, distributeSelection, applyStyleToSelection, swapFillStroke, defaultColors, groupSelection, ungroupSelection,
   resizeCanvas, setBackground,
-  bringForward, sendBackward, bringToFront, sendToBack,
+  bringForward, sendBackward, bringToFront, sendToBack, selectObjectInStack,
   type AlignAxis, type DistributeDir,
 } from './lib/canvasEngine';
 import {
@@ -954,6 +954,8 @@ export default function App() {
         }
         return;
       }
+      if (match('edit.selectNextAbove')) { e.preventDefault(); if (selectObjectInStack('up')) announce(t('Select Next Object Above')); return; }
+      if (match('edit.selectNextBelow')) { e.preventDefault(); if (selectObjectInStack('down')) announce(t('Select Next Object Below')); return; }
       if (match('edit.deselectAll')) {
         e.preventDefault();
         const c = getCanvas();
