@@ -15,6 +15,7 @@ import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { changeCaseSelection } from '../lib/textCase';
 import { applyTextOnArc } from '../lib/textPath';
 import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
+import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -193,6 +194,16 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Send Backward'), onClick: () => sendBackward(), kbd: 'Ctrl+[' },
         { label: t('Send to Back'), onClick: () => sendToBack() },
         { sep: true },
+        { label: t('Pathfinder'), sub: [
+          { label: t('Union'), onClick: () => { void booleanOp('union'); } },
+          { label: t('Subtract'), onClick: () => { void booleanOp('subtract'); } },
+          { label: t('Intersect'), onClick: () => { void booleanOp('intersect'); } },
+          { label: t('Exclude'), onClick: () => { void booleanOp('exclude'); } },
+          { label: t('Minus Back'), onClick: () => { void booleanOp('minus-back'); } },
+          { sep: true },
+          { label: t('Divide'), onClick: () => { divideSelection(); } },
+          { label: t('Trim'), onClick: () => { trimSelection(); } },
+        ] },
         { label: t('Make Clipping Mask'), onClick: () => { if (!applyClipMask()) toast.warn(t('Select 2 or more objects first.')); }, kbd: 'Ctrl+7' },
         { label: t('Release Clipping Mask'), onClick: () => { if (!releaseClipMask()) toast.warn(t('Select a clipping group first.')); }, kbd: 'Ctrl+Alt+7' },
         { label: t('Make Compound Path'), onClick: () => { if (!makeCompoundPath()) toast.warn(t('Select 2 or more objects first.')); }, kbd: 'Ctrl+8' },

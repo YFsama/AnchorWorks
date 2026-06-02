@@ -366,3 +366,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       scale HSL lightness (−100..100%) of every solid fill/stroke; BrightnessDialog +
       Edit Colors submenu + command palette. +2 tests. Rounds out Edit Colors
       (Invert/Grayscale/Saturate/Hue/Brightness). 2026-06-03.
+- [x] Pathfinder menu — Edit menu gains a Pathfinder submenu (MenuBar.tsx) with
+      Union/Subtract/Intersect/Exclude/Minus Back + Divide/Trim (booleanOps.ts);
+      the boolean ops were Align-panel/palette-only, absent from the menu bar.
+      2026-06-03.
