@@ -859,6 +859,7 @@ export default function App() {
       if (match('view.zoomIn')) { e.preventDefault(); zoomBy(1.25); announce(t('Zoom In')); return; }
       if (match('view.zoomOut')) { e.preventDefault(); zoomBy(1 / 1.25); announce(t('Zoom Out')); return; }
       if (match('view.zoomFit')) { e.preventDefault(); zoomFit(); announce(t('Fit to Page')); return; }
+      if (match('view.toggleGuides')) { e.preventDefault(); const s = useEditor.getState(); s.setGuidesVisible(!s.guidesVisible); announce(t('Show Guides')); return; }
       if (match('view.actualSize')) {
         e.preventDefault();
         const c = getCanvas();

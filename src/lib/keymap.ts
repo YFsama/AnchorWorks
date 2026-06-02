@@ -94,6 +94,7 @@ export const BINDINGS: ShortcutBinding[] = [
   { id: 'view.zoomFit',          label: 'Fit to Page',         defaultCombo: 'Ctrl+0' },
   { id: 'view.actualSize',       label: 'Actual Size',         defaultCombo: 'Ctrl+1' },
   { id: 'view.zoomSelection',    label: 'Zoom to Selection',   defaultCombo: 'Ctrl+2' },
+  { id: 'view.toggleGuides',     label: 'Show / Hide Guides',  defaultCombo: 'Ctrl+;' },
 
   // -------- File --------
   { id: 'file.saveProject',      label: 'Save Project',        defaultCombo: 'Ctrl+Shift+S' },

@@ -469,3 +469,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Show/Hide Rulers — store rulersVisible flag (default true) gates the Rulers
       overlay in CanvasView; View-menu checkbox + command palette toggle it
       (Illustrator View→Rulers), for more canvas room. 2026-06-03.
+- [x] Show/Hide Guides — store guidesVisible flag gates GuidesLayer's draw (hide
+      without deleting); View-menu checkbox + Ctrl+; keymap/App + command palette
+      (Illustrator View→Guides→Hide Guides). 2026-06-03.

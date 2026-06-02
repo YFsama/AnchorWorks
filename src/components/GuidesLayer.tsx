@@ -15,6 +15,7 @@ export function GuidesLayer() {
   const ref = useRef<HTMLCanvasElement>(null);
   const guides = useEditor(s => s.userGuides);
   const drag = useEditor(s => s.guideDrag);
+  const guidesVisible = useEditor(s => s.guidesVisible);
 
   useEffect(() => {
     const el = ref.current;
@@ -58,14 +59,16 @@ export function GuidesLayer() {
         ctx.stroke();
       };
 
-      for (const g of guides) line(g.axis, g.pos, false);
-      if (drag) line(drag.axis, drag.pos, true);
+      if (guidesVisible) {
+        for (const g of guides) line(g.axis, g.pos, false);
+        if (drag) line(drag.axis, drag.pos, true);
+      }
       ctx.setLineDash([]);
     };
 
     draw();
     return subscribeViewport(draw);
-  }, [guides, drag]);
+  }, [guides, drag, guidesVisible]);
 
   return (
     <canvas

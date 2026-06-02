@@ -84,6 +84,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   const smartGuidesEnabled = useEditor(s => s.smartGuidesEnabled);
   const anchorSnapEnabled = useEditor(s => s.anchorSnapEnabled);
   const guidesLocked = useEditor(s => s.guidesLocked);
+  const guidesVisible = useEditor(s => s.guidesVisible);
   const rulersVisible = useEditor(s => s.rulersVisible);
   const setRulersVisible = useEditor(s => s.setRulersVisible);
   const setGridVisible = useEditor(s => s.setGridVisible);
@@ -255,6 +256,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { sep: true },
         { label: t('Make Guides from Selection'), onClick: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
         { label: t('Margin Guides…'), onClick: () => setModal('showMarginGuides', true) },
+        { label: t('Show Guides'), onClick: () => { const s = useEditor.getState(); s.setGuidesVisible(!s.guidesVisible); }, checked: guidesVisible, kbd: 'Ctrl+;' },
         { label: t('Lock Guides'), onClick: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked), checked: guidesLocked },
         { label: t('Clear Guides'), onClick: () => useEditor.getState().clearUserGuides() },
       ]} />

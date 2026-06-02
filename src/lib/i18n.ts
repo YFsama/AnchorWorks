@@ -103,6 +103,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Snap to Grid': { en: 'Snap to Grid', zh: '吸附到网格' },
   'Show Grid': { en: 'Show Grid', zh: '显示网格' },
   'Show Rulers': { en: 'Show Rulers', zh: '显示标尺' },
+  'Show Guides': { en: 'Show Guides', zh: '显示参考线' },
   'Anchor Snap': { en: 'Anchor Snap', zh: '锚点吸附' },
   'Smart Guides': { en: 'Smart Guides', zh: '智能参考线' },
   'Anchor': { en: 'Anchor', zh: '锚点' },

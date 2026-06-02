@@ -214,12 +214,15 @@ interface EditorState {
   anchorSnapEnabled: boolean;
   /** Whether the canvas rulers are shown. */
   rulersVisible: boolean;
+  /** Whether ruler guides are shown (hide without deleting them). */
+  guidesVisible: boolean;
   setGridVisible: (v: boolean) => void;
   setGridSize: (n: number) => void;
   setSnapEnabled: (v: boolean) => void;
   setSmartGuidesEnabled: (v: boolean) => void;
   setAnchorSnapEnabled: (v: boolean) => void;
   setRulersVisible: (v: boolean) => void;
+  setGuidesVisible: (v: boolean) => void;
 
   // Cursor position (document coords)
   cursorX: number;
@@ -363,12 +366,14 @@ export const useEditor = create<EditorState>((set) => ({
   smartGuidesEnabled: true,
   anchorSnapEnabled: true,
   rulersVisible: true,
+  guidesVisible: true,
   setGridVisible: (v) => set({ gridVisible: v }),
   setGridSize: (n) => set({ gridSize: Math.max(2, Math.min(500, n)) }),
   setSnapEnabled: (v) => set({ snapEnabled: v }),
   setSmartGuidesEnabled: (v) => set({ smartGuidesEnabled: v }),
   setAnchorSnapEnabled: (v) => set({ anchorSnapEnabled: v }),
   setRulersVisible: (v) => set({ rulersVisible: v }),
+  setGuidesVisible: (v) => set({ guidesVisible: v }),
 
   cursorX: 0,
   cursorY: 0,
