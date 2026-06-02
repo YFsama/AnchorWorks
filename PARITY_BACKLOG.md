@@ -370,7 +370,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Union/Subtract/Intersect/Exclude/Minus Back + Divide/Trim (booleanOps.ts);
       the boolean ops were Align-panel/palette-only, absent from the menu bar.
       2026-06-03.
-- [x] Swatches panel — swatches.ts (localStorage CRUD + change event) + new
-      SwatchesPanel: a persistent reusable colour palette; click applies fill,
-      Alt-click stroke, "+" saves the current fill, × removes (Illustrator Swatches).
-      Mounted under Properties. 2026-06-03.
+- [~] Swatches panel — ALREADY PRESENT: PropertiesPanel has a full Swatches
+      section (default palette, localStorage `vector.swatches`, click=fill /
+      Alt=stroke / right-click=remove / + add current). My duplicate panel was
+      reverted; grep harder next time. 2026-06-03.
+- [x] Collect colours into swatches — added a Pipette button to the existing
+      PropertiesPanel Swatches that harvests every solid fill/stroke in the
+      selection (collectSelectionColors) into the palette, deduped. 2026-06-03.

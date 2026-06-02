@@ -3,6 +3,7 @@ import { RowInputIdContext, useRowInputId } from '../lib/rowInputIdContext';
 import { RowInput, RowSelect } from './RowInput';
 import { useEditor } from '../store/editor';
 import { applyStyleToSelection, applyTransformToSelection, bringForward, sendBackward, bringToFront, sendToBack, groupSelection, ungroupSelection, deleteSelection, duplicateSelection, getCanvas } from '../lib/canvasEngine';
+import { collectSelectionColors } from '../lib/selectionApply';
 import {
   applyGradientToSelection,
   applyShadowToSelection,
@@ -917,6 +918,13 @@ function Swatches() {
     setSwatches([...swatches, c]);
   };
 
+  // Harvest every solid fill/stroke colour used in the selection into swatches.
+  const collectColors = () => {
+    const have = new Set(swatches.map((c) => c.toLowerCase()));
+    const fresh = collectSelectionColors().filter((c) => !have.has(c.toLowerCase()));
+    if (fresh.length) setSwatches([...swatches, ...fresh]);
+  };
+
   return (
     <div className="mb-2">
       <div className="flex items-center justify-between text-muted text-[10px] mb-1">
@@ -942,6 +950,13 @@ function Swatches() {
           onClick={addCurrent}
           className="w-5 h-5 rounded-sm border border-border bg-panel2 text-muted hover:text-ink hover:bg-panel3 transition-colors flex items-center justify-center text-[10px] leading-none"
         ><span aria-hidden="true">+</span></button>
+        <button
+          type="button"
+          title={t('Collect colours from selection')}
+          aria-label={t('Collect colours from selection')}
+          onClick={collectColors}
+          className="w-5 h-5 rounded-sm border border-border bg-panel2 text-muted hover:text-ink hover:bg-panel3 transition-colors flex items-center justify-center"
+        ><Pipette size={11} aria-hidden="true" /></button>
       </div>
     </div>
   );
