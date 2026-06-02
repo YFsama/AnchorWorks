@@ -22,7 +22,7 @@ import { toast } from '../lib/toast';
 import { setOutlineMode, isOutlineMode } from '../lib/outlineView';
 import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
-import { booleanOp, divideSelection, trimSelection, cropSelection } from '../lib/booleanOps';
+import { booleanOp, divideSelection, trimSelection, cropSelection, mergeSelection } from '../lib/booleanOps';
 import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
@@ -286,6 +286,7 @@ export function CommandPalette({
     { id: 'bool.minusBack', label: t('Minus Back'), category: t('Arrange'), keywords: 'pathfinder boolean minus back subtract', icon: Wand2, run: () => { void booleanOp('minus-back'); } },
     { id: 'bool.divide',    label: t('Divide'),     category: t('Arrange'), keywords: 'pathfinder boolean divide split regions', icon: Wand2, run: () => { divideSelection(); } },
     { id: 'bool.trim',      label: t('Trim'),       category: t('Arrange'), keywords: 'pathfinder boolean trim hidden remove', icon: Wand2, run: () => { trimSelection(); } },
+    { id: 'bool.merge',     label: t('Merge'),      category: t('Arrange'), keywords: 'pathfinder boolean merge same colour unite flatten', icon: Wand2, run: () => { const n = mergeSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
     { id: 'bool.crop',      label: t('Crop'),       category: t('Arrange'), keywords: 'pathfinder boolean crop frame mask clip inside', icon: Wand2, run: () => { const n = cropSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
     { id: 'cut.weld',          label: t('Weld'),               category: t('Arrange'), keywords: 'merge union combine cut weld overlap sign', icon: Wand2, run: () => {
       const objs = getCanvas()?.getActiveObjects() ?? [];

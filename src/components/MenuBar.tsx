@@ -15,7 +15,7 @@ import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { changeCaseSelection } from '../lib/textCase';
 import { applyTextOnArc } from '../lib/textPath';
 import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
-import { booleanOp, divideSelection, trimSelection, cropSelection } from '../lib/booleanOps';
+import { booleanOp, divideSelection, trimSelection, cropSelection, mergeSelection } from '../lib/booleanOps';
 import { rasterizeSelection } from '../lib/rasterize';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
@@ -205,6 +205,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { sep: true },
           { label: t('Divide'), onClick: () => { divideSelection(); } },
           { label: t('Trim'), onClick: () => { trimSelection(); } },
+          { label: t('Merge'), onClick: () => { const n = mergeSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
           { label: t('Crop'), onClick: () => { const n = cropSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
         ] },
         { label: t('Make Clipping Mask'), onClick: () => { if (!applyClipMask()) toast.warn(t('Select 2 or more objects first.')); }, kbd: 'Ctrl+7' },

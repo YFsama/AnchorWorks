@@ -561,3 +561,64 @@ export function cropSelection(): number {
   pushHistory();
   return kept.length;
 }
+
+/**
+ * Pathfinder Merge — remove every hidden (overlapped-from-front) part, then
+ * unite the remaining pieces that share a fill colour into one compound path
+ * each (Illustrator Pathfinder Merge). Returns the number of merged paths kept.
+ */
+export function mergeSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 2) return 0;
+  const allObjs = canvas.getObjects();
+  const sorted = [...objs].sort((a, b) => allObjs.indexOf(a) - allObjs.indexOf(b)); // back→front
+
+  const items = sorted
+    .map((o) => ({ obj: o, rings: objectToRings(o), fill: typeof o.fill === 'string' && o.fill ? o.fill : '' }))
+    .filter((it): it is { obj: fabric.FabricObject; rings: Ring[]; fill: string } => !!it.rings && !!it.fill);
+  if (items.length < 2) return 0;
+
+  // Knock out each object's parts hidden behind anything in front of it.
+  const knocked: { geom: MultiPolygon; fill: string }[] = [];
+  for (let i = 0; i < items.length; i++) {
+    let geom: MultiPolygon = [items[i].rings] as MultiPolygon;
+    const fronts = items.slice(i + 1).map((it) => [it.rings] as MultiPolygon);
+    if (fronts.length) {
+      try { geom = polygonClipping.difference(geom, ...fronts); }
+      catch (err) { logger.error('boolean', `merge knockout failed: ${err instanceof Error ? err.message : String(err)}`); continue; }
+    }
+    if (geom.length) knocked.push({ geom, fill: items[i].fill });
+  }
+
+  // Union the surviving pieces per fill colour (key keeps the display colour).
+  const byColour = new Map<string, { fill: string; geoms: MultiPolygon[] }>();
+  for (const k of knocked) {
+    const key = k.fill.trim().toLowerCase();
+    const group = byColour.get(key) ?? { fill: k.fill, geoms: [] };
+    group.geoms.push(k.geom);
+    byColour.set(key, group);
+  }
+
+  objs.forEach((o) => canvas.remove(o));
+  const kept: fabric.FabricObject[] = [];
+  for (const { fill, geoms } of byColour.values()) {
+    let merged: MultiPolygon = geoms[0];
+    if (geoms.length > 1) {
+      try { merged = polygonClipping.union(geoms[0], ...geoms.slice(1)); }
+      catch (err) { logger.error('boolean', `merge union failed: ${err instanceof Error ? err.message : String(err)}`); }
+    }
+    const d = merged.length ? multiPolygonToPathD(merged) : '';
+    if (!d) continue;
+    const path = new fabric.Path(d, { fill, stroke: '', strokeWidth: 0, fillRule: 'evenodd' });
+    canvas.add(path);
+    kept.push(path);
+  }
+  if (kept.length === 0) { canvas.requestRenderAll(); return 0; }
+  canvas.discardActiveObject();
+  canvas.setActiveObject(kept.length === 1 ? kept[0] : new fabric.ActiveSelection(kept, { canvas }));
+  canvas.requestRenderAll();
+  pushHistory();
+  return kept.length;
+}

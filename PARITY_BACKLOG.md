@@ -411,3 +411,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Grommets dialog — GrommetsDialog (inset / max spacing / diameter) replaces
       the hardcoded-defaults command, since banner sizes vary; menu + palette now
       open it. 2026-06-03.
+- [x] Pathfinder Merge — mergeSelection() (booleanOps.ts) knocks out hidden
+      (front-overlapped) parts then unites surviving same-fill pieces into one
+      compound path each (Illustrator Pathfinder Merge), for flattening same-colour
+      sign regions; Edit→Pathfinder submenu + command palette. 2026-06-03.
