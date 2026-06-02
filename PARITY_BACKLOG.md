@@ -104,7 +104,12 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       2026-06-02.
 
 ## P3 — stretch (harder / niche)
-- [ ] **Single-line / engraving fonts** (centerline text for pen/engrave).
-- [ ] **Rhinestone / hotfix templates** (fill an outline with a dot grid).
+- [~] **Single-line / engraving fonts** — BLOCKED: needs a bundled single-stroke
+      (Hershey) font dataset — a sizable data asset. Like opentype.js, shouldn't be
+      added silently in the loop; surface to the user for a dedicated run.
+- [x] **Rhinestone / hotfix templates** — rhinestone.ts rhinestoneFromSelection()
+      drops Ø-sized stones every N mm along the selection outline as cut-path
+      circles; RhinestoneDialog (SS presets). Command palette + right-click.
+      2026-06-02.
 - [ ] **Gradient mesh** (freeform multi-point gradient).
 - [ ] **Isolation mode** (double-click group to edit-in-place).
