@@ -485,3 +485,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Eyedropper copies type — eyedropperTool.ts readTextStyle() + paint() now also
       transfer font family/size/weight/style/tracking/leading/align/underline between
       text objects (Illustrator's eyedropper carries type attributes). 2026-06-03.
+- [x] Select All Text Objects — selectionOps.ts selectByType()/selectAllText() select
+      every text object on the canvas (Illustrator Select→Object→Text Objects), for
+      batch restyling; command palette. 2026-06-03.

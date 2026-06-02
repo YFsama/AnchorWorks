@@ -240,6 +240,30 @@ export function selectObjectInStack(dir: 'up' | 'down'): boolean {
   return true;
 }
 
+/** Select every selectable object whose type is in `kinds` (Illustrator
+ *  Select→Object→…). Returns the number selected. */
+export function selectByType(kinds: string[]): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const set = new Set(kinds);
+  const matches = canvas.getObjects().filter((o) =>
+    set.has(o.type ?? '')
+    && !(o as { excludeFromExport?: boolean }).excludeFromExport
+    && o.visible !== false
+    && o.selectable !== false);
+  if (matches.length === 0) return 0;
+  canvas.discardActiveObject();
+  if (matches.length === 1) canvas.setActiveObject(matches[0]);
+  else canvas.setActiveObject(new fabric.ActiveSelection(matches, { canvas }));
+  canvas.requestRenderAll();
+  return matches.length;
+}
+
+/** Select all text objects (Illustrator Select→Object→Text Objects). */
+export function selectAllText(): number {
+  return selectByType(['i-text', 'text', 'textbox']);
+}
+
 /** Select every selectable object on the canvas (Illustrator Select→All).
  *  Returns the number selected. */
 export function selectAllObjects(): number {

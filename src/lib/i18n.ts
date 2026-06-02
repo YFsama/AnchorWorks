@@ -106,6 +106,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Show Guides': { en: 'Show Guides', zh: '显示参考线' },
   'Recently used': { en: 'Recently used', zh: '最近使用' },
   'Hide Others': { en: 'Hide Others', zh: '隐藏其他' },
+  'Select All Text Objects': { en: 'Select All Text Objects', zh: '选择所有文本对象' },
+  'No text objects.': { en: 'No text objects.', zh: '没有文本对象。' },
   'Anchor Snap': { en: 'Anchor Snap', zh: '锚点吸附' },
   'Smart Guides': { en: 'Smart Guides', zh: '智能参考线' },
   'Anchor': { en: 'Anchor', zh: '锚点' },

@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, zoomToPercent, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, deselectAll, selectObjectInStack,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, selectAllText, deselectAll, selectObjectInStack,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -224,6 +224,7 @@ export function CommandPalette({
     { id: 'edit.pasteInFront', label: t('Paste in Front'),     category: t('Edit'), shortcut: 'Ctrl+F', keywords: 'paste front top original position stack', icon: Copy, run: () => { void pasteFromClipboard(undefined, true, 'front'); } },
     { id: 'edit.pasteInBack',  label: t('Paste in Back'),      category: t('Edit'), shortcut: 'Ctrl+B', keywords: 'paste back bottom original position stack', icon: Copy, run: () => { void pasteFromClipboard(undefined, true, 'back'); } },
     { id: 'edit.selectInverse',    label: t('Select Inverse'),     category: t('Edit'), keywords: 'select inverse invert opposite others', icon: MousePointerClick, run: () => { const n = selectInverse(); toast.success(`${n} ${t('selected')}`); } },
+    { id: 'edit.selectAllText',    label: t('Select All Text Objects'), category: t('Edit'), keywords: 'select all text objects type batch font', icon: MousePointerClick, run: () => { const n = selectAllText(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text objects.')); } },
     { id: 'edit.selectNextAbove',  label: t('Select Next Object Above'), category: t('Edit'), shortcut: 'Ctrl+Alt+]', keywords: 'select next object above stack z order', icon: MousePointerClick, run: () => { if (!selectObjectInStack('up')) toast.warn(t('Nothing above.')); } },
     { id: 'edit.selectNextBelow',  label: t('Select Next Object Below'), category: t('Edit'), shortcut: 'Ctrl+Alt+[', keywords: 'select next object below stack z order', icon: MousePointerClick, run: () => { if (!selectObjectInStack('down')) toast.warn(t('Nothing below.')); } },
     { id: 'edit.selectSameFill',   label: t('Select Same Fill'),   category: t('Edit'), keywords: 'select same fill colour color match', icon: MousePointerClick, run: () => { const n = selectSame('fill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
