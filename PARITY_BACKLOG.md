@@ -195,3 +195,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Blend — blendSelection() (blend.ts) inserts N interpolated copies between
       two objects (position/scale/rotation/opacity/colour) — Illustrator
       Object→Blend; BlendDialog + command palette. 2026-06-02.
+- [x] Surface path-effect dialogs in the Document menu (Simplify / Round Corners
+      / Offset Path / Reverse Path Direction / Blend) — were palette/panel-only.
+      2026-06-02.

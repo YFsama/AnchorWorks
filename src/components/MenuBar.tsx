@@ -3,6 +3,7 @@ import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Ha
 import { useEditor } from '../store/editor';
 import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
+import { reversePathSelection } from '../lib/pathReverse';
 import { toast } from '../lib/toast';
 import { importImageFile } from '../lib/io3';
 import { getFormat } from '../lib/formats';
@@ -199,6 +200,14 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
           else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
         } },
+        { sep: true },
+        // Path-effect dialogs — also in the command palette / right-click;
+        // surfaced here for menu-bar discoverability.
+        { label: t('Simplify Path…'), onClick: () => setModal('showSimplify', true) },
+        { label: t('Round Corners…'), onClick: () => setModal('showRoundCorners', true) },
+        { label: t('Offset Path…'), onClick: () => setModal('showOffsetPath', true) },
+        { label: t('Reverse Path Direction'), onClick: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
+        { label: t('Blend…'), onClick: () => setModal('showBlend', true) },
       ]} />
 
       <Dropdown label={t('Help')} items={[
