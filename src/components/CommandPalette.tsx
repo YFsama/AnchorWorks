@@ -217,6 +217,7 @@ export function CommandPalette({
     { id: 'arrange.clipFree',  label: t('Release Clip Mask'),  category: t('Arrange'), keywords: 'unmask unclip',         icon: Wand2,        run: () => { releaseClipMask(); } },
     { id: 'arrange.compMake',  label: t('Compound Path'),      category: t('Arrange'), keywords: 'merge paths combine even-odd', icon: PenTool, run: () => { makeCompoundPath(); } },
     { id: 'arrange.compFree',  label: t('Release Compound'),   category: t('Arrange'), keywords: 'split decompose paths', icon: PenTool,      run: () => { releaseCompoundPath(); } },
+    { id: 'path.simplify',     label: t('Simplify Path…'),     category: t('Arrange'), keywords: 'simplify reduce anchor points douglas peucker smooth', icon: PenTool, run: () => setModal('showSimplify', true) },
     { id: 'cut.weld',          label: t('Weld'),               category: t('Arrange'), keywords: 'merge union combine cut weld overlap sign', icon: Wand2, run: () => {
       const objs = getCanvas()?.getActiveObjects() ?? [];
       if (!objs.length) { toast.warn(t('Select one or more shapes first.')); return; }

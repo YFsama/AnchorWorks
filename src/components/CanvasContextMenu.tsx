@@ -157,7 +157,7 @@ export function CanvasContextMenu() {
     c?.requestRenderAll();
   };
 
-  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone') =>
+  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showSimplify') =>
     useEditor.getState().setModal(k, true);
 
   const nest = () => {
@@ -352,6 +352,11 @@ export function CanvasContextMenu() {
         label={t('Rhinestone Template…')}
         disabled={!hasSelection}
         onClick={() => run(() => openModal('showRhinestone'), hasSelection)}
+      />
+      <Item
+        label={t('Simplify Path…')}
+        disabled={!hasSelection}
+        onClick={() => run(() => openModal('showSimplify'), hasSelection)}
       />
       <Item
         label={t('Cut Contour…')}

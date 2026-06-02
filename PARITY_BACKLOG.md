@@ -67,8 +67,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 
 ## P1 — path & transform tooling (Illustrator parity)
 
-- [ ] **Simplify Path** — user-facing Douglas-Peucker simplify with a tolerance
-      slider (reuse douglasPeucker from cutContour). Object→Path→Simplify.
+- [x] **Simplify Path** — pathSimplify.ts simplifySelection() flattens each
+      selected path, Douglas-Peucker-reduces it at a px tolerance, and rebuilds it
+      (absolute-`d` → new fabric.Path, like boolean ops); SimplifyDialog tolerance
+      slider; command palette + right-click. 2026-06-02.
 - [ ] **Flip Horizontal / Vertical** as first-class Object commands (menu +
       shortcut + Transform panel), not just the right-click entry.
 - [ ] **Transform dialog** — rotate / scale (by % or absolute) / move by exact
