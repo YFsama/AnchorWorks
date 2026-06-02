@@ -43,6 +43,7 @@ const RhinestoneDialog = lazy(() => import('./components/RhinestoneDialog').then
 const SimplifyDialog = lazy(() => import('./components/SimplifyDialog').then(m => ({ default: m.SimplifyDialog })));
 const TransformDialog = lazy(() => import('./components/TransformDialog').then(m => ({ default: m.TransformDialog })));
 const RoundCornersDialog = lazy(() => import('./components/RoundCornersDialog').then(m => ({ default: m.RoundCornersDialog })));
+const OffsetPathDialog = lazy(() => import('./components/OffsetPathDialog').then(m => ({ default: m.OffsetPathDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
@@ -708,6 +709,7 @@ export default function App() {
   const showSimplify = useEditor(s => s.showSimplify);
   const showTransform = useEditor(s => s.showTransform);
   const showRoundCorners = useEditor(s => s.showRoundCorners);
+  const showOffsetPath = useEditor(s => s.showOffsetPath);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const highContrast = useEditor(s => s.highContrast);
@@ -1215,6 +1217,11 @@ export default function App() {
       {showRoundCorners && (
         <Suspense fallback={null}>
           <RoundCornersDialog />
+        </Suspense>
+      )}
+      {showOffsetPath && (
+        <Suspense fallback={null}>
+          <OffsetPathDialog />
         </Suspense>
       )}
       {showPreferences && (

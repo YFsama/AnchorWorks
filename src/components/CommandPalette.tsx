@@ -235,6 +235,7 @@ export function CommandPalette({
     { id: 'arrange.compFree',  label: t('Release Compound'),   category: t('Arrange'), keywords: 'split decompose paths', icon: PenTool,      run: () => { releaseCompoundPath(); } },
     { id: 'path.simplify',     label: t('Simplify Path…'),     category: t('Arrange'), keywords: 'simplify reduce anchor points douglas peucker smooth', icon: PenTool, run: () => setModal('showSimplify', true) },
     { id: 'path.roundCorners', label: t('Round Corners…'),     category: t('Arrange'), keywords: 'round corners fillet radius soften stylize', icon: PenTool, run: () => setModal('showRoundCorners', true) },
+    { id: 'path.offset',       label: t('Offset Path…'),       category: t('Arrange'), keywords: 'offset path parallel inset outset expand contour', icon: PenTool, run: () => setModal('showOffsetPath', true) },
     { id: 'path.join',         label: t('Join Paths'),         category: t('Arrange'), shortcut: 'Ctrl+J', keywords: 'join connect close path endpoints merge', icon: PenTool, run: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); } },
     { id: 'bool.union',     label: t('Union'),     category: t('Arrange'), keywords: 'pathfinder boolean unite merge combine', icon: Wand2, run: () => { void booleanOp('union'); } },
     { id: 'bool.subtract',  label: t('Subtract'),  category: t('Arrange'), keywords: 'pathfinder boolean minus front difference', icon: Wand2, run: () => { void booleanOp('subtract'); } },

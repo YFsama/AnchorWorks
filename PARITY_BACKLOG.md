@@ -178,3 +178,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Round Corners — roundCornersOnSelection() (roundCorners.ts) fillets path/
       shape corners by a radius via quadratic arcs (Illustrator Stylize→Round
       Corners); RoundCornersDialog + command palette + right-click. 2026-06-02.
+- [x] Offset Path — offsetPathSelection() (offsetPath.ts) adds a parallel offset
+      copy (±mm, original kept) via offsetPolyline (Illustrator Object→Path→Offset
+      Path); OffsetPathDialog + command palette + right-click. 2026-06-02.

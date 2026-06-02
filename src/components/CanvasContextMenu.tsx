@@ -151,7 +151,7 @@ export function CanvasContextMenu() {
     c?.requestRenderAll();
   };
 
-  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showSimplify' | 'showRoundCorners') =>
+  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath') =>
     useEditor.getState().setModal(k, true);
 
   const nest = () => {
@@ -368,6 +368,11 @@ export function CanvasContextMenu() {
         label={t('Round Corners…')}
         disabled={!hasSelection}
         onClick={() => run(() => openModal('showRoundCorners'), hasSelection)}
+      />
+      <Item
+        label={t('Offset Path…')}
+        disabled={!hasSelection}
+        onClick={() => run(() => openModal('showOffsetPath'), hasSelection)}
       />
       <Item
         label={t('Cut Contour…')}
