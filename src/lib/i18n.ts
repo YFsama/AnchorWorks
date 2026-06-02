@@ -817,6 +817,10 @@ const dict: Record<string, Record<Lang, string>> = {
   'Transform…': { en: 'Transform…', zh: '变换…' },
   'Join Paths': { en: 'Join Paths', zh: '连接路径' },
   'selected': { en: 'selected', zh: '个已选中' },
+  'Lock Selection': { en: 'Lock Selection', zh: '锁定所选' },
+  'Unlock All': { en: 'Unlock All', zh: '全部解锁' },
+  'locked': { en: 'locked', zh: '个已锁定' },
+  'unlocked': { en: 'unlocked', zh: '个已解锁' },
   'Select Same Fill': { en: 'Select Same Fill', zh: '选择相同填充' },
   'Select Same Stroke': { en: 'Select Same Stroke', zh: '选择相同描边' },
   'Select an object with a solid colour first.': {

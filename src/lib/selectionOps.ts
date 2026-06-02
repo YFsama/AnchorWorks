@@ -90,6 +90,44 @@ export function selectSame(prop: 'fill' | 'stroke'): number {
   return matches.length;
 }
 
+/**
+ * Lock the active selection — disables move / scale / rotate (Illustrator's
+ * Object→Lock). Matches the Layers-panel lock (lockMovementX), so the lock icon
+ * there reflects it, and the props serialise with the project. Returns the count.
+ */
+export function lockSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  for (const o of objs) {
+    o.set({ lockMovementX: true, lockMovementY: true, lockScalingX: true, lockScalingY: true, lockRotation: true });
+  }
+  if (objs.length) {
+    canvas.discardActiveObject();
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return objs.length;
+}
+
+/** Unlock every locked object on the canvas (Object→Unlock All). Returns count. */
+export function unlockAll(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  let n = 0;
+  for (const o of canvas.getObjects()) {
+    if (o.lockMovementX || o.lockMovementY) {
+      o.set({ lockMovementX: false, lockMovementY: false, lockScalingX: false, lockScalingY: false, lockRotation: false });
+      n++;
+    }
+  }
+  if (n > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return n;
+}
+
 /** Flip every selected object about its own centre. `'x'` mirrors horizontally,
  *  `'y'` vertically (Illustrator's Object→Transform→Reflect). */
 export function flipSelection(axis: 'x' | 'y'): void {

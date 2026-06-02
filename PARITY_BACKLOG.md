@@ -142,3 +142,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Select Same — selectSame() (selectionOps.ts) selects every object matching
       the active object's fill/stroke colour (Illustrator Select→Same); command
       palette + right-click. 2026-06-02.
+- [x] Lock / Unlock — lockSelection()/unlockAll() (selectionOps.ts) lock move/
+      scale/rotate (matches the Layers-panel lock, serialises); Edit menu +
+      command palette. 2026-06-02.
