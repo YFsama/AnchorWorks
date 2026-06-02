@@ -98,8 +98,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **PLT import colour restore** — pltImporter.ts tracks SP pen per polyline
       (PltPolyline.pen) and polylinesToSvg() restores it via penColor()/PEN_COLORS,
       so imported jobs separate by colour. +3 unit tests. 2026-06-02.
-- [ ] **Nesting / auto-arrange** — pack selected shapes to minimise material
-      waste within the artboard/material width.
+- [x] **Nesting / auto-arrange** — autoArrangeSelection() in alignDistribute.ts
+      shelf-packs the selection into rows within the artboard/material width
+      (tallest-first); command palette + right-click "Auto-arrange (Nest)".
+      2026-06-02.
 
 ## P3 — stretch (harder / niche)
 - [ ] **Single-line / engraving fonts** (centerline text for pen/engrave).
