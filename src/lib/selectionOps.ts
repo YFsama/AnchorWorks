@@ -163,6 +163,27 @@ export function showAll(): number {
 }
 
 /**
+ * Select the inverse — everything selectable EXCEPT the current selection
+ * (Illustrator Select→Inverse). Skips overlay / hidden / non-selectable objects.
+ * Returns the new selection count.
+ */
+export function selectInverse(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const active = new Set(canvas.getActiveObjects());
+  const others = canvas.getObjects().filter((o) =>
+    !active.has(o)
+    && !(o as { excludeFromExport?: boolean }).excludeFromExport
+    && o.visible !== false
+    && o.selectable !== false);
+  canvas.discardActiveObject();
+  if (others.length === 1) canvas.setActiveObject(others[0]);
+  else if (others.length > 1) canvas.setActiveObject(new fabric.ActiveSelection(others, { canvas }));
+  canvas.requestRenderAll();
+  return others.length;
+}
+
+/**
  * Make guides from the selection (Illustrator View→Guides→Make Guides): drop a
  * persistent ruler guide at each selected object's four bounding-box edges. The
  * objects are kept (not consumed). Returns the number of guides added.

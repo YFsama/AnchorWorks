@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll, swapFillStroke, makeGuidesFromSelection,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll, swapFillStroke, makeGuidesFromSelection, selectInverse,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -205,6 +205,7 @@ export function CommandPalette({
     { id: 'edit.ungroup',    label: t('Ungroup'),   category: t('Edit'),                                     icon: Ungroup,  run: () => ungroupSelection() },
     { id: 'edit.selectAll',  label: t('Select All'), category: t('Edit'), shortcut: 'Ctrl+A',                icon: MousePointerClick, run: selectAll },
     { id: 'edit.pasteInPlace', label: t('Paste in Place'),     category: t('Edit'), shortcut: 'Ctrl+Shift+V', keywords: 'paste place position original same', icon: Copy, run: () => { void pasteFromClipboard(undefined, true); } },
+    { id: 'edit.selectInverse',    label: t('Select Inverse'),     category: t('Edit'), keywords: 'select inverse invert opposite others', icon: MousePointerClick, run: () => { const n = selectInverse(); toast.success(`${n} ${t('selected')}`); } },
     { id: 'edit.selectSameFill',   label: t('Select Same Fill'),   category: t('Edit'), keywords: 'select same fill colour color match', icon: MousePointerClick, run: () => { const n = selectSame('fill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
     { id: 'edit.selectSameStroke', label: t('Select Same Stroke'), category: t('Edit'), keywords: 'select same stroke colour color match', icon: MousePointerClick, run: () => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
     { id: 'edit.lock',        label: t('Lock Selection'),      category: t('Edit'), keywords: 'lock freeze protect immovable', icon: MousePointerClick, run: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },

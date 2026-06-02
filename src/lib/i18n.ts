@@ -831,6 +831,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Unlock All': { en: 'Unlock All', zh: '全部解锁' },
   'locked': { en: 'locked', zh: '个已锁定' },
   'unlocked': { en: 'unlocked', zh: '个已解锁' },
+  'Select Inverse': { en: 'Select Inverse', zh: '反向选择' },
   'Select Same Fill': { en: 'Select Same Fill', zh: '选择相同填充' },
   'Select Same Stroke': { en: 'Select Same Stroke', zh: '选择相同描边' },
   'Select an object with a solid colour first.': {

@@ -160,3 +160,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Make Guides from Selection — makeGuidesFromSelection() (selectionOps.ts)
       drops ruler guides at each selected object's bbox edges (Illustrator
       Make Guides); View menu + command palette. 2026-06-02.
+- [x] Select Inverse — selectInverse() (selectionOps.ts) selects all selectable
+      objects except the current selection (Illustrator Select→Inverse); command
+      palette + right-click. 2026-06-02.

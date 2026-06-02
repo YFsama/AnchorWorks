@@ -13,6 +13,7 @@ import {
   autoArrangeSelection,
   flipSelection,
   selectSame,
+  selectInverse,
 } from '../lib/canvasEngine';
 import {
   copySelection,
@@ -382,6 +383,10 @@ export function CanvasContextMenu() {
         label={t('Select Same Fill')}
         disabled={!hasSelection}
         onClick={() => run(() => { selectSame('fill'); }, hasSelection)}
+      />
+      <Item
+        label={t('Select Inverse')}
+        onClick={() => run(() => { selectInverse(); }, true)}
       />
     </div>
   );
