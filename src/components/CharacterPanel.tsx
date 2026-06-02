@@ -18,12 +18,14 @@ import {
   TextAlignJustify,
   CaseUpper,
   CaseLower,
+  CaseSensitive,
   Type,
 } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { getCanvas, pushHistory } from '../lib/canvasEngine';
 import { applyTextOnPath, canApplyTextOnPath, applyTextOnArc, canApplyTextOnArc } from '../lib/textPath';
 import { createOutlinesFromText, canCreateOutlines } from '../lib/textToOutline';
+import { changeCaseSelection } from '../lib/textCase';
 import { toast } from '../lib/toast';
 import { registerSkill } from '../lib/mcp';
 import { useT } from '../lib/i18n';
@@ -82,28 +84,6 @@ function patchActiveText(patch: Partial<TextProps>) {
   if (a.type !== 'i-text' && a.type !== 'text' && a.type !== 'textbox') return;
   (a as fabric.IText).set(patch as Record<string, unknown>);
   a.setCoords();
-  c.requestRenderAll();
-  pushHistory();
-}
-
-function titleCase(s: string): string {
-  return s.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-}
-
-function transformActiveText(mode: 'upper' | 'lower' | 'title') {
-  const c = getCanvas();
-  if (!c) return;
-  const a = c.getActiveObject();
-  if (!a) return;
-  if (a.type !== 'i-text' && a.type !== 'text' && a.type !== 'textbox') return;
-  const t = a as fabric.IText;
-  const cur = (t as unknown as { text?: string }).text ?? '';
-  let next: string;
-  if (mode === 'upper') next = cur.toUpperCase();
-  else if (mode === 'lower') next = cur.toLowerCase();
-  else next = titleCase(cur);
-  t.set({ text: next });
-  t.setCoords();
   c.requestRenderAll();
   pushHistory();
 }
@@ -335,15 +315,18 @@ export function CharacterPanel() {
       </div>
 
       {/* Case transforms */}
-      <div className="grid grid-cols-3 gap-1 mb-2">
-        <ToggleBtn on={false} onClick={() => transformActiveText('upper')} title={t('UPPERCASE')}>
+      <div className="grid grid-cols-4 gap-1 mb-2">
+        <ToggleBtn on={false} onClick={() => changeCaseSelection('upper')} title={t('UPPERCASE')}>
           <CaseUpper size={14} aria-hidden="true" />
         </ToggleBtn>
-        <ToggleBtn on={false} onClick={() => transformActiveText('lower')} title={t('lowercase')}>
+        <ToggleBtn on={false} onClick={() => changeCaseSelection('lower')} title={t('lowercase')}>
           <CaseLower size={14} aria-hidden="true" />
         </ToggleBtn>
-        <ToggleBtn on={false} onClick={() => transformActiveText('title')} title={t('Title Case')}>
+        <ToggleBtn on={false} onClick={() => changeCaseSelection('title')} title={t('Title Case')}>
           <Type size={14} aria-hidden="true" />
+        </ToggleBtn>
+        <ToggleBtn on={false} onClick={() => changeCaseSelection('sentence')} title={t('Sentence case')}>
+          <CaseSensitive size={14} aria-hidden="true" />
         </ToggleBtn>
       </div>
 

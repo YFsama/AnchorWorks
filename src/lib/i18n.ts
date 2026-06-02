@@ -277,6 +277,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'UPPERCASE': { en: 'UPPERCASE', zh: '大写' },
   'lowercase': { en: 'lowercase', zh: '小写' },
   'Title Case': { en: 'Title Case', zh: '首字母大写' },
+  'Sentence case': { en: 'Sentence case', zh: '句首大写' },
+  'Select a text object first.': { en: 'Select a text object first.', zh: '请先选中一个文本对象。' },
 
   // -------- Selection footer --------
   'object selected': { en: 'object selected', zh: '个对象已选中' },

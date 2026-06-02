@@ -26,6 +26,7 @@ import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { createOutlinesFromText } from '../lib/textToOutline';
+import { changeCaseSelection } from '../lib/textCase';
 import { pasteFromClipboard } from '../lib/clipboard';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
@@ -274,6 +275,10 @@ export function CommandPalette({
     { id: 'text.variableData', label: t('Variable Data…'),    category: t('Arrange'), keywords: 'serial number numbering badge variable data merge sequence list', icon: Type, run: () => setModal('showVariableData', true) },
     { id: 'cut.rhinestone',   label: t('Rhinestone Template…'), category: t('Arrange'), keywords: 'rhinestone hotfix stone bling dots template outline', icon: Wand2, run: () => setModal('showRhinestone', true) },
     { id: 'text.createOutlines', label: t('Create Outlines'), category: t('Arrange'), keywords: 'text outlines vectorise convert curves create outline cut', icon: Type, run: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); } },
+    { id: 'text.caseUpper',    label: t('UPPERCASE'),          category: t('Arrange'), keywords: 'change case uppercase caps text', icon: Type, run: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.caseLower',    label: t('lowercase'),          category: t('Arrange'), keywords: 'change case lowercase text', icon: Type, run: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.caseTitle',    label: t('Title Case'),         category: t('Arrange'), keywords: 'change case title capitalise each word text', icon: Type, run: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.caseSentence', label: t('Sentence case'),      category: t('Arrange'), keywords: 'change case sentence capitalise text', icon: Type, run: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.arcUp',   label: `${t('Text on Arc')} ∩`, category: t('Arrange'), keywords: 'text arc curve circle badge seal up arch', icon: Type, run: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'text.arcDown', label: `${t('Text on Arc')} ∪`, category: t('Arrange'), keywords: 'text arc curve circle badge seal down arch', icon: Type, run: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'cut.outlineStroke',  label: t('Outline Stroke'),    category: t('Arrange'), keywords: 'stroke outline expand cut edges', icon: PenTool, run: () => {

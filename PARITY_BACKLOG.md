@@ -270,3 +270,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       selected path at its midpoint, faithfully (de Casteljau) doubling anchors
       (Illustrator Object→Path→Add Anchor Points); Document menu + command palette
       + right-click. 2026-06-02.
+- [x] Change Case multi-select + Sentence + palette — extracted textCase.ts
+      changeCaseSelection() (works across a multi-text selection, adds Sentence
+      case); Character panel now uses it (+4th button) and 4 commands added to the
+      palette. Was single-object, panel-only, no sentence case. +3 tests. 2026-06-02.
