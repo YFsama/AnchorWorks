@@ -57,10 +57,13 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       stacks 1–4 stroke-silhouette clones behind any object (works on text without
       vectorising) via OutlineEffectDialog; per-ring colour, uniform width. Command
       palette + right-click. 2026-06-02.
-- [ ] **Letter spacing (tracking) + line height (leading)** controls in the
-      Character panel (charSpacing / lineHeight on IText).
-- [ ] **Align to key object / align to artboard** — alignment reference selector
-      (selection bbox vs last-clicked object vs artboard) in the Align panel.
+- [x] **Letter spacing (tracking) + line height (leading)** — ALREADY PRESENT:
+      CharacterPanel has Tracking + Leading sliders/inputs/presets (charSpacing /
+      lineHeight). Inventory was wrong. 2026-06-02.
+- [x] **Align to key object / align to artboard** — alignSelection(axis, ref) in
+      alignDistribute.ts gained an 'artboard' reference; Align panel "Align to"
+      selector (Selection / Artboard). Key-object (last-clicked) deferred — Fabric
+      doesn't track selection click order cleanly. 2026-06-02.
 
 ## P1 — path & transform tooling (Illustrator parity)
 
