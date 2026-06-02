@@ -263,6 +263,18 @@ export function CanvasContextMenu() {
         disabled={!canPaste}
         onClick={() => run(() => pasteFromClipboard(undefined, true), canPaste)}
       />
+      <Item
+        label={t('Paste in Front')}
+        kbd="Ctrl+F"
+        disabled={!canPaste}
+        onClick={() => run(() => pasteFromClipboard(undefined, true, 'front'), canPaste)}
+      />
+      <Item
+        label={t('Paste in Back')}
+        kbd="Ctrl+B"
+        disabled={!canPaste}
+        onClick={() => run(() => pasteFromClipboard(undefined, true, 'back'), canPaste)}
+      />
       <Separator />
       <Item
         label={t('Duplicate')}

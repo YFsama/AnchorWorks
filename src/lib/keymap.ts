@@ -77,6 +77,8 @@ export const BINDINGS: ShortcutBinding[] = [
   { id: 'edit.cut',              label: 'Cut',                 defaultCombo: 'Ctrl+X' },
   { id: 'edit.paste',            label: 'Paste',               defaultCombo: 'Ctrl+V' },
   { id: 'edit.pasteInPlace',     label: 'Paste in Place',      defaultCombo: 'Ctrl+Shift+V' },
+  { id: 'edit.pasteInFront',     label: 'Paste in Front',      defaultCombo: 'Ctrl+F' },
+  { id: 'edit.pasteInBack',      label: 'Paste in Back',       defaultCombo: 'Ctrl+B' },
 
   // -------- Group --------
   { id: 'edit.ungroup',          label: 'Ungroup',             defaultCombo: 'Ctrl+Shift+G' },

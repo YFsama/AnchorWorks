@@ -828,6 +828,8 @@ export default function App() {
       if (match('edit.copy')) { e.preventDefault(); if (copySelection()) announce(t('Copy')); return; }
       if (match('edit.cut')) { e.preventDefault(); if (cutSelection()) announce(t('Cut')); return; }
       if (match('edit.pasteInPlace')) { e.preventDefault(); pasteFromClipboard(undefined, true).then((ok) => { if (ok) announce(t('Paste in Place')); }); return; }
+      if (match('edit.pasteInFront')) { e.preventDefault(); pasteFromClipboard(undefined, true, 'front').then((ok) => { if (ok) announce(t('Paste in Front')); }); return; }
+      if (match('edit.pasteInBack')) { e.preventDefault(); pasteFromClipboard(undefined, true, 'back').then((ok) => { if (ok) announce(t('Paste in Back')); }); return; }
       if (match('edit.paste')) { e.preventDefault(); pasteFromClipboard().then((ok) => { if (ok) announce(t('Paste')); }); return; }
       // Cmd+Shift+G must be checked before plain Cmd+G so the shift modifier
       // routes to ungroup. Both bypass the lowercase tool map (which requires

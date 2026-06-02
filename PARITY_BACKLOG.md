@@ -311,3 +311,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (Illustrator Recolor hue wheel); HueDialog slider + Document menu + command
       palette. +2 tests. Completes Edit Colors (Invert/Grayscale/Saturate/Hue).
       2026-06-02.
+- [x] Paste in Front / Back — pasteFromClipboard() gained a `stack` arg
+      (clipboard.ts) that bring-to-fronts / send-to-backs the in-place paste
+      (Illustrator Ctrl+F / Ctrl+B); keymap + App handlers, command palette, and
+      right-click next to Paste in Place. 2026-06-02.

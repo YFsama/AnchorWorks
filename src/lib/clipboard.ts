@@ -44,7 +44,7 @@ export function cutSelection(): boolean {
  * a brand new id (Fabric generates one via `assignId` in canvasEngine via the
  * `object:added` listener). Returns false if the clipboard is empty.
  */
-export async function pasteFromClipboard(at?: { x: number; y: number }, inPlace = false): Promise<boolean> {
+export async function pasteFromClipboard(at?: { x: number; y: number }, inPlace = false, stack?: 'front' | 'back'): Promise<boolean> {
   const c = getCanvas();
   if (!c || !clipboard) return false;
   const raw = Array.isArray(clipboard) ? clipboard : [clipboard];
@@ -91,6 +91,14 @@ export async function pasteFromClipboard(at?: { x: number; y: number }, inPlace 
     o.set({ left: (o.left ?? 0) + dx, top: (o.top ?? 0) + dy });
     o.setCoords();
     c.add(o);
+  }
+
+  // Paste in Front (default add order = top) / Paste in Back. For back, send in
+  // reverse so the pasted objects keep their relative order at the bottom.
+  if (stack === 'back') {
+    for (let i = enlived.length - 1; i >= 0; i--) c.sendObjectToBack(enlived[i]);
+  } else if (stack === 'front') {
+    for (const o of enlived) c.bringObjectToFront(o);
   }
 
   if (enlived.length === 1) {
