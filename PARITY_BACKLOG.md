@@ -175,3 +175,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Inner contours first — sortInsideFirst() (cutOptimize.ts, containment by
       centroid+area) + plotter `insideFirst` option cut nested contours before
       their container (print-and-cut); Plotter-dialog checkbox. +1 test. 2026-06-02.
+- [x] Round Corners — roundCornersOnSelection() (roundCorners.ts) fillets path/
+      shape corners by a radius via quadratic arcs (Illustrator Stylize→Round
+      Corners); RoundCornersDialog + command palette + right-click. 2026-06-02.

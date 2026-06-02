@@ -860,6 +860,13 @@ const dict: Record<string, Record<Lang, string>> = {
   'Transformed copy': { en: 'Transformed copy', zh: '已变换副本' },
   'Select something to transform.': { en: 'Select something to transform.', zh: '请先选中要变换的对象。' },
   'Flip Horizontal / Vertical': { en: 'Flip Horizontal / Vertical', zh: '水平 / 垂直翻转' },
+  'Round Corners': { en: 'Round Corners', zh: '圆角' },
+  'Round Corners…': { en: 'Round Corners…', zh: '圆角…' },
+  'Radius (mm)': { en: 'Radius (mm)', zh: '半径 (mm)' },
+  'shapes rounded': { en: 'shapes rounded', zh: '个形状已圆角' },
+  'Select one or more paths/shapes first.': {
+    en: 'Select one or more paths/shapes first.', zh: '请先选中一个或多个路径/形状。',
+  },
   'Simplify Path': { en: 'Simplify Path', zh: '简化路径' },
   'Simplify Path…': { en: 'Simplify Path…', zh: '简化路径…' },
   'Tolerance (px)': { en: 'Tolerance (px)', zh: '容差 (px)' },
