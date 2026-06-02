@@ -302,3 +302,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       fabric.Path in the stroke colour and drops the source stroke (Illustrator
       Object→Path→Outline Stroke, fill flavour vs the existing cut flavour);
       Document menu + command palette. 2026-06-02.
+- [x] Select Same — stroke weight / opacity — selectSame() (selectionOps.ts) now
+      also matches numeric props (strokeWidth / opacity) with an epsilon, not just
+      fill/stroke colour (Illustrator Select→Same→Stroke Weight / Opacity); 2 new
+      command-palette entries. 2026-06-02.

@@ -887,6 +887,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Select Inverse': { en: 'Select Inverse', zh: '反向选择' },
   'Select Same Fill': { en: 'Select Same Fill', zh: '选择相同填充' },
   'Select Same Stroke': { en: 'Select Same Stroke', zh: '选择相同描边' },
+  'Select Same Stroke Weight': { en: 'Select Same Stroke Weight', zh: '选择相同描边粗细' },
+  'Select Same Opacity': { en: 'Select Same Opacity', zh: '选择相同不透明度' },
   'Select an object with a solid colour first.': {
     en: 'Select an object with a solid colour first.',
     zh: '请先选中一个有纯色的对象。',
