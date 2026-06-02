@@ -95,8 +95,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Serial / variable data** — variableData.ts buildSerialValues()/
       generateVariableData() + VariableDataDialog grid out N text copies from a
       number sequence or a list ("#" run = slot). Command palette. 2026-06-02.
-- [ ] **PLT import colour restore** — carry pen/colour info from imported PLT so
-      cut-by-colour works on imported jobs.
+- [x] **PLT import colour restore** — pltImporter.ts tracks SP pen per polyline
+      (PltPolyline.pen) and polylinesToSvg() restores it via penColor()/PEN_COLORS,
+      so imported jobs separate by colour. +3 unit tests. 2026-06-02.
 - [ ] **Nesting / auto-arrange** — pack selected shapes to minimise material
       waste within the artboard/material width.
 
