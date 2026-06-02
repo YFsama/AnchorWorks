@@ -397,3 +397,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       distributeCentres()) equalises centre-to-centre spacing (equal pitch), the
       Illustrator distribute mode distinct from the existing equal-gap; two new
       Align-panel buttons. 2026-06-03.
+- [x] Arc Warp — warp.ts warpArcPoints() (pure) + warpArcSelection() bend the
+      selection into an arc/banner over a shared x-frame (parabolic Y shift,
+      Illustrator Effect→Warp→Arc), distinct from Text-on-Arc; WarpDialog (bend) +
+      Distort submenu + command palette. +3 tests. 2026-06-03.

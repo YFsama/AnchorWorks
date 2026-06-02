@@ -287,6 +287,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Roughen…'), onClick: () => setModal('showRoughen', true) },
           { label: t('Zig Zag…'), onClick: () => setModal('showZigzag', true) },
           { label: t('Twist…'), onClick: () => setModal('showTwist', true) },
+          { label: t('Arc Warp…'), onClick: () => setModal('showWarp', true) },
           { label: t('Blend…'), onClick: () => setModal('showBlend', true) },
         ] },
         { label: t('Edit Colors'), sub: [
