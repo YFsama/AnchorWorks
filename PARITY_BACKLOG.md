@@ -438,3 +438,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       over a single object and drops the copy at the drag-start position on the first
       object:moving (cleared on mouseup, so an alt-click alone never duplicates) —
       Illustrator's Alt-drag. 2026-06-03.
+- [x] Double-click path to edit — canvasEngine.ts mouse:dblclick on a path switches
+      to Direct Select and enterPathEdit() (Illustrator double-click-to-edit); text
+      keeps Fabric's native dblclick-to-edit. 2026-06-03.

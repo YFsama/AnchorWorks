@@ -82,6 +82,18 @@ export function initCanvas(el: HTMLCanvasElement) {
     }
   });
 
+  // Double-click a path → jump into Direct Select + path-edit (Illustrator's
+  // double-click-to-edit). Text objects enter editing via Fabric's own native
+  // dblclick, so we only intercept paths here.
+  canvas.on('mouse:dblclick', (e) => {
+    const target = e.target as fabric.FabricObject | undefined;
+    if (target && target.type === 'path' && (activeTool === 'select' || activeTool === 'directSelect')) {
+      setTool('directSelect');
+      useEditor.getState().setTool('directSelect');
+      enterPathEdit(canvas!, target as fabric.Path);
+    }
+  });
+
   canvas.on('selection:created', updateSelection);
   canvas.on('selection:updated', updateSelection);
   canvas.on('selection:cleared', clearSelection);
@@ -166,6 +178,7 @@ function getScenePointer(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
 // imported it from canvasEngine.
 export { ANCHOR_SNAP_TOLERANCE } from './smartGuides';
 import { applySmartSnap } from './smartGuides';
+import { enterPathEdit } from './pathEdit';
 
 function onMouseDown(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
   if (!canvas) return;
