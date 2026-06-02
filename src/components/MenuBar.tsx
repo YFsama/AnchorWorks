@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
@@ -178,6 +178,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       <Dropdown label={t('View')} items={[
         { label: t('Zoom In'), onClick: () => zoomBy(1.25), kbd: '+' },
         { label: t('Zoom Out'), onClick: () => zoomBy(1 / 1.25), kbd: '-' },
+        { label: t('Actual Size'), onClick: () => zoomToPercent(100), kbd: '1' },
         { label: t('Fit to Page'), onClick: () => zoomFit(), kbd: '0' },
         { sep: true },
         { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: 'Ctrl+Alt+Y', checked: outlineMode },

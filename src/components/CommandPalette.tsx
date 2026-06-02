@@ -12,7 +12,7 @@ import {
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
 import {
-  undo, redo, zoomBy, zoomFit, deleteSelection, duplicateSelection,
+  undo, redo, zoomBy, zoomFit, zoomToPercent, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
   bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, deselectAll,
 } from '../lib/canvasEngine';
@@ -288,6 +288,7 @@ export function CommandPalette({
     // ---------- View ----------
     { id: 'view.zoomIn',  label: t('Zoom In'),     category: t('View'), shortcut: 'Ctrl+=', icon: Plus,      run: () => zoomBy(1.25) },
     { id: 'view.zoomOut', label: t('Zoom Out'),    category: t('View'), shortcut: 'Ctrl+-', icon: Minus,     run: () => zoomBy(1 / 1.25) },
+    { id: 'view.actualSize', label: t('Actual Size'), category: t('View'), shortcut: 'Ctrl+1', keywords: 'actual size 100 percent real zoom reset', icon: Maximize2, run: () => zoomToPercent(100) },
     { id: 'view.fit',     label: t('Fit to Page'), category: t('View'), shortcut: 'Ctrl+0', icon: Maximize2, run: () => zoomFit() },
     { id: 'view.outline', label: t('Outline View'), category: t('View'), shortcut: 'Ctrl+Alt+Y', keywords: 'wireframe geometry preview', icon: PenTool, run: () => setOutlineMode(!isOutlineMode()) },
     { id: 'view.makeGuides', label: t('Make Guides from Selection'), category: t('View'), keywords: 'guide make convert selection bounds ruler', icon: Grid3X3, run: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },

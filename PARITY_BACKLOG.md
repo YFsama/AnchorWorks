@@ -240,3 +240,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       readout into a click-to-edit input; viewport.ts zoomToPercent() jumps to a
       typed % centred on the viewport (Illustrator/SignMaster status-bar zoom).
       2026-06-02.
+- [x] Actual Size in View menu + palette — surfaced the 100% zoom command
+      (zoomToPercent(100)) in the View menu and command palette; it was Ctrl+1
+      keyboard-only before. 2026-06-02.
