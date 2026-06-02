@@ -70,7 +70,7 @@ export const BINDINGS: ShortcutBinding[] = [
   { id: 'view.outline',          label: 'Outline View',        defaultCombo: 'Ctrl+Alt+Y' },
   { id: 'edit.redo',             label: 'Redo',                defaultCombo: 'Ctrl+Y' },
   { id: 'edit.duplicate',        label: 'Duplicate',           defaultCombo: 'Ctrl+D' },
-  { id: 'edit.transformAgain',   label: 'Transform Again',     defaultCombo: 'Ctrl+Shift+D' },
+  { id: 'edit.transformAgain',   label: 'Transform Again',     defaultCombo: 'Ctrl+Alt+D' },
 
   // -------- Clipboard --------
   { id: 'edit.copy',             label: 'Copy',                defaultCombo: 'Ctrl+C' },

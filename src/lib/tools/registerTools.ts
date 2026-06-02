@@ -37,13 +37,14 @@ import {
   shapeDrawEnd,
 } from './shapeDrawTool';
 import { measureBegin, measureUpdate, measureEnd, measureClear } from './measureTool';
+import { eyedropperActivate, eyedropperPick, eyedropperClear } from './eyedropperTool';
 import { useEditor } from '../../store/editor';
 import { zoomToPoint } from '../viewport';
 import { enterPathEdit, exitPathEdit } from '../pathEdit';
 import { PressureBrush } from '../pressureBrush';
 import { panBegin } from '../panSession';
 import {
-  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Type, Hand, ZoomIn, Ruler,
+  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Type, Hand, ZoomIn, Ruler, Pipette,
 } from 'lucide-react';
 
 let initialized = false;
@@ -261,5 +262,23 @@ export function registerBuiltInTools(): void {
     onMouseMove: (ctx) => measureUpdate(ctx.sp.x, ctx.sp.y),
     onMouseUp: () => measureEnd(),
     onDeactivate: () => measureClear(),
+  });
+
+  // Eyedropper — click an object to copy its appearance (fill / stroke /
+  // stroke-width / opacity) onto the selection that was active when the tool
+  // was picked. `pickable` so objects stay hit-testable for findTarget; the
+  // tool flips them non-selectable in onActivate so clicks sample, not drag.
+  registerTool({
+    id: 'eyedropper',
+    label: 'Eyedropper',
+    icon: Pipette,
+    shortcut: 'I',
+    keywords: 'eyedropper sample copy appearance fill stroke style pipette',
+    cursor: 'crosshair',
+    pickable: true,
+    selectable: false,
+    onActivate: (canvas) => eyedropperActivate(canvas),
+    onMouseDown: (ctx) => eyedropperPick(ctx),
+    onDeactivate: () => eyedropperClear(),
   });
 }

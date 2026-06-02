@@ -158,7 +158,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: 'Ctrl+Y' },
         { sep: true },
         { label: t('Transform…'), onClick: () => setModal('showTransform', true) },
-        { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: 'Ctrl+Shift+D' },
+        { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: 'Ctrl+Alt+D' },
         { label: t('Flip Horizontal'), onClick: () => flipSelection('x'), kbd: 'Shift+H' },
         { label: t('Flip Vertical'), onClick: () => flipSelection('y'), kbd: 'Shift+V' },
         { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: 'Ctrl+J' },

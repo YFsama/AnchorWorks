@@ -216,3 +216,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Also restored a green `eslint .`: ignore src-tauri/target build output +
       tests/e2e fixtures, and fixed a pre-existing ref-update-during-render in
       useResizableWidth.ts. 2026-06-02.
+- [x] Eyedropper tool (I) — eyedropperTool.ts samples the clicked object's
+      appearance (fill/stroke/stroke-width/opacity) onto the objects selected when
+      the tool was picked (Illustrator Eyedropper); registered in registerTools.ts
+      so it auto-lists in toolbar/keymap/shortcuts. Also fixed a Ctrl+Shift+D
+      collision (Transform Again moved to Ctrl+Alt+D; it had shadowed the Debug
+      Panel). 2026-06-02.

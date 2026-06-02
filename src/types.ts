@@ -11,7 +11,8 @@ export type ToolId =
   | 'text'
   | 'hand'
   | 'zoom'
-  | 'measure';
+  | 'measure'
+  | 'eyedropper';
 
 export interface LayerInfo {
   id: string;
