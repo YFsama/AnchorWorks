@@ -11,6 +11,7 @@ import {
   sendToBack,
   deleteSelection,
   pushHistory,
+  autoArrangeSelection,
 } from '../lib/canvasEngine';
 import {
   copySelection,
@@ -158,6 +159,12 @@ export function CanvasContextMenu() {
 
   const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor') =>
     useEditor.getState().setModal(k, true);
+
+  const nest = () => {
+    const n = autoArrangeSelection();
+    if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
+    else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
+  };
 
   // One-click contour — generate a default 2 mm offset cut line around the
   // selection and show it, no dialog. The dialog ("Cut Contour…") stays for
@@ -335,6 +342,11 @@ export function CanvasContextMenu() {
         label={t('Recolor Artwork…')}
         disabled={!hasSelection}
         onClick={() => run(() => openModal('showRecolor'), hasSelection)}
+      />
+      <Item
+        label={t('Auto-arrange (Nest)')}
+        disabled={active.length < 2}
+        onClick={() => run(() => nest(), active.length >= 2)}
       />
       <Item
         label={t('Cut Contour…')}

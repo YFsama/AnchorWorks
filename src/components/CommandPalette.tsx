@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -208,6 +208,11 @@ export function CommandPalette({
     { id: 'arrange.back',      label: t('Send Backward'),      category: t('Arrange'), keywords: 'order z-index down',   icon: ChevronDown,  run: () => sendBackward() },
     { id: 'arrange.bottom',    label: t('Send to Back'),       category: t('Arrange'), keywords: 'order z-index bottom', icon: ChevronsDown, run: () => sendToBack() },
     { id: 'arrange.repeat',    label: t('Repeat (Grid / Radial / Mirror)…'), category: t('Arrange'), keywords: 'array duplicate pattern radial mirror', icon: Grid3X3, run: () => setModal('showRepeat', true) },
+    { id: 'arrange.nest',      label: t('Auto-arrange (Nest)'), category: t('Arrange'), keywords: 'nest pack arrange tile material waste layout bin', icon: Grid3X3, run: () => {
+      const n = autoArrangeSelection();
+      if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
+      else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
+    } },
     { id: 'arrange.clipMake',  label: t('Make Clip Mask'),     category: t('Arrange'), keywords: 'mask clip',            icon: Wand2,        run: () => { applyClipMask(); } },
     { id: 'arrange.clipFree',  label: t('Release Clip Mask'),  category: t('Arrange'), keywords: 'unmask unclip',         icon: Wand2,        run: () => { releaseClipMask(); } },
     { id: 'arrange.compMake',  label: t('Compound Path'),      category: t('Arrange'), keywords: 'merge paths combine even-odd', icon: PenTool, run: () => { makeCompoundPath(); } },

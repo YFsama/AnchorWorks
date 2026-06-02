@@ -813,6 +813,9 @@ const dict: Record<string, Record<Lang, string>> = {
   'Align to': { en: 'Align to', zh: '对齐基准' },
   'Artboard': { en: 'Artboard', zh: '画板' },
   'Measure': { en: 'Measure', zh: '测量' },
+  'Auto-arrange (Nest)': { en: 'Auto-arrange (Nest)', zh: '自动排料' },
+  'objects arranged': { en: 'objects arranged', zh: '个对象已排列' },
+  'Select 2 or more objects first.': { en: 'Select 2 or more objects first.', zh: '请先选中 2 个或以上对象。' },
   'Variable Data': { en: 'Variable Data', zh: '可变数据' },
   'Variable Data…': { en: 'Variable Data…', zh: '可变数据…' },
   'Duplicate the selected text. A "#" run is the slot (e.g. No. ###); otherwise the whole text is replaced.': {

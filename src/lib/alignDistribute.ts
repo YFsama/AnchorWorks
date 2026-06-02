@@ -64,6 +64,49 @@ export function alignSelection(axis: AlignAxis, ref: AlignRef = 'selection'): vo
   pushHistory();
 }
 
+const MM_TO_PX = 3.7795; // 96dpi
+
+/**
+ * Auto-arrange (nest) the selection into rows within the material width,
+ * minimising wasted material — SignMaster's Nesting / a shelf bin-pack. Objects
+ * are sorted tallest-first and laid left→right; a new row starts when the next
+ * object would overflow the width. The material width is the first artboard's
+ * width (else the document width); origin is the artboard's top-left. Requires
+ * 2+ objects. Returns the number arranged.
+ */
+export function autoArrangeSelection(gapMm = 5): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 2) return 0;
+  const gap = Math.max(0, gapMm) * MM_TO_PX;
+
+  const ab = useEditor.getState().artboards[0];
+  const doc = useEditor.getState().doc;
+  const maxWidth = ab ? ab.width : (doc.width || 800);
+
+  const items = objs.map(o => ({ o, r: o.getBoundingRect() }));
+  const startX = ab ? ab.x : Math.min(...items.map(i => i.r.left));
+  const startY = ab ? ab.y : Math.min(...items.map(i => i.r.top));
+  items.sort((a, b) => b.r.height - a.r.height); // tallest first
+
+  let cx = startX, cy = startY, rowH = 0;
+  for (const { o, r } of items) {
+    // Wrap to a new row when this item would overflow the width (but never on
+    // an empty row, or a single item wider than the material just overhangs).
+    if (cx > startX && cx + r.width > startX + maxWidth) {
+      cx = startX; cy += rowH + gap; rowH = 0;
+    }
+    o.set({ left: (o.left ?? 0) + (cx - r.left), top: (o.top ?? 0) + (cy - r.top) });
+    o.setCoords();
+    cx += r.width + gap;
+    rowH = Math.max(rowH, r.height);
+  }
+  canvas.requestRenderAll();
+  pushHistory();
+  return objs.length;
+}
+
 /**
  * Distribute the active selection so the gaps between consecutive objects
  * (along the given axis) are equal. Requires 3+ objects.
