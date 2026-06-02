@@ -159,6 +159,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Undo'), onClick: () => undo(), disabled: !canUndo, kbd: 'Ctrl+Z' },
         { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: 'Ctrl+Y' },
         { sep: true },
+        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true) },
         { label: t('Select All'), onClick: () => { const n = selectAllObjects(); if (!n) toast.warn(t('Nothing to select.')); }, kbd: 'Ctrl+A' },
         { label: t('Deselect All'), onClick: () => { deselectAll(); }, kbd: 'Ctrl+Shift+A' },
         { sep: true },

@@ -282,3 +282,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Compound Path surfaces — same treatment for masks.ts makeCompoundPath()/
       releaseCompoundPath() (were palette-only): Edit menu, canvas right-click, and
       Ctrl+8 / Ctrl+Alt+8 keymap + App handlers. 2026-06-02.
+- [x] Find & Replace text — findReplace.ts replaceAllText()/countTextMatches()
+      walk every text object (incl. group children) and replace all occurrences
+      (case-sensitive toggle, live match count); FindReplaceDialog + Edit menu +
+      command palette (Illustrator Edit→Find and Replace). 2026-06-02.
