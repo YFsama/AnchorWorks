@@ -92,8 +92,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Recolor artwork** — collectSelectionColors()/recolorSelection() in
       selectionApply.ts (walks groups, remaps solid fills+strokes); RecolorDialog
       swatch table. Command palette + right-click. 2026-06-02.
-- [ ] **Serial / variable data** — generate N copies with an incrementing number
-      or a list (SignMaster badges/numbering).
+- [x] **Serial / variable data** — variableData.ts buildSerialValues()/
+      generateVariableData() + VariableDataDialog grid out N text copies from a
+      number sequence or a list ("#" run = slot). Command palette. 2026-06-02.
 - [ ] **PLT import colour restore** — carry pen/colour info from imported PLT so
       cut-by-colour works on imported jobs.
 - [ ] **Nesting / auto-arrange** — pack selected shapes to minimise material
