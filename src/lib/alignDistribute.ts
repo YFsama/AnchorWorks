@@ -18,8 +18,26 @@ import { useEditor } from '../store/editor';
 
 export type AlignAxis = 'left' | 'centerH' | 'right' | 'top' | 'centerV' | 'bottom';
 export type DistributeDir = 'horizontal' | 'vertical';
-/** What the alignment snaps to — the selection's own bounds, or the artboard. */
-export type AlignRef = 'selection' | 'artboard';
+/** What the alignment snaps to — the selection's bounds, the artboard, or a
+ *  designated "key object" (Illustrator's Align To → Key Object). */
+export type AlignRef = 'selection' | 'artboard' | 'key';
+
+/** The id of the object alignment uses as the reference when ref === 'key'. */
+let keyObjectId: string | null = null;
+
+/** Mark the single active object as the key object. Returns true on success. */
+export function setKeyObject(): boolean {
+  const canvas = getCanvas();
+  const a = canvas?.getActiveObject();
+  if (!a || a.type === 'activeselection') return false;
+  const id = (a as { _id?: string })._id;
+  if (!id) return false;
+  keyObjectId = id;
+  return true;
+}
+
+export function clearKeyObject(): void { keyObjectId = null; }
+export function hasKeyObject(): boolean { return keyObjectId !== null; }
 
 /**
  * Align the active selection along the given axis. `ref` chooses the reference
@@ -39,6 +57,13 @@ export function alignSelection(axis: AlignAxis, ref: AlignRef = 'selection'): vo
     if (abs.length === 0) return;
     const a = abs[0];
     refLeft = a.x; refRight = a.x + a.width; refTop = a.y; refBottom = a.y + a.height;
+  } else if (ref === 'key') {
+    // Align to the designated key object's bounds (it stays put; others snap to
+    // it). Fall back to selection bounds if the key is gone.
+    const key = keyObjectId ? canvas.getObjects().find(o => (o as { _id?: string })._id === keyObjectId) : undefined;
+    if (!key) { alignSelection(axis, 'selection'); return; }
+    const r = key.getBoundingRect();
+    refLeft = r.left; refRight = r.left + r.width; refTop = r.top; refBottom = r.top + r.height;
   } else {
     if (objs.length < 2) return;
     const b = objs.map(o => o.getBoundingRect());

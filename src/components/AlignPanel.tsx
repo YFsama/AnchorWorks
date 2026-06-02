@@ -12,7 +12,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
-import { alignSelection, distributeSelection, distributeSpacing, flipSelection } from '../lib/canvasEngine';
+import { alignSelection, distributeSelection, distributeSpacing, flipSelection, setKeyObject } from '../lib/canvasEngine';
+import { toast } from '../lib/toast';
 import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { useEditor } from '../store/editor';
@@ -24,12 +25,15 @@ export function AlignPanel() {
   const selCount = useEditor(s => s.selectionIds.length);
   const selectionSummary = useEditor(s => s.selectionSummary);
   const artboardCount = useEditor(s => s.artboards.length);
-  const [alignRef, setAlignRef] = useState<'selection' | 'artboard'>('selection');
+  const [alignRef, setAlignRef] = useState<'selection' | 'artboard' | 'key'>('selection');
+  const [keyed, setKeyed] = useState(false);
   const [spacingMm, setSpacingMm] = useState(5);
-  // Aligning to the artboard works on a single object; aligning to the
-  // selection's own bounds needs 2+.
+  // Aligning to the artboard / key object works on a single object; aligning to
+  // the selection's own bounds needs 2+.
   const enoughForAlign = alignRef === 'artboard'
     ? (selCount >= 1 && artboardCount >= 1)
+    : alignRef === 'key'
+    ? (selCount >= 1 && keyed)
     : selCount >= 2;
   const enoughForDistribute = selCount >= 3;
   const enoughForBool = selCount >= 2;
@@ -62,16 +66,29 @@ export function AlignPanel() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <h4 className="field-label !mb-0">{t('Align')}</h4>
-              <select
-                className="input-num !h-6 !py-0 !text-[10px] !w-auto"
-                value={alignRef}
-                onChange={(e) => setAlignRef(e.target.value as 'selection' | 'artboard')}
-                title={t('Align to')}
-                aria-label={t('Align to')}
-              >
-                <option value="selection">{t('Selection')}</option>
-                <option value="artboard">{t('Artboard')}</option>
-              </select>
+              <div className="flex items-center gap-1">
+                {alignRef === 'key' && (
+                  <button
+                    type="button"
+                    className="input-num !h-6 !py-0 !px-1.5 !text-[10px] !w-auto hover:text-ink"
+                    onClick={() => { if (setKeyObject()) { setKeyed(true); toast.success(t('Key object set')); } else toast.warn(t('Select a single object first.')); }}
+                    title={t('Set the selected object as the alignment key')}
+                  >
+                    {t('Set Key')}
+                  </button>
+                )}
+                <select
+                  className="input-num !h-6 !py-0 !text-[10px] !w-auto"
+                  value={alignRef}
+                  onChange={(e) => setAlignRef(e.target.value as 'selection' | 'artboard' | 'key')}
+                  title={t('Align to')}
+                  aria-label={t('Align to')}
+                >
+                  <option value="selection">{t('Selection')}</option>
+                  <option value="artboard">{t('Artboard')}</option>
+                  <option value="key">{t('Key Object')}</option>
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-6 gap-1">
               <Btn title={t('Align left')} disabled={!enoughForAlign} onClick={() => alignSelection('left', alignRef)}>

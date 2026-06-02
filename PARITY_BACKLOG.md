@@ -327,3 +327,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       filled triangular head (sized from stroke width, in the stroke colour) to the
       start/end/both endpoints of selected open paths/lines (sign/dimension arrows);
       Document menu + command palette. +2 tests. 2026-06-02.
+- [x] Align to Key Object — alignDistribute.ts setKeyObject()/keyObjectId + a 'key'
+      AlignRef align the selection to a designated object's bounds (it stays put),
+      resolving the earlier "deferred — Fabric doesn't track click order" note via an
+      explicit Set Key button + Key Object option in the Align panel. 2026-06-02.
