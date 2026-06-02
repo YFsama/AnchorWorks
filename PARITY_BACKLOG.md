@@ -359,3 +359,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       arrowTriangle() heads (reused from arrowheads.ts) at both endpoints with the
       line + mm label, so a pinned measurement reads as a proper dimension line.
       2026-06-03.
+- [x] View-menu display toggles — Show Grid / Snap to Grid / Smart Guides / Anchor
+      Snap added as checkbox items to the View menu (MenuBar.tsx) reusing the store
+      setters; previously only the toolbar icons toggled them. 2026-06-03.
