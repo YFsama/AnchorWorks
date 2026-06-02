@@ -43,9 +43,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **Outline Stroke** — `outlineStrokeToCutPaths()` in contourFromSelection.ts
       (offset ±½ stroke into cut lines on both band edges; closed→outer+inner ring,
       open→closed band); right-click menu + command palette. 2026-06-02.
-- [ ] **Tiling / paneling for cut & print** — split an oversized job into panels
-      sized to the material width with an overlap, numbered, previewable. Extend
-      io3 tilePrint into a cut-aware paneling dialog.
+- [x] **Tiling / paneling for cut & print** — new TilePrintDialog.tsx (page size/
+      orientation/cols/rows/overlap + live grid preview) replacing the prompt()
+      flow; io3 tilePrint() gained `overlapPx` glue margins. Menu + command
+      palette. 2026-06-02.
 
 ## P1 — sign text effects & layout
 
