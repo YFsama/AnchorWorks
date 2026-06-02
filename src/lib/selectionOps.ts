@@ -183,6 +183,35 @@ export function selectInverse(): number {
   return others.length;
 }
 
+/** Select every selectable object on the canvas (Illustrator Select→All).
+ *  Returns the number selected. */
+export function selectAllObjects(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getObjects().filter((o) =>
+    !(o as { excludeFromExport?: boolean }).excludeFromExport
+    && o.visible !== false
+    && o.selectable !== false);
+  canvas.discardActiveObject();
+  if (objs.length === 1) canvas.setActiveObject(objs[0]);
+  else if (objs.length > 1) canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas }));
+  canvas.requestRenderAll();
+  return objs.length;
+}
+
+/** Clear the current selection (Illustrator Select→Deselect). Returns the
+ *  number of objects that were deselected. */
+export function deselectAll(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const n = canvas.getActiveObjects().length;
+  if (n > 0) {
+    canvas.discardActiveObject();
+    canvas.requestRenderAll();
+  }
+  return n;
+}
+
 /**
  * Make guides from the selection (Illustrator View→Guides→Make Guides): drop a
  * persistent ruler guide at each selected object's four bounding-box edges. The

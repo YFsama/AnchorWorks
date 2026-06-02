@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
@@ -156,6 +156,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       <Dropdown label={t('Edit')} items={[
         { label: t('Undo'), onClick: () => undo(), disabled: !canUndo, kbd: 'Ctrl+Z' },
         { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: 'Ctrl+Y' },
+        { sep: true },
+        { label: t('Select All'), onClick: () => { const n = selectAllObjects(); if (!n) toast.warn(t('Nothing to select.')); }, kbd: 'Ctrl+A' },
+        { label: t('Deselect All'), onClick: () => { deselectAll(); }, kbd: 'Ctrl+Shift+A' },
         { sep: true },
         { label: t('Transform…'), onClick: () => setModal('showTransform', true) },
         { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: 'Ctrl+Alt+D' },

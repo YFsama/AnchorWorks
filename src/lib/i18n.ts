@@ -1069,6 +1069,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Export PDF (Vector)': { en: 'Export PDF (Vector)', zh: '导出 PDF (矢量)' },
   'Deselect': { en: 'Deselect', zh: '取消选择' },
   'Select All': { en: 'Select All', zh: '全选' },
+  'Deselect All': { en: 'Deselect All', zh: '取消全选' },
+  'Nothing to select.': { en: 'Nothing to select.', zh: '没有可选择的对象。' },
   'Actual Size': { en: 'Actual Size', zh: '实际大小' },
   'Click to set, Shift-click to fit': { en: 'Click to set, Shift-click to fit', zh: '单击编辑，Shift-单击适应页面' },
   'Try a different keyword — tool, file, edit, view, AI…': {

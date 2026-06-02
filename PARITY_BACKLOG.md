@@ -222,3 +222,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       so it auto-lists in toolbar/keymap/shortcuts. Also fixed a Ctrl+Shift+D
       collision (Transform Again moved to Ctrl+Alt+D; it had shadowed the Debug
       Panel). 2026-06-02.
+- [x] Deselect All — selectionOps.ts deselectAll()/selectAllObjects() give the
+      Select→Deselect (Ctrl+Shift+A) command a real keymap binding + Edit-menu
+      pair + command-palette entry; previously only Escape cleared a selection.
+      2026-06-02.

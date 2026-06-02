@@ -921,6 +921,16 @@ export default function App() {
         }
         return;
       }
+      if (match('edit.deselectAll')) {
+        e.preventDefault();
+        const c = getCanvas();
+        if (c && c.getActiveObjects().length > 0) {
+          c.discardActiveObject();
+          c.requestRenderAll();
+          announce(t('Deselect'));
+        }
+        return;
+      }
       // Excluded from BINDINGS: Delete/Backspace are two equivalent keys for
       // one action — a single combo can't model that alias cleanly.
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); announce(t('Delete')); return; }
