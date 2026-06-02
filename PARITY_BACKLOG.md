@@ -370,3 +370,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Union/Subtract/Intersect/Exclude/Minus Back + Divide/Trim (booleanOps.ts);
       the boolean ops were Align-panel/palette-only, absent from the menu bar.
       2026-06-03.
+- [x] Swatches panel — swatches.ts (localStorage CRUD + change event) + new
+      SwatchesPanel: a persistent reusable colour palette; click applies fill,
+      Alt-click stroke, "+" saves the current fill, × removes (Illustrator Swatches).
+      Mounted under Properties. 2026-06-03.

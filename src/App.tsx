@@ -4,6 +4,7 @@ import { Toolbar } from './components/Toolbar';
 import { CanvasView } from './components/CanvasView';
 import { PropertiesPanel } from './components/PropertiesPanel';
 import { AlignPanel } from './components/AlignPanel';
+import { SwatchesPanel } from './components/SwatchesPanel';
 import { ArtboardsPanel } from './components/ArtboardsPanel';
 import { SymbolsPanel } from './components/SymbolsPanel';
 import { LayersPanel } from './components/LayersPanel';
@@ -1168,6 +1169,7 @@ export default function App() {
           aria-label={t('Properties and panels')}
         >
           <PropertiesPanel />
+          <SwatchesPanel />
           <AlignPanel />
           <ArtboardsPanel />
           <SymbolsPanel />
