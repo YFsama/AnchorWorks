@@ -85,8 +85,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       persistent guide (Rulers.tsx startGuide); GuidesLayer.tsx renders them +
       the live drag; store userGuides/guidesLocked; Lock/Clear Guides in View
       menu + command palette. (Snap-to-guide is a follow-up.) 2026-06-02.
-- [ ] **Dimension / measure tool** — click-drag to read distance/angle; optional
-      persistent dimension annotations.
+- [x] **Dimension / measure tool** — new 'measure' tool (M): measureTool.ts +
+      MeasureLayer.tsx draw a click-drag segment with a px/mm/angle readout; never
+      mutates the document. Auto-listed in toolbar/palette/keymap. (Persistent
+      dimension annotations are a follow-up.) 2026-06-02.
 - [ ] **Recolor artwork** — remap all colours in the selection through a small
       swatch-to-swatch table (Illustrator: Recolor Artwork).
 - [ ] **Serial / variable data** — generate N copies with an incrementing number
