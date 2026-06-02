@@ -204,3 +204,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Persistent dimensions — commitDimension() (measureTool.ts): Enter pins the
       Measure tool's live segment as a grouped line+mm-label object on the canvas
       (the measure tool's noted follow-up). 2026-06-02.
+- [x] Roughen — roughenSelection() (roughen.ts) densifies then jitters path points
+      for a distressed/hand-drawn edge (Illustrator Distort→Roughen); RoughenDialog
+      (size+detail) + Document menu + command palette. 2026-06-02.
