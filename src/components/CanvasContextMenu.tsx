@@ -14,6 +14,11 @@ import {
   flipSelection,
   selectSame,
   selectInverse,
+  lockSelection,
+  unlockAll,
+  hideSelection,
+  showAll,
+  deselectAll,
 } from '../lib/canvasEngine';
 import {
   copySelection,
@@ -311,6 +316,25 @@ export function CanvasContextMenu() {
         onClick={() => run(() => { sendToBack(); }, hasSelection)}
       />
       <Separator />
+      <Item
+        label={t('Lock Selection')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); }, hasSelection)}
+      />
+      <Item
+        label={t('Unlock All')}
+        onClick={() => run(() => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); }, true)}
+      />
+      <Item
+        label={t('Hide Selection')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); }, hasSelection)}
+      />
+      <Item
+        label={t('Show All')}
+        onClick={() => run(() => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); }, true)}
+      />
+      <Separator />
       {editableText && (
         <Item
           label={t('Edit Text')}
@@ -393,6 +417,12 @@ export function CanvasContextMenu() {
         label={t('Select All')}
         kbd="Ctrl+A"
         onClick={() => run(() => selectAll(), true)}
+      />
+      <Item
+        label={t('Deselect All')}
+        kbd="Ctrl+Shift+A"
+        disabled={!hasSelection}
+        onClick={() => run(() => { deselectAll(); }, hasSelection)}
       />
       <Item
         label={t('Select Same Fill')}

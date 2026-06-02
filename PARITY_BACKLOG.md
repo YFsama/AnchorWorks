@@ -226,3 +226,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Select→Deselect (Ctrl+Shift+A) command a real keymap binding + Edit-menu
       pair + command-palette entry; previously only Escape cleared a selection.
       2026-06-02.
+- [x] Lock/Hide in right-click — surfaced Lock Selection / Unlock All / Hide
+      Selection / Show All (+ Deselect All) in CanvasContextMenu.tsx; these
+      high-frequency ops existed only in the Edit menu before. 2026-06-02.
