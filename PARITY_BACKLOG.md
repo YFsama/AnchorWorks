@@ -319,3 +319,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Front / Forward / Send Backward / to Back to the Edit menu (MenuBar.tsx);
       these were right-click/shortcut/palette-only, absent from the top menu.
       2026-06-02.
+- [x] Split Into Grid — splitGrid.ts gridCells() (pure) + splitIntoGrid() divide a
+      selected object's bbox into rows×cols rectangles with a mm gutter (Illustrator
+      Object→Path→Split Into Grid), distinct from RepeatDialog's duplicate-grid;
+      SplitGridDialog + Document menu + command palette. +3 tests. 2026-06-02.

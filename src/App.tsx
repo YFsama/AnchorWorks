@@ -52,6 +52,7 @@ const StarDialog = lazy(() => import('./components/StarDialog').then(m => ({ def
 const FindReplaceDialog = lazy(() => import('./components/FindReplaceDialog').then(m => ({ default: m.FindReplaceDialog })));
 const SaturateDialog = lazy(() => import('./components/SaturateDialog').then(m => ({ default: m.SaturateDialog })));
 const HueDialog = lazy(() => import('./components/HueDialog').then(m => ({ default: m.HueDialog })));
+const SplitGridDialog = lazy(() => import('./components/SplitGridDialog').then(m => ({ default: m.SplitGridDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
@@ -728,6 +729,7 @@ export default function App() {
   const showFindReplace = useEditor(s => s.showFindReplace);
   const showSaturate = useEditor(s => s.showSaturate);
   const showHue = useEditor(s => s.showHue);
+  const showSplitGrid = useEditor(s => s.showSplitGrid);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const highContrast = useEditor(s => s.highContrast);
@@ -1301,6 +1303,11 @@ export default function App() {
       {showHue && (
         <Suspense fallback={null}>
           <HueDialog />
+        </Suspense>
+      )}
+      {showSplitGrid && (
+        <Suspense fallback={null}>
+          <SplitGridDialog />
         </Suspense>
       )}
       {showPreferences && (
