@@ -222,6 +222,7 @@ export function CommandPalette({
       toast.success(`${t('Welded into')} ${paths.length} ${t('cut paths')}`, { title: t('Weld') });
     } },
     { id: 'effect.outline', label: t('Multi-outline…'),       category: t('Arrange'), keywords: 'outline contour border sign text effect stroke layered', icon: Wand2, run: () => setModal('showOutline', true) },
+    { id: 'effect.recolor', label: t('Recolor Artwork…'),     category: t('Arrange'), keywords: 'recolor remap colors swatch replace palette', icon: Palette, run: () => setModal('showRecolor', true) },
     { id: 'text.arcUp',   label: `${t('Text on Arc')} ∩`, category: t('Arrange'), keywords: 'text arc curve circle badge seal up arch', icon: Type, run: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'text.arcDown', label: `${t('Text on Arc')} ∪`, category: t('Arrange'), keywords: 'text arc curve circle badge seal down arch', icon: Type, run: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'cut.outlineStroke',  label: t('Outline Stroke'),    category: t('Arrange'), keywords: 'stroke outline expand cut edges', icon: PenTool, run: () => {

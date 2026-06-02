@@ -813,6 +813,18 @@ const dict: Record<string, Record<Lang, string>> = {
   'Align to': { en: 'Align to', zh: '对齐基准' },
   'Artboard': { en: 'Artboard', zh: '画板' },
   'Measure': { en: 'Measure', zh: '测量' },
+  'Recolor Artwork': { en: 'Recolor Artwork', zh: '重新着色' },
+  'Recolor Artwork…': { en: 'Recolor Artwork…', zh: '重新着色…' },
+  'Recolor': { en: 'Recolor', zh: '重新着色' },
+  'paints recolored': { en: 'paints recolored', zh: '处颜色已替换' },
+  'Nothing changed — pick different target colors.': {
+    en: 'Nothing changed — pick different target colors.',
+    zh: '没有变化——请选择不同的目标颜色。',
+  },
+  'No solid colors in the selection to recolor.': {
+    en: 'No solid colors in the selection to recolor.',
+    zh: '选区中没有可重新着色的纯色。',
+  },
   'Lock Guides': { en: 'Lock Guides', zh: '锁定参考线' },
   'Clear Guides': { en: 'Clear Guides', zh: '清除参考线' },
   'Cut order': { en: 'Cut order', zh: '切割顺序' },

@@ -156,7 +156,7 @@ export function CanvasContextMenu() {
     c?.requestRenderAll();
   };
 
-  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline') =>
+  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor') =>
     useEditor.getState().setModal(k, true);
 
   // One-click contour — generate a default 2 mm offset cut line around the
@@ -330,6 +330,11 @@ export function CanvasContextMenu() {
         label={t('Multi-outline…')}
         disabled={!hasSelection}
         onClick={() => run(() => openModal('showOutline'), hasSelection)}
+      />
+      <Item
+        label={t('Recolor Artwork…')}
+        disabled={!hasSelection}
+        onClick={() => run(() => openModal('showRecolor'), hasSelection)}
       />
       <Item
         label={t('Cut Contour…')}

@@ -21,10 +21,61 @@
  * consumers don't need to change their import paths.
  */
 
+import type * as fabric from 'fabric';
 import { getCanvas } from './canvasEngine';
 import { pushHistory } from './historyOps';
 import { useEditor } from '../store/editor';
 import { emitGuides } from './canvasEvents';
+
+/** Walk an object and any nested group children. */
+function* walkObjects(obj: fabric.FabricObject): Generator<fabric.FabricObject> {
+  yield obj;
+  const kids = (obj as unknown as { _objects?: fabric.FabricObject[] })._objects;
+  if (kids) for (const k of kids) yield* walkObjects(k);
+}
+
+/** Normalise a paint value for map keys — lowercase, so '#AABBCC' === '#aabbcc'. */
+const norm = (c: string) => c.trim().toLowerCase();
+
+/**
+ * Distinct solid fill + stroke colours used anywhere in the active selection
+ * (recursing into groups). Gradients / patterns / transparent are skipped —
+ * Recolor only remaps flat colours. Returns normalised (lowercase) strings.
+ */
+export function collectSelectionColors(): string[] {
+  const canvas = getCanvas();
+  if (!canvas) return [];
+  const set = new Set<string>();
+  for (const top of canvas.getActiveObjects()) {
+    for (const o of walkObjects(top)) {
+      if (typeof o.fill === 'string' && o.fill && o.fill !== 'transparent') set.add(norm(o.fill));
+      if (typeof o.stroke === 'string' && o.stroke && o.stroke !== 'transparent') set.add(norm(o.stroke));
+    }
+  }
+  return [...set];
+}
+
+/**
+ * Remap every solid fill/stroke in the selection through `map` (source colour →
+ * target colour, both lowercase hex/rgb). Returns the number of paints changed.
+ */
+export function recolorSelection(map: Record<string, string>): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  let changed = 0;
+  for (const top of canvas.getActiveObjects()) {
+    for (const o of walkObjects(top)) {
+      if (typeof o.fill === 'string') { const t = map[norm(o.fill)]; if (t && norm(t) !== norm(o.fill)) { o.set('fill', t); changed++; } }
+      if (typeof o.stroke === 'string') { const t = map[norm(o.stroke)]; if (t && norm(t) !== norm(o.stroke)) { o.set('stroke', t); changed++; } }
+    }
+  }
+  if (changed > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+    updateSelection();
+  }
+  return changed;
+}
 
 /** Drop the selection summary + clear any smart-guide overlays. Wired to
  *  Fabric's `selection:cleared` event in `initCanvas`. Companion to
