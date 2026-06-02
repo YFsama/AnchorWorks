@@ -34,6 +34,7 @@ const ACTIONS: Shortcut[] = [
   { keys: 'Ctrl+D', labelKey: 'Duplicate selection' },
   { keys: 'Ctrl+C / Ctrl+X / Ctrl+V', labelKey: 'Copy / Cut / Paste' },
   { keys: 'Ctrl+Shift+V', labelKey: 'Paste in Place' },
+  { keys: 'Shift+X / D', labelKey: 'Swap / Default Fill & Stroke' },
   { keys: 'Ctrl+G / Ctrl+Shift+G', labelKey: 'Group / Ungroup' },
   { keys: 'Shift+H / Shift+V', labelKey: 'Flip Horizontal / Vertical' },
   { keys: 'Ctrl+J', labelKey: 'Join Paths' },

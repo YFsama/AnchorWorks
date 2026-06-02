@@ -129,6 +129,19 @@ export function applyStyleToSelection(
 }
 
 /**
+ * Reset to the default fill / stroke (Illustrator's "D"): white fill, black
+ * 1px stroke. Updates the style used for new shapes, and applies to the
+ * current selection when there is one.
+ */
+export function defaultColors(): void {
+  useEditor.getState().setStyle({ fill: '#ffffff', stroke: '#000000', strokeWidth: 1 });
+  const canvas = getCanvas();
+  if (canvas && canvas.getActiveObjects().length > 0) {
+    applyStyleToSelection({ fill: '#ffffff', stroke: '#000000' });
+  }
+}
+
+/**
  * Swap fill and stroke colours on the selection (Illustrator Shift+X). Only
  * flat string colours swap; if an object had no visible stroke, its width is
  * bumped to 1 so the swapped-in colour shows. Returns the count changed.

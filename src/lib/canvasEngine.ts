@@ -239,7 +239,7 @@ import { handleWheel } from './viewport';
 // (task #20). updateSelection + clearSelection are imported back for the
 // canvas selection:created / :updated / :cleared event-handler
 // registrations inside initCanvas above.
-export { applyStyleToSelection, applyTransformToSelection, swapFillStroke } from './selectionApply';
+export { applyStyleToSelection, applyTransformToSelection, swapFillStroke, defaultColors } from './selectionApply';
 import { updateSelection, clearSelection } from './selectionApply';
 
 // Selection ops (delete / duplicate / nudge) extracted to selectionOps.ts

@@ -163,3 +163,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Select Inverse — selectInverse() (selectionOps.ts) selects all selectable
       objects except the current selection (Illustrator Select→Inverse); command
       palette + right-click. 2026-06-02.
+- [x] Default Fill/Stroke — defaultColors() (selectionApply.ts) resets to white
+      fill / black stroke (Illustrator "D"); D shortcut (keymap+App) + command
+      palette. 2026-06-02.
