@@ -362,3 +362,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] View-menu display toggles — Show Grid / Snap to Grid / Smart Guides / Anchor
       Snap added as checkbox items to the View menu (MenuBar.tsx) reusing the store
       setters; previously only the toolbar icons toggled them. 2026-06-03.
+- [x] Adjust Brightness — colorAdjust.ts brightnessColorsSelection()/brightenRGB()
+      scale HSL lightness (−100..100%) of every solid fill/stroke; BrightnessDialog +
+      Edit Colors submenu + command palette. +2 tests. Rounds out Edit Colors
+      (Invert/Grayscale/Saturate/Hue/Brightness). 2026-06-03.

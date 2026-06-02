@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseColor, toHex, invertRGB, grayRGB, rgbToHsl, hslToRgb, saturateRGB, shiftHueRGB } from '../colorAdjust';
+import { parseColor, toHex, invertRGB, grayRGB, rgbToHsl, hslToRgb, saturateRGB, shiftHueRGB, brightenRGB } from '../colorAdjust';
 
 describe('parseColor', () => {
   it('parses #rgb, #rrggbb and rgb()', () => {
@@ -65,5 +65,17 @@ describe('shiftHueRGB', () => {
     expect(toHex(shiftHueRGB({ r: 255, g: 136, b: 0 }, 0))).toBe('#ff8800');
     expect(toHex(shiftHueRGB({ r: 255, g: 0, b: 0 }, 360))).toBe('#ff0000');
     expect(toHex(shiftHueRGB({ r: 255, g: 0, b: 0 }, -240))).toBe('#00ff00');
+  });
+});
+
+describe('brightenRGB', () => {
+  it('factor 1 is identity, 0 is black', () => {
+    expect(toHex(brightenRGB({ r: 128, g: 64, b: 32 }, 1))).toBe('#804020');
+    expect(toHex(brightenRGB({ r: 128, g: 64, b: 32 }, 0))).toBe('#000000');
+  });
+  it('factor > 1 lightens, clamped at full lightness (white)', () => {
+    const lighter = brightenRGB({ r: 100, g: 50, b: 25 }, 1.5);
+    expect(rgbToHsl(lighter).l).toBeGreaterThan(rgbToHsl({ r: 100, g: 50, b: 25 }).l);
+    expect(toHex(brightenRGB({ r: 200, g: 200, b: 200 }, 5))).toBe('#ffffff');
   });
 });

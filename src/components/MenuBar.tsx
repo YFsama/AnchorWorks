@@ -280,6 +280,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Convert to Grayscale'), onClick: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
           { label: t('Saturate…'), onClick: () => setModal('showSaturate', true) },
           { label: t('Adjust Hue…'), onClick: () => setModal('showHue', true) },
+          { label: t('Adjust Brightness…'), onClick: () => setModal('showBrightness', true) },
         ] },
         { label: t('Sign Effects'), sub: [
           { label: t('Multi-outline…'), onClick: () => setModal('showOutline', true) },

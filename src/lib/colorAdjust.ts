@@ -89,6 +89,12 @@ export const shiftHueRGB = (rgb: RGB, deg: number): RGB => {
   return hslToRgb({ ...hsl, h: ((hsl.h + deg) % 360 + 360) % 360 });
 };
 
+/** Scale lightness by `factor` (0 = black, 1 = unchanged, >1 = lighter). */
+export const brightenRGB = (rgb: RGB, factor: number): RGB => {
+  const hsl = rgbToHsl(rgb);
+  return hslToRgb({ ...hsl, l: Math.max(0, Math.min(1, hsl.l * factor)) });
+};
+
 /** True when the selection holds at least one object. */
 export function canAdjustColors(): boolean {
   const c = getCanvas();
@@ -140,4 +146,11 @@ export function saturateColorsSelection(amount: number): number {
 /** Rotate the hue of every solid fill/stroke by `deg` degrees. */
 export function shiftHueColorsSelection(deg: number): number {
   return adjustSelection((rgb) => shiftHueRGB(rgb, deg));
+}
+
+/** Lighten/darken every solid fill/stroke. `amount` in [-100, 100]: −100 →
+ *  black, 0 → unchanged, +100 → doubled lightness. */
+export function brightnessColorsSelection(amount: number): number {
+  const factor = 1 + amount / 100;
+  return adjustSelection((rgb) => brightenRGB(rgb, factor));
 }
