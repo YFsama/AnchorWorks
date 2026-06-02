@@ -198,3 +198,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Surface path-effect dialogs in the Document menu (Simplify / Round Corners
       / Offset Path / Reverse Path Direction / Blend) — were palette/panel-only.
       2026-06-02.
+- [x] Cut bridges / tabs — bridgePolyline()/addBridges() (bridges.ts) break
+      closed cut paths with uncut gaps so pieces/stencil islands stay attached
+      (SignMaster Bridge); Plotter-dialog count×gap + button. +3 tests. 2026-06-02.

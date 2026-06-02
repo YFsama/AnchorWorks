@@ -3,6 +3,7 @@ import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIc
 import { useEditor } from '../store/editor';
 import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type PlotterOptions } from '../lib/plotter';
 import { generateRegMarks, generateWeedBorder, generateWeedLines } from '../lib/cutContour';
+import { addBridges } from '../lib/bridges';
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { optimizeOrder, cutStats, estimateSeconds, formatDuration, type PolyLite } from '../lib/cutOptimize';
 import { getCanvas } from '../lib/canvasEngine';
@@ -35,6 +36,8 @@ export function PlotterDialog() {
   const [mutedColors, setMutedColors] = useState<Set<string>>(() => new Set());
   // Weed grid dividers (0 = border only).
   const [weedRows, setWeedRows] = useState(0);
+  const [bridgeCount, setBridgeCount] = useState(4);
+  const [bridgeGap, setBridgeGap] = useState(1);
   const [weedCols, setWeedCols] = useState(0);
 
   const cutPaths = useEditor(s => s.cutPaths);
@@ -206,6 +209,16 @@ export function PlotterDialog() {
     if (weedRows > 0 || weedCols > 0) paths.push(...generateWeedLines(bounds, weedRows, weedCols, 5));
     addCutPaths(paths);
     toast.success(t('Weed border added.'), { title: t('Weeding') });
+  };
+
+  // Bridges — break closed cut paths with small uncut gaps so the cut-out
+  // pieces stay attached to the material (stencils / no-shift weeding).
+  const applyBridges = () => {
+    const ed = useEditor.getState();
+    const closed = ed.cutPaths.filter(p => p.closed && p.kind !== 'regmark');
+    if (closed.length === 0) { toast.warn(t('No closed cut paths to bridge.'), { title: t('Bridges') }); return; }
+    ed.setCutPaths(addBridges(ed.cutPaths, bridgeCount, bridgeGap));
+    toast.success(`${closed.length} ${t('paths bridged')}`, { title: t('Bridges') });
   };
 
   return (
@@ -443,6 +456,35 @@ export function PlotterDialog() {
               >
                 <Crosshair size={11} aria-hidden="true" />
                 {hasRegmarks ? t('Redo marks') : t('Add positioning marks')}
+              </button>
+            </div>
+
+            {/* Bridges — leave small uncut gaps so cut pieces / stencil islands
+                stay attached to the material. */}
+            <div className="flex items-center gap-1 mt-1.5 text-[10px] text-muted">
+              <span title={t('Number of bridges per path × gap width (mm).')}>{t('Bridges')}</span>
+              <input
+                type="number" min={0} max={20} value={bridgeCount}
+                onChange={(e) => setBridgeCount(Math.max(0, Math.min(20, parseInt(e.target.value, 10) || 0)))}
+                className="input-num !w-9 !py-0.5 !text-[10px] text-center"
+                aria-label={t('Bridge count')}
+              />
+              <span>×</span>
+              <input
+                type="number" min={0.2} max={10} step={0.2} value={bridgeGap}
+                onChange={(e) => setBridgeGap(Math.max(0.2, parseFloat(e.target.value) || 0.2))}
+                className="input-num !w-10 !py-0.5 !text-[10px] text-center"
+                aria-label={t('Bridge gap (mm)')}
+              />
+              <span>mm</span>
+              <button
+                type="button"
+                className="btn !py-1 !text-[10px] flex items-center gap-1 ml-auto"
+                onClick={applyBridges}
+                title={t('Break closed cut paths with uncut bridges.')}
+              >
+                <SquareDashed size={11} aria-hidden="true" />
+                {t('Add bridges')}
               </button>
             </div>
           </div>

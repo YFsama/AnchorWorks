@@ -958,6 +958,18 @@ const dict: Record<string, Record<Lang, string>> = {
     en: 'Reverse the blade-travel direction of every path.',
     zh: '反转每条路径的刀头行进方向。',
   },
+  'Bridges': { en: 'Bridges', zh: '桥接' },
+  'Add bridges': { en: 'Add bridges', zh: '添加桥接' },
+  'Bridge count': { en: 'Bridge count', zh: '桥接数量' },
+  'Bridge gap (mm)': { en: 'Bridge gap (mm)', zh: '桥接间隙 (mm)' },
+  'Number of bridges per path × gap width (mm).': {
+    en: 'Number of bridges per path × gap width (mm).', zh: '每条路径的桥接数 × 间隙宽度 (mm)。',
+  },
+  'Break closed cut paths with uncut bridges.': {
+    en: 'Break closed cut paths with uncut bridges.', zh: '在闭合切割路径上留出不切的桥接。',
+  },
+  'No closed cut paths to bridge.': { en: 'No closed cut paths to bridge.', zh: '没有可桥接的闭合切割路径。' },
+  'paths bridged': { en: 'paths bridged', zh: '条路径已桥接' },
   'Cut order': { en: 'Cut order', zh: '切割顺序' },
   'Number the cut paths in travel order with a start arrow.': {
     en: 'Number the cut paths in travel order with a start arrow.',
