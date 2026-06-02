@@ -377,3 +377,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Collect colours into swatches — added a Pipette button to the existing
       PropertiesPanel Swatches that harvests every solid fill/stroke in the
       selection (collectSelectionColors) into the palette, deduped. 2026-06-03.
+- [x] Rasterize — rasterize.ts rasterizeSelection() renders the selection to an
+      offscreen 2×-zoomed StaticCanvas, then replaces it with a single embedded PNG
+      FabricImage at the same on-screen size (Illustrator Object→Rasterize); Document
+      Path submenu + command palette. 2026-06-03.

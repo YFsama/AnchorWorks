@@ -16,6 +16,7 @@ import { changeCaseSelection } from '../lib/textCase';
 import { applyTextOnArc } from '../lib/textPath';
 import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
 import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
+import { rasterizeSelection } from '../lib/rasterize';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -278,6 +279,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Add Arrowhead (End)'), onClick: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
           { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
           { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
+          { label: t('Rasterize'), onClick: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
         ] },
         { label: t('Distort & Transform'), sub: [
           { label: t('Roughen…'), onClick: () => setModal('showRoughen', true) },

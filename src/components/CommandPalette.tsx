@@ -28,6 +28,7 @@ import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { fitArtboardToContent } from '../lib/fitArtboard';
 import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
+import { rasterizeSelection } from '../lib/rasterize';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { createOutlinesFromText } from '../lib/textToOutline';
@@ -239,6 +240,7 @@ export function CommandPalette({
     { id: 'arrange.bottom',    label: t('Send to Back'),       category: t('Arrange'), keywords: 'order z-index bottom', icon: ChevronsDown, run: () => sendToBack() },
     { id: 'arrange.transform', label: t('Transform…'),          category: t('Arrange'), keywords: 'transform move scale rotate numeric exact copy reflect', icon: Wand2, run: () => setModal('showTransform', true) },
     { id: 'arrange.resize',    label: t('Resize…'),            category: t('Arrange'), keywords: 'resize scale exact size mm width height dimensions', icon: Wand2, run: () => setModal('showResize', true) },
+    { id: 'arrange.rasterize', label: t('Rasterize'),          category: t('Arrange'), keywords: 'rasterize raster bitmap flatten image png', icon: Wand2, run: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
     { id: 'arrange.transformAgain', label: t('Transform Again'), category: t('Arrange'), shortcut: 'Ctrl+Alt+D', keywords: 'transform again repeat step and repeat array duplicate last', icon: Wand2, run: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); } },
     { id: 'arrange.rotateCW',  label: t('Rotate 90° CW'),      category: t('Arrange'), keywords: 'rotate 90 clockwise right turn', icon: RotateCw, run: () => { void rotateSelection(90); } },
     { id: 'arrange.rotateCCW', label: t('Rotate 90° CCW'),     category: t('Arrange'), keywords: 'rotate 90 counter clockwise anticlockwise left turn', icon: RotateCcw, run: () => { void rotateSelection(-90); } },

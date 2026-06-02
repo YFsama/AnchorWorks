@@ -988,6 +988,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Select an open path or line first.': { en: 'Select an open path or line first.', zh: '请先选中开放路径或线段。' },
   'Outline Stroke to Fill': { en: 'Outline Stroke to Fill', zh: '描边转填充' },
   'strokes outlined': { en: 'strokes outlined', zh: '处描边已转填充' },
+  'Rasterize': { en: 'Rasterize', zh: '栅格化' },
+  'Rasterized': { en: 'Rasterized', zh: '已栅格化' },
   'Clean Up': { en: 'Clean Up', zh: '清理' },
   'stray objects removed': { en: 'stray objects removed', zh: '个杂散对象已移除' },
   'Nothing to clean up.': { en: 'Nothing to clean up.', zh: '没有需要清理的对象。' },
