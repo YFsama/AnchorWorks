@@ -148,3 +148,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Hide / Show All — hideSelection()/showAll() (selectionOps.ts) toggle
       `visible` (matches the Layers-panel eye, serialises); Edit menu + command
       palette. 2026-06-02.
+- [x] Swap Fill/Stroke — swapFillStroke() (selectionApply.ts) exchanges the
+      selection's fill & stroke colours (Illustrator Shift+X); keymap + App +
+      command palette. 2026-06-02.

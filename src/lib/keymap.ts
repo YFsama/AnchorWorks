@@ -107,6 +107,7 @@ export const BINDINGS: ShortcutBinding[] = [
   { id: 'edit.flipH',            label: 'Flip Horizontal',     defaultCombo: 'Shift+H' },
   { id: 'edit.flipV',            label: 'Flip Vertical',       defaultCombo: 'Shift+V' },
   { id: 'edit.join',             label: 'Join Paths',          defaultCombo: 'Ctrl+J' },
+  { id: 'edit.swapFillStroke',   label: 'Swap Fill / Stroke',  defaultCombo: 'Shift+X' },
 
   // -------- Help / dialogs --------
   { id: 'help.shortcuts',        label: 'Keyboard Shortcuts',  defaultCombo: '?' },

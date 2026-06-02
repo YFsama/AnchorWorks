@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, showAll, swapFillStroke,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -215,6 +215,7 @@ export function CommandPalette({
     { id: 'arrange.back',      label: t('Send Backward'),      category: t('Arrange'), keywords: 'order z-index down',   icon: ChevronDown,  run: () => sendBackward() },
     { id: 'arrange.bottom',    label: t('Send to Back'),       category: t('Arrange'), keywords: 'order z-index bottom', icon: ChevronsDown, run: () => sendToBack() },
     { id: 'arrange.transform', label: t('Transform…'),          category: t('Arrange'), keywords: 'transform move scale rotate numeric exact copy reflect', icon: Wand2, run: () => setModal('showTransform', true) },
+    { id: 'color.swapFillStroke', label: t('Swap Fill / Stroke'), category: t('Arrange'), shortcut: 'Shift+X', keywords: 'swap exchange fill stroke colour color', icon: Palette, run: () => { if (!swapFillStroke()) toast.warn(t('Select an object first.')); } },
     { id: 'arrange.flipH',     label: t('Flip Horizontal'),     category: t('Arrange'), shortcut: 'Shift+H', keywords: 'flip mirror reflect horizontal', icon: Wand2, run: () => flipSelection('x') },
     { id: 'arrange.flipV',     label: t('Flip Vertical'),       category: t('Arrange'), shortcut: 'Shift+V', keywords: 'flip mirror reflect vertical', icon: Wand2, run: () => flipSelection('y') },
     { id: 'arrange.repeat',    label: t('Repeat (Grid / Radial / Mirror)…'), category: t('Arrange'), keywords: 'array duplicate pattern radial mirror', icon: Grid3X3, run: () => setModal('showRepeat', true) },

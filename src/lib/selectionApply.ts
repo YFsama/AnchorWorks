@@ -128,6 +128,32 @@ export function applyStyleToSelection(
   updateSelection();
 }
 
+/**
+ * Swap fill and stroke colours on the selection (Illustrator Shift+X). Only
+ * flat string colours swap; if an object had no visible stroke, its width is
+ * bumped to 1 so the swapped-in colour shows. Returns the count changed.
+ */
+export function swapFillStroke(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  let n = 0;
+  for (const o of objs) {
+    const f = typeof o.fill === 'string' ? o.fill : '';
+    const s = typeof o.stroke === 'string' ? o.stroke : '';
+    o.set({ fill: s, stroke: f });
+    if ((o.strokeWidth ?? 0) === 0 && f) o.set({ strokeWidth: 1 });
+    o.setCoords();
+    n++;
+  }
+  if (n > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+    updateSelection();
+  }
+  return n;
+}
+
 /** Apply a position / size / angle patch to the active object. Width and
  *  height are converted to scaleX/scaleY against the object's base dims so
  *  Fabric's transform stays consistent. */

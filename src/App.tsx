@@ -47,7 +47,7 @@ const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').th
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
 import {
   undo, redo, deleteSelection, duplicateSelection, nudgeSelection, flipSelection, zoomBy, zoomFit, zoomToPoint, zoomToArtboard,
-  alignSelection, distributeSelection, applyStyleToSelection, groupSelection, ungroupSelection,
+  alignSelection, distributeSelection, applyStyleToSelection, swapFillStroke, groupSelection, ungroupSelection,
   resizeCanvas, setBackground,
   bringForward, sendBackward, bringToFront, sendToBack,
   type AlignAxis, type DistributeDir,
@@ -892,6 +892,7 @@ export default function App() {
       if (match('edit.flipH')) { e.preventDefault(); flipSelection('x'); announce(t('Flip Horizontal')); return; }
       if (match('edit.flipV')) { e.preventDefault(); flipSelection('y'); announce(t('Flip Vertical')); return; }
       if (match('edit.join')) { e.preventDefault(); if (joinSelection()) announce(t('Join Paths')); else toast.warn(t('Select 1 open path to close, or 2 to join.')); return; }
+      if (match('edit.swapFillStroke')) { e.preventDefault(); if (swapFillStroke()) announce(t('Swap Fill / Stroke')); return; }
       if (match('edit.selectAll')) {
         e.preventDefault();
         const c = getCanvas();
