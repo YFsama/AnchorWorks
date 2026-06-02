@@ -42,6 +42,47 @@ export const grayRGB = ({ r, g, b }: RGB): RGB => {
   return { r: y, g: y, b: y };
 };
 
+type HSL = { h: number; s: number; l: number };
+
+/** RGB (0–255) → HSL (h 0–360, s/l 0–1). */
+export function rgbToHsl({ r, g, b }: RGB): HSL {
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+  else if (max === gn) h = (bn - rn) / d + 2;
+  else h = (rn - gn) / d + 4;
+  return { h: h * 60, s, l };
+}
+
+/** HSL → RGB (0–255). */
+export function hslToRgb({ h, s, l }: HSL): RGB {
+  if (s === 0) return { r: l * 255, g: l * 255, b: l * 255 };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hk = ((h % 360) + 360) % 360 / 360;
+  const ch = (t: number) => {
+    let tc = t;
+    if (tc < 0) tc += 1;
+    if (tc > 1) tc -= 1;
+    if (tc < 1 / 6) return p + (q - p) * 6 * tc;
+    if (tc < 1 / 2) return q;
+    if (tc < 2 / 3) return p + (q - p) * (2 / 3 - tc) * 6;
+    return p;
+  };
+  return { r: ch(hk + 1 / 3) * 255, g: ch(hk) * 255, b: ch(hk - 1 / 3) * 255 };
+}
+
+/** Scale saturation by `factor` (0 = grey, 1 = unchanged, >1 = more vivid). */
+export const saturateRGB = (rgb: RGB, factor: number): RGB => {
+  const hsl = rgbToHsl(rgb);
+  return hslToRgb({ ...hsl, s: Math.max(0, Math.min(1, hsl.s * factor)) });
+};
+
 /** True when the selection holds at least one object. */
 export function canAdjustColors(): boolean {
   const c = getCanvas();
@@ -81,4 +122,11 @@ export function invertColorsSelection(): number {
 /** Convert every solid fill/stroke colour to its luminance grey. */
 export function grayscaleColorsSelection(): number {
   return adjustSelection(grayRGB);
+}
+
+/** Scale the saturation of every solid fill/stroke. `amount` is a percentage
+ *  in [-100, 100]: −100 → greyscale, 0 → unchanged, +100 → double saturation. */
+export function saturateColorsSelection(amount: number): number {
+  const factor = 1 + amount / 100;
+  return adjustSelection((rgb) => saturateRGB(rgb, factor));
 }

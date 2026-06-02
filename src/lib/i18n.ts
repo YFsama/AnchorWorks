@@ -916,6 +916,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Ridges': { en: 'Ridges', zh: '波纹数' },
   'Smooth (wave)': { en: 'Smooth (wave)', zh: '平滑(波浪)' },
   'shapes zig-zagged': { en: 'shapes zig-zagged', zh: '个形状已锯齿化' },
+  'Saturate': { en: 'Saturate', zh: '调整饱和度' },
+  'Saturate…': { en: 'Saturate…', zh: '调整饱和度…' },
   'Invert Colors': { en: 'Invert Colors', zh: '反相颜色' },
   'Convert to Grayscale': { en: 'Convert to Grayscale', zh: '转为灰度' },
   'colours changed': { en: 'colours changed', zh: '处颜色已更改' },

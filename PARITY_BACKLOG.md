@@ -290,3 +290,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       / grayscaleColorsSelection() remap every solid hex/rgb fill+stroke in the
       selection (incl. groups) per-channel (Illustrator Edit→Edit Colors); Document
       menu + command palette. +5 tests (parse/invert/luminance). 2026-06-02.
+- [x] Saturate — colorAdjust.ts saturateColorsSelection() scales each solid colour's
+      HSL saturation (−100..+100%) via new rgbToHsl/hslToRgb/saturateRGB
+      (Illustrator Edit→Edit Colors→Saturate); SaturateDialog slider + Document menu
+      + command palette. +3 tests (HSL round-trip, factor 0/1). 2026-06-02.

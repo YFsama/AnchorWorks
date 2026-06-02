@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseColor, toHex, invertRGB, grayRGB } from '../colorAdjust';
+import { parseColor, toHex, invertRGB, grayRGB, rgbToHsl, hslToRgb, saturateRGB } from '../colorAdjust';
 
 describe('parseColor', () => {
   it('parses #rgb, #rrggbb and rgb()', () => {
@@ -31,5 +31,27 @@ describe('grayRGB', () => {
   });
   it('keeps greys unchanged', () => {
     expect(toHex(grayRGB({ r: 128, g: 128, b: 128 }))).toBe('#808080');
+  });
+});
+
+describe('HSL round-trip + saturate', () => {
+  it('rgbToHsl/hslToRgb round-trips primary colours', () => {
+    for (const c of ['#ff0000', '#00ff00', '#0000ff', '#ff8800', '#336699']) {
+      const rgb = parseColor(c)!;
+      const back = hslToRgb(rgbToHsl(rgb));
+      expect(toHex(back)).toBe(c);
+    }
+  });
+
+  it('factor 0 desaturates to grey, factor 1 is identity', () => {
+    const red = { r: 255, g: 0, b: 0 };
+    const grey = saturateRGB(red, 0);
+    expect(grey.r).toBeCloseTo(grey.g, 4);
+    expect(grey.g).toBeCloseTo(grey.b, 4);
+    expect(toHex(saturateRGB(red, 1))).toBe('#ff0000');
+  });
+
+  it('a pure grey has no saturation to scale', () => {
+    expect(toHex(saturateRGB({ r: 100, g: 100, b: 100 }, 2))).toBe('#646464');
   });
 });
