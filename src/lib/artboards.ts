@@ -130,6 +130,19 @@ export function resizeArtboard(id: string, w: number, h: number): void {
   commit(list);
 }
 
+/** Reposition + resize an artboard to tightly fit `bbox` plus a px margin, in
+ *  one commit (Fit Artboard to Artwork / Selection). */
+export function fitArtboard(id: string, bbox: { left: number; top: number; width: number; height: number }, marginPx = 0): void {
+  const list = getArtboards().map((a) => (a.id === id ? {
+    ...a,
+    x: Math.round(bbox.left - marginPx),
+    y: Math.round(bbox.top - marginPx),
+    width: Math.max(1, Math.round(bbox.width + marginPx * 2)),
+    height: Math.max(1, Math.round(bbox.height + marginPx * 2)),
+  } : a));
+  commit(list);
+}
+
 function findArtboard(id: string): Artboard | undefined {
   return getArtboards().find((a) => a.id === id);
 }

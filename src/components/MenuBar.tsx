@@ -9,6 +9,7 @@ import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
+import { fitArtboardToContent } from '../lib/fitArtboard';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -209,6 +210,8 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
 
       <Dropdown label={t('Document')} items={[
         { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
+        { label: t('Fit Artboard to Artwork'), onClick: () => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); } },
+        { label: t('Fit Artboard to Selection'), onClick: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
         { label: t('Star / Polygon…'), onClick: () => setModal('showStar', true) },
         { label: t('Split Into Grid…'), onClick: () => setModal('showSplitGrid', true) },
         { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => setModal('showRepeat', true) },

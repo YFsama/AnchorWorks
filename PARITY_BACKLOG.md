@@ -331,3 +331,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       AlignRef align the selection to a designated object's bounds (it stays put),
       resolving the earlier "deferred — Fabric doesn't track click order" note via an
       explicit Set Key button + Key Object option in the Align panel. 2026-06-02.
+- [x] Fit Artboard to Artwork / Selection — fitArtboard.ts fitArtboardToContent() +
+      artboards.ts fitArtboard() resize+reposition the first artboard to wrap all
+      art (or the selection) with a mm margin (Illustrator Fit to Artwork Bounds);
+      Document menu + command palette. 2026-06-03.

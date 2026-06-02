@@ -26,6 +26,7 @@ import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
+import { fitArtboardToContent } from '../lib/fitArtboard';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { createOutlinesFromText } from '../lib/textToOutline';
@@ -318,6 +319,8 @@ export function CommandPalette({
     { id: 'view.zoomOut', label: t('Zoom Out'),    category: t('View'), shortcut: 'Ctrl+-', icon: Minus,     run: () => zoomBy(1 / 1.25) },
     { id: 'view.actualSize', label: t('Actual Size'), category: t('View'), shortcut: 'Ctrl+1', keywords: 'actual size 100 percent real zoom reset', icon: Maximize2, run: () => zoomToPercent(100) },
     { id: 'view.fit',     label: t('Fit to Page'), category: t('View'), shortcut: 'Ctrl+0', icon: Maximize2, run: () => zoomFit() },
+    { id: 'artboard.fitArtwork', label: t('Fit Artboard to Artwork'), category: t('View'), keywords: 'fit artboard artwork bounds crop resize', icon: Maximize2, run: () => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); } },
+    { id: 'artboard.fitSelection', label: t('Fit Artboard to Selection'), category: t('View'), keywords: 'fit artboard selection crop resize', icon: Maximize2, run: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
     { id: 'view.outline', label: t('Outline View'), category: t('View'), shortcut: 'Ctrl+Alt+Y', keywords: 'wireframe geometry preview', icon: PenTool, run: () => setOutlineMode(!isOutlineMode()) },
     { id: 'view.makeGuides', label: t('Make Guides from Selection'), category: t('View'), keywords: 'guide make convert selection bounds ruler', icon: Grid3X3, run: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
     { id: 'view.clearGuides', label: t('Clear Guides'), category: t('View'), keywords: 'guide ruler remove delete', icon: Grid3X3, run: () => useEditor.getState().clearUserGuides() },
