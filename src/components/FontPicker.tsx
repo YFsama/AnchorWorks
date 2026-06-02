@@ -5,9 +5,27 @@ import * as fabric from 'fabric';
 import { Upload, Search } from 'lucide-react';
 import { useT } from '../lib/i18n';
 
+const RECENT_KEY = 'vector.recentFonts';
+interface RecentFont { name: string; family: string; }
+
+function loadRecentFonts(): RecentFont[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    if (Array.isArray(raw)) return raw.filter((r) => r && typeof r.name === 'string' && typeof r.family === 'string').slice(0, 6);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function pushRecentFont(name: string, family: string): RecentFont[] {
+  const next = [{ name, family }, ...loadRecentFonts().filter((r) => r.name !== name)].slice(0, 6);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  return next;
+}
+
 export function FontPicker() {
   const t = useT();
   const [filter, setFilter] = useState('');
+  const [recent, setRecent] = useState<RecentFont[]>(loadRecentFonts);
   const fileRef = useRef<HTMLInputElement>(null);
   const apply = (family: string, name: string) => {
     ensureFontLoaded(name);
@@ -17,6 +35,7 @@ export function FontPicker() {
       (a as fabric.IText).set({ fontFamily: family });
       c.requestRenderAll();
       pushHistory();
+      setRecent(pushRecentFont(name, family));
     }
   };
   const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,6 +76,24 @@ export function FontPicker() {
         />
       </div>
       <div className="max-h-48 overflow-y-auto border border-border rounded bg-panel2">
+        {!filter && recent.length > 0 && (
+          <div className="border-b border-border">
+            <div className="px-2 pt-1.5 pb-0.5 type-caption text-muted">{t('Recently used')}</div>
+            {recent.map((f) => (
+              <button
+                key={`recent-${f.name}`}
+                type="button"
+                onMouseEnter={() => ensureFontLoaded(f.name)}
+                onFocus={() => ensureFontLoaded(f.name)}
+                onClick={() => apply(f.family, f.name)}
+                className="block w-full text-left px-2 py-1 text-xs rounded-sm hover:bg-panel3 transition-colors"
+                style={{ fontFamily: f.family }}
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
+        )}
         {list.length === 0 ? (
           // Empty state matches the visual pattern of LayersPanel / AssetsPanel:
           // small line-art glyph + heading + caption. Previously this was a

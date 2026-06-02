@@ -472,3 +472,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Show/Hide Guides — store guidesVisible flag gates GuidesLayer's draw (hide
       without deleting); View-menu checkbox + Ctrl+; keymap/App + command palette
       (Illustrator View→Guides→Hide Guides). 2026-06-03.
+- [x] Recently used fonts — FontPicker.tsx loadRecentFonts()/pushRecentFont()
+      (localStorage vector.recentFonts, cap 6) + a "Recently used" section at the top
+      of the font list when not searching. 2026-06-03.
