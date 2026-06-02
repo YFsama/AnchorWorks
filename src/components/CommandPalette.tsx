@@ -189,6 +189,7 @@ export function CommandPalette({
     { id: 'file.exportPdf',   label: t('Export PDF'),          category: t('File'), keywords: getFormat('pdf')?.keywords,        icon: FileText,   run: () => { void getFormat('pdf')?.export?.(); } },
     { id: 'file.exportPdfV',  label: t('Export PDF (Vector)'), category: t('File'), keywords: getFormat('pdf-vector')?.keywords, icon: FileText,   run: () => { void getFormat('pdf-vector')?.export?.(); } },
     { id: 'file.print',       label: t('Print…'),              category: t('File'), shortcut: 'Ctrl+P',                   icon: Printer,    run: () => setModal('showPrint', true) },
+    { id: 'file.tilePrint',   label: t('Tile Print…'),         category: t('File'), keywords: 'tile panel poster large format split pages', icon: Printer, run: () => setModal('showTilePrint', true) },
     { id: 'file.plotter',     label: t('Send to Plotter…'),    category: t('File'), keywords: 'cutter cnc',               icon: Send,       run: () => setModal('showPlotter', true) },
 
     // ---------- Edit ----------

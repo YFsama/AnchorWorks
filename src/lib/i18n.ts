@@ -783,6 +783,14 @@ const dict: Record<string, Record<Lang, string>> = {
   'Weld': { en: 'Weld', zh: '焊接合并' },
   'Welded into': { en: 'Welded into', zh: '已焊接为' },
   'Outline Stroke': { en: 'Outline Stroke', zh: '描边转轮廓' },
+  'Columns': { en: 'Columns', zh: '列数' },
+  'Overlap (mm)': { en: 'Overlap (mm)', zh: '重叠 (mm)' },
+  'Shared margin between pages so they can be taped together.': {
+    en: 'Shared margin between pages so they can be taped together.',
+    zh: '相邻页之间的共享边距，便于拼接粘贴。',
+  },
+  'pages': { en: 'pages', zh: '页' },
+  'Tile preview': { en: 'Tile preview', zh: '拼版预览' },
   'Select shapes that have a stroke first.': {
     en: 'Select shapes that have a stroke first.',
     zh: '请先选中带描边的图形。',

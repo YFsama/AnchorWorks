@@ -35,6 +35,7 @@ const RecoveryDialog = lazy(() => import('./components/RecoveryDialog').then(m =
 const DebugPanel = lazy(() => import('./components/DebugPanel').then(m => ({ default: m.DebugPanel })));
 const DocSettingsDialog = lazy(() => import('./components/DocSettingsDialog').then(m => ({ default: m.DocSettingsDialog })));
 const RepeatDialog = lazy(() => import('./components/RepeatDialog').then(m => ({ default: m.RepeatDialog })));
+const TilePrintDialog = lazy(() => import('./components/TilePrintDialog').then(m => ({ default: m.TilePrintDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
@@ -691,6 +692,7 @@ export default function App() {
   const showDocSettings = useEditor(s => s.showDocSettings);
   const showTemplates = useEditor(s => s.showTemplates);
   const showRepeat = useEditor(s => s.showRepeat);
+  const showTilePrint = useEditor(s => s.showTilePrint);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const highContrast = useEditor(s => s.highContrast);
@@ -1152,6 +1154,11 @@ export default function App() {
       {showRepeat && (
         <Suspense fallback={null}>
           <RepeatDialog />
+        </Suspense>
+      )}
+      {showTilePrint && (
+        <Suspense fallback={null}>
+          <TilePrintDialog />
         </Suspense>
       )}
       {showPreferences && (

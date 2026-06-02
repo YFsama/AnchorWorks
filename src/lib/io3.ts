@@ -288,6 +288,9 @@ export interface TilePrintOptions {
   /** Optional explicit grid; if omitted, derived from canvas size. */
   cols?: number;
   rows?: number;
+  /** Glue overlap in CANVAS px shared between neighbouring tiles, so the
+   *  printed pages can be taped together with a margin. 0 = butt-join. */
+  overlapPx?: number;
 }
 
 /**
@@ -341,14 +344,22 @@ export function tilePrint(opts: TilePrintOptions): void {
   const multiplier = 2;
   const fullUrl = canvas.toDataURL({ format: 'png', multiplier });
 
+  // Overlap is given in canvas px; the snapshot is `multiplier`× that.
+  const overlap = Math.max(0, opts.overlapPx ?? 0) * multiplier;
+
   const img = new Image();
   img.onload = () => {
     const tileW = img.width / cols;
     const tileH = img.height / rows;
+    // Each tile crops its own cell PLUS `overlap` into the next cell so the
+    // taped seam shares content. Edge tiles get white padding where the crop
+    // runs past the snapshot.
+    const cropW = tileW + overlap;
+    const cropH = tileH + overlap;
     const tileDataUrls: string[] = [];
     const tmp = document.createElement('canvas');
-    tmp.width = Math.ceil(tileW);
-    tmp.height = Math.ceil(tileH);
+    tmp.width = Math.ceil(cropW);
+    tmp.height = Math.ceil(cropH);
     const ctx = tmp.getContext('2d');
     if (!ctx) return;
     for (let r = 0; r < rows; r++) {
@@ -356,11 +367,11 @@ export function tilePrint(opts: TilePrintOptions): void {
         ctx.clearRect(0, 0, tmp.width, tmp.height);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, tmp.width, tmp.height);
-        ctx.drawImage(
-          img,
-          c * tileW, r * tileH, tileW, tileH,
-          0, 0, tmp.width, tmp.height,
-        );
+        const sx = c * tileW;
+        const sy = r * tileH;
+        const sw = Math.min(cropW, img.width - sx);
+        const sh = Math.min(cropH, img.height - sy);
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
         tileDataUrls.push(tmp.toDataURL('image/png'));
       }
     }

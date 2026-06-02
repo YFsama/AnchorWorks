@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { undo, redo, zoomBy, zoomFit, zoomToPoint, getCanvas } from '../lib/canvasEngine';
-import { importImageFile, tilePrint } from '../lib/io3';
+import { importImageFile } from '../lib/io3';
 import { getFormat } from '../lib/formats';
 import { resetOnboarding } from '../lib/onboarding';
 import { useT, useI18n, LANGUAGES, t as tStatic, type Lang } from '../lib/i18n';
@@ -98,17 +98,6 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
     e.target.value = '';
   };
 
-  const onTilePrint = () => {
-    const colsStr = prompt(t('Tile columns'), '3');
-    if (colsStr == null) return;
-    const rowsStr = prompt(t('Tile rows'), '3');
-    if (rowsStr == null) return;
-    const cols = Math.max(1, parseInt(colsStr, 10) || 3);
-    const rows = Math.max(1, parseInt(rowsStr, 10) || 3);
-    // Default page size assumes A4 portrait at ~96 DPI
-    tilePrint({ pageW: 794, pageH: 1123, cols, rows });
-  };
-
   return (
     // The outer bar is the app's top banner: <header> gives it an implicit
     // `banner` landmark, pairing with the <main> canvas region and the right
@@ -154,7 +143,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Export JSON'), onClick: () => { void getFormat('json')?.export?.(); } },
         { sep: true },
         { label: t('Print…'), onClick: () => setModal('showPrint', true), kbd: 'Ctrl+P' },
-        { label: t('Tile Print…'), onClick: onTilePrint },
+        { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true) },
         { label: t('Send to Plotter…'), onClick: () => setModal('showPlotter', true) },
         ...buildRecentFilesItems(recent),
       ]} />
