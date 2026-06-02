@@ -78,8 +78,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 
 ## P2 — workflow convenience & SignMaster extras
 
-- [ ] **Cut-order visualisation** — number badges + start arrows overlaid on the
-      cut preview (and optionally canvas) so the operator sees travel order.
+- [x] **Cut-order visualisation** — CutPreview `showOrder` prop overlays numbered
+      badges + start arrows in the same greedy travel order the output uses;
+      "Cut order" toggle in the Plotter dialog. 2026-06-02.
 - [ ] **User guides from rulers** — drag from the ruler to drop snap guides;
       lock/clear guides. (Illustrator core.)
 - [ ] **Dimension / measure tool** — click-drag to read distance/angle; optional
