@@ -335,3 +335,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       artboards.ts fitArtboard() resize+reposition the first artboard to wrap all
       art (or the selection) with a mm margin (Illustrator Fit to Artwork Bounds);
       Document menu + command palette. 2026-06-03.
+- [x] Break Text into Letters / Lines — splitText.ts splitTextToLetters()/
+      splitTextToLines() explode a text object into per-letter / per-line ITexts
+      positioned from __charBounds + getHeightOfLine (honouring scale/rotation),
+      keeping font/fill (SignMaster Break Text); command palette. 2026-06-03.

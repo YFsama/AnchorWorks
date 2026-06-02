@@ -31,6 +31,7 @@ import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { createOutlinesFromText } from '../lib/textToOutline';
 import { changeCaseSelection } from '../lib/textCase';
+import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { pasteFromClipboard } from '../lib/clipboard';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
@@ -291,6 +292,8 @@ export function CommandPalette({
     { id: 'cut.rhinestone',   label: t('Rhinestone Template…'), category: t('Arrange'), keywords: 'rhinestone hotfix stone bling dots template outline', icon: Wand2, run: () => setModal('showRhinestone', true) },
     { id: 'text.findReplace', label: t('Find & Replace…'),     category: t('Arrange'), keywords: 'find replace search text substitute', icon: Type, run: () => setModal('showFindReplace', true) },
     { id: 'text.createOutlines', label: t('Create Outlines'), category: t('Arrange'), keywords: 'text outlines vectorise convert curves create outline cut', icon: Type, run: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); } },
+    { id: 'text.splitLetters', label: t('Break Text into Letters'), category: t('Arrange'), keywords: 'break split text letters characters explode per letter', icon: Type, run: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); } },
+    { id: 'text.splitLines',   label: t('Break Text into Lines'), category: t('Arrange'), keywords: 'break split text lines rows explode per line', icon: Type, run: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); } },
     { id: 'text.caseUpper',    label: t('UPPERCASE'),          category: t('Arrange'), keywords: 'change case uppercase caps text', icon: Type, run: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.caseLower',    label: t('lowercase'),          category: t('Arrange'), keywords: 'change case lowercase text', icon: Type, run: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.caseTitle',    label: t('Title Case'),         category: t('Arrange'), keywords: 'change case title capitalise each word text', icon: Type, run: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); } },
