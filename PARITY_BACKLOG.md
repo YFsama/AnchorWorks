@@ -347,3 +347,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       selection (object/group/multi) so its bbox matches a target W/H in mm about
       its centre, with optional aspect lock; ResizeDialog (prefilled, live ratio) +
       Edit menu + command palette. Fills the px-only single-object W/H gap. 2026-06-03.
+- [x] Type menu — new top-level Type menu (MenuBar.tsx) gathers Create Outlines,
+      Break Text into Letters/Lines, Text on Arc (Up/Down), Change Case submenu, and
+      Find & Replace — text ops were scattered across the Character panel + palette
+      with no menu-bar home (Illustrator's Type menu). 2026-06-03.

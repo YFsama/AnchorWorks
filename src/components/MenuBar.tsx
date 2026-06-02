@@ -10,6 +10,10 @@ import { cleanUpDocument } from '../lib/cleanUp';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { fitArtboardToContent } from '../lib/fitArtboard';
+import { createOutlinesFromText } from '../lib/textToOutline';
+import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
+import { changeCaseSelection } from '../lib/textCase';
+import { applyTextOnArc } from '../lib/textPath';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -194,6 +198,24 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Unlock All'), onClick: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
         { label: t('Hide Selection'), onClick: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },
         { label: t('Show All'), onClick: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); } },
+      ]} />
+
+      <Dropdown label={t('Type')} items={[
+        { label: t('Create Outlines'), onClick: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); } },
+        { label: t('Break Text into Letters'), onClick: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); } },
+        { label: t('Break Text into Lines'), onClick: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); } },
+        { sep: true },
+        { label: t('Text on Arc (Up)'), onClick: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); } },
+        { label: t('Text on Arc (Down)'), onClick: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); } },
+        { sep: true },
+        { label: t('Change Case'), sub: [
+          { label: t('UPPERCASE'), onClick: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); } },
+          { label: t('lowercase'), onClick: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); } },
+          { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); } },
+          { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); } },
+        ] },
+        { sep: true },
+        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true) },
       ]} />
 
       <Dropdown label={t('View')} items={[
