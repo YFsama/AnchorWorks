@@ -330,6 +330,18 @@ function GeneralTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
           }}
         />
       </Field>
+
+      <Field label={t('Keyboard increment (px)')}>
+        <input
+          type="number"
+          min={0.1}
+          max={100}
+          step={0.1}
+          className="input-num"
+          value={draft.prefs.keyboardIncrementPx}
+          onChange={(e) => patch.prefs({ keyboardIncrementPx: Math.max(0.1, Math.min(100, +e.target.value || 1)) })}
+        />
+      </Field>
     </div>
   );
 }

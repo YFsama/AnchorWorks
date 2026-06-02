@@ -989,6 +989,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Outline Stroke to Fill': { en: 'Outline Stroke to Fill', zh: '描边转填充' },
   'strokes outlined': { en: 'strokes outlined', zh: '处描边已转填充' },
   'Crop': { en: 'Crop', zh: '裁剪' },
+  'Keyboard increment (px)': { en: 'Keyboard increment (px)', zh: '键盘微移增量 (px)' },
   'Rasterize': { en: 'Rasterize', zh: '栅格化' },
   'Rasterized': { en: 'Rasterized', zh: '已栅格化' },
   'Clean Up': { en: 'Clean Up', zh: '清理' },

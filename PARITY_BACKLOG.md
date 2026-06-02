@@ -385,3 +385,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       object with the frontmost (crop frame), keeping each piece's own fill and
       discarding the frame (Illustrator Pathfinder Crop); Edit→Pathfinder submenu +
       command palette. 2026-06-03.
+- [x] Keyboard increment preference — preferences.ts keyboardIncrementPx +
+      getKeyboardIncrement(); the arrow-key nudge in App.tsx now reads it (Shift =
+      10×) instead of a hardcoded 1px, with a Preferences field (Illustrator's
+      Keyboard Increment). 2026-06-03.

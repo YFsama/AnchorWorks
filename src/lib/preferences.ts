@@ -23,6 +23,9 @@ export interface AppPreferences {
   defaultDocBackground: string;
   /** Autosave loop period in milliseconds. 0 disables autosave. */
   autosaveIntervalMs: number;
+  /** Arrow-key nudge distance in px (Shift = 10×). Illustrator's Keyboard
+   *  Increment. */
+  keyboardIncrementPx: number;
 }
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -30,6 +33,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   defaultDocHeight: 600,
   defaultDocBackground: '#ffffff',
   autosaveIntervalMs: 30000,
+  keyboardIncrementPx: 1,
 };
 
 /**
@@ -68,6 +72,12 @@ export function getAutoSaveInterval(): number {
   return typeof v === 'number' && v >= 0 ? v : DEFAULT_PREFERENCES.autosaveIntervalMs;
 }
 
+/** Arrow-key nudge distance in px (Shift multiplies by 10). */
+export function getKeyboardIncrement(): number {
+  const v = loadPreferences().keyboardIncrementPx;
+  return typeof v === 'number' && v > 0 ? v : DEFAULT_PREFERENCES.keyboardIncrementPx;
+}
+
 /** Coerce numeric / string fields back into sensible ranges. */
 function sanitize(p: Partial<AppPreferences>): Partial<AppPreferences> {
   const out: Partial<AppPreferences> = {};
@@ -82,6 +92,9 @@ function sanitize(p: Partial<AppPreferences>): Partial<AppPreferences> {
   }
   if (typeof p.autosaveIntervalMs === 'number' && isFinite(p.autosaveIntervalMs) && p.autosaveIntervalMs >= 0) {
     out.autosaveIntervalMs = Math.round(p.autosaveIntervalMs);
+  }
+  if (typeof p.keyboardIncrementPx === 'number' && isFinite(p.keyboardIncrementPx) && p.keyboardIncrementPx > 0) {
+    out.keyboardIncrementPx = Math.min(100, p.keyboardIncrementPx);
   }
   return out;
 }

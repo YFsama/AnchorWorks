@@ -107,6 +107,7 @@ import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
 import { joinSelection } from './lib/pathJoin';
 import { repeatTransform } from './lib/transformOps';
+import { getKeyboardIncrement } from './lib/preferences';
 import { commitDimension } from './lib/tools/measureTool';
 
 // Register a built-in "Skill" so the AI can call it as a tool.
@@ -1006,7 +1007,7 @@ export default function App() {
       // Excluded from BINDINGS: arrow nudge — four keys + Shift multiplier
       // can't be expressed as a single rebindable combo.
       const arrowMap: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-      if (arrowMap[e.key]) { e.preventDefault(); const [dx, dy] = arrowMap[e.key]; const step = e.shiftKey ? 10 : 1; nudgeSelection(dx * step, dy * step); return; }
+      if (arrowMap[e.key]) { e.preventDefault(); const [dx, dy] = arrowMap[e.key]; const inc = getKeyboardIncrement(); const step = e.shiftKey ? inc * 10 : inc; nudgeSelection(dx * step, dy * step); return; }
       // Tool shortcuts — each is its own binding so users can rebind them.
       // Wrapped in !cmd to preserve the original "letter tool requires no
       // modifier" rule (otherwise Ctrl+S etc. would also hit 's').
