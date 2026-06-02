@@ -425,3 +425,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Margin guides — selectionOps.ts makeMarginGuides(mm) drops a safe-area frame
       of 4 ruler guides inset from the first artboard's edges; MarginGuidesDialog +
       View menu + command palette. 2026-06-03.
+- [x] Right-click Sign Effects submenu — folded Multi-outline / Recolor Artwork /
+      Auto-arrange / Rhinestone into a "Sign Effects" flyout in CanvasContextMenu,
+      further shortening the right-click menu. 2026-06-03.

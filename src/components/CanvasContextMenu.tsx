@@ -427,26 +427,12 @@ export function CanvasContextMenu() {
         disabled={!hasSelection}
         onClick={() => run(() => outlineStroke(), hasSelection)}
       />
-      <Item
-        label={t('Multi-outline…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showOutline'), hasSelection)}
-      />
-      <Item
-        label={t('Recolor Artwork…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showRecolor'), hasSelection)}
-      />
-      <Item
-        label={t('Auto-arrange (Nest)')}
-        disabled={active.length < 2}
-        onClick={() => run(() => nest(), active.length >= 2)}
-      />
-      <Item
-        label={t('Rhinestone Template…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => openModal('showRhinestone'), hasSelection)}
-      />
+      <SubMenu label={t('Sign Effects')} openLeft={openLeft} disabled={!hasSelection}>
+        <Item label={t('Multi-outline…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOutline'), hasSelection)} />
+        <Item label={t('Recolor Artwork…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRecolor'), hasSelection)} />
+        <Item label={t('Auto-arrange (Nest)')} disabled={active.length < 2} onClick={() => run(() => nest(), active.length >= 2)} />
+        <Item label={t('Rhinestone Template…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRhinestone'), hasSelection)} />
+      </SubMenu>
       <Item
         label={t('Join Paths')}
         kbd="Ctrl+J"
