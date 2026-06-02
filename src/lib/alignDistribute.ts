@@ -245,6 +245,31 @@ function distributeCentres(dir: DistributeDir): void {
   pushHistory();
 }
 
+/** Centre each selected object on the first artboard, both axes (one-shot
+ *  Align Horizontal + Vertical Centre to Artboard). Returns true on success. */
+export function centerOnArtboard(): boolean {
+  const canvas = getCanvas();
+  if (!canvas) return false;
+  const objs = canvas.getActiveObjects();
+  if (objs.length === 0) return false;
+  const abs = useEditor.getState().artboards;
+  if (abs.length === 0) return false;
+  const a = abs[0];
+  const cx = a.x + a.width / 2;
+  const cy = a.y + a.height / 2;
+  for (const o of objs) {
+    const b = o.getBoundingRect();
+    o.set({
+      left: (o.left ?? 0) + (cx - (b.left + b.width / 2)),
+      top: (o.top ?? 0) + (cy - (b.top + b.height / 2)),
+    });
+    o.setCoords();
+  }
+  canvas.requestRenderAll();
+  pushHistory();
+  return true;
+}
+
 /**
  * Distribute the selection across the first artboard with equal gaps, including
  * the two edge margins (Illustrator's Distribute + Align To Artboard). Needs 1+

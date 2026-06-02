@@ -492,3 +492,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       the selection across the first artboard with equal gaps incl. edge margins;
       the Align panel's equal-spacing buttons use it when Align-To is set to Artboard
       (Illustrator Distribute + Align To Artboard). 2026-06-03.
+- [x] Center on Artboard — centerOnArtboard() (alignDistribute.ts) centres each
+      selected object on the first artboard on both axes in one shot; command palette.
+      2026-06-03.

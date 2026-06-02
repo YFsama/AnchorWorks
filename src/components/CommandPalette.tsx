@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, zoomToPercent, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, selectAllText, deselectAll, selectObjectInStack,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, centerOnArtboard, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, selectAllText, deselectAll, selectObjectInStack,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -244,6 +244,7 @@ export function CommandPalette({
     { id: 'arrange.bottom',    label: t('Send to Back'),       category: t('Arrange'), keywords: 'order z-index bottom', icon: ChevronsDown, run: () => sendToBack() },
     { id: 'arrange.transform', label: t('Transform…'),          category: t('Arrange'), keywords: 'transform move scale rotate numeric exact copy reflect', icon: Wand2, run: () => setModal('showTransform', true) },
     { id: 'arrange.resize',    label: t('Resize…'),            category: t('Arrange'), keywords: 'resize scale exact size mm width height dimensions', icon: Wand2, run: () => setModal('showResize', true) },
+    { id: 'arrange.centerArtboard', label: t('Center on Artboard'), category: t('Arrange'), keywords: 'center centre artboard page middle align', icon: AlignCenter, run: () => { if (!centerOnArtboard()) toast.warn(t('Select something first.')); } },
     { id: 'arrange.rasterize', label: t('Rasterize'),          category: t('Arrange'), keywords: 'rasterize raster bitmap flatten image png', icon: Wand2, run: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
     { id: 'arrange.shear',     label: t('Shear…'),             category: t('Arrange'), keywords: 'shear skew slant oblique italic transform', icon: Wand2, run: () => setModal('showShear', true) },
     { id: 'arrange.transformAgain', label: t('Transform Again'), category: t('Arrange'), shortcut: 'Ctrl+Alt+D', keywords: 'transform again repeat step and repeat array duplicate last', icon: Wand2, run: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); } },
