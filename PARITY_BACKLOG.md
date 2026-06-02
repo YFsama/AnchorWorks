@@ -339,3 +339,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       splitTextToLines() explode a text object into per-letter / per-line ITexts
       positioned from __charBounds + getHeightOfLine (honouring scale/rotation),
       keeping font/fill (SignMaster Break Text); command palette. 2026-06-03.
+- [x] Document menu submenus — MenuBar.tsx MenuRow gained `sub` flyout support
+      (named Tailwind group/sub); the ~30-item Document menu is regrouped into
+      Insert / Path / Distort & Transform / Edit Colors / Sign Effects submenus
+      so it's navigable again (operation-convenience). 2026-06-03.

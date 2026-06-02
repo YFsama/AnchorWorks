@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check } from 'lucide-react';
+import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check, ChevronRight } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, groupSelection, ungroupSelection, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
@@ -212,47 +212,53 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
         { label: t('Fit Artboard to Artwork'), onClick: () => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); } },
         { label: t('Fit Artboard to Selection'), onClick: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
-        { label: t('Star / Polygon…'), onClick: () => setModal('showStar', true) },
-        { label: t('Split Into Grid…'), onClick: () => setModal('showSplitGrid', true) },
-        { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => setModal('showRepeat', true) },
         { sep: true },
+        { label: t('Insert'), sub: [
+          { label: t('Star / Polygon…'), onClick: () => setModal('showStar', true) },
+          { label: t('Split Into Grid…'), onClick: () => setModal('showSplitGrid', true) },
+          { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => setModal('showRepeat', true) },
+        ] },
         // Cut Contour suite — opens the multi-tab dialog covering vector
         // offset, bitmap trace, and registration marks. Lives under
-        // Document because cut paths are document-level metadata
-        // (alongside artboards/symbols), not edit-level operations.
+        // Document because cut paths are document-level metadata.
         { label: t('Cut Contour…'), onClick: () => setModal('showCutContour', true), kbd: 'Ctrl+Shift+C' },
         { sep: true },
-        // Sign / effect operations — also reachable via right-click + command
-        // palette; surfaced here for menu-bar discoverability.
-        { label: t('Multi-outline…'), onClick: () => setModal('showOutline', true) },
-        { label: t('Recolor Artwork…'), onClick: () => setModal('showRecolor', true) },
-        { label: t('Invert Colors'), onClick: () => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-        { label: t('Convert to Grayscale'), onClick: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-        { label: t('Saturate…'), onClick: () => setModal('showSaturate', true) },
-        { label: t('Adjust Hue…'), onClick: () => setModal('showHue', true) },
-        { label: t('Rhinestone Template…'), onClick: () => setModal('showRhinestone', true) },
-        { label: t('Variable Data…'), onClick: () => setModal('showVariableData', true) },
-        { label: t('Auto-arrange (Nest)'), onClick: () => {
-          const n = autoArrangeSelection();
-          if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
-          else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
-        } },
-        { sep: true },
-        // Path-effect dialogs — also in the command palette / right-click;
-        // surfaced here for menu-bar discoverability.
-        { label: t('Add Anchor Points'), onClick: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
-        { label: t('Outline Stroke to Fill'), onClick: () => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); } },
-        { label: t('Add Arrowhead (End)'), onClick: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
-        { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
-        { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
-        { label: t('Simplify Path…'), onClick: () => setModal('showSimplify', true) },
-        { label: t('Round Corners…'), onClick: () => setModal('showRoundCorners', true) },
-        { label: t('Offset Path…'), onClick: () => setModal('showOffsetPath', true) },
-        { label: t('Roughen…'), onClick: () => setModal('showRoughen', true) },
-        { label: t('Zig Zag…'), onClick: () => setModal('showZigzag', true) },
-        { label: t('Twist…'), onClick: () => setModal('showTwist', true) },
-        { label: t('Reverse Path Direction'), onClick: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
-        { label: t('Blend…'), onClick: () => setModal('showBlend', true) },
+        // Path / effect operations grouped into flyouts — all also reachable via
+        // the command palette + right-click; submenus keep this menu navigable.
+        { label: t('Path'), sub: [
+          { label: t('Add Anchor Points'), onClick: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
+          { label: t('Outline Stroke to Fill'), onClick: () => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); } },
+          { label: t('Simplify Path…'), onClick: () => setModal('showSimplify', true) },
+          { label: t('Round Corners…'), onClick: () => setModal('showRoundCorners', true) },
+          { label: t('Offset Path…'), onClick: () => setModal('showOffsetPath', true) },
+          { label: t('Reverse Path Direction'), onClick: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
+          { label: t('Add Arrowhead (End)'), onClick: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
+          { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
+          { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
+        ] },
+        { label: t('Distort & Transform'), sub: [
+          { label: t('Roughen…'), onClick: () => setModal('showRoughen', true) },
+          { label: t('Zig Zag…'), onClick: () => setModal('showZigzag', true) },
+          { label: t('Twist…'), onClick: () => setModal('showTwist', true) },
+          { label: t('Blend…'), onClick: () => setModal('showBlend', true) },
+        ] },
+        { label: t('Edit Colors'), sub: [
+          { label: t('Recolor Artwork…'), onClick: () => setModal('showRecolor', true) },
+          { label: t('Invert Colors'), onClick: () => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Convert to Grayscale'), onClick: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Saturate…'), onClick: () => setModal('showSaturate', true) },
+          { label: t('Adjust Hue…'), onClick: () => setModal('showHue', true) },
+        ] },
+        { label: t('Sign Effects'), sub: [
+          { label: t('Multi-outline…'), onClick: () => setModal('showOutline', true) },
+          { label: t('Rhinestone Template…'), onClick: () => setModal('showRhinestone', true) },
+          { label: t('Variable Data…'), onClick: () => setModal('showVariableData', true) },
+          { label: t('Auto-arrange (Nest)'), onClick: () => {
+            const n = autoArrangeSelection();
+            if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
+            else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
+          } },
+        ] },
       ]} />
 
       <Dropdown label={t('Help')} items={[
@@ -707,6 +713,8 @@ interface MenuItem {
   checked?: boolean;
   /** Optional custom JSX — when present, replaces the standard button row. */
   node?: React.ReactNode;
+  /** Nested submenu — renders a flyout panel on hover/focus. */
+  sub?: MenuItem[];
 }
 function Dropdown({ label, items, width }: { label: string; items: MenuItem[]; width?: string }) {
   // Track open state so aria-expanded reflects reality. The visual
@@ -740,36 +748,63 @@ function Dropdown({ label, items, width }: { label: string; items: MenuItem[]; w
         role="menu"
         aria-label={label}
       >
-        {items.map((it, i) => {
-          if (it.sep) return <div key={i} className="my-1 border-t border-border" role="separator" />;
-          if (it.node) return <div key={i}>{it.node}</div>;
-          const isToggle = typeof it.checked === 'boolean';
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={it.disabled}
-              onClick={it.onClick}
-              role={isToggle ? 'menuitemcheckbox' : 'menuitem'}
-              aria-checked={isToggle ? it.checked : undefined}
-              aria-label={it.label}
-              aria-keyshortcuts={ariaKeyshortcuts(it.kbd)}
-              className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent gap-2 transition-colors"
-            >
-              <span className="flex items-center gap-1.5 flex-1 min-w-0 truncate">{it.label}</span>
-              <span className="flex items-center gap-1.5 shrink-0">
-                {it.kbd && <Kbd combo={it.kbd} />}
-                {isToggle && (
-                  <span className={`w-3 ${it.checked ? 'text-success' : 'text-transparent'}`} aria-hidden="true">
-                    <Check size={12} />
-                  </span>
-                )}
-              </span>
-            </button>
-          );
-        })}
+        {items.map((it, i) => <MenuRow key={i} it={it} />)}
       </div>
     </div>
+  );
+}
+
+/** A single dropdown row: separator, custom node, nested submenu, or button. */
+function MenuRow({ it }: { it: MenuItem }) {
+  if (it.sep) return <div className="my-1 border-t border-border" role="separator" />;
+  if (it.node) return <div>{it.node}</div>;
+
+  if (it.sub) {
+    return (
+      <div className="relative group/sub">
+        <button
+          type="button"
+          role="menuitem"
+          aria-haspopup="menu"
+          aria-label={it.label}
+          className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 gap-2 transition-colors"
+        >
+          <span className="flex items-center gap-1.5 flex-1 min-w-0 truncate">{it.label}</span>
+          <ChevronRight size={12} aria-hidden="true" className="shrink-0 text-muted" />
+        </button>
+        <div
+          className="absolute left-full top-0 -mt-1 bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-all z-50 w-56 py-1 max-h-[70vh] overflow-y-auto"
+          role="menu"
+          aria-label={it.label}
+        >
+          {it.sub.map((s, j) => <MenuRow key={j} it={s} />)}
+        </div>
+      </div>
+    );
+  }
+
+  const isToggle = typeof it.checked === 'boolean';
+  return (
+    <button
+      type="button"
+      disabled={it.disabled}
+      onClick={it.onClick}
+      role={isToggle ? 'menuitemcheckbox' : 'menuitem'}
+      aria-checked={isToggle ? it.checked : undefined}
+      aria-label={it.label}
+      aria-keyshortcuts={ariaKeyshortcuts(it.kbd)}
+      className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent gap-2 transition-colors"
+    >
+      <span className="flex items-center gap-1.5 flex-1 min-w-0 truncate">{it.label}</span>
+      <span className="flex items-center gap-1.5 shrink-0">
+        {it.kbd && <Kbd combo={it.kbd} />}
+        {isToggle && (
+          <span className={`w-3 ${it.checked ? 'text-success' : 'text-transparent'}`} aria-hidden="true">
+            <Check size={12} />
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
 
