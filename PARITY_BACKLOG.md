@@ -172,3 +172,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Reverse cut direction — reversePolys() (cutOptimize.ts) + plotter `reverse`
       option flip every path's blade-travel direction; Plotter-dialog checkbox.
       +1 unit test. 2026-06-02.
+- [x] Inner contours first — sortInsideFirst() (cutOptimize.ts, containment by
+      centroid+area) + plotter `insideFirst` option cut nested contours before
+      their container (print-and-cut); Plotter-dialog checkbox. +1 test. 2026-06-02.

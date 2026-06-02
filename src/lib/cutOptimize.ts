@@ -51,6 +51,63 @@ export function reversePolys(polys: PolyLite[]): PolyLite[] {
   return polys.map(p => ({ closed: p.closed, points: p.points.slice().reverse() }));
 }
 
+/** Average of a polyline's vertices — a cheap interior estimate for the
+ *  containment test (good for the simple, mostly-convex contours stickers have). */
+function centroid(pts: Array<[number, number]>): [number, number] {
+  let sx = 0, sy = 0;
+  for (const [x, y] of pts) { sx += x; sy += y; }
+  const n = Math.max(1, pts.length);
+  return [sx / n, sy / n];
+}
+
+/** Absolute polygon area (shoelace) — used to break concentric containment ties. */
+function polyArea(pts: Array<[number, number]>): number {
+  let a = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    a += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1];
+  }
+  return Math.abs(a) / 2;
+}
+
+/** Ray-cast point-in-polygon test against a closed ring. */
+function pointInPoly(pt: [number, number], ring: Array<[number, number]>): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) &&
+        pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi + 1e-12) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Order closed paths inside-first: a contour contained inside N others is cut
+ * before them (deepest first), so inner holes/detail cut while the material is
+ * still anchored — the print-and-cut "cut inside first" rule. Stable, so any
+ * prior travel ordering is preserved within each depth band. Open paths keep
+ * their relative position (depth 0).
+ */
+export function sortInsideFirst(polys: PolyLite[]): PolyLite[] {
+  const centres = polys.map(p => centroid(p.points));
+  const areas = polys.map(p => polyArea(p.points));
+  const depth = polys.map((_, i) => {
+    let d = 0;
+    for (let j = 0; j < polys.length; j++) {
+      // j contains i only if i's centre is inside j AND j is the larger shape
+      // (the area test breaks the concentric mutual-containment tie).
+      if (j === i || !polys[j].closed) continue;
+      if (areas[j] > areas[i] && pointInPoly(centres[i], polys[j].points)) d++;
+    }
+    return d;
+  });
+  return polys
+    .map((p, i) => ({ p, i, d: depth[i] }))
+    .sort((a, b) => b.d - a.d || a.i - b.i)
+    .map(x => x.p);
+}
+
 /** Hard cap above which we skip the O(n²) ordering pass to stay responsive. */
 export const OPTIMIZE_LIMIT = 1500;
 

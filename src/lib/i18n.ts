@@ -913,6 +913,11 @@ const dict: Record<string, Record<Lang, string>> = {
   'Lock Guides': { en: 'Lock Guides', zh: '锁定参考线' },
   'Clear Guides': { en: 'Clear Guides', zh: '清除参考线' },
   'Reverse direction': { en: 'Reverse direction', zh: '反转方向' },
+  'Inner contours first': { en: 'Inner contours first', zh: '内轮廓优先' },
+  'Cut contours nested inside others before the outer ones (print-and-cut).': {
+    en: 'Cut contours nested inside others before the outer ones (print-and-cut).',
+    zh: '先切割嵌套在其他轮廓内部的轮廓，再切外部（印刷并切割）。',
+  },
   'Reverse the blade-travel direction of every path.': {
     en: 'Reverse the blade-travel direction of every path.',
     zh: '反转每条路径的刀头行进方向。',

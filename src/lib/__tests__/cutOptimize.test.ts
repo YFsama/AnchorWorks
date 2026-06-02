@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  optimizeOrder, mirrorPolys, cutStats, estimateSeconds, formatDuration, bounds, applyOvercut, reversePolys, type PolyLite,
+  optimizeOrder, mirrorPolys, cutStats, estimateSeconds, formatDuration, bounds, applyOvercut, reversePolys, sortInsideFirst, type PolyLite,
 } from '../cutOptimize';
 
 const seg = (a: [number, number], b: [number, number]): PolyLite => ({ points: [a, b], closed: false });
@@ -78,6 +78,15 @@ describe('cutOptimize', () => {
     expect(r.points).toEqual([[2, 5], [1, 0], [0, 0]]);
     expect(r.closed).toBe(true);
     expect(cutStats([r]).cutLen).toBeCloseTo(cutStats(polys).cutLen, 6);
+  });
+
+  it('sortInsideFirst cuts a nested contour before its container', () => {
+    const outer: PolyLite = { points: [[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]], closed: true };
+    const inner: PolyLite = { points: [[40, 40], [60, 40], [60, 60], [40, 60], [40, 40]], closed: true };
+    // Pass outer-first; inside-first should put the inner one before it.
+    const ordered = sortInsideFirst([outer, inner]);
+    expect(ordered[0]).toBe(inner);
+    expect(ordered[1]).toBe(outer);
   });
 
   it('overcut of 0 is a no-op', () => {

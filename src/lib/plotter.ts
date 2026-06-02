@@ -5,7 +5,7 @@
 
 import { exportSVG } from './io';
 import { useEditor } from '../store/editor';
-import { optimizeOrder, mirrorPolys, applyOvercut, reversePolys } from './cutOptimize';
+import { optimizeOrder, mirrorPolys, applyOvercut, reversePolys, sortInsideFirst } from './cutOptimize';
 
 /**
  * HP-GL dialect selector. Real-world cutter firmwares accept HP-GL with
@@ -52,6 +52,8 @@ export interface PlotterOptions {
   overcutMm: number;
   /** Reverse the cut direction of every path. */
   reverse: boolean;
+  /** Cut contours contained inside others first (print-and-cut weeding order). */
+  insideFirst: boolean;
 }
 
 /**
@@ -97,6 +99,7 @@ export const defaultPlotterOptions: PlotterOptions = {
   optimize: true,
   overcutMm: 0,
   reverse: false,
+  insideFirst: false,
 };
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
@@ -421,10 +424,13 @@ export function buildPlotterOutput(
  *  preview/stats UI can mirror the exact geometry the machine will receive. */
 export function postProcess(
   polylines: Array<{ points: Array<[number, number]>; closed: boolean }>,
-  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm' | 'reverse'>,
+  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm' | 'reverse' | 'insideFirst'>,
 ): Array<{ points: Array<[number, number]>; closed: boolean }> {
   let out = polylines;
   if (opts.optimize) out = optimizeOrder(out);
+  // Inside-first is a hard ordering constraint, applied after travel optimise
+  // (which it stably preserves within each containment band).
+  if (opts.insideFirst) out = sortInsideFirst(out);
   if (opts.reverse) out = reversePolys(out);
   if (opts.overcutMm > 0) out = applyOvercut(out, opts.overcutMm);
   if (opts.mirror) out = mirrorPolys(out, 'h');

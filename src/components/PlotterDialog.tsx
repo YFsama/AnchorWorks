@@ -298,10 +298,15 @@ export function PlotterDialog() {
               <Route size={13} aria-hidden="true" />
               {t('Optimize order')}
             </label>
-            <label className="flex items-center gap-2 text-xs text-ink cursor-pointer col-span-2" title={t('Reverse the blade-travel direction of every path.')}>
+            <label className="flex items-center gap-2 text-xs text-ink cursor-pointer" title={t('Reverse the blade-travel direction of every path.')}>
               <input type="checkbox" checked={opts.reverse} onChange={(e) => setOpts({ ...opts, reverse: e.target.checked })} />
               <FlipHorizontal2 size={13} aria-hidden="true" />
               {t('Reverse direction')}
+            </label>
+            <label className="flex items-center gap-2 text-xs text-ink cursor-pointer" title={t('Cut contours nested inside others before the outer ones (print-and-cut).')}>
+              <input type="checkbox" checked={opts.insideFirst} onChange={(e) => setOpts({ ...opts, insideFirst: e.target.checked })} />
+              <Scissors size={13} aria-hidden="true" />
+              {t('Inner contours first')}
             </label>
             <Field label={`${t('Overcut')} (mm)`}>
               <input
