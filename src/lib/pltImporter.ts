@@ -49,6 +49,21 @@ export const defaultPltImportOptions: PltImportOptions = {
 export interface PltPolyline {
   points: Array<[number, number]>; // in mm, Y-down (SVG convention)
   closed: boolean;
+  /** Pen number from the SP command active when this polyline was drawn.
+   *  1 by default. Mapped to a colour on import so cut-by-colour works. */
+  pen?: number;
+}
+
+/** Classic plotter pen palette — pen N → PEN_COLORS[(N-1) mod len]. */
+export const PEN_COLORS = [
+  '#111111', '#e11d48', '#16a34a', '#2563eb', '#db2777',
+  '#0891b2', '#ca8a04', '#ea580c', '#7c3aed', '#0d9488',
+];
+
+/** Resolve a 1-based pen number to a hex colour. */
+export function penColor(pen: number | undefined): string {
+  const n = Math.max(1, Math.floor(pen ?? 1));
+  return PEN_COLORS[(n - 1) % PEN_COLORS.length];
 }
 
 export interface PltImportResult {
@@ -85,14 +100,15 @@ export function parsePlt(text: string, partial?: Partial<PltImportOptions>): Plt
   // Parser state.
   let cur: [number, number] = [0, 0]; // current pen position in plotter units
   let absolute = true;
+  let currentPen = 1; // active SP pen — restored as a colour on import
   let lineUnits: Array<[number, number]> = []; // current polyline (units)
-  const polysUnits: Array<{ points: Array<[number, number]>; closed: boolean }> = [];
+  const polysUnits: Array<{ points: Array<[number, number]>; closed: boolean; pen: number }> = [];
   let pageWidthU: number | undefined;
   let pageHeightU: number | undefined;
   let expectPageSize = false; // TB just seen — next bare numbers = page dims
 
   const flush = () => {
-    if (lineUnits.length >= 2) polysUnits.push({ points: lineUnits, closed: false });
+    if (lineUnits.length >= 2) polysUnits.push({ points: lineUnits, closed: false, pen: currentPen });
     lineUnits = [];
   };
 
@@ -127,9 +143,13 @@ export function parsePlt(text: string, partial?: Partial<PltImportOptions>): Plt
     const params = parseNums(m[2]);
 
     switch (op) {
+      case 'SP':       // select pen — end the current line, switch pen colour
+        flush();
+        if (params.length >= 1 && Number.isFinite(params[0])) currentPen = Math.max(1, params[0]);
+        break;
+
       case 'IN':       // initialise — reset state but keep accumulated geometry
       case 'DF':       // default values
-      case 'SP':       // select pen (ignored)
       case 'LT':       // line type (ignored)
       case 'CI':       // circle: not used by cutter PLT — fall through warning
       case 'VS':       // velocity
@@ -243,7 +263,7 @@ export function parsePlt(text: string, partial?: Partial<PltImportOptions>): Plt
     // exporter can emit Z and the editor's path tools recognise the loop.
     const first = pts[0], last = pts[pts.length - 1];
     const closed = Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.05;
-    polylines.push({ points: pts, closed });
+    polylines.push({ points: pts, closed, pen: p.pen });
   }
 
   // Recompute bounds after the unit-conversion + Y-flip pass.
@@ -291,7 +311,9 @@ export function polylinesToSvg(
   opts: { pxPerMm?: number; strokeColor?: string } = {},
 ): string {
   const pxPerMm = opts.pxPerMm ?? 3.7795;
-  const stroke = opts.strokeColor ?? '#111';
+  // When the caller forces a colour, honour it; otherwise restore each
+  // polyline's pen colour so cut-by-colour separates the imported job.
+  const strokeFor = (p: PltPolyline) => opts.strokeColor ?? penColor(p.pen);
 
   if (polys.length === 0) {
     return '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"/>';
@@ -316,7 +338,7 @@ export function polylinesToSvg(
       parts.push(i === 0 ? `M${X} ${Y}` : `L${X} ${Y}`);
     });
     if (p.closed) parts.push('Z');
-    return `<path d="${parts.join(' ')}" fill="none" stroke="${stroke}" stroke-width="0.5"/>`;
+    return `<path d="${parts.join(' ')}" fill="none" stroke="${strokeFor(p)}" stroke-width="0.5"/>`;
   }).join('');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${vbW.toFixed(2)}" height="${vbH.toFixed(2)}" viewBox="0 0 ${vbW.toFixed(2)} ${vbH.toFixed(2)}">${paths}</svg>`;

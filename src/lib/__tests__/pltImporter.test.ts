@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parsePlt, polylinesToSvg } from '../pltImporter';
+import { parsePlt, polylinesToSvg, penColor } from '../pltImporter';
 import { generateHPGL, defaultPlotterOptions } from '../plotter';
 
 describe('parsePlt', () => {
@@ -158,5 +158,33 @@ describe('polylinesToSvg', () => {
     const svg = polylinesToSvg([]);
     expect(svg).toMatch(/<svg/);
     expect(svg).not.toMatch(/<path/);
+  });
+
+  it('restores per-pen stroke colours (and honours an override)', () => {
+    const polys = [
+      { points: [[0, 0], [10, 0]] as Array<[number, number]>, closed: false, pen: 1 },
+      { points: [[0, 0], [10, 0]] as Array<[number, number]>, closed: false, pen: 2 },
+    ];
+    const svg = polylinesToSvg(polys);
+    expect(svg).toContain(penColor(1));
+    expect(svg).toContain(penColor(2));
+    // Override forces a single colour.
+    const forced = polylinesToSvg(polys, { strokeColor: '#abcdef' });
+    expect((forced.match(/#abcdef/g) ?? []).length).toBe(2);
+  });
+});
+
+describe('PLT pen tracking', () => {
+  it('records the SP pen number on each polyline', () => {
+    const plt = 'IN;SP1;PU0,0;PD400,0,400,400;SP2;PU800,0;PD1200,0,1200,400;';
+    const pens = parsePlt(plt).polylines.map(p => p.pen);
+    expect(pens).toContain(1);
+    expect(pens).toContain(2);
+  });
+
+  it('penColor maps 1-based pens into the palette and wraps', () => {
+    expect(penColor(1)).toBe('#111111');
+    expect(penColor(2)).toBe('#e11d48');
+    expect(penColor(11)).toBe(penColor(1)); // 10-colour palette wraps
   });
 });
