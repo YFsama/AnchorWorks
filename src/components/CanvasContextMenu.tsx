@@ -12,6 +12,7 @@ import {
   deleteSelection,
   autoArrangeSelection,
   flipSelection,
+  selectSame,
 } from '../lib/canvasEngine';
 import {
   copySelection,
@@ -370,6 +371,11 @@ export function CanvasContextMenu() {
         label={t('Select All')}
         kbd="Ctrl+A"
         onClick={() => run(() => selectAll(), true)}
+      />
+      <Item
+        label={t('Select Same Fill')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { selectSame('fill'); }, hasSelection)}
       />
     </div>
   );

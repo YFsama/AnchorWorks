@@ -17,7 +17,7 @@
  * importing from './canvasEngine' unchanged.
  */
 
-import type * as fabric from 'fabric';
+import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
 
 type FabricObject = fabric.FabricObject;
@@ -61,6 +61,33 @@ export function nudgeSelection(dx: number, dy: number): void {
     canvas.requestRenderAll();
     pushHistory();
   }
+}
+
+/**
+ * Select every object whose `fill` (or `stroke`) matches the active object's —
+ * Illustrator's Select → Same → Fill / Stroke Color. Only flat string colours
+ * match (gradients/patterns are skipped). Returns the count selected.
+ */
+export function selectSame(prop: 'fill' | 'stroke'): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const ref = canvas.getActiveObject();
+  if (!ref) return 0;
+  const refVal = (ref as unknown as Record<string, unknown>)[prop];
+  if (typeof refVal !== 'string' || !refVal) return 0;
+  const norm = (c: string) => c.trim().toLowerCase();
+  const target = norm(refVal);
+  const matches = canvas.getObjects().filter((o) => {
+    if ((o as { excludeFromExport?: boolean }).excludeFromExport) return false;
+    const v = (o as unknown as Record<string, unknown>)[prop];
+    return typeof v === 'string' && norm(v) === target;
+  });
+  if (matches.length === 0) return 0;
+  canvas.discardActiveObject();
+  if (matches.length === 1) canvas.setActiveObject(matches[0]);
+  else canvas.setActiveObject(new fabric.ActiveSelection(matches, { canvas }));
+  canvas.requestRenderAll();
+  return matches.length;
 }
 
 /** Flip every selected object about its own centre. `'x'` mirrors horizontally,

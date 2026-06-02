@@ -139,3 +139,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Transform Each — TransformDialog "Transform each" checkbox + applyTransform
       `each` (transformOps.ts) pivots every object on its own centre (Illustrator
       Transform Each), completing the Transform feature. 2026-06-02.
+- [x] Select Same — selectSame() (selectionOps.ts) selects every object matching
+      the active object's fill/stroke colour (Illustrator Select→Same); command
+      palette + right-click. 2026-06-02.
