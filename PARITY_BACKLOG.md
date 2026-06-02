@@ -306,3 +306,8 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       also matches numeric props (strokeWidth / opacity) with an epsilon, not just
       fill/stroke colour (Illustrator Select→Same→Stroke Weight / Opacity); 2 new
       command-palette entries. 2026-06-02.
+- [x] Adjust Hue — colorAdjust.ts shiftHueColorsSelection()/shiftHueRGB() rotate
+      the hue of every solid fill/stroke (−180..180°) reusing rgbToHsl/hslToRgb
+      (Illustrator Recolor hue wheel); HueDialog slider + Document menu + command
+      palette. +2 tests. Completes Edit Colors (Invert/Grayscale/Saturate/Hue).
+      2026-06-02.

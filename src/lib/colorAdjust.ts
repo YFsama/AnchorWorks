@@ -83,6 +83,12 @@ export const saturateRGB = (rgb: RGB, factor: number): RGB => {
   return hslToRgb({ ...hsl, s: Math.max(0, Math.min(1, hsl.s * factor)) });
 };
 
+/** Rotate hue by `deg` degrees around the colour wheel. */
+export const shiftHueRGB = (rgb: RGB, deg: number): RGB => {
+  const hsl = rgbToHsl(rgb);
+  return hslToRgb({ ...hsl, h: ((hsl.h + deg) % 360 + 360) % 360 });
+};
+
 /** True when the selection holds at least one object. */
 export function canAdjustColors(): boolean {
   const c = getCanvas();
@@ -129,4 +135,9 @@ export function grayscaleColorsSelection(): number {
 export function saturateColorsSelection(amount: number): number {
   const factor = 1 + amount / 100;
   return adjustSelection((rgb) => saturateRGB(rgb, factor));
+}
+
+/** Rotate the hue of every solid fill/stroke by `deg` degrees. */
+export function shiftHueColorsSelection(deg: number): number {
+  return adjustSelection((rgb) => shiftHueRGB(rgb, deg));
 }

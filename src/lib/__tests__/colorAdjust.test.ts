@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseColor, toHex, invertRGB, grayRGB, rgbToHsl, hslToRgb, saturateRGB } from '../colorAdjust';
+import { parseColor, toHex, invertRGB, grayRGB, rgbToHsl, hslToRgb, saturateRGB, shiftHueRGB } from '../colorAdjust';
 
 describe('parseColor', () => {
   it('parses #rgb, #rrggbb and rgb()', () => {
@@ -53,5 +53,17 @@ describe('HSL round-trip + saturate', () => {
 
   it('a pure grey has no saturation to scale', () => {
     expect(toHex(saturateRGB({ r: 100, g: 100, b: 100 }, 2))).toBe('#646464');
+  });
+});
+
+describe('shiftHueRGB', () => {
+  it('+120° rotates red → green → blue', () => {
+    expect(toHex(shiftHueRGB({ r: 255, g: 0, b: 0 }, 120))).toBe('#00ff00');
+    expect(toHex(shiftHueRGB({ r: 0, g: 255, b: 0 }, 120))).toBe('#0000ff');
+  });
+  it('0° and 360° are identity; wraps negatives', () => {
+    expect(toHex(shiftHueRGB({ r: 255, g: 136, b: 0 }, 0))).toBe('#ff8800');
+    expect(toHex(shiftHueRGB({ r: 255, g: 0, b: 0 }, 360))).toBe('#ff0000');
+    expect(toHex(shiftHueRGB({ r: 255, g: 0, b: 0 }, -240))).toBe('#00ff00');
   });
 });

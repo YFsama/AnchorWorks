@@ -217,6 +217,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Invert Colors'), onClick: () => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
         { label: t('Convert to Grayscale'), onClick: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
         { label: t('Saturate…'), onClick: () => setModal('showSaturate', true) },
+        { label: t('Adjust Hue…'), onClick: () => setModal('showHue', true) },
         { label: t('Rhinestone Template…'), onClick: () => setModal('showRhinestone', true) },
         { label: t('Variable Data…'), onClick: () => setModal('showVariableData', true) },
         { label: t('Auto-arrange (Nest)'), onClick: () => {
