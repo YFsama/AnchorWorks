@@ -207,3 +207,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Roughen — roughenSelection() (roughen.ts) densifies then jitters path points
       for a distressed/hand-drawn edge (Illustrator Distort→Roughen); RoughenDialog
       (size+detail) + Document menu + command palette. 2026-06-02.
+- [x] Roughen in right-click — added the Roughen… item to CanvasContextMenu.tsx
+      next to Simplify/Round Corners/Offset Path, so every path effect shares all
+      three surfaces (menu / palette / right-click). 2026-06-02.
