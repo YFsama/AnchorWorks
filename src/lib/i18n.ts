@@ -791,6 +791,17 @@ const dict: Record<string, Record<Lang, string>> = {
   },
   'pages': { en: 'pages', zh: '页' },
   'Tile preview': { en: 'Tile preview', zh: '拼版预览' },
+  'Text on Arc': { en: 'Text on Arc', zh: '弧形文字' },
+  'Arc': { en: 'Arc', zh: '弧形' },
+  'Curve the text upward along an arc': {
+    en: 'Curve the text upward along an arc', zh: '让文字沿弧线向上弯曲（∩）',
+  },
+  'Curve the text downward along an arc': {
+    en: 'Curve the text downward along an arc', zh: '让文字沿弧线向下弯曲（∪）',
+  },
+  'Select a single text object to enable': {
+    en: 'Select a single text object to enable', zh: '请选中单个文字对象以启用',
+  },
   'Select shapes that have a stroke first.': {
     en: 'Select shapes that have a stroke first.',
     zh: '请先选中带描边的图形。',

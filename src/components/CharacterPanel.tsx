@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { getCanvas, pushHistory } from '../lib/canvasEngine';
-import { applyTextOnPath, canApplyTextOnPath } from '../lib/textPath';
+import { applyTextOnPath, canApplyTextOnPath, applyTextOnArc, canApplyTextOnArc } from '../lib/textPath';
 import { registerSkill } from '../lib/mcp';
 import { useT } from '../lib/i18n';
 
@@ -224,6 +224,7 @@ export function CharacterPanel() {
 
   const tracking = props.charSpacing;
   const onPathEnabled = canApplyTextOnPath();
+  const onArcEnabled = canApplyTextOnArc();
 
   return (
     <div className="panel-section p-3">
@@ -353,6 +354,28 @@ export function CharacterPanel() {
       >
         {t('Text on Path')}
       </button>
+
+      {/* Text on arc — up (∩) / down (∪). Needs only a single text object. */}
+      <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+        <button
+          type="button"
+          disabled={!onArcEnabled}
+          onClick={() => applyTextOnArc(false)}
+          title={onArcEnabled ? t('Curve the text upward along an arc') : t('Select a single text object to enable')}
+          className="btn w-full disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {t('Arc')} ∩
+        </button>
+        <button
+          type="button"
+          disabled={!onArcEnabled}
+          onClick={() => applyTextOnArc(true)}
+          title={onArcEnabled ? t('Curve the text downward along an arc') : t('Select a single text object to enable')}
+          className="btn w-full disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {t('Arc')} ∪
+        </button>
+      </div>
     </div>
   );
 }

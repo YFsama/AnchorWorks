@@ -6,7 +6,7 @@ import {
   ChevronsUp, ChevronUp, ChevronDown, ChevronsDown,
   Plus, Minus, Maximize2, Bug,
   Settings2, Keyboard, HelpCircle, Sparkles, BookOpen,
-  Wand2, Palette, AlignCenter, Grid3X3, SunMoon,
+  Wand2, Palette, AlignCenter, Grid3X3, SunMoon, Type,
   type LucideIcon,
 } from 'lucide-react';
 import { useEditor } from '../store/editor';
@@ -23,6 +23,7 @@ import { setOutlineMode, isOutlineMode } from '../lib/outlineView';
 import { openProjectFromFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
+import { applyTextOnArc } from '../lib/textPath';
 import { applyStrokeAlign } from '../lib/strokeAlign';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
 import { listTools } from '../lib/tools/types';
@@ -220,6 +221,8 @@ export function CommandPalette({
       ed.setCutPathsVisible(true);
       toast.success(`${t('Welded into')} ${paths.length} ${t('cut paths')}`, { title: t('Weld') });
     } },
+    { id: 'text.arcUp',   label: `${t('Text on Arc')} ∩`, category: t('Arrange'), keywords: 'text arc curve circle badge seal up arch', icon: Type, run: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a single text object to enable')); } },
+    { id: 'text.arcDown', label: `${t('Text on Arc')} ∪`, category: t('Arrange'), keywords: 'text arc curve circle badge seal down arch', icon: Type, run: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a single text object to enable')); } },
     { id: 'cut.outlineStroke',  label: t('Outline Stroke'),    category: t('Arrange'), keywords: 'stroke outline expand cut edges', icon: PenTool, run: () => {
       const objs = getCanvas()?.getActiveObjects() ?? [];
       if (!objs.length) { toast.warn(t('Select one or more shapes first.')); return; }

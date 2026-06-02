@@ -48,6 +48,86 @@ export function canApplyTextOnPath(): boolean {
   return getTextAndPath() !== null;
 }
 
+/** Return the single selected text object, or null. Used by Text on Arc, which
+ *  (unlike Text on Path) needs no separate path object — the arc is generated. */
+function getSingleText(): fabric.IText | null {
+  const c = getCanvas();
+  if (!c) return null;
+  const objs = c.getActiveObjects();
+  if (objs.length !== 1) return null;
+  const o = objs[0];
+  if (o.type === 'i-text' || o.type === 'text' || o.type === 'textbox') return o as fabric.IText;
+  return null;
+}
+
+export function canApplyTextOnArc(): boolean {
+  return getSingleText() !== null;
+}
+
+/**
+ * Text on Arc — curve the selected text along a circular baseline, the badge /
+ * seal layout every sign program offers. `flip = false` arches up (∩, centre
+ * highest); `flip = true` arches down (∪, centre lowest). Each glyph is placed
+ * analytically on the circle and rotated to the local tangent, then grouped so
+ * the whole label moves as one. Radius auto-fits the text length.
+ */
+export function applyTextOnArc(flip = false): boolean {
+  const text = getSingleText();
+  const c = getCanvas();
+  if (!text || !c) return false;
+
+  const t = text as unknown as {
+    fontSize?: number; fontFamily?: string; fontWeight?: string | number;
+    fontStyle?: string; text?: string;
+  };
+  const fontSize = t.fontSize ?? 32;
+  const fontFamily = t.fontFamily ?? 'Inter, sans-serif';
+  const fill = (text.fill as string) ?? '#000000';
+  const fontWeight = t.fontWeight ?? 'normal';
+  const fontStyle = t.fontStyle ?? 'normal';
+  const str = (t.text ?? '').replace(/\n/g, ' ');
+  if (!str) return false;
+
+  // Keep the arc centred where the text currently sits.
+  const centre = text.getCenterPoint();
+  const step = Math.max(2, fontSize * 0.7);          // arc-length between glyph centres
+  const radius = Math.max(fontSize * 1.5, (str.length * step) / 1.8);
+  const dphi = step / radius;                         // angle between glyph centres
+  // Circle centre + the arc's mid-angle. Up-arch puts the centre below the
+  // text (top of circle = text); down-arch puts it above.
+  const C = flip ? { x: centre.x, y: centre.y - radius } : { x: centre.x, y: centre.y + radius };
+  const phiMid = flip ? Math.PI / 2 : -Math.PI / 2;
+
+  const glyphs: FabricObject[] = [];
+  const n = str.length;
+  for (let i = 0; i < n; i++) {
+    const k = i - (n - 1) / 2;                        // symmetric offset about the mid
+    const phi = flip ? phiMid - k * dphi : phiMid + k * dphi;
+    const x = C.x + radius * Math.cos(phi);
+    const y = C.y + radius * Math.sin(phi);
+    // Reading-direction tangent → upright glyphs along the curve.
+    const angle = flip
+      ? Math.atan2(-Math.cos(phi), Math.sin(phi))
+      : Math.atan2(Math.cos(phi), -Math.sin(phi));
+    glyphs.push(new fabric.IText(str[i], {
+      left: x, top: y, fill, fontFamily, fontSize, fontWeight, fontStyle,
+      originX: 'center', originY: 'center',
+      angle: (angle * 180) / Math.PI,
+      selectable: true, evented: true,
+    }));
+  }
+  if (glyphs.length === 0) return false;
+
+  const group = new fabric.Group(glyphs, { subTargetCheck: false });
+  c.add(group);
+  c.remove(text);
+  c.discardActiveObject();
+  c.setActiveObject(group);
+  c.requestRenderAll();
+  pushHistory();
+  return true;
+}
+
 /**
  * Convert a Fabric Path back to an SVG `d` string. Fabric stores the path
  * as a parsed array (e.g. [['M', x, y], ['L', x, y], ...]); joining each
