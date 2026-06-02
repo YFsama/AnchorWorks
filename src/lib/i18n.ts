@@ -937,6 +937,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Release Clipping Mask': { en: 'Release Clipping Mask', zh: '释放剪切蒙版' },
   'Select a clipping group first.': { en: 'Select a clipping group first.', zh: '请先选中一个剪切组。' },
   'Add Anchor Points': { en: 'Add Anchor Points', zh: '添加锚点' },
+  'Outline Stroke to Fill': { en: 'Outline Stroke to Fill', zh: '描边转填充' },
+  'strokes outlined': { en: 'strokes outlined', zh: '处描边已转填充' },
   'Clean Up': { en: 'Clean Up', zh: '清理' },
   'stray objects removed': { en: 'stray objects removed', zh: '个杂散对象已移除' },
   'Nothing to clean up.': { en: 'Nothing to clean up.', zh: '没有需要清理的对象。' },

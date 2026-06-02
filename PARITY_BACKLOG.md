@@ -297,3 +297,8 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Clean Up — cleanUp.ts cleanUpDocument() removes empty text objects, stray
       single-anchor paths, and zero-size objects (Illustrator Object→Path→Clean Up),
       handy after imports; Document menu + command palette. 2026-06-02.
+- [x] Outline Stroke to Fill — outlineStrokeFill.ts outlineStrokeToFillSelection()
+      reuses outlineStrokeToCutPaths' band rings to build a filled even-odd
+      fabric.Path in the stroke colour and drops the source stroke (Illustrator
+      Object→Path→Outline Stroke, fill flavour vs the existing cut flavour);
+      Document menu + command palette. 2026-06-02.
