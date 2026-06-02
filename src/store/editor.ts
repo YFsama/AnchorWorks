@@ -172,7 +172,8 @@ interface EditorState {
   showBrightness: boolean;
   showShear: boolean;
   showWarp: boolean;
-  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showTwist' | 'showStar' | 'showFindReplace' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp', v: boolean) => void;
+  showGrommets: boolean;
+  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showTwist' | 'showStar' | 'showFindReplace' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -317,6 +318,7 @@ export const useEditor = create<EditorState>((set) => ({
   showBrightness: false,
   showShear: false,
   showWarp: false,
+  showGrommets: false,
   setModal: (k, v) => set({ [k]: v } as Partial<EditorState>),
 
   cutPaths: [],

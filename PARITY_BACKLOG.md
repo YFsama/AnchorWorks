@@ -408,3 +408,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       bbox's inset perimeter with evenly-spaced grommet-hole cut circles (corners +
       edges, gap-capped) for vinyl-banner finishing (SignMaster); Sign Effects
       submenu + command palette. 2026-06-03.
+- [x] Grommets dialog — GrommetsDialog (inset / max spacing / diameter) replaces
+      the hardcoded-defaults command, since banner sizes vary; menu + palette now
+      open it. 2026-06-03.

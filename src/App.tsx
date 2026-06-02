@@ -57,6 +57,7 @@ const ResizeDialog = lazy(() => import('./components/ResizeDialog').then(m => ({
 const BrightnessDialog = lazy(() => import('./components/BrightnessDialog').then(m => ({ default: m.BrightnessDialog })));
 const ShearDialog = lazy(() => import('./components/ShearDialog').then(m => ({ default: m.ShearDialog })));
 const WarpDialog = lazy(() => import('./components/WarpDialog').then(m => ({ default: m.WarpDialog })));
+const GrommetsDialog = lazy(() => import('./components/GrommetsDialog').then(m => ({ default: m.GrommetsDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
 const KeymapEditor = lazy(() => import('./components/KeymapEditor').then(m => ({ default: m.KeymapEditor })));
@@ -739,6 +740,7 @@ export default function App() {
   const showBrightness = useEditor(s => s.showBrightness);
   const showShear = useEditor(s => s.showShear);
   const showWarp = useEditor(s => s.showWarp);
+  const showGrommets = useEditor(s => s.showGrommets);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const highContrast = useEditor(s => s.highContrast);
@@ -1337,6 +1339,11 @@ export default function App() {
       {showWarp && (
         <Suspense fallback={null}>
           <WarpDialog />
+        </Suspense>
+      )}
+      {showGrommets && (
+        <Suspense fallback={null}>
+          <GrommetsDialog />
         </Suspense>
       )}
       {showPreferences && (
