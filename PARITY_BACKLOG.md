@@ -546,3 +546,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Transform dialog shared unit — TransformDialog.tsx binds its mm/px toggle to the
       store dimUnit/setDimUnit (was local useState) so the dialog opens in the document
       unit and toggling there flips inspector/rulers/status bar — one global unit. 2026-06-03.
+- [x] Right-click Select Same submenu — CanvasContextMenu.tsx replaces the lone Select
+      Same Fill item with a Select Same SubMenu (fill/stroke/stroke-weight/opacity) to
+      match the command palette + Illustrator Select>Same; i18n.ts adds parent key. 2026-06-03.
