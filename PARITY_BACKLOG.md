@@ -564,3 +564,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Edit-menu Select family — MenuBar.tsx Edit menu gains a Select Same flyout
       (fill/stroke/weight/opacity/type) + Select All Text Objects + Select Inverse after
       Deselect All; were palette/right-click only (Illustrator Select menu). 2026-06-03.
+- [x] Keyboard-increment unit — PreferencesDialog.tsx GeneralTab keyboard-increment field
+      now displays/edits in the shared dimUnit (storage stays keyboardIncrementPx; converts
+      via MM_TO_PX) so mm users can set a physical nudge step; was px-only. 2026-06-03.
