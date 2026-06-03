@@ -164,6 +164,8 @@ export function PropertiesPanel() {
         if (preset) { setDashKey(preset); setDashCustom(''); }
         else { setDashKey('solid'); setDashCustom(da.join(' ')); }
       }
+      // Reflect the object's blend mode too (same write-only-state fix).
+      setBlendMode((c.getActiveObject() as { globalCompositeOperation?: GlobalCompositeOperation } | undefined)?.globalCompositeOperation ?? 'source-over');
       const obj = c.getActiveObject() as { shadow?: { color?: string; blur?: number; offsetX?: number; offsetY?: number } | null } | undefined;
       const sh = obj?.shadow;
       if (sh && typeof sh === 'object') {
