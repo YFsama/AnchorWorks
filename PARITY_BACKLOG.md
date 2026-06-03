@@ -555,3 +555,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Align spacing unit — AlignPanel.tsx Distribute-Spacing input now follows the shared
       dimUnit (spacing in doc unit → spacingMm via MM_TO_PX; dynamic label/aria/title) so
       px docs can enter a px gap; was hard-coded mm. 2026-06-03.
+- [x] Right-click Path Effects parity — CanvasContextMenu.tsx Path Effects submenu gains
+      Outline Stroke to Fill + Reverse Path Direction (were in Object>Path menu + palette
+      only); high-frequency for sign/cut knockouts. 2026-06-03.
