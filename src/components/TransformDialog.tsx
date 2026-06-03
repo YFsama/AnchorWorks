@@ -19,8 +19,13 @@ export function TransformDialog() {
   const close = useCallback(() => useEditor.getState().setModal('showTransform', false), []);
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
-  const [scale, setScale] = useState(100);
+  const [scaleX, setScaleX] = useState(100);
+  const [scaleY, setScaleY] = useState(100);
+  // Linked = uniform scale (the previous behaviour); unlink for non-uniform.
+  const [linkScale, setLinkScale] = useState(true);
   const [rotate, setRotate] = useState(0);
+  const setSX = (v: number) => { const n = Math.max(1, v || 100); setScaleX(n); if (linkScale) setScaleY(n); };
+  const setSY = (v: number) => { const n = Math.max(1, v || 100); setScaleY(n); if (linkScale) setScaleX(n); };
   const [copy, setCopy] = useState(false);
   const [each, setEach] = useState(false);
   // Move can be entered as X/Y or polar distance+angle (Illustrator's Move
@@ -45,7 +50,7 @@ export function TransformDialog() {
     const rad = (angle * Math.PI) / 180;
     const mdx = moveMode === 'polar' ? dist * Math.cos(rad) : dx;
     const mdy = moveMode === 'polar' ? -dist * Math.sin(rad) : dy;
-    const ok = await applyTransform({ dx: mdx * k, dy: mdy * k, scale: scale / 100, rotate, copy, each });
+    const ok = await applyTransform({ dx: mdx * k, dy: mdy * k, scale: scaleX / 100, scaleY: scaleY / 100, rotate, copy, each });
     if (ok) toast.success(copy ? t('Transformed copy') : t('Transformed'), { title: t('Transform') });
     close();
   };
@@ -96,12 +101,19 @@ export function TransformDialog() {
               </Field>
             </>
           )}
-          <Field label={`${t('Scale')} (%)`}>
-            <input type="number" min={1} step={1} className="input-num" value={scale} onChange={(e) => setScale(Math.max(1, parseFloat(e.target.value) || 100))} />
+          <Field label={`${t('Scale')} X (%)`}>
+            <input type="number" min={1} step={1} className="input-num" value={scaleX} onChange={(e) => setSX(parseFloat(e.target.value))} />
+          </Field>
+          <Field label={`${t('Scale')} Y (%)`}>
+            <input type="number" min={1} step={1} className="input-num" value={scaleY} onChange={(e) => setSY(parseFloat(e.target.value))} />
           </Field>
           <Field label={`${t('Rotate')} (°)`}>
             <input type="number" step={1} className="input-num" value={rotate} onChange={(e) => setRotate(parseFloat(e.target.value) || 0)} />
           </Field>
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer self-end pb-2" title={t('Scale X and Y together')}>
+            <input type="checkbox" checked={linkScale} onChange={(e) => { setLinkScale(e.target.checked); if (e.target.checked) setScaleY(scaleX); }} />
+            {t('Link scale')}
+          </label>
         </div>
 
         <label className="flex items-center gap-2 mt-2 text-xs cursor-pointer">

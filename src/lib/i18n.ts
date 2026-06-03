@@ -971,6 +971,8 @@ const dict: Record<string, Record<Lang, string>> = {
   },
   'Move': { en: 'Move', zh: '移动' },
   'Scale': { en: 'Scale', zh: '缩放' },
+  'Link scale': { en: 'Link scale', zh: '链接缩放' },
+  'Scale X and Y together': { en: 'Scale X and Y together', zh: '同时缩放 X 与 Y' },
   'Rotate': { en: 'Rotate', zh: '旋转' },
   'Apply to a copy': { en: 'Apply to a copy', zh: '应用到副本' },
   'Transform each': { en: 'Transform each', zh: '逐个变换' },

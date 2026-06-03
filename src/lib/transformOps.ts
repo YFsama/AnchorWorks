@@ -9,7 +9,8 @@ import { getCanvas, pushHistory } from './canvasEngine';
 
 export interface TransformParams {
   /** Move in px. */ dx: number; dy: number;
-  /** Uniform scale factor (1 = 100%). */ scale: number;
+  /** Horizontal scale factor (1 = 100%); also vertical when `scaleY` is unset. */ scale: number;
+  /** Optional vertical scale factor for non-uniform scaling (defaults to `scale`). */ scaleY?: number;
   /** Rotation in degrees, added to the current angle. */ rotate: number;
   /** Apply to a clone instead of the original. */ copy: boolean;
   /** Transform Each — pivot every object on its OWN centre instead of the
@@ -20,10 +21,10 @@ export interface TransformParams {
 /** Scale + rotate about the target's own centre, then move. */
 function transformAboutCentre(target: fabric.FabricObject, p: TransformParams): void {
   const centre = target.getCenterPoint();
-  if (p.scale > 0 && p.scale !== 1) {
-    target.scaleX = (target.scaleX ?? 1) * p.scale;
-    target.scaleY = (target.scaleY ?? 1) * p.scale;
-  }
+  const sx = p.scale;
+  const sy = p.scaleY ?? p.scale;
+  if (sx > 0 && sx !== 1) target.scaleX = (target.scaleX ?? 1) * sx;
+  if (sy > 0 && sy !== 1) target.scaleY = (target.scaleY ?? 1) * sy;
   if (p.rotate) target.set('angle', (target.angle ?? 0) + p.rotate);
   target.setPositionByOrigin(centre, 'center', 'center');
   if (p.dx || p.dy) target.set({ left: (target.left ?? 0) + p.dx, top: (target.top ?? 0) + p.dy });
