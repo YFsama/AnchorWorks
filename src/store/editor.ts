@@ -174,6 +174,7 @@ interface EditorState {
   showBlend: boolean;
   showRoughen: boolean;
   showZigzag: boolean;
+  showPucker: boolean;
   showTwist: boolean;
   showStar: boolean;
   showFindReplace: boolean;
@@ -186,7 +187,7 @@ interface EditorState {
   showWarp: boolean;
   showGrommets: boolean;
   showMarginGuides: boolean;
-  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showTwist' | 'showStar' | 'showFindReplace' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMarginGuides', v: boolean) => void;
+  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showStar' | 'showFindReplace' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMarginGuides', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -330,6 +331,7 @@ export const useEditor = create<EditorState>((set) => ({
   showBlend: false,
   showRoughen: false,
   showZigzag: false,
+  showPucker: false,
   showTwist: false,
   showStar: false,
   showFindReplace: false,

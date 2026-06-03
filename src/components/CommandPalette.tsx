@@ -286,6 +286,7 @@ export function CommandPalette({
     { id: 'path.splitGrid',    label: t('Split Into Grid…'),   category: t('Arrange'), keywords: 'split grid rows columns divide cells labels panels', icon: Grid3X3, run: () => setModal('showSplitGrid', true) },
     { id: 'path.roughen',      label: t('Roughen…'),           category: t('Arrange'), keywords: 'roughen distort jitter rough distressed hand drawn', icon: PenTool, run: () => setModal('showRoughen', true) },
     { id: 'path.zigzag',       label: t('Zig Zag…'),           category: t('Arrange'), keywords: 'zigzag zig zag wave distort ridges scallop border', icon: PenTool, run: () => setModal('showZigzag', true) },
+    { id: 'path.pucker',       label: t('Pucker & Bloat…'),    category: t('Arrange'), keywords: 'pucker bloat distort star spike balloon inflate deflate', icon: PenTool, run: () => setModal('showPucker', true) },
     { id: 'path.twist',        label: t('Twist…'),             category: t('Arrange'), keywords: 'twist twirl swirl spiral distort rotate', icon: PenTool, run: () => setModal('showTwist', true) },
     { id: 'path.warp',         label: t('Arc Warp…'),          category: t('Arrange'), keywords: 'warp arc arch bend banner envelope distort curve', icon: PenTool, run: () => setModal('showWarp', true) },
     { id: 'insert.star',       label: t('Star / Polygon…'),    category: t('Insert'), keywords: 'star polygon spiral shape burst pentagon hexagon insert create', icon: Star, run: () => setModal('showStar', true) },

@@ -47,6 +47,7 @@ const OffsetPathDialog = lazy(() => import('./components/OffsetPathDialog').then
 const BlendDialog = lazy(() => import('./components/BlendDialog').then(m => ({ default: m.BlendDialog })));
 const RoughenDialog = lazy(() => import('./components/RoughenDialog').then(m => ({ default: m.RoughenDialog })));
 const ZigzagDialog = lazy(() => import('./components/ZigzagDialog').then(m => ({ default: m.ZigzagDialog })));
+const PuckerDialog = lazy(() => import('./components/PuckerDialog').then(m => ({ default: m.PuckerDialog })));
 const TwistDialog = lazy(() => import('./components/TwistDialog').then(m => ({ default: m.TwistDialog })));
 const StarDialog = lazy(() => import('./components/StarDialog').then(m => ({ default: m.StarDialog })));
 const FindReplaceDialog = lazy(() => import('./components/FindReplaceDialog').then(m => ({ default: m.FindReplaceDialog })));
@@ -732,6 +733,7 @@ export default function App() {
   const showBlend = useEditor(s => s.showBlend);
   const showRoughen = useEditor(s => s.showRoughen);
   const showZigzag = useEditor(s => s.showZigzag);
+  const showPucker = useEditor(s => s.showPucker);
   const showTwist = useEditor(s => s.showTwist);
   const showStar = useEditor(s => s.showStar);
   const showFindReplace = useEditor(s => s.showFindReplace);
@@ -1304,6 +1306,11 @@ export default function App() {
       {showZigzag && (
         <Suspense fallback={null}>
           <ZigzagDialog />
+        </Suspense>
+      )}
+      {showPucker && (
+        <Suspense fallback={null}>
+          <PuckerDialog />
         </Suspense>
       )}
       {showTwist && (

@@ -171,7 +171,7 @@ export function CanvasContextMenu() {
     c?.requestRenderAll();
   };
 
-  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showGrommets' | 'showVariableData' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag' | 'showTwist') =>
+  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showGrommets' | 'showVariableData' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist') =>
     useEditor.getState().setModal(k, true);
 
   const nest = () => {
@@ -453,6 +453,7 @@ export function CanvasContextMenu() {
         <Item label={t('Offset Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOffsetPath'), hasSelection)} />
         <Item label={t('Roughen…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoughen'), hasSelection)} />
         <Item label={t('Zig Zag…')} disabled={!hasSelection} onClick={() => run(() => openModal('showZigzag'), hasSelection)} />
+        <Item label={t('Pucker & Bloat…')} disabled={!hasSelection} onClick={() => run(() => openModal('showPucker'), hasSelection)} />
         <Item label={t('Twist…')} disabled={!hasSelection} onClick={() => run(() => openModal('showTwist'), hasSelection)} />
       </SubMenu>
       <Item
