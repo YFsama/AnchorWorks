@@ -581,3 +581,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Duplicate Artboard — artboards.ts duplicateArtboard() clones an artboard frame +
       its contained artwork (centre-in-bounds) offset to the row's right; ArtboardsPanel
       per-row Copy button focuses the new board (Illustrator/SignMaster). 2026-06-03.
+- [x] Artboard from selection — artboards.ts createArtboardFromSelection() frames the active
+      selection's bbox in place; ArtboardsPanel 'From Selection' button beside Add Artboard
+      (Illustrator Artboard-from-selection), distinct from Fit-Artboard. 2026-06-03.
