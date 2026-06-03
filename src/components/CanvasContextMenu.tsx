@@ -14,6 +14,7 @@ import {
   autoArrangeSelection,
   flipSelection,
   selectSame,
+  selectSameType,
   selectInverse,
   lockSelection,
   unlockAll,
@@ -474,6 +475,7 @@ export function CanvasContextMenu() {
         <Item label={t('Select Same Stroke')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
         <Item label={t('Select Same Stroke Weight')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
         <Item label={t('Select Same Opacity')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Type')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameType(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
       </SubMenu>
       <Item
         label={t('Select Inverse')}

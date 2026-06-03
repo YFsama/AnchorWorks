@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, zoomToPercent, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection, ungroupAll,
-  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, centerOnArtboard, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, selectAllText, deselectAll, selectObjectInStack,
+  bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, centerOnArtboard, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, selectAllText, selectSameType, deselectAll, selectObjectInStack,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
 import { getFormat } from '../lib/formats';
@@ -236,6 +236,7 @@ export function CommandPalette({
     { id: 'edit.selectSameStroke', label: t('Select Same Stroke'), category: t('Edit'), keywords: 'select same stroke colour color match', icon: MousePointerClick, run: () => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
     { id: 'edit.selectSameWeight', label: t('Select Same Stroke Weight'), category: t('Edit'), keywords: 'select same stroke weight width thickness match', icon: MousePointerClick, run: () => { const n = selectSame('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
     { id: 'edit.selectSameOpacity', label: t('Select Same Opacity'), category: t('Edit'), keywords: 'select same opacity transparency alpha match', icon: MousePointerClick, run: () => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+    { id: 'edit.selectSameType', label: t('Select Same Type'), category: t('Edit'), keywords: 'select same type object kind shape rectangle path text batch', icon: MousePointerClick, run: () => { const n = selectSameType(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
     { id: 'edit.lock',        label: t('Lock Selection'),      category: t('Edit'), keywords: 'lock freeze protect immovable', icon: MousePointerClick, run: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
     { id: 'edit.unlockAll',   label: t('Unlock All'),          category: t('Edit'), keywords: 'unlock release all', icon: MousePointerClick, run: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
     { id: 'edit.hide',        label: t('Hide Selection'),      category: t('Edit'), shortcut: 'Ctrl+3', keywords: 'hide invisible conceal', icon: MousePointerClick, run: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },

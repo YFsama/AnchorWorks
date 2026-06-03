@@ -942,6 +942,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Nothing below.': { en: 'Nothing below.', zh: '下方没有对象。' },
   'Select Same Stroke Weight': { en: 'Select Same Stroke Weight', zh: '选择相同描边粗细' },
   'Select Same Opacity': { en: 'Select Same Opacity', zh: '选择相同不透明度' },
+  'Select Same Type': { en: 'Select Same Type', zh: '选择相同类型' },
   'Select an object with a solid colour first.': {
     en: 'Select an object with a solid colour first.',
     zh: '请先选中一个有纯色的对象。',

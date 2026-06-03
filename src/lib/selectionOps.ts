@@ -264,6 +264,27 @@ export function selectAllText(): number {
   return selectByType(['i-text', 'text', 'textbox']);
 }
 
+/**
+ * Select every object sharing the active object's type (Illustrator/SignMaster
+ * "Select Same → Object Type"). The three text variants are folded together so
+ * picking any text selects all text. Returns the number selected, 0 if nothing
+ * is active.
+ */
+const TEXT_TYPES = ['i-text', 'text', 'textbox'];
+export function selectSameType(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const ref = canvas.getActiveObject();
+  if (!ref) return 0;
+  // An ActiveSelection has no meaningful single type — use its first child.
+  const refObj = (ref.type === 'activeselection')
+    ? (ref as fabric.ActiveSelection).getObjects()[0]
+    : ref;
+  const type = refObj?.type;
+  if (!type) return 0;
+  return selectByType(TEXT_TYPES.includes(type) ? TEXT_TYPES : [type]);
+}
+
 /** Select every selectable object on the canvas (Illustrator Select→All).
  *  Returns the number selected. */
 export function selectAllObjects(): number {
