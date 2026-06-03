@@ -23,7 +23,10 @@ export function TransformDialog() {
   const [rotate, setRotate] = useState(0);
   const [copy, setCopy] = useState(false);
   const [each, setEach] = useState(false);
-  const [unit, setUnit] = useState<'mm' | 'px'>('mm');
+  // Unit is the shared document unit (store) so the Transform dialog, inspector,
+  // rulers and status bar always agree; toggling here flips them all.
+  const unit = useEditor(s => s.dimUnit);
+  const setUnit = useEditor(s => s.setDimUnit);
   const k = unit === 'mm' ? 3.7795 : 1;
 
   useEscapeClose(open, close);
