@@ -532,3 +532,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       persisted mm/px segmented toggle (PropertiesPanel.tsx xfUnit + toU/fromU,
       localStorage vector.xfUnit, default mm); the always-visible core inspector was
       px-only while the Resize/Transform dialogs already used mm. 2026-06-03.
+- [x] Shared dim unit — lift the mm/px unit into the store (editor.ts dimUnit/setDimUnit
+      + readInitialDimUnit, reuses vector.xfUnit key) so the inspector and the status-bar
+      selection dimensions (StatusBar.tsx dim()) always agree instead of the status bar
+      staying hard-coded px. 2026-06-03.
