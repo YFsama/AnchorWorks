@@ -5,7 +5,7 @@
 
 import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
-import { exportSVG } from './io';
+import { exportSVG, importSVGString } from './io';
 import { toast } from './toast';
 import { t } from './i18n';
 import { logger } from './debug';
@@ -180,6 +180,39 @@ export async function importImageFile(
     });
   } catch {
     /* non-fatal */
+  }
+}
+
+/**
+ * Paste an image or SVG from the *system* clipboard (Illustrator's external
+ * paste) — distinct from the in-app object clipboard on Ctrl+V. Uses the async
+ * Clipboard API: raster image blobs import as images, `image/svg+xml` or text
+ * that looks like SVG imports as vectors. Returns 'empty' when the clipboard
+ * holds nothing usable, 'failed' if the API is unavailable/blocked, else 'ok'.
+ */
+export async function pasteFromSystemClipboard(): Promise<'ok' | 'empty' | 'failed'> {
+  if (!navigator.clipboard?.read) return 'failed';
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      if (item.types.includes('image/svg+xml')) {
+        const blob = await item.getType('image/svg+xml');
+        await importSVGString(await blob.text());
+        return 'ok';
+      }
+      const imgType = item.types.find((ty) => ty.startsWith('image/'));
+      if (imgType) {
+        const blob = await item.getType(imgType);
+        await importImageFile(new File([blob], `pasted.${imgType.split('/')[1] || 'png'}`, { type: imgType }));
+        return 'ok';
+      }
+    }
+    // Fall back to clipboard text that is actually SVG markup (e.g. Copy as SVG).
+    const text = await navigator.clipboard.readText?.();
+    if (text && /<svg[\s>]/i.test(text)) { await importSVGString(text); return 'ok'; }
+    return 'empty';
+  } catch {
+    return 'failed';
   }
 }
 

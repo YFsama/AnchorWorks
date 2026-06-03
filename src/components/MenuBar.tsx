@@ -22,7 +22,7 @@ import { rasterizeSelection } from '../lib/rasterize';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
-import { importImageFile } from '../lib/io3';
+import { importImageFile, pasteFromSystemClipboard } from '../lib/io3';
 import { getFormat } from '../lib/formats';
 import { resetOnboarding } from '../lib/onboarding';
 import { useT, useI18n, LANGUAGES, t as tStatic, type Lang } from '../lib/i18n';
@@ -151,6 +151,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('New from Template…'), onClick: () => setModal('showTemplates', true) },
         { label: t('Open SVG / JSON…'), onClick: () => fileRef.current?.click(), kbd: 'Ctrl+O' },
         { label: t('Import Image…'), onClick: () => imageRef.current?.click() },
+        { label: t('Paste from Clipboard'), onClick: () => { void pasteFromSystemClipboard().then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }); } },
         { sep: true },
         // File-menu exports route through the format registry — same files,
         // filenames, and options as before, but every consumer (CommandPalette,

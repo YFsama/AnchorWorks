@@ -68,6 +68,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'New from Template…': { en: 'New from Template…', zh: '从模板新建…' },
   'Open SVG / JSON…': { en: 'Open SVG / JSON…', zh: '打开 SVG / JSON…' },
   'Import Image…': { en: 'Import Image…', zh: '导入图像…' },
+  'Paste from Clipboard': { en: 'Paste from Clipboard', zh: '从剪贴板粘贴' },
+  'No image or SVG on the clipboard.': { en: 'No image or SVG on the clipboard.', zh: '剪贴板中没有图像或 SVG。' },
   'Export SVG': { en: 'Export SVG', zh: '导出 SVG' },
   'Export PNG (2×)': { en: 'Export PNG (2×)', zh: '导出 PNG (2×)' },
   'Export JPG (2×)': { en: 'Export JPG (2×)', zh: '导出 JPG (2×)' },

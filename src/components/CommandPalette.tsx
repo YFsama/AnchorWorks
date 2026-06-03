@@ -28,6 +28,7 @@ import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { fitArtboardToContent } from '../lib/fitArtboard';
 import { exportSelectionSVG, exportSelectionPNG, copySelectionSVG } from '../lib/exportSelection';
+import { pasteFromSystemClipboard } from '../lib/io3';
 import { exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
 import { rasterizeSelection } from '../lib/rasterize';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
@@ -191,6 +192,7 @@ export function CommandPalette({
     { id: 'file.saveProject',   label: t('Save Project'),        category: t('File'), shortcut: 'Ctrl+Shift+S', keywords: 'persist vstudio', icon: Save, run: () => { void saveProjectQuick(); } },
     { id: 'file.saveProjectAs', label: t('Save Project As…'),    category: t('File'), keywords: 'copy duplicate vstudio',   icon: Save,       run: () => { void saveProjectToFile(); } },
     { id: 'file.importImage', label: t('Import Image…'),       category: t('File'), keywords: 'png jpg picture',         icon: Image,      run: onImportImage },
+    { id: 'file.pasteClipboard', label: t('Paste from Clipboard'), category: t('File'), keywords: 'paste clipboard image svg external system import', icon: Image, run: () => { void pasteFromSystemClipboard().then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }); } },
     { id: 'file.exportSvg',   label: t('Export SVG'),          category: t('File'), shortcut: 'Ctrl+S', keywords: getFormat('svg')?.keywords, icon: Save,
       // Routes through the format registry — see `formatRegistration.ts`
       // SVG handler. Identical byte output to the previous direct
