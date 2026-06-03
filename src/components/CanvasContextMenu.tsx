@@ -171,7 +171,7 @@ export function CanvasContextMenu() {
     c?.requestRenderAll();
   };
 
-  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag' | 'showTwist') =>
+  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showGrommets' | 'showVariableData' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag' | 'showTwist') =>
     useEditor.getState().setModal(k, true);
 
   const nest = () => {
@@ -433,8 +433,10 @@ export function CanvasContextMenu() {
       <SubMenu label={t('Sign Effects')} openLeft={openLeft} disabled={!hasSelection}>
         <Item label={t('Multi-outline…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOutline'), hasSelection)} />
         <Item label={t('Recolor Artwork…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRecolor'), hasSelection)} />
-        <Item label={t('Auto-arrange (Nest)')} disabled={active.length < 2} onClick={() => run(() => nest(), active.length >= 2)} />
         <Item label={t('Rhinestone Template…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRhinestone'), hasSelection)} />
+        <Item label={t('Banner Grommets…')} disabled={!hasSelection} onClick={() => run(() => openModal('showGrommets'), hasSelection)} />
+        <Item label={t('Variable Data…')} disabled={!hasSelection} onClick={() => run(() => openModal('showVariableData'), hasSelection)} />
+        <Item label={t('Auto-arrange (Nest)')} disabled={active.length < 2} onClick={() => run(() => nest(), active.length >= 2)} />
       </SubMenu>
       <Item
         label={t('Join Paths')}
