@@ -549,3 +549,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Right-click Select Same submenu — CanvasContextMenu.tsx replaces the lone Select
       Same Fill item with a Select Same SubMenu (fill/stroke/stroke-weight/opacity) to
       match the command palette + Illustrator Select>Same; i18n.ts adds parent key. 2026-06-03.
+- [x] Select Same Type — selectionOps.ts selectSameType() selects every object sharing the
+      active object's type (text variants folded); wired into the right-click Select Same
+      submenu + command palette (Illustrator/SignMaster Select>Same>Object Type). 2026-06-03.
