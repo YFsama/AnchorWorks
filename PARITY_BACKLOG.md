@@ -604,3 +604,5 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       applyTransform; was X/Y only. 2026-06-03.
 - [x] Non-uniform scale — transformOps.ts TransformParams.scaleY (optional) + per-axis apply;
       TransformDialog Scale X%/Y% with a Link toggle (default linked); was single uniform %. 2026-06-03.
+- [x] Miter limit — effects.ts StrokeStylePatch.strokeMiterLimit + apply; PropertiesPanel
+      Advanced stroke shows a Miter limit field when join=miter (SVG stroke-miterlimit). 2026-06-03.
