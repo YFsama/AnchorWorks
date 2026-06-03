@@ -356,6 +356,9 @@ const dict: Record<string, Record<Lang, string>> = {
   'Trace': { en: 'Trace', zh: '描摹' },
   'Tracing…': { en: 'Tracing…', zh: '描摹中…' },
   'Image traced': { en: 'Image traced', zh: '图像已描摹' },
+  'Trace Image': { en: 'Trace Image', zh: '描摹图像' },
+  'Select a raster image first.': { en: 'Select a raster image first.', zh: '请先选中一张位图。' },
+  'Could not extract enough outline pixels. Try a higher-contrast image.': { en: 'Could not extract enough outline pixels. Try a higher-contrast image.', zh: '无法提取足够的轮廓像素，请尝试对比度更高的图像。' },
   'Import an image into the library': { en: 'Import an image into the library', zh: '将图像导入到库中' },
   'Trace the selected raster image into a polygon': { en: 'Trace the selected raster image into a polygon', zh: '将选中位图描摹为多边形' },
   "Drop images on the canvas or use Import — they'll show up here for quick re-use.": {

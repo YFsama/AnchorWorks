@@ -28,7 +28,7 @@ import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { fitArtboardToContent } from '../lib/fitArtboard';
 import { exportSelectionSVG, exportSelectionPNG, copySelectionSVG } from '../lib/exportSelection';
-import { pasteFromSystemClipboard } from '../lib/io3';
+import { pasteFromSystemClipboard, traceSelectedImage } from '../lib/io3';
 import { exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
 import { rasterizeSelection } from '../lib/rasterize';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
@@ -256,6 +256,7 @@ export function CommandPalette({
     { id: 'arrange.resize',    label: t('Resize…'),            category: t('Arrange'), keywords: 'resize scale exact size mm width height dimensions', icon: Wand2, run: () => setModal('showResize', true) },
     { id: 'arrange.centerArtboard', label: t('Center on Artboard'), category: t('Arrange'), keywords: 'center centre artboard page middle align', icon: AlignCenter, run: () => { if (!centerOnArtboard()) toast.warn(t('Select something first.')); } },
     { id: 'arrange.rasterize', label: t('Rasterize'),          category: t('Arrange'), keywords: 'rasterize raster bitmap flatten image png', icon: Wand2, run: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
+    { id: 'image.trace', label: t('Trace Image'),              category: t('Arrange'), keywords: 'image trace vectorise vectorize outline bitmap raster polygon autotrace', icon: Wand2, run: () => { void traceSelectedImage().then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }); } },
     { id: 'arrange.shear',     label: t('Shear…'),             category: t('Arrange'), keywords: 'shear skew slant oblique italic transform', icon: Wand2, run: () => setModal('showShear', true) },
     { id: 'arrange.transformAgain', label: t('Transform Again'), category: t('Arrange'), shortcut: 'Ctrl+Alt+D', keywords: 'transform again repeat step and repeat array duplicate last', icon: Wand2, run: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); } },
     { id: 'arrange.rotateCW',  label: t('Rotate 90° CW'),      category: t('Arrange'), keywords: 'rotate 90 clockwise right turn', icon: RotateCw, run: () => { void rotateSelection(90); } },

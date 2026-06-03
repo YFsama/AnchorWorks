@@ -35,6 +35,7 @@ import { rotateSelection } from '../lib/transformOps';
 import { booleanOp, divideSelection, trimSelection, mergeSelection, cropSelection } from '../lib/booleanOps';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { reversePathSelection } from '../lib/pathReverse';
+import { traceSelectedImage } from '../lib/io3';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
@@ -429,6 +430,11 @@ export function CanvasContextMenu() {
         label={t('Outline Stroke')}
         disabled={!hasSelection}
         onClick={() => run(() => outlineStroke(), hasSelection)}
+      />
+      <Item
+        label={t('Trace Image')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { void traceSelectedImage().then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }); }, hasSelection)}
       />
       <SubMenu label={t('Sign Effects')} openLeft={openLeft} disabled={!hasSelection}>
         <Item label={t('Multi-outline…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOutline'), hasSelection)} />

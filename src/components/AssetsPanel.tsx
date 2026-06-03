@@ -72,8 +72,8 @@ export function AssetsPanel() {
                 void (async () => {
                   setTracing(true);
                   try {
-                    await traceSelectedImage();
-                    toast.success(t('Image traced'));
+                    if (await traceSelectedImage()) toast.success(t('Image traced'));
+                    else toast.warn(t('Select a raster image first.'));
                   } catch (err) {
                     toast.error(err instanceof Error ? err.message : String(err), { title: t('Trace') });
                   } finally {

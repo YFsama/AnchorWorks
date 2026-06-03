@@ -658,17 +658,14 @@ function traceOnWorker(imageData: ImageData, threshold: number): Promise<Array<[
  * (see `./workers/trace.worker.ts`). If the worker can't be created the
  * algorithm transparently falls back to the main thread.
  */
-export async function traceSelectedImage(): Promise<void> {
+export async function traceSelectedImage(): Promise<boolean> {
   const canvas = getCanvas();
-  if (!canvas) return;
+  if (!canvas) return false;
   const active = canvas.getActiveObject();
-  if (!active || active.type !== 'image') {
-    alert('Select a raster image first.');
-    return;
-  }
+  if (!active || active.type !== 'image') return false;
   const img = active as fabric.FabricImage;
   const el = img.getElement() as HTMLImageElement | HTMLCanvasElement;
-  if (!el) return;
+  if (!el) return false;
 
   const srcW = (el as HTMLImageElement).naturalWidth || (el as HTMLCanvasElement).width;
   const srcH = (el as HTMLImageElement).naturalHeight || (el as HTMLCanvasElement).height;
@@ -683,7 +680,7 @@ export async function traceSelectedImage(): Promise<void> {
   off.width = w;
   off.height = h;
   const ctx = off.getContext('2d');
-  if (!ctx) return;
+  if (!ctx) return false;
   ctx.drawImage(el, 0, 0, w, h);
   const imageData = ctx.getImageData(0, 0, w, h);
 
@@ -699,15 +696,15 @@ export async function traceSelectedImage(): Promise<void> {
     sampled = await traceOnWorker(imageData, 128);
   } catch (err) {
     logger.error('trace', `failed: ${err instanceof Error ? err.message : String(err)}`);
-    return;
+    return false;
   } finally {
     window.clearTimeout(toastTimer);
     if (toastId) toast.dismiss(toastId);
   }
 
   if (sampled.length < 3) {
-    alert('Could not extract enough outline pixels. Try a higher-contrast image.');
-    return;
+    toast.warn(t('Could not extract enough outline pixels. Try a higher-contrast image.'));
+    return false;
   }
 
   // Map back to the image's on-canvas coordinate space.
@@ -734,4 +731,5 @@ export async function traceSelectedImage(): Promise<void> {
   canvas.setActiveObject(poly);
   canvas.requestRenderAll();
   pushHistory();
+  return true;
 }
