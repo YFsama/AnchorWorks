@@ -584,3 +584,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Artboard from selection — artboards.ts createArtboardFromSelection() frames the active
       selection's bbox in place; ArtboardsPanel 'From Selection' button beside Add Artboard
       (Illustrator Artboard-from-selection), distinct from Fit-Artboard. 2026-06-03.
+- [x] Pucker & Bloat — lib/pucker.ts puckerBloatPolyline()/puckerSelection() bows segments
+      toward/away from the centroid (-100..100%) keeping anchors fixed; PuckerDialog +
+      Distort&Transform menu/palette/right-click (Illustrator); 6 unit tests. 2026-06-03.
