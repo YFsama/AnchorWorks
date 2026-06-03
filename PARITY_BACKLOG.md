@@ -609,3 +609,5 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Stroke controls sync — PropertiesPanel.tsx selection-change block now hydrates dash
       preset/custom + cap + join + miter from the active object (were write-only/stale),
       matching the dash array to a preset or surfacing it in the custom field. 2026-06-03.
+- [x] Blend mode sync — PropertiesPanel.tsx selection-change block hydrates blendMode from
+      the object's globalCompositeOperation (was write-only/stale, same class of fix). 2026-06-03.
