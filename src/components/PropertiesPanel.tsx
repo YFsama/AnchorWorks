@@ -152,6 +152,18 @@ export function PropertiesPanel() {
     if (c) {
       setStrokeAlignState(getStrokeAlign(c.getActiveObject()));
       setStrokeUniformState(!!(c.getActiveObject() as { strokeUniform?: boolean } | undefined)?.strokeUniform);
+      // Reflect the object's actual stroke style so the controls aren't stale.
+      const so = c.getActiveObject() as { strokeDashArray?: number[] | null; strokeLineCap?: CanvasLineCap; strokeLineJoin?: CanvasLineJoin; strokeMiterLimit?: number } | undefined;
+      if (so) {
+        setLineCap(so.strokeLineCap ?? 'butt');
+        setLineJoin(so.strokeLineJoin ?? 'miter');
+        setMiterLimit(typeof so.strokeMiterLimit === 'number' ? so.strokeMiterLimit : 4);
+        const da = Array.isArray(so.strokeDashArray) ? so.strokeDashArray : [];
+        const preset = (Object.keys(DASH_PRESETS) as (keyof typeof DASH_PRESETS)[])
+          .find((kk) => JSON.stringify(DASH_PRESETS[kk]) === JSON.stringify(da));
+        if (preset) { setDashKey(preset); setDashCustom(''); }
+        else { setDashKey('solid'); setDashCustom(da.join(' ')); }
+      }
       const obj = c.getActiveObject() as { shadow?: { color?: string; blur?: number; offsetX?: number; offsetY?: number } | null } | undefined;
       const sh = obj?.shadow;
       if (sh && typeof sh === 'object') {
