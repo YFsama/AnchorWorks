@@ -516,3 +516,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       selected text object, not just the active one, so Select All Text Objects +
       pick a font restyles them all (Illustrator's font-change-across-selection /
       Find Font). 2026-06-03.
+- [x] Character panel multi-select — patchActiveText() (CharacterPanel.tsx) applies
+      bold/italic/size/tracking/leading/align/etc. to every selected text object, not
+      just the active one (same single-object bug as the font picker). 2026-06-03.

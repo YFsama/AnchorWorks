@@ -79,11 +79,14 @@ function readActiveTextProps(): TextProps | null {
 function patchActiveText(patch: Partial<TextProps>) {
   const c = getCanvas();
   if (!c) return;
-  const a = c.getActiveObject();
-  if (!a) return;
-  if (a.type !== 'i-text' && a.type !== 'text' && a.type !== 'textbox') return;
-  (a as fabric.IText).set(patch as Record<string, unknown>);
-  a.setCoords();
+  // Apply to every selected text object so a multi-text selection restyles all
+  // of them, not just the active one.
+  const texts = c.getActiveObjects().filter((o) => o.type === 'i-text' || o.type === 'text' || o.type === 'textbox') as fabric.IText[];
+  if (texts.length === 0) return;
+  for (const a of texts) {
+    a.set(patch as Record<string, unknown>);
+    a.setCoords();
+  }
   c.requestRenderAll();
   pushHistory();
 }
