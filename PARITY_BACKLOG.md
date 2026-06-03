@@ -576,3 +576,5 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Text H/V scale — CharacterPanel.tsx adds Horizontal/Vertical Scale (%) fields backed
       by the text scaleX/scaleY (10..1000%) for condensing/extending type to fit a width
       (CorelDRAW/SignMaster staple); applies across multi-text selection. 2026-06-03.
+- [x] Zoom to Selection surfaces — viewport.ts zoomToSelection() extracted from App.tsx
+      inline; now wired into the View menu + command palette (Ctrl+2), not keyboard-only. 2026-06-03.
