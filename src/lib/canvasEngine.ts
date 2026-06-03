@@ -298,7 +298,7 @@ export { bringForward, sendBackward, bringToFront, sendToBack } from './zOrder';
 // Group / ungroup operations extracted to grouping.ts (task #20).
 // Re-exported for back-compat: CanvasContextMenu, PropertiesPanel,
 // CommandPalette, App.tsx skills keep importing from './canvasEngine'.
-export { groupSelection, ungroupSelection } from './grouping';
+export { groupSelection, ungroupSelection, ungroupAll } from './grouping';
 
 // Document-level ops (resize / background) extracted to docOps.ts (task #20).
 // Re-exported for back-compat: App.tsx, DocSettingsDialog, templates.ts,

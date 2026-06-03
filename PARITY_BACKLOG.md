@@ -522,3 +522,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Create Outlines on multi-selection — textToOutline.ts refactored into
       traceTextToPath() + a loop, so Create Outlines converts every selected text
       object (was single-only); canCreateOutlines() now true for 1+ text. 2026-06-03.
+- [x] Ungroup All — grouping.ts ungroupAll() recursively breaks every nested group
+      in the selection down to leaf objects (flatten before cutting/booleans); Edit
+      menu + command palette. 2026-06-03.

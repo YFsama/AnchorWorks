@@ -106,6 +106,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Show Guides': { en: 'Show Guides', zh: '显示参考线' },
   'Recently used': { en: 'Recently used', zh: '最近使用' },
   'Hide Others': { en: 'Hide Others', zh: '隐藏其他' },
+  'Ungroup All': { en: 'Ungroup All', zh: '全部解组' },
+  'groups ungrouped': { en: 'groups ungrouped', zh: '个组已解组' },
   'Center on Artboard': { en: 'Center on Artboard', zh: '居中到画板' },
   'Constant Stroke Width': { en: 'Constant Stroke Width', zh: '描边宽度恒定' },
   'Constant width': { en: 'Constant width', zh: '宽度恒定' },

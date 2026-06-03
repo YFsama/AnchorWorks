@@ -13,7 +13,7 @@ import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
 import {
   undo, redo, zoomBy, zoomFit, zoomToPercent, deleteSelection, duplicateSelection,
-  groupSelection, ungroupSelection,
+  groupSelection, ungroupSelection, ungroupAll,
   bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, centerOnArtboard, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, selectAllText, deselectAll, selectObjectInStack,
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
@@ -222,6 +222,7 @@ export function CommandPalette({
     { id: 'edit.delete',     label: t('Delete'),    category: t('Edit'), shortcut: 'Del',    icon: Trash2,   run: () => deleteSelection() },
     { id: 'edit.group',      label: t('Group'),     category: t('Edit'), keywords: 'combine bundle',         icon: Group,    run: () => groupSelection() },
     { id: 'edit.ungroup',    label: t('Ungroup'),   category: t('Edit'),                                     icon: Ungroup,  run: () => ungroupSelection() },
+    { id: 'edit.ungroupAll', label: t('Ungroup All'), category: t('Edit'), keywords: 'ungroup all flatten recursive nested groups', icon: Ungroup, run: () => { const n = ungroupAll(); if (n) toast.success(`${n} ${t('groups ungrouped')}`); else toast.warn(t('Select a group first.')); } },
     { id: 'edit.selectAll',  label: t('Select All'), category: t('Edit'), shortcut: 'Ctrl+A',                icon: MousePointerClick, run: selectAll },
     { id: 'edit.deselectAll', label: t('Deselect All'), category: t('Edit'), shortcut: 'Ctrl+Shift+A', keywords: 'deselect none clear selection nothing', icon: MousePointerClick, run: () => { deselectAll(); } },
     { id: 'edit.pasteInPlace', label: t('Paste in Place'),     category: t('Edit'), shortcut: 'Ctrl+Shift+V', keywords: 'paste place position original same', icon: Copy, run: () => { void pasteFromClipboard(undefined, true); } },

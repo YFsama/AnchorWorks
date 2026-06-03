@@ -32,6 +32,39 @@ export function groupSelection(): void {
   canvas.requestRenderAll();
 }
 
+/**
+ * Recursively ungroup every group (and nested group) in the selection down to
+ * leaf objects — flattening before cutting / boolean ops. Returns the number of
+ * groups broken.
+ */
+export function ungroupAll(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects().slice();
+  if (objs.length === 0) return 0;
+  canvas.discardActiveObject(); // groups back to absolute coords before breaking
+
+  let broken = 0;
+  const leaves: FabricObject[] = [];
+  const queue = [...objs];
+  while (queue.length) {
+    const o = queue.shift() as FabricObject;
+    if (o.type === 'group') {
+      const kids = (o as fabric.Group).removeAll() as FabricObject[];
+      canvas.remove(o);
+      kids.forEach((k) => canvas.add(k));
+      queue.push(...kids);
+      broken++;
+    } else {
+      leaves.push(o);
+    }
+  }
+  if (broken === 0) { canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas })); return 0; }
+  canvas.setActiveObject(leaves.length === 1 ? leaves[0] : new fabric.ActiveSelection(leaves, { canvas }));
+  canvas.requestRenderAll();
+  return broken;
+}
+
 /** Ungroup the currently-active Fabric.Group back into a multi-selection.
  *  No-op unless the active object is a Group. */
 export function ungroupSelection(): void {
