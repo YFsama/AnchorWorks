@@ -34,6 +34,8 @@ import { joinSelection } from '../lib/pathJoin';
 import { rotateSelection } from '../lib/transformOps';
 import { booleanOp, divideSelection, trimSelection, mergeSelection, cropSelection } from '../lib/booleanOps';
 import { addAnchorsToSelection } from '../lib/addAnchors';
+import { reversePathSelection } from '../lib/pathReverse';
+import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
@@ -442,6 +444,8 @@ export function CanvasContextMenu() {
       />
       <SubMenu label={t('Path Effects')} openLeft={openLeft} disabled={!hasSelection}>
         <Item label={t('Add Anchor Points')} disabled={!hasSelection} onClick={() => run(() => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
+        <Item label={t('Outline Stroke to Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); }, hasSelection)} />
+        <Item label={t('Reverse Path Direction')} disabled={!hasSelection} onClick={() => run(() => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
         <Item label={t('Simplify Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showSimplify'), hasSelection)} />
         <Item label={t('Round Corners…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoundCorners'), hasSelection)} />
         <Item label={t('Offset Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOffsetPath'), hasSelection)} />
