@@ -12,7 +12,7 @@
  */
 
 import * as fabric from 'fabric';
-import { getCanvas } from './canvasEngine';
+import { getCanvas, pushHistory } from './canvasEngine';
 import { useEditor } from '../store/editor';
 import { download, downloadDataURL } from './io';
 import type { Artboard } from '../types';
@@ -112,6 +112,45 @@ export function createArtboard(name?: string, w?: number, h?: number): Artboard 
 export function deleteArtboard(id: string): void {
   const list = getArtboards().filter((a) => a.id !== id);
   commit(list);
+}
+
+/**
+ * Duplicate an artboard together with the artwork inside it (Illustrator/
+ * SignMaster "Duplicate Artboard"). The new frame is placed to the right of all
+ * existing artboards on the source's row; every object whose centre lies inside
+ * the source frame is cloned and shifted by the same delta. Async because
+ * Fabric v6's clone() is Promise-based. Returns the new artboard, or null.
+ */
+export async function duplicateArtboard(id: string): Promise<Artboard | null> {
+  const src = findArtboard(id);
+  if (!src) return null;
+  const list = getArtboards();
+  const rightmost = list.reduce((acc, a) => (a.x + a.width > acc.x + acc.width ? a : acc), list[0]);
+  const nx = rightmost.x + rightmost.width + 30;
+  const ny = src.y;
+  const ab: Artboard = { id: nextId(), name: `${src.name} copy`, x: nx, y: ny, width: src.width, height: src.height };
+  commit([...list, ab]);
+
+  const canvas = getCanvas();
+  if (canvas) {
+    const dx = nx - src.x;
+    const dy = ny - src.y;
+    const inside = canvas.getObjects().filter((o) => {
+      if ((o as { excludeFromExport?: boolean }).excludeFromExport) return false;
+      const b = o.getBoundingRect();
+      const cx = b.left + b.width / 2;
+      const cy = b.top + b.height / 2;
+      return cx >= src.x && cx <= src.x + src.width && cy >= src.y && cy <= src.y + src.height;
+    });
+    for (const o of inside) {
+      const clone = (await o.clone()) as fabric.FabricObject;
+      clone.set({ left: (o.left ?? 0) + dx, top: (o.top ?? 0) + dy });
+      clone.setCoords();
+      canvas.add(clone);
+    }
+    if (inside.length) { canvas.requestRenderAll(); pushHistory(); }
+  }
+  return ab;
 }
 
 export function renameArtboard(id: string, name: string): void {

@@ -756,6 +756,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'MCP discovery complete': { en: 'MCP discovery complete', zh: 'MCP 发现完成' },
   'No tools discovered': { en: 'No tools discovered', zh: '未发现任何工具' },
   'Focus this artboard': { en: 'Focus this artboard', zh: '聚焦此画板' },
+  'Duplicate this artboard': { en: 'Duplicate this artboard', zh: '复制此画板' },
+  'Artboard duplicated': { en: 'Artboard duplicated', zh: '画板已复制' },
   'Artboard navigation': { en: 'Artboard navigation', zh: '画板导航' },
   'Previous artboard': { en: 'Previous artboard', zh: '上一个画板' },
   'Next artboard': { en: 'Next artboard', zh: '下一个画板' },

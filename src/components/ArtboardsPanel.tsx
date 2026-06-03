@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target, Copy } from 'lucide-react';
 import { zoomToArtboard } from '../lib/canvasEngine';
+import { toast } from '../lib/toast';
 import { showConfirm } from '../lib/confirm';
 import { useT } from '../lib/i18n';
 import {
   createArtboard,
   deleteArtboard,
+  duplicateArtboard,
   renameArtboard,
   moveArtboard,
   resizeArtboard,
@@ -144,6 +146,14 @@ function ArtboardRow({ artboard }: { artboard: Artboard }) {
           aria-label={t('Focus this artboard')}
         >
           <Target size={12} aria-hidden="true" />
+        </button>
+        <button
+          onClick={() => { void duplicateArtboard(artboard.id).then((ab) => { if (ab) { zoomToArtboard({ x: ab.x, y: ab.y, width: ab.width, height: ab.height }); toast.success(t('Artboard duplicated')); } }); }}
+          className="p-1 text-muted hover:text-ink transition-colors"
+          title={t('Duplicate this artboard')}
+          aria-label={t('Duplicate this artboard')}
+        >
+          <Copy size={12} aria-hidden="true" />
         </button>
         <button
           onClick={async () => { if (await showConfirm({ message: `${t('Delete artboard')} "${artboard.name}"?`, confirmLabel: t('Delete'), danger: true })) deleteArtboard(artboard.id); }}
