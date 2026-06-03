@@ -578,3 +578,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (CorelDRAW/SignMaster staple); applies across multi-text selection. 2026-06-03.
 - [x] Zoom to Selection surfaces — viewport.ts zoomToSelection() extracted from App.tsx
       inline; now wired into the View menu + command palette (Ctrl+2), not keyboard-only. 2026-06-03.
+- [x] Duplicate Artboard — artboards.ts duplicateArtboard() clones an artboard frame +
+      its contained artwork (centre-in-bounds) offset to the row's right; ArtboardsPanel
+      per-row Copy button focuses the new board (Illustrator/SignMaster). 2026-06-03.
