@@ -590,3 +590,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Edge distribution — alignDistribute.ts distributeByAnchor(dir,'start'|'center'|'end')
       adds top/bottom/left/right-edge distribute (Illustrator's 6-op set); AlignPanel.tsx
       second distribute row with 4 edge buttons. 2026-06-03.
+- [x] Custom dash pattern — PropertiesPanel.tsx Advanced stroke gains a Custom dash field
+      parsing space/comma-separated lengths into strokeDashArray (perforation/cut lines);
+      presets were the only option. 2026-06-03.
