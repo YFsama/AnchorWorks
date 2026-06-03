@@ -112,9 +112,10 @@ export type StrokeStylePatch = Partial<{
   strokeDashArray: number[];
   strokeLineCap: CanvasLineCap;
   strokeLineJoin: CanvasLineJoin;
+  strokeMiterLimit: number;
 }>;
 
-/** Apply advanced stroke styling (dash, line cap, line join) to selection. */
+/** Apply advanced stroke styling (dash, line cap, line join, miter) to selection. */
 export function applyStrokeStyleToSelection(patch: StrokeStylePatch) {
   const canvas = getCanvas();
   if (!canvas) return;
@@ -130,6 +131,9 @@ export function applyStrokeStyleToSelection(patch: StrokeStylePatch) {
     }
     if (patch.strokeLineJoin !== undefined) {
       o.set('strokeLineJoin', patch.strokeLineJoin);
+    }
+    if (patch.strokeMiterLimit !== undefined) {
+      o.set('strokeMiterLimit', patch.strokeMiterLimit);
     }
     o.setCoords();
   });

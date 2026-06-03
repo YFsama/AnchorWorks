@@ -250,6 +250,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Round': { en: 'Round', zh: '圆头' },
   'Square': { en: 'Square', zh: '方头' },
   'Miter': { en: 'Miter', zh: '尖角' },
+  'Miter limit': { en: 'Miter limit', zh: '尖角限制' },
   'Bevel': { en: 'Bevel', zh: '斜角' },
   'Stroke alignment': { en: 'Stroke alignment', zh: '描边对齐' },
   'Center': { en: 'Center', zh: '居中' },

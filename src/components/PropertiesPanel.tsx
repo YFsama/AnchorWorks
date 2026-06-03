@@ -77,6 +77,7 @@ export function PropertiesPanel() {
   const [dashCustom, setDashCustom] = useState('');
   const [lineCap, setLineCap] = useState<CanvasLineCap>('butt');
   const [lineJoin, setLineJoin] = useState<CanvasLineJoin>('miter');
+  const [miterLimit, setMiterLimit] = useState(4);
   const [strokeAlign, setStrokeAlignState] = useState<StrokeAlign>('center');
   const [strokeUniform, setStrokeUniformState] = useState(false);
 
@@ -695,6 +696,25 @@ export function PropertiesPanel() {
             <option value="bevel">{t('Bevel')}</option>
           </RowSelect>
         </Row>
+        {lineJoin === 'miter' && (
+          <Row label={t('Miter limit')}>
+            {/* How far a sharp corner may extend before it's clipped to a bevel
+             *  (SVG stroke-miterlimit). Only meaningful for miter joins. */}
+            <RowInput
+              type="number"
+              min={1}
+              step={1}
+              className="input-num"
+              aria-label={t('Miter limit')}
+              value={String(miterLimit)}
+              onChange={(e) => {
+                const v = Math.max(1, parseFloat(e.target.value) || 4);
+                setMiterLimit(v);
+                applyStrokeStyleToSelection({ strokeMiterLimit: v });
+              }}
+            />
+          </Row>
+        )}
         <Row label={t('Stroke alignment')}>
           <div className="flex items-center gap-1">
             {(['center', 'inside', 'outside'] as const).map((mode) => {
