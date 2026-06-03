@@ -74,6 +74,7 @@ export function PropertiesPanel() {
 
   // Stroke style local state
   const [dashKey, setDashKey] = useState<keyof typeof DASH_PRESETS>('solid');
+  const [dashCustom, setDashCustom] = useState('');
   const [lineCap, setLineCap] = useState<CanvasLineCap>('butt');
   const [lineJoin, setLineJoin] = useState<CanvasLineJoin>('miter');
   const [strokeAlign, setStrokeAlignState] = useState<StrokeAlign>('center');
@@ -642,6 +643,25 @@ export function PropertiesPanel() {
             <option value="dashed">{t('Dashed')}</option>
             <option value="dotted">{t('Dotted')}</option>
           </RowSelect>
+        </Row>
+        <Row label={t('Custom dash')}>
+          {/* Space/comma-separated dash & gap lengths (px) — perforation / cut
+           *  lines need exact patterns the presets can't express. Applies live;
+           *  an empty field is ignored so it doesn't clobber the preset. */}
+          <RowInput
+            className="input-num"
+            aria-label={t('Custom dash')}
+            placeholder="10 5 2 5"
+            value={dashCustom}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setDashCustom(raw);
+              const arr = raw.split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n) && n >= 0);
+              if (arr.length >= 1 && arr.some((n) => n > 0)) {
+                applyStrokeStyleToSelection({ strokeDashArray: arr });
+              }
+            }}
+          />
         </Row>
         <Row label={t('Line cap')}>
           <RowSelect

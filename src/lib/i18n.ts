@@ -228,6 +228,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Offset Y': { en: 'Offset Y', zh: 'Y 偏移' },
   'Angle': { en: 'Angle', zh: '角度' },
   'Dash': { en: 'Dash', zh: '虚线' },
+  'Custom dash': { en: 'Custom dash', zh: '自定义虚线' },
   'Line cap': { en: 'Line cap', zh: '端点' },
   'Line join': { en: 'Line join', zh: '拐角' },
   'Mode': { en: 'Mode', zh: '模式' },
