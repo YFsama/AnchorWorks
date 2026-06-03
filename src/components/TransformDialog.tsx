@@ -23,6 +23,11 @@ export function TransformDialog() {
   const [rotate, setRotate] = useState(0);
   const [copy, setCopy] = useState(false);
   const [each, setEach] = useState(false);
+  // Move can be entered as X/Y or polar distance+angle (Illustrator's Move
+  // dialog). Angle is Illustrator-style: 0° = right, 90° = up.
+  const [moveMode, setMoveMode] = useState<'xy' | 'polar'>('xy');
+  const [dist, setDist] = useState(0);
+  const [angle, setAngle] = useState(0);
   // Unit is the shared document unit (store) so the Transform dialog, inspector,
   // rulers and status bar always agree; toggling here flips them all.
   const unit = useEditor(s => s.dimUnit);
@@ -35,7 +40,12 @@ export function TransformDialog() {
 
   const apply = async () => {
     if (!getCanvas()?.getActiveObject()) { toast.warn(t('Select something to transform.'), { title: t('Transform') }); return; }
-    const ok = await applyTransform({ dx: dx * k, dy: dy * k, scale: scale / 100, rotate, copy, each });
+    // Resolve the move into X/Y (in the active unit). Screen Y grows downward,
+    // so a positive (up) angle negates the Y component.
+    const rad = (angle * Math.PI) / 180;
+    const mdx = moveMode === 'polar' ? dist * Math.cos(rad) : dx;
+    const mdy = moveMode === 'polar' ? -dist * Math.sin(rad) : dy;
+    const ok = await applyTransform({ dx: mdx * k, dy: mdy * k, scale: scale / 100, rotate, copy, each });
     if (ok) toast.success(copy ? t('Transformed copy') : t('Transformed'), { title: t('Transform') });
     close();
   };
@@ -61,13 +71,31 @@ export function TransformDialog() {
           <button type="button" role="radio" aria-checked={unit === 'px'} className={unit === 'px' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setUnit('px')}>px</button>
         </div>
 
+        <div className="flex gap-1 mb-2" role="radiogroup" aria-label={t('Move mode')}>
+          <button type="button" role="radio" aria-checked={moveMode === 'xy'} className={moveMode === 'xy' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setMoveMode('xy')}>{t('XY')}</button>
+          <button type="button" role="radio" aria-checked={moveMode === 'polar'} className={moveMode === 'polar' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setMoveMode('polar')}>{t('Polar')}</button>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
-          <Field label={`${t('Move')} X (${unit})`}>
-            <input type="number" className="input-num" value={dx} onChange={(e) => setDx(parseFloat(e.target.value) || 0)} />
-          </Field>
-          <Field label={`${t('Move')} Y (${unit})`}>
-            <input type="number" className="input-num" value={dy} onChange={(e) => setDy(parseFloat(e.target.value) || 0)} />
-          </Field>
+          {moveMode === 'xy' ? (
+            <>
+              <Field label={`${t('Move')} X (${unit})`}>
+                <input type="number" className="input-num" value={dx} onChange={(e) => setDx(parseFloat(e.target.value) || 0)} />
+              </Field>
+              <Field label={`${t('Move')} Y (${unit})`}>
+                <input type="number" className="input-num" value={dy} onChange={(e) => setDy(parseFloat(e.target.value) || 0)} />
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label={`${t('Distance')} (${unit})`}>
+                <input type="number" className="input-num" value={dist} onChange={(e) => setDist(parseFloat(e.target.value) || 0)} />
+              </Field>
+              <Field label={`${t('Angle')} (°)`}>
+                <input type="number" step={1} className="input-num" value={angle} onChange={(e) => setAngle(parseFloat(e.target.value) || 0)} />
+              </Field>
+            </>
+          )}
           <Field label={`${t('Scale')} (%)`}>
             <input type="number" min={1} step={1} className="input-num" value={scale} onChange={(e) => setScale(Math.max(1, parseFloat(e.target.value) || 100))} />
           </Field>
