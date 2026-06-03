@@ -558,3 +558,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Right-click Path Effects parity — CanvasContextMenu.tsx Path Effects submenu gains
       Outline Stroke to Fill + Reverse Path Direction (were in Object>Path menu + palette
       only); high-frequency for sign/cut knockouts. 2026-06-03.
+- [x] Right-click Sign Effects parity — CanvasContextMenu.tsx Sign Effects submenu gains
+      Banner Grommets + Variable Data (were in Document>Sign Effects menu only); extended
+      the local openModal union to cover the two modal keys. 2026-06-03.
