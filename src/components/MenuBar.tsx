@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check, ChevronRight } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, selectSame, selectSameType, selectInverse, selectAllText, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
@@ -183,6 +183,15 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true) },
         { label: t('Select All'), onClick: () => { const n = selectAllObjects(); if (!n) toast.warn(t('Nothing to select.')); }, kbd: 'Ctrl+A' },
         { label: t('Deselect All'), onClick: () => { deselectAll(); }, kbd: 'Ctrl+Shift+A' },
+        { label: t('Select Same'), sub: [
+          { label: t('Select Same Fill'), onClick: () => { const n = selectSame('fill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Select Same Stroke'), onClick: () => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Select Same Stroke Weight'), onClick: () => { const n = selectSame('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+          { label: t('Select Same Opacity'), onClick: () => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+          { label: t('Select Same Type'), onClick: () => { const n = selectSameType(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+        ] },
+        { label: t('Select All Text Objects'), onClick: () => { const n = selectAllText(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text objects.')); } },
+        { label: t('Select Inverse'), onClick: () => { selectInverse(); } },
         { sep: true },
         { label: t('Transform…'), onClick: () => setModal('showTransform', true) },
         { label: t('Resize…'), onClick: () => setModal('showResize', true) },
