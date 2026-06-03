@@ -15,7 +15,7 @@ import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { changeCaseSelection } from '../lib/textCase';
 import { smartPunctuationSelection } from '../lib/smartPunctuation';
 import { applyTextOnArc } from '../lib/textPath';
-import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
+import { exportSelectionSVG, exportSelectionPNG, copySelectionSVG } from '../lib/exportSelection';
 import { exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
 import { booleanOp, divideSelection, trimSelection, cropSelection, mergeSelection } from '../lib/booleanOps';
 import { rasterizeSelection } from '../lib/rasterize';
@@ -170,6 +170,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Export All Artboards (PNG)'), onClick: () => { const n = exportAllArtboardsAsPNG(); if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
         { label: t('Export Selection as SVG'), onClick: () => { void exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
         { label: t('Export Selection as PNG'), onClick: () => { void exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+        { label: t('Copy as SVG'), onClick: () => { void copySelectionSVG().then(r => { if (r === 'ok') toast.success(t('SVG copied to clipboard')); else if (r === 'empty') toast.warn(t('Select something first.')); else toast.warn(t('Clipboard unavailable.')); }); } },
         { sep: true },
         { label: t('Print…'), onClick: () => setModal('showPrint', true), kbd: 'Ctrl+P' },
         { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true) },

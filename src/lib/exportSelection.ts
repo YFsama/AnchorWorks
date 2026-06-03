@@ -59,6 +59,27 @@ export async function exportSelectionSVG(): Promise<boolean> {
   }
 }
 
+/**
+ * Copy the current selection to the clipboard as SVG markup (Illustrator
+ * "Copy as SVG") — paste straight into HTML / code / another editor. Returns
+ * 'empty' when nothing is selected, 'failed' if the Clipboard API is
+ * unavailable or rejected, 'ok' otherwise.
+ */
+export async function copySelectionSVG(): Promise<'ok' | 'empty' | 'failed'> {
+  const r = await renderSelection();
+  if (!r) return 'empty';
+  try {
+    const svg = r.off.toSVG({ viewBox: { x: 0, y: 0, width: r.box.width, height: r.box.height } });
+    if (!navigator.clipboard?.writeText) return 'failed';
+    await navigator.clipboard.writeText(svg);
+    return 'ok';
+  } catch {
+    return 'failed';
+  } finally {
+    r.off.dispose();
+  }
+}
+
 /** Export the current selection as a cropped PNG download. */
 export async function exportSelectionPNG(multiplier = 2): Promise<boolean> {
   const r = await renderSelection();

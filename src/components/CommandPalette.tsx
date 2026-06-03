@@ -27,7 +27,7 @@ import { reversePathSelection } from '../lib/pathReverse';
 import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { fitArtboardToContent } from '../lib/fitArtboard';
-import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
+import { exportSelectionSVG, exportSelectionPNG, copySelectionSVG } from '../lib/exportSelection';
 import { exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
 import { rasterizeSelection } from '../lib/rasterize';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
@@ -209,6 +209,7 @@ export function CommandPalette({
     { id: 'file.exportAllArtboardsPng', label: t('Export All Artboards (PNG)'), category: t('File'), keywords: 'export all artboards png each separate batch', icon: FileImage, run: () => { const n = exportAllArtboardsAsPNG(); if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
     { id: 'file.exportSelSvg', label: t('Export Selection as SVG'), category: t('File'), keywords: 'export selection svg cropped only selected', icon: Save, run: () => { void exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
     { id: 'file.exportSelPng', label: t('Export Selection as PNG'), category: t('File'), keywords: 'export selection png cropped only selected', icon: FileImage, run: () => { void exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+    { id: 'file.copyAsSvg', label: t('Copy as SVG'), category: t('File'), keywords: 'copy svg clipboard markup code paste selection', icon: Save, run: () => { void copySelectionSVG().then(r => { if (r === 'ok') toast.success(t('SVG copied to clipboard')); else if (r === 'empty') toast.warn(t('Select something first.')); else toast.warn(t('Clipboard unavailable.')); }); } },
     { id: 'file.exportJpg',   label: t('Export JPG (2×)'),     category: t('File'), keywords: getFormat('jpg')?.keywords,        icon: FileImage,  run: () => { void getFormat('jpg')?.export?.(); } },
     { id: 'file.exportPdf',   label: t('Export PDF'),          category: t('File'), keywords: getFormat('pdf')?.keywords,        icon: FileText,   run: () => { void getFormat('pdf')?.export?.(); } },
     { id: 'file.exportPdfV',  label: t('Export PDF (Vector)'), category: t('File'), keywords: getFormat('pdf-vector')?.keywords, icon: FileText,   run: () => { void getFormat('pdf-vector')?.export?.(); } },
