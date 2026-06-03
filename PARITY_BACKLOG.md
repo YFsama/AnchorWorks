@@ -536,3 +536,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       + readInitialDimUnit, reuses vector.xfUnit key) so the inspector and the status-bar
       selection dimensions (StatusBar.tsx dim()) always agree instead of the status bar
       staying hard-coded px. 2026-06-03.
+- [x] Rulers follow unit — Rulers.tsx now ticks in the shared dimUnit (px/mm) with an
+      adaptive 1-2-5-10 major step (~80px between labels; lib/rulerTicks.ts niceMajor +
+      formatTick, 7 tests) instead of fixed 10/50/100 doc-px; closes the last unit gap so
+      ruler labels match the inspector + status bar. 2026-06-03.
