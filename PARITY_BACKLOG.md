@@ -543,3 +543,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Cursor readout unit — StatusBar.tsx live cursor X/Y now converts via dim() and
       labels the shared dimUnit (was raw doc-px); the pointer position reads in mm when
       the doc is in mm, matching rulers + inspector + selection dims. 2026-06-03.
+- [x] Transform dialog shared unit — TransformDialog.tsx binds its mm/px toggle to the
+      store dimUnit/setDimUnit (was local useState) so the dialog opens in the document
+      unit and toggling there flips inspector/rulers/status bar — one global unit. 2026-06-03.
