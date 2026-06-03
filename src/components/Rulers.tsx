@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { getCanvas, subscribeViewport } from '../lib/canvasEngine';
 import { useEditor } from '../store/editor';
 import { readToken as cssVar, readTokenAlpha as cssVarA } from '../lib/tokens';
+import { niceMajor, formatTick, MM_TO_PX } from '../lib/rulerTicks';
 
 const RULER_SIZE = 20; // px thickness of each ruler strip
 
@@ -17,6 +18,10 @@ export function Rulers() {
   const topRef = useRef<HTMLCanvasElement>(null);
   const leftRef = useRef<HTMLCanvasElement>(null);
   const sizeRef = useRef<Size>({ w: 0, h: 0 });
+  // Rulers tick in the same unit the inspector + status bar show (shared store
+  // flag). px ⇒ 1 doc-px/label-unit; mm ⇒ MM_TO_PX doc-px/label-unit.
+  const dimUnit = useEditor(s => s.dimUnit);
+  const unitPx = dimUnit === 'mm' ? MM_TO_PX : 1;
 
   useEffect(() => {
     const top = topRef.current;
@@ -53,8 +58,8 @@ export function Rulers() {
       }
       sizeRef.current = { w: topW, h: ch };
 
-      drawTop(top, dpr, topW, topH, zoom, panX);
-      drawLeft(left, dpr, RULER_SIZE, ch, zoom, panY);
+      drawTop(top, dpr, topW, topH, zoom, panX, unitPx);
+      drawLeft(left, dpr, RULER_SIZE, ch, zoom, panY, unitPx);
     };
 
     draw();
@@ -72,7 +77,7 @@ export function Rulers() {
       ro.disconnect();
       window.removeEventListener('resize', draw);
     };
-  }, []);
+  }, [unitPx]);
 
   // Pull a new guide off a ruler. Top ruler → horizontal guide (varies in Y);
   // left ruler → vertical guide (varies in X). Tracks the pointer globally and
@@ -141,7 +146,7 @@ export function Rulers() {
   );
 }
 
-function drawTop(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom: number, panX: number) {
+function drawTop(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom: number, panX: number, unitPx: number) {
   const ctx = el.getContext('2d');
   if (!ctx) return;
   // Resolve theme-aware colours fresh each frame so toggling theme repaints
@@ -159,32 +164,34 @@ function drawTop(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom:
   ctx.textBaseline = 'top';
   ctx.fillStyle = LABEL_COLOR;
 
-  // Find the first doc-px value visible at the left edge of the ruler
-  // canvas viewport-x to doc-x: docX = (viewportX - panX) / zoom
-  const startDoc = Math.floor(-panX / zoom / 10) * 10;
-  const endDoc = Math.ceil((w - panX) / zoom / 10) * 10;
-
-  const ticksMinor = 10;
-  for (let dx = startDoc; dx <= endDoc; dx += ticksMinor) {
-    const x = dx * zoom + panX;
+  // Ticks are spaced in *label units* (px or mm) and converted to doc-px via
+  // unitPx, then to screen-x via zoom/pan. Major step is chosen adaptively so
+  // labels stay ~80px apart; minor = major/10, mid emphasis at major/2.
+  const major = niceMajor(zoom * unitPx);
+  const minor = major / 10;
+  const i0 = Math.floor(-panX / zoom / unitPx / minor);
+  const i1 = Math.ceil((w - panX) / zoom / unitPx / minor);
+  for (let i = i0; i <= i1; i++) {
+    const x = i * minor * unitPx * zoom + panX;
     if (x < 0 || x > w) continue;
+    const isMajor = i % 10 === 0;
     let tickH = 4;
     let color = TICK_COLOR;
-    if (dx % 100 === 0) { tickH = h; color = TICK_COLOR_MAJOR; }
-    else if (dx % 50 === 0) { tickH = 8; color = TICK_COLOR_MAJOR; }
+    if (isMajor) { tickH = h; color = TICK_COLOR_MAJOR; }
+    else if (i % 5 === 0) { tickH = 8; color = TICK_COLOR_MAJOR; }
     ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(x + 0.5, h - tickH);
     ctx.lineTo(x + 0.5, h);
     ctx.stroke();
-    if (dx % 100 === 0) {
+    if (isMajor) {
       ctx.fillStyle = LABEL_COLOR;
-      ctx.fillText(String(dx), x + 2, 1);
+      ctx.fillText(formatTick(i * minor), x + 2, 1);
     }
   }
 }
 
-function drawLeft(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom: number, panY: number) {
+function drawLeft(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom: number, panY: number, unitPx: number) {
   const ctx = el.getContext('2d');
   if (!ctx) return;
   const BG = cssVar('--color-panel3', '#1a1a1f');
@@ -200,29 +207,30 @@ function drawLeft(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom
   ctx.textBaseline = 'top';
   ctx.fillStyle = LABEL_COLOR;
 
-  const startDoc = Math.floor(-panY / zoom / 10) * 10;
-  const endDoc = Math.ceil((h - panY) / zoom / 10) * 10;
-
-  const ticksMinor = 10;
-  for (let dy = startDoc; dy <= endDoc; dy += ticksMinor) {
-    const y = dy * zoom + panY;
+  const major = niceMajor(zoom * unitPx);
+  const minor = major / 10;
+  const i0 = Math.floor(-panY / zoom / unitPx / minor);
+  const i1 = Math.ceil((h - panY) / zoom / unitPx / minor);
+  for (let i = i0; i <= i1; i++) {
+    const y = i * minor * unitPx * zoom + panY;
     if (y < 0 || y > h) continue;
+    const isMajor = i % 10 === 0;
     let tickW = 4;
     let color = TICK_COLOR;
-    if (dy % 100 === 0) { tickW = w; color = TICK_COLOR_MAJOR; }
-    else if (dy % 50 === 0) { tickW = 8; color = TICK_COLOR_MAJOR; }
+    if (isMajor) { tickW = w; color = TICK_COLOR_MAJOR; }
+    else if (i % 5 === 0) { tickW = 8; color = TICK_COLOR_MAJOR; }
     ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(w - tickW, y + 0.5);
     ctx.lineTo(w, y + 0.5);
     ctx.stroke();
-    if (dy % 100 === 0) {
+    if (isMajor) {
       ctx.save();
       ctx.translate(2, y + 2);
       ctx.rotate(-Math.PI / 2);
       ctx.textBaseline = 'top';
       ctx.fillStyle = LABEL_COLOR;
-      ctx.fillText(String(dy), -22, 0);
+      ctx.fillText(formatTick(i * minor), -22, 0);
       ctx.restore();
     }
   }
