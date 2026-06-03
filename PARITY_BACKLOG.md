@@ -567,3 +567,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Keyboard-increment unit — PreferencesDialog.tsx GeneralTab keyboard-increment field
       now displays/edits in the shared dimUnit (storage stays keyboardIncrementPx; converts
       via MM_TO_PX) so mm users can set a physical nudge step; was px-only. 2026-06-03.
+- [x] Smart Punctuation — lib/smartPunctuation.ts smartenPunctuation()/smartPunctuationSelection()
+      converts straight quotes→curly, --→em dash, ...→ellipsis across selected text; Type menu
+      + command palette (Illustrator Type→Smart Punctuation); 6 unit tests. 2026-06-03.
