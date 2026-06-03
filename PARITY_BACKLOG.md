@@ -528,3 +528,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Transform dialog mm/px move — TransformDialog gains a mm/px unit toggle for the
       Move X/Y fields (default mm), converting to px before applyTransform; px-only
       before, which is awkward for sign work. 2026-06-03.
+- [x] Inspector Transform mm/px — PropertiesPanel Transform section (X/Y/W/H) gains a
+      persisted mm/px segmented toggle (PropertiesPanel.tsx xfUnit + toU/fromU,
+      localStorage vector.xfUnit, default mm); the always-visible core inspector was
+      px-only while the Resize/Transform dialogs already used mm. 2026-06-03.
