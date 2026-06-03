@@ -13,6 +13,7 @@ import { fitArtboardToContent } from '../lib/fitArtboard';
 import { createOutlinesFromText } from '../lib/textToOutline';
 import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { changeCaseSelection } from '../lib/textCase';
+import { smartPunctuationSelection } from '../lib/smartPunctuation';
 import { applyTextOnArc } from '../lib/textPath';
 import { exportSelectionSVG, exportSelectionPNG } from '../lib/exportSelection';
 import { exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
@@ -250,6 +251,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); } },
           { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); } },
         ] },
+        { label: t('Smart Punctuation'), onClick: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); } },
         { sep: true },
         { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true) },
       ]} />

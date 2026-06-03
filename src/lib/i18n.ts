@@ -1012,6 +1012,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Text on Arc (Up)': { en: 'Text on Arc (Up)', zh: '弧形文字（上凸）' },
   'Text on Arc (Down)': { en: 'Text on Arc (Down)', zh: '弧形文字（下凹）' },
   'Change Case': { en: 'Change Case', zh: '更改大小写' },
+  'Smart Punctuation': { en: 'Smart Punctuation', zh: '智能标点' },
+  'text objects updated': { en: 'text objects updated', zh: '个文本对象已更新' },
   'Break Text into Letters': { en: 'Break Text into Letters', zh: '拆分文本为单字' },
   'Break Text into Lines': { en: 'Break Text into Lines', zh: '拆分文本为单行' },
   'letters created': { en: 'letters created', zh: '个字母已创建' },

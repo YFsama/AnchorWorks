@@ -34,6 +34,7 @@ import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
 import { createOutlinesFromText } from '../lib/textToOutline';
 import { changeCaseSelection, adjustFontSize, adjustTracking, adjustLeading } from '../lib/textCase';
+import { smartPunctuationSelection } from '../lib/smartPunctuation';
 import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { pasteFromClipboard } from '../lib/clipboard';
@@ -321,6 +322,7 @@ export function CommandPalette({
     { id: 'text.caseLower',    label: t('lowercase'),          category: t('Arrange'), keywords: 'change case lowercase text', icon: Type, run: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.caseTitle',    label: t('Title Case'),         category: t('Arrange'), keywords: 'change case title capitalise each word text', icon: Type, run: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); } },
     { id: 'text.caseSentence', label: t('Sentence case'),      category: t('Arrange'), keywords: 'change case sentence capitalise text', icon: Type, run: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); } },
+    { id: 'text.smartPunctuation', label: t('Smart Punctuation'), category: t('Arrange'), keywords: 'smart punctuation curly quotes typographic apostrophe em dash ellipsis text', icon: Type, run: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); } },
     { id: 'text.fontSizeUp',   label: t('Increase Font Size'), category: t('Arrange'), shortcut: 'Ctrl+>', keywords: 'font size increase bigger larger text', icon: Type, run: () => { if (!adjustFontSize(2)) toast.warn(t('Select a text object first.')); } },
     { id: 'text.fontSizeDown', label: t('Decrease Font Size'), category: t('Arrange'), shortcut: 'Ctrl+<', keywords: 'font size decrease smaller text', icon: Type, run: () => { if (!adjustFontSize(-2)) toast.warn(t('Select a text object first.')); } },
     { id: 'text.trackingUp',   label: t('Increase Tracking'), category: t('Arrange'), shortcut: 'Alt+→', keywords: 'tracking letter spacing increase wider kerning text', icon: Type, run: () => { if (!adjustTracking(25)) toast.warn(t('Select a text object first.')); } },
