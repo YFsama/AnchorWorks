@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { X, Settings, Sparkles, PenTool, Monitor } from 'lucide-react';
 import { useEditor } from '../store/editor';
+import { MM_TO_PX } from '../lib/rulerTicks';
 import { useT, useI18n, LANGUAGES, type Lang } from '../lib/i18n';
 import { loadAIConfig, saveAIConfig, type AIConfig } from '../lib/ai';
 import { loadPreferences, savePreferences, type AppPreferences } from '../lib/preferences';
@@ -254,6 +255,7 @@ interface PatchAPI {
 
 function GeneralTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
   const t = useT();
+  const dimUnit = useEditor((s) => s.dimUnit);
   return (
     <div className="space-y-4">
       <Field label={t('Language')}>
@@ -331,15 +333,21 @@ function GeneralTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
         />
       </Field>
 
-      <Field label={t('Keyboard increment (px)')}>
+      {/* Stored in px (source of truth for the arrow-key nudge); shown/edited in
+          the active document unit so mm users can set a physical increment. */}
+      <Field label={`${t('Keyboard increment')} (${dimUnit})`}>
         <input
           type="number"
-          min={0.1}
+          min={dimUnit === 'mm' ? 0.05 : 0.1}
           max={100}
-          step={0.1}
+          step={dimUnit === 'mm' ? 0.05 : 0.1}
           className="input-num"
-          value={draft.prefs.keyboardIncrementPx}
-          onChange={(e) => patch.prefs({ keyboardIncrementPx: Math.max(0.1, Math.min(100, +e.target.value || 1)) })}
+          value={dimUnit === 'mm' ? Math.round((draft.prefs.keyboardIncrementPx / MM_TO_PX) * 100) / 100 : draft.prefs.keyboardIncrementPx}
+          onChange={(e) => {
+            const v = +e.target.value || 0;
+            const px = dimUnit === 'mm' ? v * MM_TO_PX : v;
+            patch.prefs({ keyboardIncrementPx: Math.max(0.1, Math.min(100, px)) });
+          }}
         />
       </Field>
 
