@@ -505,3 +505,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Export All Artboards (PNG) — artboards.ts exportAllArtboardsAsPNG() downloads
       each artboard as a 2× PNG (mirrors the SVG batch via exportArtboardPNG); File
       menu + command palette. 2026-06-03.
+- [x] Constant-width stroke checkbox — Properties panel gains a "Constant width"
+      checkbox (effects.ts setUniformStroke()) that reflects + sets strokeUniform on
+      the selection, a discoverable home for the command-palette toggle. 2026-06-03.

@@ -9,6 +9,7 @@ import {
   applyShadowToSelection,
   applyStrokeStyleToSelection,
   applyBlendModeToSelection,
+  setUniformStroke,
   applyPatternFill,
   generatePalette,
   type GradientStop,
@@ -76,6 +77,7 @@ export function PropertiesPanel() {
   const [lineCap, setLineCap] = useState<CanvasLineCap>('butt');
   const [lineJoin, setLineJoin] = useState<CanvasLineJoin>('miter');
   const [strokeAlign, setStrokeAlignState] = useState<StrokeAlign>('center');
+  const [strokeUniform, setStrokeUniformState] = useState(false);
 
   // Blend mode local state
   const [blendMode, setBlendMode] = useState<GlobalCompositeOperation>('source-over');
@@ -140,6 +142,7 @@ export function PropertiesPanel() {
     const c = getCanvas();
     if (c) {
       setStrokeAlignState(getStrokeAlign(c.getActiveObject()));
+      setStrokeUniformState(!!(c.getActiveObject() as { strokeUniform?: boolean } | undefined)?.strokeUniform);
       const obj = c.getActiveObject() as { shadow?: { color?: string; blur?: number; offsetX?: number; offsetY?: number } | null } | undefined;
       const sh = obj?.shadow;
       if (sh && typeof sh === 'object') {
@@ -695,6 +698,16 @@ export function PropertiesPanel() {
               );
             })}
           </div>
+        </Row>
+        <Row label={t('Constant width')}>
+          <label className="flex items-center gap-2 text-xs text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={strokeUniform}
+              onChange={(e) => { setStrokeUniformState(e.target.checked); setUniformStroke(e.target.checked); }}
+            />
+            <span>{t('Keep stroke width when scaling')}</span>
+          </label>
         </Row>
       </div>
 

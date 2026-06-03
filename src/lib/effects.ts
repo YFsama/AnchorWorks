@@ -158,15 +158,23 @@ export function applyBlendModeToSelection(mode: GlobalCompositeOperation) {
  * (Illustrator's "Scale Strokes & Effects" off). Flips based on the active
  * object's current state. Returns the new state, or null if nothing selected.
  */
-export function toggleUniformStroke(): boolean | null {
+/** Set constant-stroke-width (strokeUniform) on the selection. Returns count. */
+export function setUniformStroke(on: boolean): number {
   const canvas = getCanvas();
-  if (!canvas) return null;
+  if (!canvas) return 0;
   const objs = canvas.getActiveObjects();
-  if (!objs.length) return null;
-  const next = !((canvas.getActiveObject() as { strokeUniform?: boolean })?.strokeUniform);
-  objs.forEach((o) => { (o as { strokeUniform?: boolean }).strokeUniform = next; o.setCoords(); });
+  if (!objs.length) return 0;
+  objs.forEach((o) => { (o as { strokeUniform?: boolean }).strokeUniform = on; o.setCoords(); });
   canvas.requestRenderAll();
   pushHistory();
+  return objs.length;
+}
+
+export function toggleUniformStroke(): boolean | null {
+  const canvas = getCanvas();
+  if (!canvas || !canvas.getActiveObjects().length) return null;
+  const next = !((canvas.getActiveObject() as { strokeUniform?: boolean })?.strokeUniform);
+  setUniformStroke(next);
   return next;
 }
 

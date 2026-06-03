@@ -108,6 +108,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'Hide Others': { en: 'Hide Others', zh: '隐藏其他' },
   'Center on Artboard': { en: 'Center on Artboard', zh: '居中到画板' },
   'Constant Stroke Width': { en: 'Constant Stroke Width', zh: '描边宽度恒定' },
+  'Constant width': { en: 'Constant width', zh: '宽度恒定' },
+  'Keep stroke width when scaling': { en: 'Keep stroke width when scaling', zh: '缩放时保持描边宽度' },
   'Stroke width is now constant': { en: 'Stroke width is now constant', zh: '描边宽度现已恒定' },
   'Stroke width now scales': { en: 'Stroke width now scales', zh: '描边宽度现随缩放' },
   'Select All Text Objects': { en: 'Select All Text Objects', zh: '选择所有文本对象' },
