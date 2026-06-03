@@ -4,6 +4,65 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] — 2026-06-03
+
+A large Adobe Illustrator + SignMaster parity release. The headline themes:
+
+### Added
+- **Pathfinder** — Union, Subtract, Intersect, Exclude, Minus Back, Divide,
+  Trim, Merge, Crop, plus Clipping Mask and Compound Path (menu + right-click +
+  Align panel + shortcuts).
+- **Distort & Transform** — Roughen, Zig Zag, **Pucker & Bloat**, Twist, Arc
+  Warp (Arc / Rise / Flag / Wave), and Blend between two objects.
+- **Numeric Transform** — move / scale / rotate / copy dialog with **polar
+  (distance + angle) move**, **non-uniform X/Y scale** with a link toggle,
+  Transform Each, Transform Again (step-and-repeat), Shear, quick 90°/180°
+  rotates, Flip H/V, and Resize-to-exact-mm.
+- **Align & Distribute** — full align (edges/centres) with Selection / Artboard /
+  Key-Object reference; distribute by centres, by **each edge (top/bottom/
+  left/right)**, by equal gap, and by an exact spacing value; Auto-arrange
+  (shelf-pack nest); Center / Distribute on the artboard.
+- **Type** — Create Outlines (font-independent), Change Case, **Smart
+  Punctuation**, Break into Letters / Lines, Text on Arc, **horizontal/vertical
+  scale**, tracking & leading (with Alt+arrow shortcuts), Find & Replace, and
+  Variable Data (serial numbering / list merge).
+- **Colour** — Recolor Artwork, Edit Colors (Invert, Grayscale, Saturate, Hue,
+  Brightness), a persistent Swatches palette, eyedropper that carries appearance
+  *and* text attributes, swap / default fill+stroke.
+- **Selection** — Select Same (fill, stroke, stroke-weight, opacity, **object
+  type**), Select Inverse, Select All Text, next/previous object in the stack,
+  Lock / Unlock All, Hide / Hide Others / Show All.
+- **Shapes & paths** — Star / Polygon / Spiral generators; Simplify, Offset
+  Path, Round Corners, Add Anchor Points, Outline Stroke to Fill, Reverse Path
+  Direction, Join, Clean Up, Arrowheads.
+- **Artboards** — **Duplicate Artboard** (with its contents), **Artboard from
+  selection**, Fit to Artwork / Selection, and Export-all as separate SVG / PNG.
+- **Stroke** — custom dash pattern, **miter limit**, constant-width (uniform)
+  toggle, line cap / join, stroke alignment (centre / inside / outside).
+- **Cut & sign** — Weld, Multi-outline, Rhinestone / hotfix templates, Banner
+  Grommets, bridges / tabs, inner-contours-first cut ordering, Outline-Stroke
+  cut lines, and a Measure tool (distance + angle).
+- **Import / export** — **Copy as SVG** to the clipboard, **Paste from
+  Clipboard** (external image / SVG), Image Trace from the right-click + command
+  palette, and Export-Selection as SVG / PNG.
+- **Shared document unit** — one mm/px unit drives the inspector, rulers
+  (adaptive 1-2-5-10 ticks), status-bar dimensions + cursor read-out, the
+  Resize / Transform dialogs, align spacing, and the keyboard nudge increment.
+- **Guides & view** — ruler-drag guides (persisted), margin / safe-area guides,
+  Make Guides from selection, lock / show toggles; Zoom to Selection, rulers /
+  guides / grid toggles, an editable zoom-percentage field.
+- **Canvas interaction** — double-click a path to edit, Alt-drag to duplicate,
+  Shift-snap rotation to 15°, Shift-constrained shape drawing, snap to the
+  artboard frame.
+
+### Changed / Fixed
+- Multi-selection styling now applies to **every** selected text object (font,
+  character panel, Create Outlines).
+- The Properties panel hydrates its dash / cap / join / miter-limit / blend-mode
+  controls from the selected object instead of showing stale defaults.
+- Right-click, menu and command-palette surfaces brought to parity (Select Same,
+  Path Effects, Sign Effects, Trace Image, the Edit-menu Select family).
+
 ## [0.10.3] — 2026-06-02
 
 ### Added
