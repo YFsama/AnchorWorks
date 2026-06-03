@@ -561,3 +561,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Right-click Sign Effects parity — CanvasContextMenu.tsx Sign Effects submenu gains
       Banner Grommets + Variable Data (were in Document>Sign Effects menu only); extended
       the local openModal union to cover the two modal keys. 2026-06-03.
+- [x] Edit-menu Select family — MenuBar.tsx Edit menu gains a Select Same flyout
+      (fill/stroke/weight/opacity/type) + Select All Text Objects + Select Inverse after
+      Deselect All; were palette/right-click only (Illustrator Select menu). 2026-06-03.
