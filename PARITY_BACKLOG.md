@@ -611,3 +611,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       matching the dash array to a preset or surfacing it in the custom field. 2026-06-03.
 - [x] Blend mode sync — PropertiesPanel.tsx selection-change block hydrates blendMode from
       the object's globalCompositeOperation (was write-only/stale, same class of fix). 2026-06-03.
+- [x] Trace Image surfaces — io3.ts traceSelectedImage() now returns boolean (no alert);
+      wired into right-click + command palette (was Assets-panel button only); toasts on
+      not-an-image / low-detail. 2026-06-03.
