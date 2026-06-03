@@ -1429,6 +1429,9 @@ const dict: Record<string, Record<Lang, string>> = {
   'Artboards': { en: 'Artboards', zh: '画板' },
   'Append a new artboard': { en: 'Append a new artboard', zh: '追加一个画板' },
   'Add Artboard': { en: 'Add Artboard', zh: '添加画板' },
+  'From Selection': { en: 'From Selection', zh: '按选区' },
+  'Create an artboard around the selection': { en: 'Create an artboard around the selection', zh: '在选区周围创建画板' },
+  'Artboard created': { en: 'Artboard created', zh: '画板已创建' },
   'No artboards yet': { en: 'No artboards yet', zh: '还没有画板' },
   'Click "Add Artboard" above to lay out multiple pages side-by-side.': {
     en: 'Click "Add Artboard" above to lay out multiple pages side-by-side.',

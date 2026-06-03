@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target, Copy } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target, Copy, Frame } from 'lucide-react';
 import { zoomToArtboard } from '../lib/canvasEngine';
 import { toast } from '../lib/toast';
 import { showConfirm } from '../lib/confirm';
 import { useT } from '../lib/i18n';
 import {
   createArtboard,
+  createArtboardFromSelection,
   deleteArtboard,
   duplicateArtboard,
   renameArtboard,
@@ -42,14 +43,24 @@ export function ArtboardsPanel() {
       </h3>
       {open && (
         <div id="artboards-panel-body" className="px-2 pb-3 space-y-2">
-          <button
-            type="button"
-            onClick={() => createArtboard()}
-            className="btn flex items-center gap-1 w-full justify-center"
-            title={t('Append a new artboard')}
-          >
-            <Plus size={12} aria-hidden="true" /> {t('Add Artboard')}
-          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => createArtboard()}
+              className="btn flex items-center gap-1 flex-1 justify-center"
+              title={t('Append a new artboard')}
+            >
+              <Plus size={12} aria-hidden="true" /> {t('Add Artboard')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { const ab = createArtboardFromSelection(); if (ab) { zoomToArtboard({ x: ab.x, y: ab.y, width: ab.width, height: ab.height }); toast.success(t('Artboard created')); } else toast.warn(t('Select something first.')); }}
+              className="btn flex items-center gap-1 flex-1 justify-center"
+              title={t('Create an artboard around the selection')}
+            >
+              <Frame size={12} aria-hidden="true" /> {t('From Selection')}
+            </button>
+          </div>
 
           {artboards.length === 0 ? (
             <div className="flex flex-col items-center text-center px-2 py-3">

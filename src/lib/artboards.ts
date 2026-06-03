@@ -115,6 +115,30 @@ export function deleteArtboard(id: string): void {
 }
 
 /**
+ * Create a new artboard that frames the current selection's bounding box
+ * (Illustrator "Artboard from selection"), optionally inset by a margin. Placed
+ * in-place over the artwork so it encloses it — handy for carving a piece out
+ * for separate export. Returns the artboard, or null when nothing is selected.
+ */
+export function createArtboardFromSelection(marginPx = 0): Artboard | null {
+  const canvas = getCanvas();
+  const sel = canvas?.getActiveObject();
+  if (!sel) return null;
+  const b = sel.getBoundingRect();
+  const list = getArtboards();
+  const ab: Artboard = {
+    id: nextId(),
+    name: `Artboard ${list.length + 1}`,
+    x: b.left - marginPx,
+    y: b.top - marginPx,
+    width: b.width + marginPx * 2,
+    height: b.height + marginPx * 2,
+  };
+  commit([...list, ab]);
+  return ab;
+}
+
+/**
  * Duplicate an artboard together with the artwork inside it (Illustrator/
  * SignMaster "Duplicate Artboard"). The new frame is placed to the right of all
  * existing artboards on the source's row; every object whose centre lies inside
