@@ -4,6 +4,16 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] — 2026-06-03
+
+### Fixed
+- **Release CI (portable Windows)**: the portable-exe step passed an invalid
+  `--bundles app` flag — the Tauri CLI only accepts `msi` / `nsis` as Windows
+  bundle targets, which failed the 0.11.0 release build. Switched to
+  `--no-bundle` (compiles the raw `anchorworks.exe` without an installer). No
+  application changes — this re-ships the 0.11.0 feature set with a working
+  release pipeline.
+
 ## [0.11.0] — 2026-06-03
 
 A large Adobe Illustrator + SignMaster parity release. The headline themes:
