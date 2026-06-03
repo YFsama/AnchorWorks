@@ -116,6 +116,8 @@ export const BINDINGS: ShortcutBinding[] = [
   { id: 'edit.deselectAll',      label: 'Deselect All',        defaultCombo: 'Ctrl+Shift+A' },
   { id: 'edit.selectNextAbove',  label: 'Select Next Object Above', defaultCombo: 'Ctrl+Alt+]' },
   { id: 'edit.selectNextBelow',  label: 'Select Next Object Below', defaultCombo: 'Ctrl+Alt+[' },
+  { id: 'edit.hideSelection',    label: 'Hide Selection',      defaultCombo: 'Ctrl+3' },
+  { id: 'edit.showAll',          label: 'Show All',            defaultCombo: 'Ctrl+Alt+3' },
   { id: 'text.fontSizeUp',       label: 'Increase Font Size',  defaultCombo: 'Ctrl+>' },
   { id: 'text.fontSizeDown',     label: 'Decrease Font Size',  defaultCombo: 'Ctrl+<' },
   { id: 'edit.flipH',            label: 'Flip Horizontal',     defaultCombo: 'Shift+H' },

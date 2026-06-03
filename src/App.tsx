@@ -66,7 +66,7 @@ import {
   undo, redo, deleteSelection, duplicateSelection, nudgeSelection, flipSelection, zoomBy, zoomFit, zoomToPoint, zoomToArtboard,
   alignSelection, distributeSelection, applyStyleToSelection, swapFillStroke, defaultColors, groupSelection, ungroupSelection,
   resizeCanvas, setBackground,
-  bringForward, sendBackward, bringToFront, sendToBack, selectObjectInStack,
+  bringForward, sendBackward, bringToFront, sendToBack, selectObjectInStack, hideSelection, showAll,
   type AlignAxis, type DistributeDir,
 } from './lib/canvasEngine';
 import {
@@ -956,6 +956,8 @@ export default function App() {
         }
         return;
       }
+      if (match('edit.hideSelection')) { e.preventDefault(); if (hideSelection()) announce(t('Hide Selection')); return; }
+      if (match('edit.showAll')) { e.preventDefault(); const n = showAll(); if (n) announce(t('Show All')); return; }
       if (match('text.fontSizeUp')) { e.preventDefault(); if (adjustFontSize(2)) announce(t('Increase Font Size')); return; }
       if (match('text.fontSizeDown')) { e.preventDefault(); if (adjustFontSize(-2)) announce(t('Decrease Font Size')); return; }
       if (match('edit.selectNextAbove')) { e.preventDefault(); if (selectObjectInStack('up')) announce(t('Select Next Object Above')); return; }

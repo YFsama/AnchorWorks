@@ -508,3 +508,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Constant-width stroke checkbox — Properties panel gains a "Constant width"
       checkbox (effects.ts setUniformStroke()) that reflects + sets strokeUniform on
       the selection, a discoverable home for the command-palette toggle. 2026-06-03.
+- [x] Hide/Show All shortcuts — Ctrl+3 hides the selection and Ctrl+Alt+3 shows all
+      (Illustrator defaults); keymap + App handlers + kbd hints on the existing menu /
+      palette entries (Ctrl+2 stays Zoom-to-Selection, so Lock keeps no shortcut).
+      2026-06-03.

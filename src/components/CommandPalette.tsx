@@ -237,9 +237,9 @@ export function CommandPalette({
     { id: 'edit.selectSameOpacity', label: t('Select Same Opacity'), category: t('Edit'), keywords: 'select same opacity transparency alpha match', icon: MousePointerClick, run: () => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
     { id: 'edit.lock',        label: t('Lock Selection'),      category: t('Edit'), keywords: 'lock freeze protect immovable', icon: MousePointerClick, run: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
     { id: 'edit.unlockAll',   label: t('Unlock All'),          category: t('Edit'), keywords: 'unlock release all', icon: MousePointerClick, run: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
-    { id: 'edit.hide',        label: t('Hide Selection'),      category: t('Edit'), keywords: 'hide invisible conceal', icon: MousePointerClick, run: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },
+    { id: 'edit.hide',        label: t('Hide Selection'),      category: t('Edit'), shortcut: 'Ctrl+3', keywords: 'hide invisible conceal', icon: MousePointerClick, run: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); } },
     { id: 'edit.hideOthers',  label: t('Hide Others'),         category: t('Edit'), keywords: 'hide others isolate focus conceal rest', icon: MousePointerClick, run: () => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); } },
-    { id: 'edit.showAll',     label: t('Show All'),            category: t('Edit'), keywords: 'show reveal all hidden', icon: MousePointerClick, run: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); } },
+    { id: 'edit.showAll',     label: t('Show All'),            category: t('Edit'), shortcut: 'Ctrl+Alt+3', keywords: 'show reveal all hidden', icon: MousePointerClick, run: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); } },
 
     // ---------- Arrange ----------
     { id: 'arrange.front',     label: t('Bring to Front'),     category: t('Arrange'), keywords: 'order z-index top',    icon: ChevronsUp,   run: () => bringToFront() },
