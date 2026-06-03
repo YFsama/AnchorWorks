@@ -599,3 +599,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Paste from Clipboard — io3.ts pasteFromSystemClipboard() imports an external image /
       SVG from the system clipboard via the async Clipboard API; File menu + command palette
       (explicit, to avoid the internal Ctrl+V paste collision). 2026-06-03.
+- [x] Polar move — TransformDialog.tsx adds an XY/Polar toggle; polar Distance+Angle resolve
+      to dx=dist·cos(a), dy=-dist·sin(a) (Illustrator Move dialog) in the active unit before
+      applyTransform; was X/Y only. 2026-06-03.
