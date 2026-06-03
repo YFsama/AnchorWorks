@@ -606,3 +606,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       TransformDialog Scale X%/Y% with a Link toggle (default linked); was single uniform %. 2026-06-03.
 - [x] Miter limit — effects.ts StrokeStylePatch.strokeMiterLimit + apply; PropertiesPanel
       Advanced stroke shows a Miter limit field when join=miter (SVG stroke-miterlimit). 2026-06-03.
+- [x] Stroke controls sync — PropertiesPanel.tsx selection-change block now hydrates dash
+      preset/custom + cap + join + miter from the active object (were write-only/stale),
+      matching the dash array to a preset or surfacing it in the custom field. 2026-06-03.
