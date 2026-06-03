@@ -155,12 +155,14 @@ jobs:
           $mb = [Math]::Round((Get-Item MicrosoftEdgeWebView2RuntimeInstaller.exe).Length / 1MB)
           Write-Host "Downloaded Evergreen WebView2 installer ($mb MB)"
 
-      # --bundles app asks Tauri to produce just the raw executable (no
-      # installer). The exe links against whatever WebView2 the host provides
-      # at launch (system install, or the bundled installer run once).
+      # --no-bundle compiles the raw executable without producing any installer
+      # (the CLI only accepts msi/nsis as bundle targets on Windows). The exe
+      # still lands in target/<triple>/release/ and links against whatever
+      # WebView2 the host provides at launch (system install, or the bundled
+      # installer run once).
       - name: Build portable bundle
         shell: pwsh
-        run: npx tauri build --target x86_64-pc-windows-msvc --bundles app
+        run: npx tauri build --target x86_64-pc-windows-msvc --no-bundle
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
