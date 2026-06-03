@@ -596,3 +596,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Copy as SVG — exportSelection.ts copySelectionSVG() writes cropped selection SVG to
       the clipboard (Illustrator Copy as SVG); File menu + command palette. Export was
       file-only before. 2026-06-03.
+- [x] Paste from Clipboard — io3.ts pasteFromSystemClipboard() imports an external image /
+      SVG from the system clipboard via the async Clipboard API; File menu + command palette
+      (explicit, to avoid the internal Ctrl+V paste collision). 2026-06-03.
