@@ -540,3 +540,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       adaptive 1-2-5-10 major step (~80px between labels; lib/rulerTicks.ts niceMajor +
       formatTick, 7 tests) instead of fixed 10/50/100 doc-px; closes the last unit gap so
       ruler labels match the inspector + status bar. 2026-06-03.
+- [x] Cursor readout unit — StatusBar.tsx live cursor X/Y now converts via dim() and
+      labels the shared dimUnit (was raw doc-px); the pointer position reads in mm when
+      the doc is in mm, matching rulers + inspector + selection dims. 2026-06-03.
