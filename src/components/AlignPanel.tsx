@@ -10,6 +10,10 @@ import {
   AlignVerticalSpaceAround,
   AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyEnd,
+  AlignHorizontalJustifyStart,
+  AlignHorizontalJustifyEnd,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
@@ -138,6 +142,22 @@ export function AlignPanel() {
               </Btn>
               <Btn title={t('Distribute vertical centers')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical', 'center')}>
                 <AlignVerticalDistributeCenter size={14} aria-hidden="true" />
+              </Btn>
+            </div>
+            {/* Edge distribution — equalise spacing between the chosen edges
+             *  (Illustrator's top/bottom/left/right distribute). */}
+            <div className="grid grid-cols-4 gap-1 mt-1">
+              <Btn title={t('Distribute top edges')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical', 'start')}>
+                <AlignVerticalJustifyStart size={14} aria-hidden="true" />
+              </Btn>
+              <Btn title={t('Distribute bottom edges')} disabled={!enoughForDistribute} onClick={() => distributeSelection('vertical', 'end')}>
+                <AlignVerticalJustifyEnd size={14} aria-hidden="true" />
+              </Btn>
+              <Btn title={t('Distribute left edges')} disabled={!enoughForDistribute} onClick={() => distributeSelection('horizontal', 'start')}>
+                <AlignHorizontalJustifyStart size={14} aria-hidden="true" />
+              </Btn>
+              <Btn title={t('Distribute right edges')} disabled={!enoughForDistribute} onClick={() => distributeSelection('horizontal', 'end')}>
+                <AlignHorizontalJustifyEnd size={14} aria-hidden="true" />
               </Btn>
             </div>
             {/* Exact spacing — gap between consecutive objects, in the doc unit. */}

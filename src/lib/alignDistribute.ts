@@ -177,8 +177,8 @@ export function distributeSpacing(dir: DistributeDir, gapMm: number): void {
  *
  * "horizontal" distributes left→right, "vertical" distributes top→bottom.
  */
-export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' = 'gap'): void {
-  if (by === 'center') { distributeCentres(dir); return; }
+export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' | 'start' | 'end' = 'gap'): void {
+  if (by === 'center' || by === 'start' || by === 'end') { distributeByAnchor(dir, by); return; }
   const canvas = getCanvas();
   if (!canvas) return;
   const objs = canvas.getActiveObjects();
@@ -219,24 +219,32 @@ export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' = '
   pushHistory();
 }
 
-/** Equalise the spacing between object centres along `dir` (equal pitch). */
-function distributeCentres(dir: DistributeDir): void {
+/**
+ * Equalise the spacing between a chosen anchor of each object along `dir`
+ * (Illustrator's edge/centre distribute). `anchor` picks which coordinate is
+ * spaced evenly: 'start' = top/left edge, 'center' = centre, 'end' =
+ * bottom/right edge. Equal pitch between the leftmost/topmost and the
+ * rightmost/bottommost; requires 3+ objects.
+ */
+function distributeByAnchor(dir: DistributeDir, anchor: 'start' | 'center' | 'end'): void {
   const canvas = getCanvas();
   if (!canvas) return;
   const objs = canvas.getActiveObjects();
   if (objs.length < 3) return;
   const horiz = dir === 'horizontal';
-  const items = objs.map((o) => {
-    const r = o.getBoundingRect();
-    return { obj: o, centre: horiz ? r.left + r.width / 2 : r.top + r.height / 2 };
-  });
-  items.sort((a, b) => a.centre - b.centre);
-  const first = items[0].centre;
-  const last = items[items.length - 1].centre;
+  const coordOf = (r: { left: number; top: number; width: number; height: number }) => {
+    const lo = horiz ? r.left : r.top;
+    const size = horiz ? r.width : r.height;
+    return anchor === 'start' ? lo : anchor === 'end' ? lo + size : lo + size / 2;
+  };
+  const items = objs.map((o) => ({ obj: o, coord: coordOf(o.getBoundingRect()) }));
+  items.sort((a, b) => a.coord - b.coord);
+  const first = items[0].coord;
+  const last = items[items.length - 1].coord;
   const step = (last - first) / (items.length - 1);
   items.forEach((it, i) => {
     if (i === 0 || i === items.length - 1) return;
-    const delta = (first + i * step) - it.centre;
+    const delta = (first + i * step) - it.coord;
     if (horiz) it.obj.set({ left: (it.obj.left ?? 0) + delta });
     else it.obj.set({ top: (it.obj.top ?? 0) + delta });
     it.obj.setCoords();
