@@ -860,6 +860,8 @@ const dict: Record<string, Record<Lang, string>> = {
   'outline(s) added': { en: 'outline(s) added', zh: '个轮廓已添加' },
   'Align to': { en: 'Align to', zh: '对齐基准' },
   'Exact gap between objects (mm)': { en: 'Exact gap between objects (mm)', zh: '对象之间的精确间距 (mm)' },
+  'Exact gap between objects': { en: 'Exact gap between objects', zh: '对象之间的精确间距' },
+  'Spacing': { en: 'Spacing', zh: '间距' },
   'Space horizontally by value': { en: 'Space horizontally by value', zh: '按数值水平分布间距' },
   'Space vertically by value': { en: 'Space vertically by value', zh: '按数值垂直分布间距' },
   'Artboard': { en: 'Artboard', zh: '画板' },

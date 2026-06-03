@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { FlipHorizontal2, FlipVertical2 } from 'lucide-react';
 import { alignSelection, distributeSelection, distributeInArtboard, distributeSpacing, flipSelection, setKeyObject } from '../lib/canvasEngine';
+import { MM_TO_PX } from '../lib/rulerTicks';
 import { toast } from '../lib/toast';
 import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
@@ -29,7 +30,10 @@ export function AlignPanel() {
   const artboardCount = useEditor(s => s.artboards.length);
   const [alignRef, setAlignRef] = useState<'selection' | 'artboard' | 'key'>('selection');
   const [keyed, setKeyed] = useState(false);
-  const [spacingMm, setSpacingMm] = useState(5);
+  // Exact-spacing value in the shared document unit; distributeSpacing() wants mm.
+  const dimUnit = useEditor(s => s.dimUnit);
+  const [spacing, setSpacing] = useState(5);
+  const spacingMm = dimUnit === 'mm' ? spacing : spacing / MM_TO_PX;
   // Aligning to the artboard / key object works on a single object; aligning to
   // the selection's own bounds needs 2+.
   const enoughForAlign = alignRef === 'artboard'
@@ -136,15 +140,15 @@ export function AlignPanel() {
                 <AlignVerticalDistributeCenter size={14} aria-hidden="true" />
               </Btn>
             </div>
-            {/* Exact spacing — gap in mm between consecutive objects. */}
+            {/* Exact spacing — gap between consecutive objects, in the doc unit. */}
             <div className="flex items-center gap-1 mt-1">
               <input
                 type="number" min={0} step={0.5}
-                value={spacingMm}
-                onChange={(e) => setSpacingMm(Math.max(0, parseFloat(e.target.value) || 0))}
+                value={spacing}
+                onChange={(e) => setSpacing(Math.max(0, parseFloat(e.target.value) || 0))}
                 className="input-num !h-6 !py-0 !text-[10px] w-14"
-                aria-label={t('Spacing (mm)')}
-                title={t('Exact gap between objects (mm)')}
+                aria-label={`${t('Spacing')} (${dimUnit})`}
+                title={`${t('Exact gap between objects')} (${dimUnit})`}
               />
               <Btn title={t('Space horizontally by value')} disabled={selCount < 2} onClick={() => distributeSpacing('horizontal', spacingMm)}>
                 <AlignHorizontalSpaceAround size={14} aria-hidden="true" />
