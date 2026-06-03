@@ -570,3 +570,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Smart Punctuation — lib/smartPunctuation.ts smartenPunctuation()/smartPunctuationSelection()
       converts straight quotes→curly, --→em dash, ...→ellipsis across selected text; Type menu
       + command palette (Illustrator Type→Smart Punctuation); 6 unit tests. 2026-06-03.
+- [x] Step & Repeat seamless default — RepeatDialog.tsx grid dx/dy now lazy-init from the
+      selection's bounding size (was fixed 80px) so the default array tiles edge-to-edge
+      like SignMaster; falls back to 80 with no selection. 2026-06-03.
