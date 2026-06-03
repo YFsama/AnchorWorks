@@ -587,3 +587,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Pucker & Bloat — lib/pucker.ts puckerBloatPolyline()/puckerSelection() bows segments
       toward/away from the centroid (-100..100%) keeping anchors fixed; PuckerDialog +
       Distort&Transform menu/palette/right-click (Illustrator); 6 unit tests. 2026-06-03.
+- [x] Edge distribution — alignDistribute.ts distributeByAnchor(dir,'start'|'center'|'end')
+      adds top/bottom/left/right-edge distribute (Illustrator's 6-op set); AlignPanel.tsx
+      second distribute row with 4 edge buttons. 2026-06-03.
