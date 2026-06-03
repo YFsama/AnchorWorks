@@ -552,3 +552,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Select Same Type — selectionOps.ts selectSameType() selects every object sharing the
       active object's type (text variants folded); wired into the right-click Select Same
       submenu + command palette (Illustrator/SignMaster Select>Same>Object Type). 2026-06-03.
+- [x] Align spacing unit — AlignPanel.tsx Distribute-Spacing input now follows the shared
+      dimUnit (spacing in doc unit → spacingMm via MM_TO_PX; dynamic label/aria/title) so
+      px docs can enter a px gap; was hard-coded mm. 2026-06-03.
