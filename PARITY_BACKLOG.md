@@ -512,3 +512,7 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       (Illustrator defaults); keymap + App handlers + kbd hints on the existing menu /
       palette entries (Ctrl+2 stays Zoom-to-Selection, so Lock keeps no shortcut).
       2026-06-03.
+- [x] Font picker multi-select — FontPicker.apply() now sets fontFamily on every
+      selected text object, not just the active one, so Select All Text Objects +
+      pick a font restyles them all (Illustrator's font-change-across-selection /
+      Find Font). 2026-06-03.

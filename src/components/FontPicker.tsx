@@ -30,13 +30,14 @@ export function FontPicker() {
   const apply = (family: string, name: string) => {
     ensureFontLoaded(name);
     const c = getCanvas(); if (!c) return;
-    const a = c.getActiveObject();
-    if (a && (a.type === 'i-text' || a.type === 'text' || a.type === 'textbox')) {
-      (a as fabric.IText).set({ fontFamily: family });
-      c.requestRenderAll();
-      pushHistory();
-      setRecent(pushRecentFont(name, family));
-    }
+    // Apply to every selected text object so a multi-selection (e.g. Select All
+    // Text Objects) restyles all of them, not just the active one.
+    const texts = c.getActiveObjects().filter((o) => o.type === 'i-text' || o.type === 'text' || o.type === 'textbox') as fabric.IText[];
+    if (texts.length === 0) return;
+    for (const o of texts) o.set({ fontFamily: family });
+    c.requestRenderAll();
+    pushHistory();
+    setRecent(pushRecentFont(name, family));
   };
   const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
