@@ -573,3 +573,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Step & Repeat seamless default — RepeatDialog.tsx grid dx/dy now lazy-init from the
       selection's bounding size (was fixed 80px) so the default array tiles edge-to-edge
       like SignMaster; falls back to 80 with no selection. 2026-06-03.
+- [x] Text H/V scale — CharacterPanel.tsx adds Horizontal/Vertical Scale (%) fields backed
+      by the text scaleX/scaleY (10..1000%) for condensing/extending type to fit a width
+      (CorelDRAW/SignMaster staple); applies across multi-text selection. 2026-06-03.
