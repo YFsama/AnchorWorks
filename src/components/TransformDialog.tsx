@@ -23,6 +23,8 @@ export function TransformDialog() {
   const [rotate, setRotate] = useState(0);
   const [copy, setCopy] = useState(false);
   const [each, setEach] = useState(false);
+  const [unit, setUnit] = useState<'mm' | 'px'>('mm');
+  const k = unit === 'mm' ? 3.7795 : 1;
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -30,7 +32,7 @@ export function TransformDialog() {
 
   const apply = async () => {
     if (!getCanvas()?.getActiveObject()) { toast.warn(t('Select something to transform.'), { title: t('Transform') }); return; }
-    const ok = await applyTransform({ dx, dy, scale: scale / 100, rotate, copy, each });
+    const ok = await applyTransform({ dx: dx * k, dy: dy * k, scale: scale / 100, rotate, copy, each });
     if (ok) toast.success(copy ? t('Transformed copy') : t('Transformed'), { title: t('Transform') });
     close();
   };
@@ -51,11 +53,16 @@ export function TransformDialog() {
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
+        <div className="flex gap-1 mb-2" role="radiogroup" aria-label={t('Unit')}>
+          <button type="button" role="radio" aria-checked={unit === 'mm'} className={unit === 'mm' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setUnit('mm')}>mm</button>
+          <button type="button" role="radio" aria-checked={unit === 'px'} className={unit === 'px' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setUnit('px')}>px</button>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
-          <Field label={`${t('Move')} X (px)`}>
+          <Field label={`${t('Move')} X (${unit})`}>
             <input type="number" className="input-num" value={dx} onChange={(e) => setDx(parseFloat(e.target.value) || 0)} />
           </Field>
-          <Field label={`${t('Move')} Y (px)`}>
+          <Field label={`${t('Move')} Y (${unit})`}>
             <input type="number" className="input-num" value={dy} onChange={(e) => setDy(parseFloat(e.target.value) || 0)} />
           </Field>
           <Field label={`${t('Scale')} (%)`}>

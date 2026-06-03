@@ -525,3 +525,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Ungroup All — grouping.ts ungroupAll() recursively breaks every nested group
       in the selection down to leaf objects (flatten before cutting/booleans); Edit
       menu + command palette. 2026-06-03.
+- [x] Transform dialog mm/px move — TransformDialog gains a mm/px unit toggle for the
+      Move X/Y fields (default mm), converting to px before applyTransform; px-only
+      before, which is awkward for sign work. 2026-06-03.
