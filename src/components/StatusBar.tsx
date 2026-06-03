@@ -14,6 +14,7 @@ export function StatusBar() {
   const objectCount = useEditor(s => s.objectCount);
   const selectionIds = useEditor(s => s.selectionIds);
   const summary = useEditor(s => s.selectionSummary);
+  const dimUnit = useEditor(s => s.dimUnit);
   const gridVisible = useEditor(s => s.gridVisible);
   const snapEnabled = useEditor(s => s.snapEnabled);
   const smartGuides = useEditor(s => s.smartGuidesEnabled);
@@ -41,6 +42,9 @@ export function StatusBar() {
   const toolHandler = getTool(tool);
   const toolLabel = t(toolHandler?.label ?? tool);
   const ToolIcon = toolHandler?.icon ?? MousePointer2;
+
+  // Selection dimensions follow the inspector's mm/px unit (shared store flag).
+  const dim = (px: number) => (dimUnit === 'mm' ? Math.round((px / 3.7795) * 100) / 100 : px);
 
   return (
     // The status bar is a landmark (`contentinfo`-like) — labelled but NOT a
@@ -75,12 +79,12 @@ export function StatusBar() {
       {summary && selectionIds.length === 1 && (
         <>
           <Sep />
-          <span className="flex items-center gap-1 tabular-nums" aria-label={`${t('Width')} ${summary.width}, ${t('Height')} ${summary.height}${summary.angle !== 0 ? `, ${t('Angle')} ${summary.angle}°` : ''}`} title={`${summary.width} × ${summary.height} px @ ${summary.left}, ${summary.top}`}>
+          <span className="flex items-center gap-1 tabular-nums" aria-label={`${t('Width')} ${dim(summary.width)} ${dimUnit}, ${t('Height')} ${dim(summary.height)} ${dimUnit}${summary.angle !== 0 ? `, ${t('Angle')} ${summary.angle}°` : ''}`} title={`${dim(summary.width)} × ${dim(summary.height)} ${dimUnit} @ ${dim(summary.left)}, ${dim(summary.top)}`}>
             <Maximize2 size={11} aria-hidden="true" />
-            <span className="text-ink">{summary.width}</span>
+            <span className="text-ink">{dim(summary.width)}</span>
             <span className="text-muted" aria-hidden="true">×</span>
-            <span className="text-ink">{summary.height}</span>
-            <span className="text-muted ml-1" aria-hidden="true">px</span>
+            <span className="text-ink">{dim(summary.height)}</span>
+            <span className="text-muted ml-1" aria-hidden="true">{dimUnit}</span>
             {summary.angle !== 0 && (
               <>
                 <span className="text-muted ml-2" aria-hidden="true">∠</span>

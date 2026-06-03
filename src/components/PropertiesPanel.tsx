@@ -88,10 +88,10 @@ export function PropertiesPanel() {
   const [fxContrast, setFxContrast] = useState(0);
   const [fxHue, setFxHue] = useState(0);
 
-  // Transform numeric unit (mm/px) — persists; sign work is mm-centric, but
-  // the toggle lets users drop back to raw px when they need device pixels.
-  const [xfUnit, setXfUnit] = useState<'mm' | 'px'>(() => (localStorage.getItem('vector.xfUnit') === 'px' ? 'px' : 'mm'));
-  const changeUnit = (u: 'mm' | 'px') => { setXfUnit(u); try { localStorage.setItem('vector.xfUnit', u); } catch { /* ignore */ } };
+  // Transform numeric unit (mm/px) — shared via the store so the inspector and
+  // the status-bar dimensions always agree; persisted under vector.xfUnit.
+  const xfUnit = useEditor(s => s.dimUnit);
+  const changeUnit = useEditor(s => s.setDimUnit);
   const toU = (px: number) => (xfUnit === 'mm' ? Math.round((px / 3.7795) * 100) / 100 : px);
   const fromU = (v: number) => (xfUnit === 'mm' ? v * 3.7795 : v);
 

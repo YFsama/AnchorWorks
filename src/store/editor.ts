@@ -90,6 +90,18 @@ function readInitialHighContrast(): boolean {
   return false;
 }
 
+/**
+ * Numeric display unit for Transform fields + status-bar dimensions. Reuses
+ * the `vector.xfUnit` key the Properties-panel toggle already persists so the
+ * inspector and status bar always agree. Sign work is mm-centric → default mm.
+ */
+function readInitialDimUnit(): 'mm' | 'px' {
+  if (typeof window === 'undefined') return 'mm';
+  try {
+    return window.localStorage.getItem('vector.xfUnit') === 'px' ? 'px' : 'mm';
+  } catch { return 'mm'; }
+}
+
 interface EditorState {
   tool: ToolId;
   setTool: (t: ToolId) => void;
@@ -223,6 +235,9 @@ interface EditorState {
   setAnchorSnapEnabled: (v: boolean) => void;
   setRulersVisible: (v: boolean) => void;
   setGuidesVisible: (v: boolean) => void;
+  /** Numeric display unit for Transform fields + status-bar dimensions. */
+  dimUnit: 'mm' | 'px';
+  setDimUnit: (u: 'mm' | 'px') => void;
 
   // Cursor position (document coords)
   cursorX: number;
@@ -374,6 +389,11 @@ export const useEditor = create<EditorState>((set) => ({
   setAnchorSnapEnabled: (v) => set({ anchorSnapEnabled: v }),
   setRulersVisible: (v) => set({ rulersVisible: v }),
   setGuidesVisible: (v) => set({ guidesVisible: v }),
+  dimUnit: readInitialDimUnit(),
+  setDimUnit: (u) => {
+    try { window.localStorage.setItem('vector.xfUnit', u); } catch { /* quota/blocked */ }
+    set({ dimUnit: u });
+  },
 
   cursorX: 0,
   cursorY: 0,
