@@ -43,6 +43,8 @@ interface TextProps {
   textAlign: string;
   charSpacing: number;
   lineHeight: number;
+  scaleX: number;
+  scaleY: number;
 }
 
 const DEFAULT_TEXT_PROPS: TextProps = {
@@ -54,6 +56,8 @@ const DEFAULT_TEXT_PROPS: TextProps = {
   textAlign: 'left',
   charSpacing: 0,
   lineHeight: 1.16,
+  scaleX: 1,
+  scaleY: 1,
 };
 
 function readActiveTextProps(): TextProps | null {
@@ -72,6 +76,8 @@ function readActiveTextProps(): TextProps | null {
     textAlign: (t as unknown as { textAlign?: string }).textAlign ?? 'left',
     charSpacing: (t as unknown as { charSpacing?: number }).charSpacing ?? 0,
     lineHeight: (t as unknown as { lineHeight?: number }).lineHeight ?? 1.16,
+    scaleX: (t as unknown as { scaleX?: number }).scaleX ?? 1,
+    scaleY: (t as unknown as { scaleY?: number }).scaleY ?? 1,
   };
 }
 
@@ -208,6 +214,18 @@ export function CharacterPanel() {
     setProps((p) => ({ ...p, lineHeight: v }));
     patchActiveText({ lineHeight: v });
   };
+  // Horizontal / vertical glyph scale (condense / extend text to fit a width) —
+  // stored as the object's scaleX/scaleY; the UI works in percent (10..1000%).
+  const setHScale = (pct: number) => {
+    const v = Math.max(0.1, Math.min(10, (pct || 100) / 100));
+    setProps((p) => ({ ...p, scaleX: v }));
+    patchActiveText({ scaleX: v });
+  };
+  const setVScale = (pct: number) => {
+    const v = Math.max(0.1, Math.min(10, (pct || 100) / 100));
+    setProps((p) => ({ ...p, scaleY: v }));
+    patchActiveText({ scaleY: v });
+  };
 
   const tracking = props.charSpacing;
   const onPathEnabled = canApplyTextOnPath();
@@ -301,6 +319,38 @@ export function CharacterPanel() {
             className="input-num w-16"
           />
         </div>
+      </div>
+
+      {/* Horizontal / vertical scale (condense / extend) */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <label className="flex items-center gap-1">
+          <span className="text-muted w-8">{t('H %')}</span>
+          <input
+            type="number"
+            min={10}
+            max={1000}
+            step={1}
+            value={Math.round(props.scaleX * 100)}
+            onChange={(e) => setHScale(+e.target.value)}
+            aria-label={t('Horizontal Scale')}
+            title={t('Horizontal Scale')}
+            className="input-num"
+          />
+        </label>
+        <label className="flex items-center gap-1">
+          <span className="text-muted w-8">{t('V %')}</span>
+          <input
+            type="number"
+            min={10}
+            max={1000}
+            step={1}
+            value={Math.round(props.scaleY * 100)}
+            onChange={(e) => setVScale(+e.target.value)}
+            aria-label={t('Vertical Scale')}
+            title={t('Vertical Scale')}
+            className="input-num"
+          />
+        </label>
       </div>
 
       {/* Text alignment */}
