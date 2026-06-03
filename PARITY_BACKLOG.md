@@ -593,3 +593,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Custom dash pattern — PropertiesPanel.tsx Advanced stroke gains a Custom dash field
       parsing space/comma-separated lengths into strokeDashArray (perforation/cut lines);
       presets were the only option. 2026-06-03.
+- [x] Copy as SVG — exportSelection.ts copySelectionSVG() writes cropped selection SVG to
+      the clipboard (Illustrator Copy as SVG); File menu + command palette. Export was
+      file-only before. 2026-06-03.
