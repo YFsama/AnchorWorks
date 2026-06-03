@@ -869,6 +869,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'Edit Colors': { en: 'Edit Colors', zh: '编辑颜色' },
   'Sign Effects': { en: 'Sign Effects', zh: '标牌效果' },
   'Export All Artboards (SVG)': { en: 'Export All Artboards (SVG)', zh: '导出所有画板 (SVG)' },
+  'Export All Artboards (PNG)': { en: 'Export All Artboards (PNG)', zh: '导出所有画板 (PNG)' },
   'artboards exported': { en: 'artboards exported', zh: '个画板已导出' },
   'No artboards to export.': { en: 'No artboards to export.', zh: '没有可导出的画板。' },
   'Export Selection as SVG': { en: 'Export Selection as SVG', zh: '导出所选为 SVG' },

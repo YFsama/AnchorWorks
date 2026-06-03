@@ -502,3 +502,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       each artboard as its own SVG via the async full-fidelity render (replacing the
       unused/incomplete sync exportAllArtboardsSVG); File menu + command palette.
       2026-06-03.
+- [x] Export All Artboards (PNG) — artboards.ts exportAllArtboardsAsPNG() downloads
+      each artboard as a 2× PNG (mirrors the SVG batch via exportArtboardPNG); File
+      menu + command palette. 2026-06-03.
