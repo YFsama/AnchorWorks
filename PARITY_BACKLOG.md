@@ -519,3 +519,6 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Character panel multi-select — patchActiveText() (CharacterPanel.tsx) applies
       bold/italic/size/tracking/leading/align/etc. to every selected text object, not
       just the active one (same single-object bug as the font picker). 2026-06-03.
+- [x] Create Outlines on multi-selection — textToOutline.ts refactored into
+      traceTextToPath() + a loop, so Create Outlines converts every selected text
+      object (was single-only); canCreateOutlines() now true for 1+ text. 2026-06-03.

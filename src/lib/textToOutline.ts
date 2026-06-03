@@ -17,32 +17,24 @@ import { traceBitmap } from './cutContour';
 const MM_TO_PX = 3.7795;
 type Pt = [number, number];
 
-/** True when exactly one text object is selected. */
+const isTextType = (t?: string) => ['i-text', 'text', 'textbox'].includes(t ?? '');
+
+/** True when the selection contains at least one text object. */
 export function canCreateOutlines(): boolean {
   const c = getCanvas();
   if (!c) return false;
-  const objs = c.getActiveObjects();
-  return objs.length === 1 && ['i-text', 'text', 'textbox'].includes(objs[0].type ?? '');
+  return c.getActiveObjects().some((o) => isTextType(o.type));
 }
 
 function toD(pts: Pt[]): string {
   return pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`).join(' ') + ' Z';
 }
 
-/**
- * Replace the selected text with traced outline paths (one even-odd compound
- * fabric.Path keeping the text's fill). Returns true on success.
- */
-export async function createOutlinesFromText(): Promise<boolean> {
-  const canvas = getCanvas();
-  if (!canvas) return false;
-  const objs = canvas.getActiveObjects();
-  if (objs.length !== 1) return false;
-  const text = objs[0];
-  if (!['i-text', 'text', 'textbox'].includes(text.type ?? '')) return false;
-
+/** Trace one text object into an even-odd compound fabric.Path (keeping its
+ *  fill/position), or null if nothing traceable. */
+async function traceTextToPath(text: fabric.FabricObject): Promise<fabric.Path | null> {
   const r = text.getBoundingRect();
-  if (r.width < 1 || r.height < 1) return false;
+  if (r.width < 1 || r.height < 1) return null;
 
   // Supersample the text onto a transparent offscreen canvas so the trace edges
   // stay smooth, capped so a huge headline can't blow out memory.
@@ -65,14 +57,14 @@ export async function createOutlinesFromText(): Promise<boolean> {
     sc.add(clone);
     sc.renderAll();
     const ctx = el.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return false;
+    if (!ctx) return null;
     const img = ctx.getImageData(0, 0, W, H);
     const pixelSizeMm = (r.width / MM_TO_PX) / W; // mm per raster pixel
     paths = traceBitmap(img, { useAlpha: true, threshold: 64, simplifyTolerance: 1.2, pixelSizeMm });
   } finally {
     sc.dispose();
   }
-  if (paths.length === 0) return false;
+  if (paths.length === 0) return null;
 
   // Trace coords are mm relative to the text's top-left; offset to the page and
   // convert to px so the rebuilt path lands where the text was.
@@ -82,17 +74,34 @@ export async function createOutlinesFromText(): Promise<boolean> {
     .map(c => toD(c.map(([x, y]) => [(x + offX) * MM_TO_PX, (y + offY) * MM_TO_PX] as Pt)))
     .join(' ');
 
-  const outline = new fabric.Path(d, {
+  return new fabric.Path(d, {
     fill: (text.fill as string) ?? '#000000',
     fillRule: 'evenodd',
     stroke: '',
     strokeWidth: 0,
     opacity: text.opacity ?? 1,
   });
-  canvas.remove(text);
-  canvas.add(outline);
+}
+
+/**
+ * Replace every selected text object with traced outline paths (one even-odd
+ * compound fabric.Path each, keeping the text's fill). Returns true if any were
+ * converted.
+ */
+export async function createOutlinesFromText(): Promise<boolean> {
+  const canvas = getCanvas();
+  if (!canvas) return false;
+  const texts = canvas.getActiveObjects().filter((o) => isTextType(o.type));
+  if (texts.length === 0) return false;
+
+  const made: fabric.FabricObject[] = [];
+  for (const text of texts) {
+    const outline = await traceTextToPath(text);
+    if (outline) { canvas.remove(text); canvas.add(outline); made.push(outline); }
+  }
+  if (made.length === 0) return false;
   canvas.discardActiveObject();
-  canvas.setActiveObject(outline);
+  canvas.setActiveObject(made.length === 1 ? made[0] : new fabric.ActiveSelection(made, { canvas }));
   canvas.requestRenderAll();
   pushHistory();
   return true;
