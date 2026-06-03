@@ -32,11 +32,14 @@ export function RepeatDialog() {
 
   const [tab, setTab] = useState<Tab>('grid');
 
-  // Grid params
+  // Grid params. Default the per-step offset to the selection's bounding size
+  // so the array tiles edge-to-edge out of the box (SignMaster Step & Repeat) —
+  // the dialog mounts on open, so the summary reflects the current selection.
+  const initSum = useEditor.getState().selectionSummary;
   const [cols, setCols] = useState(3);
   const [rows, setRows] = useState(3);
-  const [dx, setDx] = useState(80);
-  const [dy, setDy] = useState(80);
+  const [dx, setDx] = useState(() => (initSum && initSum.width > 0 ? Math.round(initSum.width) : 80));
+  const [dy, setDy] = useState(() => (initSum && initSum.height > 0 ? Math.round(initSum.height) : 80));
 
   // Radial params
   const [count, setCount] = useState(8);
