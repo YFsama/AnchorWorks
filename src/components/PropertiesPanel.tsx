@@ -88,6 +88,13 @@ export function PropertiesPanel() {
   const [fxContrast, setFxContrast] = useState(0);
   const [fxHue, setFxHue] = useState(0);
 
+  // Transform numeric unit (mm/px) — persists; sign work is mm-centric, but
+  // the toggle lets users drop back to raw px when they need device pixels.
+  const [xfUnit, setXfUnit] = useState<'mm' | 'px'>(() => (localStorage.getItem('vector.xfUnit') === 'px' ? 'px' : 'mm'));
+  const changeUnit = (u: 'mm' | 'px') => { setXfUnit(u); try { localStorage.setItem('vector.xfUnit', u); } catch { /* ignore */ } };
+  const toU = (px: number) => (xfUnit === 'mm' ? Math.round((px / 3.7795) * 100) / 100 : px);
+  const fromU = (v: number) => (xfUnit === 'mm' ? v * 3.7795 : v);
+
   // Pattern fill local state
   const [patternKind, setPatternKind] = useState<PatternKind>('checker');
   const [patternColor1, setPatternColor1] = useState('#ffffff');
@@ -734,12 +741,33 @@ export function PropertiesPanel() {
 
       {sum && (
         <div className="panel-section p-3">
-          <h3 className="field-label mb-2">{t('Transform')}</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="field-label">{t('Transform')}</h3>
+            <div className="flex gap-0.5" role="radiogroup" aria-label={t('Unit')}>
+              {(['mm', 'px'] as const).map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  role="radio"
+                  aria-checked={xfUnit === u}
+                  onClick={() => changeUnit(u)}
+                  className={
+                    'px-1.5 py-0.5 rounded text-[10px] border transition-colors ' +
+                    (xfUnit === u
+                      ? 'bg-accent/15 text-ink border-accent hover:bg-accent/20'
+                      : 'bg-panel2 border-border text-muted hover:bg-panel3')
+                  }
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2">
-            <NumField label={t('X')} value={sum.left} onChange={(v) => applyTransformToSelection({ left: v })} />
-            <NumField label={t('Y')} value={sum.top} onChange={(v) => applyTransformToSelection({ top: v })} />
-            <NumField label={t('W')} value={sum.width} onChange={(v) => applyTransformToSelection({ width: v })} />
-            <NumField label={t('H')} value={sum.height} onChange={(v) => applyTransformToSelection({ height: v })} />
+            <NumField label={t('X')} value={toU(sum.left)} onChange={(v) => applyTransformToSelection({ left: fromU(v) })} />
+            <NumField label={t('Y')} value={toU(sum.top)} onChange={(v) => applyTransformToSelection({ top: fromU(v) })} />
+            <NumField label={t('W')} value={toU(sum.width)} onChange={(v) => applyTransformToSelection({ width: fromU(v) })} />
+            <NumField label={t('H')} value={toU(sum.height)} onChange={(v) => applyTransformToSelection({ height: fromU(v) })} />
             <NumField label={t('Rot')} value={sum.angle} onChange={(v) => applyTransformToSelection({ angle: v })} />
           </div>
         </div>
