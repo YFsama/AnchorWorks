@@ -602,3 +602,5 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Polar move — TransformDialog.tsx adds an XY/Polar toggle; polar Distance+Angle resolve
       to dx=dist·cos(a), dy=-dist·sin(a) (Illustrator Move dialog) in the active unit before
       applyTransform; was X/Y only. 2026-06-03.
+- [x] Non-uniform scale — transformOps.ts TransformParams.scaleY (optional) + per-axis apply;
+      TransformDialog Scale X%/Y% with a Link toggle (default linked); was single uniform %. 2026-06-03.
