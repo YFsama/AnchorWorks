@@ -67,8 +67,9 @@ export function StatusBar() {
       <Sep />
       <span className="flex items-center gap-1 tabular-nums" aria-hidden="true">
         <Move size={11} aria-hidden="true" />
-        X <span className="text-ink">{cursorX}</span>
-        <span className="ml-1">Y</span> <span className="text-ink">{cursorY}</span>
+        X <span className="text-ink">{dim(cursorX)}</span>
+        <span className="ml-1">Y</span> <span className="text-ink">{dim(cursorY)}</span>
+        <span className="ml-0.5">{dimUnit}</span>
       </span>
       <Sep />
       <ZoomField zoom={zoom} label={t('Zoom')} />
