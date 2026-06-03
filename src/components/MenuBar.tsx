@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check, ChevronRight } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, selectSame, selectSameType, selectInverse, selectAllText, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, zoomToSelection, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, selectSame, selectSameType, selectInverse, selectAllText, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
@@ -261,6 +261,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Zoom Out'), onClick: () => zoomBy(1 / 1.25), kbd: '-' },
         { label: t('Actual Size'), onClick: () => zoomToPercent(100), kbd: '1' },
         { label: t('Fit to Page'), onClick: () => zoomFit(), kbd: '0' },
+        { label: t('Zoom to Selection'), onClick: () => { if (!zoomToSelection()) toast.warn(t('Select something first.')); }, kbd: 'Ctrl+2' },
         { sep: true },
         { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: 'Ctrl+Alt+Y', checked: outlineMode },
         { sep: true },

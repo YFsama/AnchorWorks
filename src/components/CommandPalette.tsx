@@ -12,7 +12,7 @@ import {
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
 import {
-  undo, redo, zoomBy, zoomFit, zoomToPercent, deleteSelection, duplicateSelection,
+  undo, redo, zoomBy, zoomFit, zoomToPercent, zoomToSelection, deleteSelection, duplicateSelection,
   groupSelection, ungroupSelection, ungroupAll,
   bringForward, sendBackward, bringToFront, sendToBack, autoArrangeSelection, centerOnArtboard, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, swapFillStroke, defaultColors, makeGuidesFromSelection, selectInverse, selectAllText, selectSameType, deselectAll, selectObjectInStack,
 } from '../lib/canvasEngine';
@@ -354,6 +354,7 @@ export function CommandPalette({
     { id: 'view.zoomOut', label: t('Zoom Out'),    category: t('View'), shortcut: 'Ctrl+-', icon: Minus,     run: () => zoomBy(1 / 1.25) },
     { id: 'view.actualSize', label: t('Actual Size'), category: t('View'), shortcut: 'Ctrl+1', keywords: 'actual size 100 percent real zoom reset', icon: Maximize2, run: () => zoomToPercent(100) },
     { id: 'view.fit',     label: t('Fit to Page'), category: t('View'), shortcut: 'Ctrl+0', icon: Maximize2, run: () => zoomFit() },
+    { id: 'view.zoomSelection', label: t('Zoom to Selection'), category: t('View'), shortcut: 'Ctrl+2', keywords: 'zoom selection fit frame focus selected', icon: Maximize2, run: () => { if (!zoomToSelection()) toast.warn(t('Select something first.')); } },
     { id: 'artboard.fitArtwork', label: t('Fit Artboard to Artwork'), category: t('View'), keywords: 'fit artboard artwork bounds crop resize', icon: Maximize2, run: () => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); } },
     { id: 'artboard.fitSelection', label: t('Fit Artboard to Selection'), category: t('View'), keywords: 'fit artboard selection crop resize', icon: Maximize2, run: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
     { id: 'view.outline', label: t('Outline View'), category: t('View'), shortcut: 'Ctrl+Alt+Y', keywords: 'wireframe geometry preview', icon: PenTool, run: () => setOutlineMode(!isOutlineMode()) },

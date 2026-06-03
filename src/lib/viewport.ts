@@ -129,3 +129,16 @@ export function zoomToArtboard(bbox: { x: number; y: number; width: number; heig
   useEditor.getState().setZoom(z);
   emitViewport();
 }
+
+/** Frame the active selection in the viewport (Illustrator Ctrl+2). Returns
+ *  true if it zoomed to a selection, false if it fell back to Fit (nothing
+ *  selected) — callers use the result to pick the right announcement. */
+export function zoomToSelection(): boolean {
+  const canvas = getCanvas();
+  if (!canvas) return false;
+  const sel = canvas.getActiveObject();
+  if (!sel) { zoomFit(); return false; }
+  const b = sel.getBoundingRect();
+  zoomToArtboard({ x: b.left, y: b.top, width: b.width, height: b.height });
+  return true;
+}

@@ -273,7 +273,7 @@ function onMouseUp(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
 // for back-compat; every existing call site imports from './canvasEngine'.
 // `handleWheel` is the `mouse:wheel` event handler (zoom + 2D pan) — it
 // also lives in viewport.ts now, wired above as `canvas.on('mouse:wheel', …)`.
-export { zoomToPoint, zoomBy, zoomFit, zoomReset, zoomToArtboard, zoomToPercent } from './viewport';
+export { zoomToPoint, zoomBy, zoomFit, zoomReset, zoomToArtboard, zoomToSelection, zoomToPercent } from './viewport';
 import { handleWheel } from './viewport';
 
 // Polygon / Pen tool helpers live in src/lib/tools/penPolyTool.ts and flow
