@@ -469,11 +469,12 @@ export function CanvasContextMenu() {
         disabled={!hasSelection}
         onClick={() => run(() => { deselectAll(); }, hasSelection)}
       />
-      <Item
-        label={t('Select Same Fill')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { selectSame('fill'); }, hasSelection)}
-      />
+      <SubMenu label={t('Select Same')} openLeft={openLeft} disabled={!hasSelection}>
+        <Item label={t('Select Same Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('fill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
+        <Item label={t('Select Same Stroke')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
+        <Item label={t('Select Same Stroke Weight')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Opacity')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+      </SubMenu>
       <Item
         label={t('Select Inverse')}
         onClick={() => run(() => { selectInverse(); }, true)}

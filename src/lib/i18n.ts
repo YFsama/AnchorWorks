@@ -933,6 +933,7 @@ const dict: Record<string, Record<Lang, string>> = {
   'locked': { en: 'locked', zh: '个已锁定' },
   'unlocked': { en: 'unlocked', zh: '个已解锁' },
   'Select Inverse': { en: 'Select Inverse', zh: '反向选择' },
+  'Select Same': { en: 'Select Same', zh: '选择相同' },
   'Select Same Fill': { en: 'Select Same Fill', zh: '选择相同填充' },
   'Select Same Stroke': { en: 'Select Same Stroke', zh: '选择相同描边' },
   'Select Next Object Above': { en: 'Select Next Object Above', zh: '选择上层对象' },
