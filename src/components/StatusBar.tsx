@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { MousePointer2, Move, Hash, Magnet, Crosshair, Target, Maximize2, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
 import { zoomToArtboard, zoomToPercent } from '../lib/canvasEngine';
 import { getTool } from '../lib/tools/types';
+import { toast } from '../lib/toast';
 
 export function StatusBar() {
   const t = useT();
@@ -22,6 +23,11 @@ export function StatusBar() {
   const artboards = useEditor(s => s.artboards);
   const cutPathCount = useEditor(s => s.cutPaths.length);
   const setModal = useEditor(s => s.setModal);
+  const clearCutPaths = useEditor(s => s.clearCutPaths);
+  const setGridVisible = useEditor(s => s.setGridVisible);
+  const setSnapEnabled = useEditor(s => s.setSnapEnabled);
+  const setSmartGuidesEnabled = useEditor(s => s.setSmartGuidesEnabled);
+  const setAnchorSnapEnabled = useEditor(s => s.setAnchorSnapEnabled);
   // Index of the artboard the user is "on". Independent of any store flag —
   // tracks the cycle of the prev/next buttons. Stays stable across re-renders
   // unless the artboards list itself changes length.
@@ -35,6 +41,24 @@ export function StatusBar() {
     zoomToArtboard({ x: a.x, y: a.y, width: a.width, height: a.height });
   };
 
+  const handleStatusActionKeys = (event: KeyboardEvent<HTMLDivElement | HTMLSpanElement>) => {
+    if (event.defaultPrevented) return;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-status-action]'))
+      .filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
+  };
+
   // Tool label + icon flow from the registry descriptor (registerTools.ts)
   // so adding a new tool doesn't require updating a parallel map here. Falls
   // through to the raw id + the default mouse-pointer icon when a tool isn't
@@ -45,6 +69,15 @@ export function StatusBar() {
 
   // Selection dimensions follow the inspector's mm/px unit (shared store flag).
   const dim = (px: number) => (dimUnit === 'mm' ? Math.round((px / 3.7795) * 100) / 100 : px);
+
+  const handleCutPathStatusClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (event.ctrlKey || event.metaKey) {
+      clearCutPaths();
+      toast.success(t('Cut paths cleared'), { title: t('Cut prep') });
+      return;
+    }
+    setModal(event.shiftKey || event.altKey ? 'showCutContour' : 'showPlotter', true);
+  };
 
   return (
     // The status bar is a landmark (`contentinfo`-like) — labelled but NOT a
@@ -96,11 +129,24 @@ export function StatusBar() {
         </>
       )}
 
-      <div className="ml-auto flex items-center gap-3">
+      <div
+        className="ml-auto flex items-center gap-3"
+        role="toolbar"
+        aria-label={t('Status actions')}
+        title={t('Use arrow keys to review status actions')}
+        onKeyDown={handleStatusActionKeys}
+      >
         {artboards.length > 1 && (
-          <span className="flex items-center gap-0.5 px-1 rounded bg-panel2 border border-border" role="navigation" aria-label={t('Artboard navigation')}>
+          <span
+            className="flex items-center gap-0.5 px-1 rounded bg-panel2 border border-border"
+            role="navigation"
+            aria-label={t('Artboard navigation')}
+            title={t('Use arrow keys to review status actions')}
+            onKeyDown={handleStatusActionKeys}
+          >
             <button
               type="button"
+              data-status-action
               onClick={() => focusArtboard(visibleIdx - 1)}
               className="p-1 rounded text-muted hover:text-ink hover:bg-panel3 transition-colors"
               aria-label={t('Previous artboard')}
@@ -110,6 +156,7 @@ export function StatusBar() {
             </button>
             <button
               type="button"
+              data-status-action
               onClick={() => focusArtboard(visibleIdx)}
               className="px-1 rounded text-[10px] tabular-nums text-ink hover:bg-panel3 transition-colors"
               title={artboards[visibleIdx]?.name ?? ''}
@@ -119,6 +166,7 @@ export function StatusBar() {
             </button>
             <button
               type="button"
+              data-status-action
               onClick={() => focusArtboard(visibleIdx + 1)}
               className="p-1 rounded text-muted hover:text-ink hover:bg-panel3 transition-colors"
               aria-label={t('Next artboard')}
@@ -131,24 +179,26 @@ export function StatusBar() {
         {cutPathCount > 0 && (
           <button
             type="button"
-            onClick={() => setModal('showCutContour', true)}
+            data-status-action
+            onClick={handleCutPathStatusClick}
             className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] hover:bg-panel2 transition-colors"
             style={{ color: '#ff2e9a' }}
-            title={t('Open Cut Contour dialog')}
-            aria-label={`${cutPathCount} ${t('cut paths')}`}
+            title={t('Open Send to Plotter (Shift-click: Cut Contour, Ctrl-click: Clear cut paths)')}
+            aria-label={`${cutPathCount} ${t('cut paths')} — ${t('Open Send to Plotter')}. ${t('Ctrl-click: Clear cut paths')}`}
           >
             <Scissors size={11} aria-hidden="true" />
             <span className="tabular-nums">{cutPathCount}</span>
           </button>
         )}
-        <Badge active={gridVisible} icon={<Hash size={11} aria-hidden="true" />} label={t('GRID')} />
-        <Badge active={snapEnabled} icon={<Magnet size={11} aria-hidden="true" />} label={t('SNAP')} />
-        <Badge active={smartGuides} icon={<Crosshair size={11} aria-hidden="true" />} label={t('GUIDES')} />
-        <Badge active={anchorSnap} icon={<Target size={11} aria-hidden="true" />} label={t('ANCHOR')} />
+        <Badge active={gridVisible} icon={<Hash size={11} aria-hidden="true" />} label={t('GRID')} onToggle={() => setGridVisible(!gridVisible)} />
+        <Badge active={snapEnabled} icon={<Magnet size={11} aria-hidden="true" />} label={t('SNAP')} onToggle={() => setSnapEnabled(!snapEnabled)} />
+        <Badge active={smartGuides} icon={<Crosshair size={11} aria-hidden="true" />} label={t('GUIDES')} onToggle={() => setSmartGuidesEnabled(!smartGuides)} />
+        <Badge active={anchorSnap} icon={<Target size={11} aria-hidden="true" />} label={t('ANCHOR')} onToggle={() => setAnchorSnapEnabled(!anchorSnap)} />
         <Sep />
         {/* Always-visible build version — opens About for full credits. */}
         <button
           type="button"
+          data-status-action
           onClick={() => useEditor.getState().setModal('showHelpCenter', true)}
           className="tabular-nums text-muted hover:text-ink transition-colors"
           title={`Anchorworks v${__APP_VERSION__}`}
@@ -209,16 +259,33 @@ function ZoomField({ zoom, label }: { zoom: number; label: string }) {
   );
 }
 
-function Badge({ active, icon, label }: { active: boolean; icon: React.ReactNode; label: string }) {
+function Badge({ active, icon, label, onToggle }: { active: boolean; icon: React.ReactNode; label: string; onToggle?: () => void }) {
   const t = useT();
   // axe color-contrast: bare `text-accent2` (#5ac8d8) on the panel surface
   // falls to ~1.8:1 in light theme, and `text-muted opacity-60` lands at
   // ~2.4:1. Use `badge-active` / `badge-inactive` so we can drive the colour
   // via index.css (which already knows the active theme).
   const state = t(active ? 'on' : 'off');
+  const className = `flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors ${active ? 'badge-active' : 'badge-inactive'}`;
+  if (onToggle) {
+    return (
+      <button
+        type="button"
+        data-status-action
+        onClick={onToggle}
+        className={`${className} hover:bg-panel2`}
+        title={`${label} ${state} — ${t('Toggle')}`}
+        aria-label={`${label} ${state}`}
+        aria-pressed={active}
+      >
+        {icon}
+        {label}
+      </button>
+    );
+  }
   return (
     <span
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors ${active ? 'badge-active' : 'badge-inactive'}`}
+      className={className}
       title={`${label} ${state}`}
       role="status"
       aria-label={`${label} ${state}`}

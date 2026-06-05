@@ -10,6 +10,23 @@ import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 type Tab = 'grid' | 'radial' | 'mirror';
 type MirrorAxis = 'horizontal' | 'vertical' | 'both';
 
+const GRID_REPEAT_PRESETS = [
+  { id: 'two-by-two', label: '2×2 repeat', cols: 2, rows: 2 },
+  { id: 'three-by-three', label: '3×3 repeat', cols: 3, rows: 3 },
+  { id: 'five-across', label: '5 across', cols: 5, rows: 1 },
+  { id: 'five-down', label: '5 down', cols: 1, rows: 5 },
+] as const;
+const RADIAL_REPEAT_PRESETS = [
+  { id: 'six-around', label: '6 around', count: 6, radius: 100, startAngle: 0, endAngle: 360, rotateInstances: true },
+  { id: 'eight-around', label: '8 around', count: 8, radius: 120, startAngle: 0, endAngle: 360, rotateInstances: true },
+  { id: 'twelve-badge', label: '12 badge', count: 12, radius: 140, startAngle: 0, endAngle: 360, rotateInstances: false },
+] as const;
+const MIRROR_AXIS_PRESETS: Array<{ value: MirrorAxis; label: string }> = [
+  { value: 'horizontal', label: 'Horizontal (flip X)' },
+  { value: 'vertical', label: 'Vertical (flip Y)' },
+  { value: 'both', label: 'Both (4-way kaleidoscope)' },
+];
+
 /**
  * "Object > Repeat" — a three-tab dialog for array transforms (Grid / Radial
  * / Mirror). Each tab has its own input set + a tiny SVG preview that
@@ -50,6 +67,10 @@ export function RepeatDialog() {
 
   // Mirror params
   const [axis, setAxis] = useState<MirrorAxis>('horizontal');
+  const [reviewedGridPreset, setReviewedGridPreset] = useState('');
+  const [reviewedRadialPreset, setReviewedRadialPreset] = useState('');
+  const [reviewedMirrorPreset, setReviewedMirrorPreset] = useState('');
+  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
 
   const [busy, setBusy] = useState(false);
 
@@ -88,6 +109,120 @@ export function RepeatDialog() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const applyGridPreset = (preset: (typeof GRID_REPEAT_PRESETS)[number]) => {
+    setCols(preset.cols);
+    setRows(preset.rows);
+  };
+
+  const resetFields = () => {
+    setTab('grid');
+    setCols(3);
+    setRows(3);
+    setDx(initSum && initSum.width > 0 ? Math.round(initSum.width) : 80);
+    setDy(initSum && initSum.height > 0 ? Math.round(initSum.height) : 80);
+    setCount(8);
+    setRadius(120);
+    setStartAngle(0);
+    setEndAngle(360);
+    setRotateInstances(true);
+    setAxis('horizontal');
+    setReviewedGridPreset('');
+    setReviewedRadialPreset('');
+    setReviewedMirrorPreset('');
+    setReviewedFooterAction(t('Reset'));
+  };
+
+  const handleGridPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-grid-preset-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    event.preventDefault();
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : event.key === 'ArrowRight'
+          ? (activeIndex + 1) % actions.length
+          : (activeIndex - 1 + actions.length) % actions.length;
+    const preset = GRID_REPEAT_PRESETS.find((item) => item.id === actions[nextIndex]?.dataset.value);
+    if (preset) applyGridPreset(preset);
+    requestAnimationFrame(() => {
+      setReviewedGridPreset(actions[nextIndex]?.dataset.review ?? '');
+      actions[nextIndex]?.focus();
+    });
+  };
+
+  const applyRadialPreset = (preset: (typeof RADIAL_REPEAT_PRESETS)[number]) => {
+    setCount(preset.count);
+    setRadius(preset.radius);
+    setStartAngle(preset.startAngle);
+    setEndAngle(preset.endAngle);
+    setRotateInstances(preset.rotateInstances);
+  };
+
+  const handleRadialPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-radial-preset-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    event.preventDefault();
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : event.key === 'ArrowRight'
+          ? (activeIndex + 1) % actions.length
+          : (activeIndex - 1 + actions.length) % actions.length;
+    const preset = RADIAL_REPEAT_PRESETS.find((item) => item.id === actions[nextIndex]?.dataset.value);
+    if (preset) applyRadialPreset(preset);
+    requestAnimationFrame(() => {
+      setReviewedRadialPreset(actions[nextIndex]?.dataset.review ?? '');
+      actions[nextIndex]?.focus();
+    });
+  };
+
+  const handleMirrorPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-mirror-preset-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    event.preventDefault();
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : event.key === 'ArrowRight'
+          ? (activeIndex + 1) % actions.length
+          : (activeIndex - 1 + actions.length) % actions.length;
+    const nextAxis = actions[nextIndex]?.dataset.value as MirrorAxis | undefined;
+    if (nextAxis) setAxis(nextAxis);
+    requestAnimationFrame(() => {
+      setReviewedMirrorPreset(actions[nextIndex]?.dataset.review ?? '');
+      actions[nextIndex]?.focus();
+    });
+  };
+
+  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
+    const nextAction = actions[nextIndex];
+    setReviewedFooterAction(nextAction?.dataset.repeatActionReview ?? nextAction?.textContent?.trim() ?? '');
+    nextAction?.focus();
   };
 
   return (
@@ -145,37 +280,145 @@ export function RepeatDialog() {
           {/* Inputs */}
           <div>
             {tab === 'grid' && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                <NumField label={t('Cols')} value={cols} min={1} max={50} step={1} onChange={setCols} />
+              <div className="space-y-3 text-xs">
+                <div>
+                  <div className="field-label !mb-1">{t('Repeat grid presets')}</div>
+                  <div
+                    className="grid grid-cols-4 gap-1"
+                    role="toolbar"
+                    aria-label={t('Repeat grid preset actions')}
+                    aria-describedby="repeat-grid-preset-review-status"
+                    title={t('Use arrow keys to review repeat grid presets')}
+                    onKeyDown={handleGridPresetKeys}
+                  >
+                    <div id="repeat-grid-preset-review-status" className="sr-only" aria-live="polite">
+                      {`${t('Reviewing')} ${reviewedGridPreset || t('Repeat grid presets')}`}
+                    </div>
+                    {GRID_REPEAT_PRESETS.map((preset) => {
+                      const active = cols === preset.cols && rows === preset.rows;
+                      const review = `${t(preset.label)} · ${t('Cols')} ${preset.cols} · ${t('Rows')} ${preset.rows}`;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          data-repeat-grid-preset-action
+                          data-value={preset.id}
+                          data-review={review}
+                          className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
+                          onClick={() => applyGridPreset(preset)}
+                          onFocus={(event) => setReviewedGridPreset(event.currentTarget.dataset.review ?? '')}
+                          aria-pressed={active}
+                          title={`${t(preset.label)} · ${preset.cols}×${preset.rows}`}
+                        >
+                          {t(preset.label)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <NumField label={t('Cols')} value={cols} min={1} max={50} step={1} onChange={setCols} />
                 <NumField label={t('Rows')} value={rows} min={1} max={50} step={1} onChange={setRows} />
                 <NumField label={t('dx (px)')} value={dx} step={1} onChange={setDx} />
                 <NumField label={t('dy (px)')} value={dy} step={1} onChange={setDy} />
-                <div className="col-span-2 text-[10px] text-muted">
-                  {cols} × {rows} = {cols * rows} {t('instances')}
+                  <div className="col-span-2 text-[10px] text-muted">
+                    {cols} × {rows} = {cols * rows} {t('instances')}
+                  </div>
                 </div>
               </div>
             )}
             {tab === 'radial' && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                <NumField label={t('Count')} value={count} min={2} max={64} step={1} onChange={setCount} />
+              <div className="space-y-3 text-xs">
+                <div>
+                  <div className="field-label !mb-1">{t('Repeat radial presets')}</div>
+                  <div
+                    className="grid grid-cols-3 gap-1"
+                    role="toolbar"
+                    aria-label={t('Repeat radial preset actions')}
+                    aria-describedby="repeat-radial-preset-review-status"
+                    title={t('Use arrow keys to review repeat radial presets')}
+                    onKeyDown={handleRadialPresetKeys}
+                  >
+                    <div id="repeat-radial-preset-review-status" className="sr-only" aria-live="polite">
+                      {`${t('Reviewing')} ${reviewedRadialPreset || t('Repeat radial presets')}`}
+                    </div>
+                    {RADIAL_REPEAT_PRESETS.map((preset) => {
+                      const active = count === preset.count
+                        && radius === preset.radius
+                        && startAngle === preset.startAngle
+                        && endAngle === preset.endAngle
+                        && rotateInstances === preset.rotateInstances;
+                      const review = `${t(preset.label)} · ${t('Count')} ${preset.count} · ${t('Radius (px)')} ${preset.radius} · ${preset.rotateInstances ? t('Rotate instances') : t('No rotation')}`;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          data-repeat-radial-preset-action
+                          data-value={preset.id}
+                          data-review={review}
+                          className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
+                          onClick={() => applyRadialPreset(preset)}
+                          onFocus={(event) => setReviewedRadialPreset(event.currentTarget.dataset.review ?? '')}
+                          aria-pressed={active}
+                          title={`${t(preset.label)} · ${preset.count} ${t('copies')} · ${preset.radius}px`}
+                        >
+                          {t(preset.label)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <NumField label={t('Count')} value={count} min={2} max={64} step={1} onChange={setCount} />
                 <NumField label={t('Radius (px)')} value={radius} min={0} step={1} onChange={setRadius} />
                 <NumField label={t('Start °')} value={startAngle} min={-360} max={360} step={1} onChange={setStartAngle} />
                 <NumField label={t('End °')} value={endAngle} min={-360} max={360} step={1} onChange={setEndAngle} />
-                <label className="col-span-2 flex items-center gap-2 text-ink cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rotateInstances}
-                    onChange={(e) => setRotateInstances(e.target.checked)}
-                  />
-                  {t('Rotate instances')}
-                </label>
+                  <label className="col-span-2 flex items-center gap-2 text-ink cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rotateInstances}
+                      onChange={(e) => setRotateInstances(e.target.checked)}
+                    />
+                    {t('Rotate instances')}
+                  </label>
+                </div>
               </div>
             )}
             {tab === 'mirror' && (
               <div className="space-y-2 text-xs">
-                <RadioRow value="horizontal" current={axis} onChange={setAxis} label={t('Horizontal (flip X)')} />
-                <RadioRow value="vertical" current={axis} onChange={setAxis} label={t('Vertical (flip Y)')} />
-                <RadioRow value="both" current={axis} onChange={setAxis} label={t('Both (4-way kaleidoscope)')} />
+                <div className="field-label !mb-1">{t('Mirror axis presets')}</div>
+                <div
+                  className="grid grid-cols-3 gap-1"
+                  role="toolbar"
+                  aria-label={t('Repeat mirror preset actions')}
+                  aria-describedby="repeat-mirror-preset-review-status"
+                  title={t('Use arrow keys to review repeat mirror presets')}
+                  onKeyDown={handleMirrorPresetKeys}
+                >
+                  <div id="repeat-mirror-preset-review-status" className="sr-only" aria-live="polite">
+                    {`${t('Reviewing')} ${reviewedMirrorPreset || t('Mirror axis presets')}`}
+                  </div>
+                  {MIRROR_AXIS_PRESETS.map((preset) => {
+                    const active = axis === preset.value;
+                    const review = `${t('Mirror')} · ${t(preset.label)}`;
+                    return (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        data-repeat-mirror-preset-action
+                        data-value={preset.value}
+                        data-review={review}
+                        className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
+                        onClick={() => setAxis(preset.value)}
+                        onFocus={(event) => setReviewedMirrorPreset(event.currentTarget.dataset.review ?? '')}
+                        aria-pressed={active}
+                        title={t(preset.label)}
+                      >
+                        {t(preset.label)}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -198,12 +441,26 @@ export function RepeatDialog() {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-border">
-          <button type="button" className="btn" onClick={close}>{t('Cancel')}</button>
+        <div
+          className="flex items-center gap-2 px-4 py-3 border-t border-border"
+          role="toolbar"
+          aria-label={t('Repeat actions')}
+          aria-describedby="repeat-action-review-status"
+          title={t('Use arrow keys to review dialog actions')}
+          onKeyDown={handleFooterActionKeys}
+        >
+          <span id="repeat-action-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedFooterAction || t('Repeat actions')}`}
+          </span>
+          <button type="button" data-repeat-action data-repeat-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
+          <button type="button" data-repeat-action data-repeat-action-review={t('Reset')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset'))} onClick={resetFields} disabled={busy}>{t('Reset')}</button>
           <div className="flex-1" />
           <button
             type="button"
+            data-repeat-action
+            data-repeat-action-review={busy ? t('Applying…') : t('Apply')}
             className="btn-primary"
+            onFocus={(event) => setReviewedFooterAction(event.currentTarget.dataset.repeatActionReview ?? '')}
             onClick={() => { void apply(); }}
             disabled={busy || selCount === 0}
             aria-busy={busy}
@@ -266,22 +523,6 @@ function NumField({
   );
 }
 
-function RadioRow({
-  value, current, onChange, label,
-}: { value: MirrorAxis; current: MirrorAxis; onChange: (v: MirrorAxis) => void; label: string }) {
-  return (
-    <label className="flex items-center gap-2 px-2 py-1.5 rounded bg-panel2 border border-border hover:border-accent2/40 cursor-pointer text-ink transition-colors">
-      <input
-        type="radio"
-        name="repeat-mirror-axis"
-        value={value}
-        checked={current === value}
-        onChange={() => onChange(value)}
-      />
-      {label}
-    </label>
-  );
-}
 
 /* -------------------------------- preview --------------------------------- */
 

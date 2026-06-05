@@ -177,13 +177,14 @@ export function distributeSpacing(dir: DistributeDir, gapMm: number): void {
  *
  * "horizontal" distributes left→right, "vertical" distributes top→bottom.
  */
-export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' | 'start' | 'end' = 'gap'): void {
-  if (by === 'center' || by === 'start' || by === 'end') { distributeByAnchor(dir, by); return; }
+export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' | 'start' | 'end' = 'gap', ref: 'selection' | 'key' = 'selection'): void {
+  if (by === 'center' || by === 'start' || by === 'end') { distributeByAnchor(dir, by, ref); return; }
   const canvas = getCanvas();
   if (!canvas) return;
   const objs = canvas.getActiveObjects();
   if (objs.length < 3) return;
-  const rects = objs.map(o => ({ obj: o, rect: o.getBoundingRect() }));
+  const rects = objs.map(o => ({ obj: o, rect: o.getBoundingRect(), isKey: (o as { _id?: string })._id === keyObjectId }));
+  const keyIndex = ref === 'key' ? rects.findIndex(r => r.isKey) : -1;
   if (dir === 'horizontal') {
     rects.sort((a, b) => a.rect.left - b.rect.left);
     const first = rects[0].rect;
@@ -193,7 +194,7 @@ export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' | '
     const gap = (totalSpan - totalWidth) / (rects.length - 1);
     let cursor = first.left;
     rects.forEach((r, i) => {
-      if (i === 0 || i === rects.length - 1) { cursor = r.rect.left + r.rect.width + gap; return; }
+      if (i === 0 || i === rects.length - 1 || i === keyIndex) { cursor = r.rect.left + r.rect.width + gap; return; }
       const dx = cursor - r.rect.left;
       r.obj.set({ left: (r.obj.left ?? 0) + dx });
       r.obj.setCoords();
@@ -208,7 +209,7 @@ export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' | '
     const gap = (totalSpan - totalHeight) / (rects.length - 1);
     let cursor = first.top;
     rects.forEach((r, i) => {
-      if (i === 0 || i === rects.length - 1) { cursor = r.rect.top + r.rect.height + gap; return; }
+      if (i === 0 || i === rects.length - 1 || i === keyIndex) { cursor = r.rect.top + r.rect.height + gap; return; }
       const dy = cursor - r.rect.top;
       r.obj.set({ top: (r.obj.top ?? 0) + dy });
       r.obj.setCoords();
@@ -226,7 +227,7 @@ export function distributeSelection(dir: DistributeDir, by: 'gap' | 'center' | '
  * bottom/right edge. Equal pitch between the leftmost/topmost and the
  * rightmost/bottommost; requires 3+ objects.
  */
-function distributeByAnchor(dir: DistributeDir, anchor: 'start' | 'center' | 'end'): void {
+function distributeByAnchor(dir: DistributeDir, anchor: 'start' | 'center' | 'end', ref: 'selection' | 'key' = 'selection'): void {
   const canvas = getCanvas();
   if (!canvas) return;
   const objs = canvas.getActiveObjects();
@@ -237,13 +238,14 @@ function distributeByAnchor(dir: DistributeDir, anchor: 'start' | 'center' | 'en
     const size = horiz ? r.width : r.height;
     return anchor === 'start' ? lo : anchor === 'end' ? lo + size : lo + size / 2;
   };
-  const items = objs.map((o) => ({ obj: o, coord: coordOf(o.getBoundingRect()) }));
+  const items = objs.map((o) => ({ obj: o, coord: coordOf(o.getBoundingRect()), isKey: (o as { _id?: string })._id === keyObjectId }));
   items.sort((a, b) => a.coord - b.coord);
   const first = items[0].coord;
   const last = items[items.length - 1].coord;
   const step = (last - first) / (items.length - 1);
+  const keyIndex = ref === 'key' ? items.findIndex(it => it.isKey) : -1;
   items.forEach((it, i) => {
-    if (i === 0 || i === items.length - 1) return;
+    if (i === 0 || i === items.length - 1 || i === keyIndex) return;
     const delta = (first + i * step) - it.coord;
     if (horiz) it.obj.set({ left: (it.obj.left ?? 0) + delta });
     else it.obj.set({ top: (it.obj.top ?? 0) + delta });

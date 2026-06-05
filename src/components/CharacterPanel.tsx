@@ -47,6 +47,12 @@ interface TextProps {
   scaleY: number;
 }
 
+const SIZE_PRESETS = [12, 18, 24, 36, 48, 72, 96, 144, 216];
+const TRACKING_PRESETS = [-50, 0, 50, 200];
+const LEADING_PRESETS = [0.9, 1, 1.16, 1.5, 2];
+const H_SCALE_PRESETS = [75, 85, 100, 115, 125];
+const V_SCALE_PRESETS = [75, 100, 125];
+
 const DEFAULT_TEXT_PROPS: TextProps = {
   fontSize: 32,
   fontWeight: 'normal',
@@ -106,6 +112,11 @@ export function CharacterPanel() {
   const selectionSummary = useEditor((s) => s.selectionSummary);
   const idKey = selectionIds.join(',');
   const [props, setProps] = useState<TextProps>(DEFAULT_TEXT_PROPS);
+  const [reviewedSizePreset, setReviewedSizePreset] = useState('');
+  const [reviewedTrackingPreset, setReviewedTrackingPreset] = useState('');
+  const [reviewedLeadingPreset, setReviewedLeadingPreset] = useState('');
+  const [reviewedHScalePreset, setReviewedHScalePreset] = useState('');
+  const [reviewedVScalePreset, setReviewedVScalePreset] = useState('');
 
   // Register the AI skill once on first mount (idempotent across re-mounts).
   useEffect(() => {
@@ -227,6 +238,30 @@ export function CharacterPanel() {
     patchActiveText({ scaleY: v });
   };
 
+  const handlePresetKeys = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    values: readonly number[],
+    current: number,
+    apply: (next: number) => void,
+    onReview?: (next: number) => void,
+  ) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const group = event.currentTarget;
+    const index = values.findIndex((value) => Math.abs(value - current) < 0.001);
+    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
+    const next = event.key === 'Home'
+      ? values[0]
+      : event.key === 'End'
+        ? values[values.length - 1]
+        : values[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
+    apply(next);
+    requestAnimationFrame(() => {
+      onReview?.(next);
+      group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus();
+    });
+  };
+
   const tracking = props.charSpacing;
   const onPathEnabled = canApplyTextOnPath();
   const onArcEnabled = canApplyTextOnArc();
@@ -237,7 +272,7 @@ export function CharacterPanel() {
       <h3 className="field-label mb-2">{t('Character')}</h3>
 
       {/* Font size */}
-      <div className="grid grid-cols-3 items-center gap-2 mb-2">
+      <div className="grid grid-cols-3 items-center gap-2 mb-1">
         <label className="text-muted">{t('Size')}</label>
         <div className="col-span-2">
           <input
@@ -250,6 +285,30 @@ export function CharacterPanel() {
             className="input-num"
           />
         </div>
+      </div>
+      <div
+        className="flex flex-wrap gap-1 mb-2 pl-[33%]"
+        role="group"
+        aria-label={t('Size presets')}
+        aria-describedby="character-size-preset-review-status"
+        title={t('Use Left/Right arrows to switch options')}
+        onKeyDown={(event) => handlePresetKeys(event, SIZE_PRESETS, props.fontSize, setFontSize, (next) => setReviewedSizePreset(`${t('Size')} ${next}px`))}
+      >
+        <span id="character-size-preset-review-status" className="sr-only" aria-live="polite">
+          {`${t('Reviewing')} ${reviewedSizePreset || t('Size presets')}`}
+        </span>
+        {SIZE_PRESETS.map((size) => (
+          <PresetPill
+            key={size}
+            label={t('Size')}
+            onClick={() => setFontSize(size)}
+            onFocus={() => setReviewedSizePreset(`${t('Size')} ${size}px`)}
+            active={Math.round(props.fontSize) === size}
+            value={size}
+          >
+            {size}
+          </PresetPill>
+        ))}
       </div>
 
       {/* Weight / style toggles */}
@@ -287,15 +346,25 @@ export function CharacterPanel() {
         </div>
       </div>
       {/* Tracking presets */}
-      <div className="flex flex-wrap gap-1 mb-3 pl-[33%]">
-        <PresetPill label={t('tight')} onClick={() => setCharSpacing(-50)} active={tracking === -50}>-50</PresetPill>
-        <PresetPill label={t('normal')} onClick={() => setCharSpacing(0)} active={tracking === 0}>0</PresetPill>
-        <PresetPill label={t('loose')} onClick={() => setCharSpacing(50)} active={tracking === 50}>50</PresetPill>
-        <PresetPill label={t('wide')} onClick={() => setCharSpacing(200)} active={tracking === 200}>200</PresetPill>
+      <div
+        className="flex flex-wrap gap-1 mb-3 pl-[33%]"
+        role="group"
+        aria-label={t('Tracking presets')}
+        aria-describedby="character-tracking-preset-review-status"
+        title={t('Use Left/Right arrows to switch options')}
+        onKeyDown={(event) => handlePresetKeys(event, TRACKING_PRESETS, tracking, setCharSpacing, (next) => setReviewedTrackingPreset(`${t('Tracking')} ${next}`))}
+      >
+        <span id="character-tracking-preset-review-status" className="sr-only" aria-live="polite">
+          {`${t('Reviewing')} ${reviewedTrackingPreset || t('Tracking presets')}`}
+        </span>
+        <PresetPill label={t('tight')} onClick={() => setCharSpacing(-50)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} -50`)} active={tracking === -50} value={-50}>-50</PresetPill>
+        <PresetPill label={t('normal')} onClick={() => setCharSpacing(0)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} 0`)} active={tracking === 0} value={0}>0</PresetPill>
+        <PresetPill label={t('loose')} onClick={() => setCharSpacing(50)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} 50`)} active={tracking === 50} value={50}>50</PresetPill>
+        <PresetPill label={t('wide')} onClick={() => setCharSpacing(200)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} 200`)} active={tracking === 200} value={200}>200</PresetPill>
       </div>
 
       {/* Leading (lineHeight) */}
-      <div className="grid grid-cols-3 items-center gap-2 mb-2">
+      <div className="grid grid-cols-3 items-center gap-2 mb-1">
         <label className="text-muted">{t('Leading')}</label>
         <div className="col-span-2 flex items-center gap-2">
           <input
@@ -320,9 +389,33 @@ export function CharacterPanel() {
           />
         </div>
       </div>
+      <div
+        className="flex flex-wrap gap-1 mb-3 pl-[33%]"
+        role="group"
+        aria-label={t('Leading presets')}
+        aria-describedby="character-leading-preset-review-status"
+        title={t('Use Left/Right arrows to switch options')}
+        onKeyDown={(event) => handlePresetKeys(event, LEADING_PRESETS, props.lineHeight, setLineHeight, (next) => setReviewedLeadingPreset(`${t('Leading')} ${next}`))}
+      >
+        <span id="character-leading-preset-review-status" className="sr-only" aria-live="polite">
+          {`${t('Reviewing')} ${reviewedLeadingPreset || t('Leading presets')}`}
+        </span>
+        {LEADING_PRESETS.map((leading) => (
+          <PresetPill
+            key={leading}
+            label={t('Leading')}
+            onClick={() => setLineHeight(leading)}
+            onFocus={() => setReviewedLeadingPreset(`${t('Leading')} ${leading}`)}
+            active={Math.abs(props.lineHeight - leading) < 0.001}
+            value={leading}
+          >
+            {leading}
+          </PresetPill>
+        ))}
+      </div>
 
       {/* Horizontal / vertical scale (condense / extend) */}
-      <div className="grid grid-cols-2 gap-2 mb-3">
+      <div className="grid grid-cols-2 gap-2 mb-1">
         <label className="flex items-center gap-1">
           <span className="text-muted w-8">{t('H %')}</span>
           <input
@@ -351,6 +444,56 @@ export function CharacterPanel() {
             className="input-num"
           />
         </label>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label={t('Horizontal scale presets')}
+          aria-describedby="character-h-scale-preset-review-status"
+          title={t('Use Left/Right arrows to switch options')}
+          onKeyDown={(event) => handlePresetKeys(event, H_SCALE_PRESETS, Math.round(props.scaleX * 100), setHScale, (next) => setReviewedHScalePreset(`${t('Horizontal Scale')} ${next}%`))}
+        >
+          <span id="character-h-scale-preset-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedHScalePreset || t('Horizontal scale presets')}`}
+          </span>
+          {H_SCALE_PRESETS.map((scale) => (
+            <PresetPill
+              key={scale}
+              label={t('Horizontal Scale')}
+              onClick={() => setHScale(scale)}
+              onFocus={() => setReviewedHScalePreset(`${t('Horizontal Scale')} ${scale}%`)}
+              active={Math.round(props.scaleX * 100) === scale}
+              value={scale}
+            >
+              {scale}%
+            </PresetPill>
+          ))}
+        </div>
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label={t('Vertical scale presets')}
+          aria-describedby="character-v-scale-preset-review-status"
+          title={t('Use Left/Right arrows to switch options')}
+          onKeyDown={(event) => handlePresetKeys(event, V_SCALE_PRESETS, Math.round(props.scaleY * 100), setVScale, (next) => setReviewedVScalePreset(`${t('Vertical Scale')} ${next}%`))}
+        >
+          <span id="character-v-scale-preset-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedVScalePreset || t('Vertical scale presets')}`}
+          </span>
+          {V_SCALE_PRESETS.map((scale) => (
+            <PresetPill
+              key={scale}
+              label={t('Vertical Scale')}
+              onClick={() => setVScale(scale)}
+              onFocus={() => setReviewedVScalePreset(`${t('Vertical Scale')} ${scale}%`)}
+              active={Math.round(props.scaleY * 100) === scale}
+              value={scale}
+            >
+              {scale}%
+            </PresetPill>
+          ))}
+        </div>
       </div>
 
       {/* Text alignment */}
@@ -468,12 +611,16 @@ function ToggleBtn({
 function PresetPill({
   label,
   onClick,
+  onFocus,
   active,
+  value,
   children,
 }: {
   label: string;
   onClick: () => void;
+  onFocus?: () => void;
   active: boolean;
+  value?: number | string;
   children: React.ReactNode;
 }) {
   return (
@@ -481,7 +628,9 @@ function PresetPill({
       type="button"
       title={label}
       aria-pressed={active}
+      data-value={value}
       onClick={onClick}
+      onFocus={onFocus}
       className={`px-2 py-0.5 text-[10px] rounded-full border transition-colors ${
         active
           // Active state needs its own hover so cursor-over-active reads as

@@ -290,7 +290,7 @@ import { updateSelection, clearSelection } from './selectionApply';
 
 // Selection ops (delete / duplicate / nudge) extracted to selectionOps.ts
 // (task #20). Re-exported for back-compat.
-export { deleteSelection, duplicateSelection, nudgeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, makeMarginGuides, selectInverse, selectAllObjects, selectAllText, selectSameType, deselectAll, selectObjectInStack } from './selectionOps';
+export { deleteSelection, duplicateSelection, renameSelection, getSelectionRenameDefault, promptRenameSelection, nudgeSelection, flipSelection, selectSame, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, makeMarginGuides, selectInverse, selectAllObjects, selectVisibleObjects, selectUnlockedObjects, selectAllText, selectAllImages, selectAllPaths, selectAllShapes, selectSameType, deselectAll, selectObjectInStack } from './selectionOps';
 
 // Z-order ops extracted to zOrder.ts (task #20). Re-exported for back-compat.
 export { bringForward, sendBackward, bringToFront, sendToBack } from './zOrder';

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Send, Eye, Code2, Settings, Plug, Loader2, RefreshCw, Trash2, X, Zap } from 'lucide-react';
 import {
   chatWithClaude,
@@ -98,6 +98,25 @@ export function AIPanel({ onClose }: Props) {
     } finally {
       setDiscovering(false);
     }
+  };
+
+  const handleAIActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-ai-action]'))
+      .filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
   };
   // Refresh skills when the MCP modal opens — new ones may have been registered.
   // Render-time prev-tracking avoids the setState-in-effect cascade pattern.
@@ -204,18 +223,31 @@ export function AIPanel({ onClose }: Props) {
           </span>
           {t('AI Assistant')}
         </h2>
-        <div className="flex items-center gap-1">
-          <button title={t('MCP / Skills')} aria-label={t('MCP / Skills')} onClick={() => setShowMCP(true)} className="btn-dialog-close"><Plug size={14} aria-hidden="true" /></button>
-          <button title={t('AI Configuration')} aria-label={t('AI Configuration')} onClick={() => setShowCfg(true)} className="btn-dialog-close"><Settings size={14} aria-hidden="true" /></button>
-          <button onClick={onClose} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
+        <div
+          className="flex items-center gap-1"
+          role="toolbar"
+          aria-label={t('AI panel actions')}
+          title={t('Use arrow keys to review AI actions')}
+          onKeyDown={handleAIActionKeys}
+        >
+          <button data-ai-action title={t('MCP / Skills')} aria-label={t('MCP / Skills')} onClick={() => setShowMCP(true)} className="btn-dialog-close"><Plug size={14} aria-hidden="true" /></button>
+          <button data-ai-action title={t('AI Configuration')} aria-label={t('AI Configuration')} onClick={() => setShowCfg(true)} className="btn-dialog-close"><Settings size={14} aria-hidden="true" /></button>
+          <button data-ai-action onClick={onClose} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
       </div>
 
       {/* Quick action row */}
-      <div className="border-b border-border px-2 py-2 flex flex-wrap gap-1">
+      <div
+        className="border-b border-border px-2 py-2 flex flex-wrap gap-1"
+        role="toolbar"
+        aria-label={t('AI quick actions')}
+        title={t('Use arrow keys to review AI actions')}
+        onKeyDown={handleAIActionKeys}
+      >
         {QUICK_ACTIONS.map(q => (
           <button
             key={q.labelKey}
+            data-ai-action
             disabled={busy}
             onClick={() => runQuick(q.prompt)}
             title={q.prompt}
@@ -309,16 +341,28 @@ export function AIPanel({ onClose }: Props) {
         )}
       </div>
 
-      <div className="border-t border-border p-2 flex items-center gap-2 text-[10px]">
-        <button onClick={() => setIncludeImage(v => !v)} aria-pressed={includeImage} className={`flex items-center gap-1 px-2 py-1 rounded border ${includeImage ? 'border-accent text-ink' : 'border-border text-muted'}`}><Eye size={11} aria-hidden="true" />{t('Vision')}</button>
-        <button onClick={() => setIncludeSVG(v => !v)} aria-pressed={includeSVG} className={`flex items-center gap-1 px-2 py-1 rounded border ${includeSVG ? 'border-accent text-ink' : 'border-border text-muted'}`}><Code2 size={11} aria-hidden="true" />{t('SVG')}</button>
+      <div
+        className="border-t border-border p-2 flex items-center gap-2 text-[10px]"
+        role="toolbar"
+        aria-label={t('AI context actions')}
+        title={t('Use arrow keys to review AI actions')}
+        onKeyDown={handleAIActionKeys}
+      >
+        <button data-ai-action onClick={() => setIncludeImage(v => !v)} aria-pressed={includeImage} className={`flex items-center gap-1 px-2 py-1 rounded border ${includeImage ? 'border-accent text-ink' : 'border-border text-muted'}`}><Eye size={11} aria-hidden="true" />{t('Vision')}</button>
+        <button data-ai-action onClick={() => setIncludeSVG(v => !v)} aria-pressed={includeSVG} className={`flex items-center gap-1 px-2 py-1 rounded border ${includeSVG ? 'border-accent text-ink' : 'border-border text-muted'}`}><Code2 size={11} aria-hidden="true" />{t('SVG')}</button>
         {cfg.streaming !== false && (
           <span className="flex items-center gap-1 px-2 py-1 rounded border border-accent2/40 bg-accent2/10 text-ink"><Zap size={11} aria-hidden="true" />{t('Stream')}</span>
         )}
         <span className="ml-auto text-muted">{skills.length} {skills.length === 1 ? t('skill') : t('skills')}</span>
       </div>
 
-      <div className="border-t border-border p-2 flex items-end gap-2">
+      <div
+        className="border-t border-border p-2 flex items-end gap-2"
+        role="toolbar"
+        aria-label={t('AI prompt actions')}
+        title={t('Use arrow keys to review AI actions')}
+        onKeyDown={handleAIActionKeys}
+      >
         <textarea
           value={input} onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -336,7 +380,7 @@ export function AIPanel({ onClose }: Props) {
           aria-label={t('Describe an edit or design…')}
           disabled={busy}
           className="flex-1 bg-panel2 border border-border rounded p-2 text-xs outline-none focus:border-accent2 resize-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors" />
-        <button onClick={send} disabled={busy || !input.trim()} className="btn-primary" title={t('Send message')} aria-label={t('Send message')} aria-busy={busy}>
+        <button data-ai-action onClick={send} disabled={busy || !input.trim()} className="btn-primary" title={t('Send message')} aria-label={t('Send message')} aria-busy={busy}>
           {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
         </button>
       </div>
@@ -390,9 +434,15 @@ export function AIPanel({ onClose }: Props) {
             Your key is stored only in this browser (<code className="bg-panel2 px-1 rounded">localStorage</code>) and is sent direct to the
             Anthropic API. Requires <code className="bg-panel2 px-1 rounded">anthropic-dangerous-direct-browser-access</code> header (auto).
           </div>
-          <div className="flex justify-end gap-2 mt-3">
-            <button type="button" className="btn" onClick={() => setShowCfg(false)}>{t('Cancel')}</button>
-            <button type="button" className="btn-primary" onClick={saveCfg}>{t('Save')}</button>
+          <div
+            className="flex justify-end gap-2 mt-3"
+            role="toolbar"
+            aria-label={t('AI settings actions')}
+            title={t('Use arrow keys to review AI actions')}
+            onKeyDown={handleAIActionKeys}
+          >
+            <button type="button" data-ai-action className="btn" onClick={() => setShowCfg(false)}>{t('Cancel')}</button>
+            <button type="button" data-ai-action className="btn-primary" onClick={saveCfg}>{t('Save')}</button>
           </div>
         </Modal>
       )}
@@ -426,8 +476,15 @@ export function AIPanel({ onClose }: Props) {
           )}
           <div className="flex items-center justify-between mb-2">
             <h3 className="field-label !mb-0">{t('MCP Servers')}</h3>
-            <div className="flex items-center gap-1">
+            <div
+              className="flex items-center gap-1"
+              role="toolbar"
+              aria-label={t('MCP discovery actions')}
+              title={t('Use arrow keys to review AI actions')}
+              onKeyDown={handleAIActionKeys}
+            >
               <button
+                data-ai-action
                 className="btn inline-flex items-center gap-1.5"
                 onClick={refreshMCP}
                 disabled={discovering}
@@ -443,11 +500,18 @@ export function AIPanel({ onClose }: Props) {
                  *  text swap is the only visible "still in progress" cue. */}
                 <span>{discovering ? t('Refreshing…') : t('Refresh')}</span>
               </button>
-              <button className="btn" onClick={addServer}>{t('+ Add')}</button>
+              <button data-ai-action className="btn" onClick={addServer}>{t('+ Add')}</button>
             </div>
           </div>
           {servers.map((srv, i) => (
-            <div key={i} className="flex items-center gap-2 mb-2">
+            <div
+              key={i}
+              className="flex items-center gap-2 mb-2"
+              role="toolbar"
+              aria-label={`${t('MCP server actions')}: ${srv.name || i + 1}`}
+              title={t('Use arrow keys to review AI actions')}
+              onKeyDown={handleAIActionKeys}
+            >
               <input
                 className="input-num flex-1"
                 value={srv.name}
@@ -469,6 +533,7 @@ export function AIPanel({ onClose }: Props) {
                 <option value="http">HTTP</option><option value="sse">SSE</option>
               </select>
               <button
+                data-ai-action
                 className="btn inline-flex items-center gap-1"
                 disabled={testingIdx.has(i)}
                 aria-busy={testingIdx.has(i)}
@@ -493,6 +558,7 @@ export function AIPanel({ onClose }: Props) {
                 {testingIdx.has(i) ? t('Testing…') : t('Test')}
               </button>
               <button
+                data-ai-action
                 className="p-1.5 rounded text-muted hover:text-danger hover:bg-panel2 transition-colors"
                 onClick={() => removeServer(i)}
                 aria-label={t('Remove server')}
@@ -502,9 +568,15 @@ export function AIPanel({ onClose }: Props) {
               </button>
             </div>
           ))}
-          <div className="flex justify-end gap-2 mt-3">
-            <button type="button" className="btn" onClick={() => setShowMCP(false)}>{t('Cancel')}</button>
-            <button type="button" className="btn-primary" onClick={saveServers}>{t('Save')}</button>
+          <div
+            className="flex justify-end gap-2 mt-3"
+            role="toolbar"
+            aria-label={t('MCP settings actions')}
+            title={t('Use arrow keys to review AI actions')}
+            onKeyDown={handleAIActionKeys}
+          >
+            <button type="button" data-ai-action className="btn" onClick={() => setShowMCP(false)}>{t('Cancel')}</button>
+            <button type="button" data-ai-action className="btn-primary" onClick={saveServers}>{t('Save')}</button>
           </div>
         </Modal>
       )}

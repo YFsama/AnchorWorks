@@ -12,6 +12,7 @@ export interface Template {
   id: string;
   name: string;
   description: string;
+  category: 'Business' | 'Social' | 'Logo' | 'Print' | 'Stickers';
   /** Inline SVG data URI used as the card thumbnail. */
   thumbnail: string;
   build: (canvas: fabric.Canvas) => Promise<void>;
@@ -40,6 +41,7 @@ const businessCard: Template = {
   id: 'business-card',
   name: 'Business Card',
   description: '90×54 mm card with name, title and accent corner.',
+  category: 'Business',
   thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 204">
     <rect width="340" height="204" fill="#fff"/>
     <polygon points="240,0 340,0 340,80" fill="#3d9bff"/>
@@ -84,6 +86,7 @@ const squareSocial: Template = {
   id: 'square-social',
   name: 'Square Social Post',
   description: '600×600 layout with bold headline and decorative shapes.',
+  category: 'Social',
   thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
     <rect width="200" height="200" fill="#1a1a2e"/>
     <circle cx="40" cy="160" r="38" fill="#ff7a3d"/>
@@ -121,6 +124,7 @@ const mountainLogo: Template = {
   id: 'mountain-logo',
   name: 'Mountain Logo',
   description: 'Two-tone mountain monogram, centered.',
+  category: 'Logo',
   thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
     <rect width="200" height="200" fill="#0f0f12"/>
     <polygon points="60,140 100,70 140,140" fill="#3d9bff"/>
@@ -169,6 +173,7 @@ const posterA4: Template = {
   id: 'poster-a4',
   name: 'Poster A4',
   description: 'A4 poster with big headline, subhead and accent block.',
+  category: 'Print',
   thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 280">
     <rect width="200" height="280" fill="#fff"/>
     <rect x="0" y="0" width="200" height="60" fill="#15151a"/>
@@ -214,6 +219,7 @@ const stickerPack: Template = {
   id: 'sticker-pack',
   name: 'Sticker Pack',
   description: 'A grid of six colorful sticker discs with emoji labels.',
+  category: 'Stickers',
   thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">
     <rect width="240" height="160" fill="#fff"/>
     <circle cx="50" cy="50" r="34" fill="#ff7a3d"/>
@@ -270,6 +276,7 @@ const flyer: Template = {
   id: 'flyer',
   name: 'Flyer',
   description: 'Header strip, body block and footer info on letter-ish size.',
+  category: 'Print',
   thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 260">
     <rect width="200" height="260" fill="#fff"/>
     <rect x="0" y="0" width="200" height="44" fill="#3d9bff"/>

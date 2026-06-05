@@ -36,6 +36,10 @@ export interface CutPath {
    *  cut-by-colour separation — multi-colour vinyl jobs cut one swatch at a
    *  time. Undefined for regmarks / weed borders, which always cut. */
   color?: string;
+  /** Non-destructive bridge metadata: bridged segments carry the original
+   *  closed path so Clear bridges can restore the cutter job. */
+  bridgeSourceId?: string;
+  bridgeOriginal?: CutPath;
 }
 
 /**
@@ -142,6 +146,7 @@ interface EditorState {
     strokeWidth: number;
     opacity: number;
     type: string;
+    name: string;
   };
   setSelectionSummary: (s: EditorState['selectionSummary']) => void;
 
@@ -153,6 +158,7 @@ interface EditorState {
   // Modal flags
   showPlotter: boolean;
   showPrint: boolean;
+  openPrintPrep: boolean;
   showDocSettings: boolean;
   showTemplates: boolean;
   showShortcuts: boolean;
@@ -176,8 +182,11 @@ interface EditorState {
   showZigzag: boolean;
   showPucker: boolean;
   showTwist: boolean;
+  showFreeDistort: boolean;
   showStar: boolean;
   showFindReplace: boolean;
+  showSingleLineText: boolean;
+  showFreeformGradient: boolean;
   showSaturate: boolean;
   showHue: boolean;
   showSplitGrid: boolean;
@@ -187,7 +196,7 @@ interface EditorState {
   showWarp: boolean;
   showGrommets: boolean;
   showMarginGuides: boolean;
-  setModal: (k: 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showStar' | 'showFindReplace' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMarginGuides', v: boolean) => void;
+  setModal: (k: 'openPrintPrep' | 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showStar' | 'showFindReplace' | 'showSingleLineText' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMarginGuides', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -310,6 +319,7 @@ export const useEditor = create<EditorState>((set) => ({
 
   showPlotter: false,
   showPrint: false,
+  openPrintPrep: false,
   showDocSettings: false,
   showTemplates: false,
   showShortcuts: false,
@@ -333,8 +343,11 @@ export const useEditor = create<EditorState>((set) => ({
   showZigzag: false,
   showPucker: false,
   showTwist: false,
+  showFreeDistort: false,
   showStar: false,
   showFindReplace: false,
+  showSingleLineText: false,
+  showFreeformGradient: false,
   showSaturate: false,
   showHue: false,
   showSplitGrid: false,

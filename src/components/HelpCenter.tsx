@@ -2167,8 +2167,10 @@ export function HelpCenter() {
   const open = useEditor((s) => s.showHelpCenter);
   const setModal = useEditor((s) => s.setModal);
   const [query, setQuery] = useState('');
+  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
   const [selectedId, setSelectedId] = useState<string>('welcome');
   const searchRef = useRef<HTMLInputElement>(null);
+  const firstTopicRef = useRef<HTMLButtonElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const topics = useMemo(() => buildTopics(t), [t]);
@@ -2236,6 +2238,48 @@ export function HelpCenter() {
     () => topics.find((tp) => tp.id === safeSelectedId) ?? topics[0],
     [topics, safeSelectedId],
   );
+  const selectedTopicIndex = filtered.findIndex((tp) => tp.id === safeSelectedId);
+
+  const focusTopicButton = (index: number) => {
+    const topic = filtered[index];
+    if (!topic) return;
+    setSelectedId(topic.id);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(`[data-help-topic-index="${index}"]`)?.focus();
+    });
+  };
+
+  const handleTopicListKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const activeIndex = Number((document.activeElement as HTMLElement | null)?.dataset.helpTopicIndex ?? filtered.findIndex((tp) => tp.id === safeSelectedId));
+    const safeActiveIndex = activeIndex >= 0 ? activeIndex : 0;
+    const lastIndex = filtered.length - 1;
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? lastIndex
+        : Math.max(0, Math.min(lastIndex, safeActiveIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+    focusTopicButton(nextIndex);
+  };
+
+  const handleSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-help-search-action]'));
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    const nextButton = buttons[nextIndex];
+    setReviewedSearchAction(nextButton?.dataset.helpSearchActionReview ?? nextButton?.textContent?.trim() ?? '');
+    nextButton?.focus();
+  };
 
   // When the dialog opens, focus the search input and reset to the welcome topic
   // on the first open (subsequent opens preserve where the user was).
@@ -2285,7 +2329,7 @@ export function HelpCenter() {
           {/* Left rail */}
           <div className="w-[220px] shrink-0 border-r border-border bg-panel2/40 flex flex-col">
             <div className="px-3 py-2 border-b border-border">
-              <div className="flex items-center gap-2 bg-panel border border-border rounded px-2 py-1">
+              <div className="flex items-center gap-2 bg-panel border border-border rounded px-2 py-1 focus-within:border-accent2">
                 <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
                 <input
                   ref={searchRef}
@@ -2294,13 +2338,91 @@ export function HelpCenter() {
                   autoComplete="off"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing && filtered[0]) {
+                      e.preventDefault();
+                      setSelectedId(filtered[0].id);
+                      requestAnimationFrame(() => bodyRef.current?.focus());
+                      return;
+                    }
+                    if (e.key === 'ArrowDown' && filtered[0]) {
+                      e.preventDefault();
+                      setSelectedId(filtered[0].id);
+                      requestAnimationFrame(() => firstTopicRef.current?.focus());
+                      return;
+                    }
+                    if (e.key === 'Escape' && query) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setQuery('');
+                    }
+                  }}
                   placeholder={t('Search topics…')}
                   aria-label={t('Search topics…')}
-                  className="flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70"
+                  title={`${t('Press Enter to open first search result')} · ${t('Press Arrow Down to focus first topic')}`}
+                  className="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70"
                 />
               </div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted tabular-nums" aria-live="polite">
+                <span>{query.trim() ? `${filtered.length} / ${topics.length} ${t('matches')}` : `${topics.length} ${t('topics')}`}</span>
+                <div
+                  className="flex items-center gap-2"
+                  role="toolbar"
+                  aria-label={t('Help search actions')}
+                  aria-describedby="help-search-action-review-status"
+                  title={t('Use arrow keys to review help search actions')}
+                  onKeyDown={handleSearchActionKeys}
+                >
+                  <span id="help-search-action-review-status" className="sr-only" aria-live="polite">
+                    {`${t('Reviewing')} ${reviewedSearchAction || t('Help search actions')}`}
+                  </span>
+                  {query && filtered.length > 0 && (
+                    <button
+                      type="button"
+                      className="hover:text-ink underline-offset-2 hover:underline transition-colors"
+                      data-help-search-action
+                      data-help-search-action-review={t('Open first search result')}
+                      onFocus={() => setReviewedSearchAction(t('Open first search result'))}
+                      onClick={() => {
+                        const first = filtered[0];
+                        if (!first) return;
+                        setSelectedId(first.id);
+                        requestAnimationFrame(() => bodyRef.current?.focus());
+                      }}
+                      title={t('Open first search result')}
+                    >
+                      {t('Open First')}
+                    </button>
+                  )}
+                  {query && (
+                    <button
+                      type="button"
+                      className="hover:text-ink underline-offset-2 hover:underline transition-colors"
+                      data-help-search-action
+                      data-help-search-action-review={t('Clear search')}
+                      onFocus={() => setReviewedSearchAction(t('Clear search'))}
+                      onClick={() => setQuery('')}
+                      title={t('Clear search')}
+                    >
+                      {t('Clear search')}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto py-2">
+            <div
+              className="flex-1 overflow-y-auto py-2"
+              role="listbox"
+              aria-label={t('Help topics')}
+              aria-describedby="help-topic-review-status"
+              title={t('Use arrow keys to review help topics')}
+              onKeyDown={handleTopicListKeys}
+            >
+              <div id="help-topic-review-status" className="sr-only" aria-live="polite">
+                {selectedTopicIndex >= 0
+                  ? `${t('Reviewing')} ${selectedTopic.title} ${selectedTopicIndex + 1} / ${filtered.length}. ${selectedTopic.category}`
+                  : t('No topics match')}
+              </div>
               {grouped.length === 0 ? (
                 <div className="flex flex-col items-center text-center px-3 py-6">
                   {/* Open-book + question-mark — matches the other empty-state
@@ -2315,6 +2437,15 @@ export function HelpCenter() {
                   <div className="type-caption leading-relaxed max-w-[180px]">
                     {t('Try a shorter or different keyword.')}
                   </div>
+                  {query && (
+                    <button
+                      type="button"
+                      className="btn !py-1 !px-2 text-[10px] mt-2"
+                      onClick={() => setQuery('')}
+                    >
+                      {t('Clear search')}
+                    </button>
+                  )}
                 </div>
               ) : (
                 grouped.map((g) => {
@@ -2328,12 +2459,18 @@ export function HelpCenter() {
                       <div>
                         {g.topics.map((tp) => {
                           const active = tp.id === safeSelectedId;
+                          const isFirst = filtered[0]?.id === tp.id;
+                          const topicIndex = filtered.findIndex((item) => item.id === tp.id);
                           return (
                             <button
                               key={tp.id}
+                              ref={isFirst ? firstTopicRef : undefined}
                               type="button"
+                              role="option"
+                              data-help-topic-index={topicIndex}
                               onClick={() => setSelectedId(tp.id)}
                               aria-current={active ? 'page' : undefined}
+                              aria-selected={active}
                               className={`w-full text-left px-3 py-1.5 text-xs truncate transition-colors ${
                                 active
                                   ? 'bg-panel3 text-ink border-l-2 border-accent2 pl-[10px]'

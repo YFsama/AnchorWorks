@@ -4,6 +4,21 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] — 2026-06-05
+
+### Added
+- **Workflow parity polish**: added more keyboard-browsable dialog actions, preset review status, and reset baselines across production dialogs so sign, print, and path-editing workflows are safer to explore before applying.
+- **Roughen reset**: the Roughen effect now exposes a footer Reset action that restores the default 1 mm Size and 3 mm Detail while clearing stale recipe review status.
+- **Preferences reset**: Preferences now includes a footer Reset action that restores the draft captured when the dialog opened and clears stale search / recipe review state before applying or saving.
+- **Find & Replace reset**: the global text cleanup dialog now adds a footer Reset action that clears Find / Replace, Match case, stale recipe review, and returns focus to Find.
+- **Keyboard Shortcuts footer**: the shortcut cheat-sheet now adds a keyboard-browsable Close action beside Customize Shortcuts so users can exit or rebind without reaching for the title-bar close button.
+- **Document-menu bridge parity**: Document now mirrors File, command-palette, and right-click bridge presets plus Clear bridges cleanup for cutter-prep workflows.
+- **Topbar bridge cleanup**: the output toolbar now places Clear bridges beside the one-click Standard bridge action for faster bridge/revert cutter-prep trials.
+- **Status-bar cut cleanup**: the pink cut-count shortcut now supports Ctrl/Cmd-click to clear cut paths directly, while click and Shift/Alt-click still open Plotter and Cut Contour.
+
+### Changed
+- **Release metadata**: synchronized npm, Tauri, and Cargo package versions for the 0.12.0 release.
+
 ## [0.11.1] — 2026-06-03
 
 ### Fixed

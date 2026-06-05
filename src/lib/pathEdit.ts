@@ -44,6 +44,7 @@ interface EditState {
   onModified: () => void;
   /** Canvas-level mouse:down listener for add-anchor-on-path. */
   uninstallAddAnchor: () => void;
+  selectedAnchors: Set<number>;
 }
 
 let state: EditState | null = null;
@@ -184,6 +185,32 @@ function makeGuide(from: { x: number; y: number }, to: { x: number; y: number })
   return g;
 }
 
+
+function styleAnchorSelection(handle: AnchorHandle, selected: boolean) {
+  handle.set({
+    fill: selected ? '#ff2e9a' : readToken('--color-accent2', '#5ac8d8'),
+    strokeWidth: selected ? 2 : 1,
+    radius: selected ? HANDLE_RADIUS + 1 : HANDLE_RADIUS,
+  });
+  handle.setCoords();
+}
+
+function setAnchorSelected(handle: AnchorHandle, selected: boolean) {
+  if (!state || handle._pathEdit?.role !== 'anchor') return;
+  const idx = handle._pathEdit.cmdIndex;
+  if (selected) state.selectedAnchors.add(idx);
+  else state.selectedAnchors.delete(idx);
+  styleAnchorSelection(handle, selected);
+}
+
+function clearAnchorSelection() {
+  if (!state) return;
+  state.selectedAnchors.clear();
+  for (const handle of state.handles) {
+    if (handle._pathEdit?.role === 'anchor') styleAnchorSelection(handle as AnchorHandle, false);
+  }
+}
+
 /**
  * Begin direct-select on a single path. Any prior edit session is exited first.
  */
@@ -238,6 +265,7 @@ export function enterPathEdit(canvas: fabric.Canvas, path: fabric.Path) {
     prevEvented: path.evented !== false,
     onModified,
     uninstallAddAnchor,
+    selectedAnchors: new Set(),
   };
 
   rebuildGuides(guides);
@@ -356,20 +384,52 @@ function attachHandleDragLogic(
     // anchor (or no-ops when the caller refuses the deletion, e.g. the
     // path's first M anchor).
     const native = opt.e as MouseEvent | TouchEvent;
-    if ((native as MouseEvent).altKey && canDelete()) {
+    const mouse = native as MouseEvent;
+    if (handle._pathEdit?.role === 'anchor' && mouse.shiftKey) {
+      setAnchorSelected(handle as AnchorHandle, !state?.selectedAnchors.has(handle._pathEdit.cmdIndex));
+      canvas.requestRenderAll();
+      return;
+    }
+    if (handle._pathEdit?.role === 'anchor' && !state?.selectedAnchors.has(handle._pathEdit.cmdIndex)) {
+      clearAnchorSelection();
+      setAnchorSelected(handle as AnchorHandle, true);
+    }
+    if (mouse.altKey && canDelete()) {
       onDelete();
       return;
     }
+    const meta = handle._pathEdit!;
+    const startPoint = { x: handle.left ?? 0, y: handle.top ?? 0 };
+    const selectedStarts = state && meta.role === 'anchor'
+      ? [...state.selectedAnchors].map((cmdIndex) => {
+        const selectedHandle = state!.handles.find(h => h._pathEdit?.role === 'anchor' && h._pathEdit.cmdIndex === cmdIndex) as AnchorHandle | undefined;
+        return selectedHandle ? { cmdIndex, handle: selectedHandle, x: selectedHandle.left ?? 0, y: selectedHandle.top ?? 0 } : null;
+      }).filter((item): item is { cmdIndex: number; handle: AnchorHandle; x: number; y: number } => !!item)
+      : [];
     const move = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
       if (!state) return;
       const sp = canvas.getScenePoint(e.e);
-      const local = canvasPointToPath(path, sp.x, sp.y);
-      const meta = handle._pathEdit!;
-      const cmd = path.path[meta.cmdIndex] as unknown as (string | number)[];
-      cmd[meta.xKey] = local.x;
-      cmd[meta.yKey] = local.y;
-      handle.set({ left: sp.x, top: sp.y });
-      handle.setCoords();
+      if (meta.role === 'anchor' && selectedStarts.length > 1) {
+        const dx = sp.x - startPoint.x;
+        const dy = sp.y - startPoint.y;
+        for (const item of selectedStarts) {
+          const next = { x: item.x + dx, y: item.y + dy };
+          const local = canvasPointToPath(path, next.x, next.y);
+          const selectedMeta = item.handle._pathEdit!;
+          const cmd = path.path[selectedMeta.cmdIndex] as unknown as (string | number)[];
+          cmd[selectedMeta.xKey] = local.x;
+          cmd[selectedMeta.yKey] = local.y;
+          item.handle.set({ left: next.x, top: next.y });
+          item.handle.setCoords();
+        }
+      } else {
+        const local = canvasPointToPath(path, sp.x, sp.y);
+        const cmd = path.path[meta.cmdIndex] as unknown as (string | number)[];
+        cmd[meta.xKey] = local.x;
+        cmd[meta.yKey] = local.y;
+        handle.set({ left: sp.x, top: sp.y });
+        handle.setCoords();
+      }
       path.dirty = true;
       canvas.requestRenderAll();
       // Tangent drags also have to refresh the dashed guide lines so the
@@ -656,3 +716,33 @@ export function exitPathEdit(canvas: fabric.Canvas) {
 
 export function isEditingPath(): boolean { return !!state; }
 export function getEditingPath(): fabric.Path | null { return state?.path ?? null; }
+
+
+export type AverageAnchorAxis = 'x' | 'y' | 'both';
+
+export function averageSelectedAnchors(axis: AverageAnchorAxis): number {
+  if (!state || state.selectedAnchors.size < 2) return 0;
+  const anchors = [...state.selectedAnchors]
+    .map((cmdIndex) => {
+      const cmd = state!.path.path[cmdIndex] as unknown as (string | number)[];
+      const anchor = commandAnchor(cmd);
+      return anchor ? { cmdIndex, cmd, anchor, x: cmd[anchor.xKey] as number, y: cmd[anchor.yKey] as number } : null;
+    })
+    .filter((item): item is { cmdIndex: number; cmd: (string | number)[]; anchor: { xKey: number; yKey: number }; x: number; y: number } => !!item);
+  if (anchors.length < 2) return 0;
+  const avgX = anchors.reduce((sum, a) => sum + a.x, 0) / anchors.length;
+  const avgY = anchors.reduce((sum, a) => sum + a.y, 0) / anchors.length;
+  for (const item of anchors) {
+    if (axis === 'x' || axis === 'both') item.cmd[item.anchor.xKey] = avgX;
+    if (axis === 'y' || axis === 'both') item.cmd[item.anchor.yKey] = avgY;
+  }
+  state.path.dirty = true;
+  state.path.setBoundingBox(true);
+  state.path.setCoords();
+  rebuildHandles();
+  state.path.canvas?.fire('object:modified', { target: state.path });
+  state.path.canvas?.requestRenderAll();
+  return anchors.length;
+}
+
+export function selectedAnchorCount(): number { return state?.selectedAnchors.size ?? 0; }

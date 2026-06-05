@@ -107,8 +107,13 @@ export async function callNative<T>(
  */
 export function ariaKeyshortcuts(combo: string | undefined | null): string | undefined {
   if (!combo) return undefined;
-  if (!isMac()) return combo;
-  return combo.replace(/\bCtrl\b/g, 'Meta');
+  const normalized = combo
+    .split(/\s*\/\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(' ');
+  if (!isMac()) return normalized;
+  return normalized.replace(/\bCtrl\b/g, 'Meta');
 }
 
 export type OSName = 'macos' | 'windows' | 'linux' | 'ios' | 'android' | 'unknown';

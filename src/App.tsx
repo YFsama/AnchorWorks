@@ -19,7 +19,7 @@ import { useEditor } from './store/editor';
 import { useT, useI18n } from './lib/i18n';
 import { announce, setLiveRegion } from './lib/a11y';
 import { getFormat } from './lib/formats';
-import { saveProjectQuick, applyProject, subscribeCurrentProjectName } from './lib/projectFile';
+import { openProjectFromFile, saveProjectQuick, saveProjectToFile, applyProject, subscribeCurrentProjectName } from './lib/projectFile';
 import { setNativeWindowTitle } from './lib/runtime';
 import { installNativeMenuListener } from './lib/tauriMenu';
 import { useResizableWidth } from './lib/hooks/useResizableWidth';
@@ -51,6 +51,8 @@ const PuckerDialog = lazy(() => import('./components/PuckerDialog').then(m => ({
 const TwistDialog = lazy(() => import('./components/TwistDialog').then(m => ({ default: m.TwistDialog })));
 const StarDialog = lazy(() => import('./components/StarDialog').then(m => ({ default: m.StarDialog })));
 const FindReplaceDialog = lazy(() => import('./components/FindReplaceDialog').then(m => ({ default: m.FindReplaceDialog })));
+const SingleLineTextDialog = lazy(() => import('./components/SingleLineTextDialog').then(m => ({ default: m.SingleLineTextDialog })));
+const FreeformGradientDialog = lazy(() => import('./components/FreeformGradientDialog').then(m => ({ default: m.FreeformGradientDialog })));
 const SaturateDialog = lazy(() => import('./components/SaturateDialog').then(m => ({ default: m.SaturateDialog })));
 const HueDialog = lazy(() => import('./components/HueDialog').then(m => ({ default: m.HueDialog })));
 const SplitGridDialog = lazy(() => import('./components/SplitGridDialog').then(m => ({ default: m.SplitGridDialog })));
@@ -58,6 +60,7 @@ const ResizeDialog = lazy(() => import('./components/ResizeDialog').then(m => ({
 const BrightnessDialog = lazy(() => import('./components/BrightnessDialog').then(m => ({ default: m.BrightnessDialog })));
 const ShearDialog = lazy(() => import('./components/ShearDialog').then(m => ({ default: m.ShearDialog })));
 const WarpDialog = lazy(() => import('./components/WarpDialog').then(m => ({ default: m.WarpDialog })));
+const FreeDistortDialog = lazy(() => import('./components/FreeDistortDialog').then(m => ({ default: m.FreeDistortDialog })));
 const GrommetsDialog = lazy(() => import('./components/GrommetsDialog').then(m => ({ default: m.GrommetsDialog })));
 const MarginGuidesDialog = lazy(() => import('./components/MarginGuidesDialog').then(m => ({ default: m.MarginGuidesDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
@@ -67,7 +70,7 @@ import {
   undo, redo, deleteSelection, duplicateSelection, nudgeSelection, flipSelection, zoomBy, zoomFit, zoomToPoint, zoomToSelection,
   alignSelection, distributeSelection, applyStyleToSelection, swapFillStroke, defaultColors, groupSelection, ungroupSelection,
   resizeCanvas, setBackground,
-  bringForward, sendBackward, bringToFront, sendToBack, selectObjectInStack, hideSelection, showAll,
+  bringForward, sendBackward, bringToFront, sendToBack, selectObjectInStack, selectInverse, lockSelection, unlockAll, hideSelection, showAll,
   type AlignAxis, type DistributeDir,
 } from './lib/canvasEngine';
 import {
@@ -78,6 +81,8 @@ import { booleanOp, type BoolOp } from './lib/booleanOps';
 import { repeatGrid, repeatRadial, repeatMirror } from './lib/repeat';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from './lib/masks';
 import { setOutlineMode, isOutlineMode } from './lib/outlineView';
+import { averageSelectedAnchors } from './lib/pathEdit';
+import { exitIsolationMode, isIsolationMode, toggleIsolationMode } from './lib/isolationMode';
 import { applyStrokeAlign, type StrokeAlign } from './lib/strokeAlign';
 import { registerSkill } from './lib/mcp';
 import { registerBuiltInFormats } from './lib/formatRegistration';
@@ -103,6 +108,7 @@ import { TooltipHost } from './components/TooltipHost';
 import { ConfirmHost } from './components/ConfirmHost';
 import { OfflineBanner } from './components/OfflineBanner';
 import { CanvasContextMenu } from './components/CanvasContextMenu';
+import { IsolationBadge } from './components/IsolationBadge';
 import { copySelection, cutSelection, pasteFromClipboard } from './lib/clipboard';
 import { CommandPalette } from './components/CommandPalette';
 import { getBinding as getKeyBinding, comboMatchesEvent } from './lib/keymap';
@@ -112,7 +118,11 @@ import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
 import { joinSelection } from './lib/pathJoin';
 import { repeatTransform } from './lib/transformOps';
-import { adjustFontSize, adjustTracking, adjustLeading } from './lib/textCase';
+import { adjustFontSize, adjustTracking, adjustLeading, changeCaseSelection } from './lib/textCase';
+import { createOutlinesFromText } from './lib/textToOutline';
+import { splitTextToLetters, splitTextToLines } from './lib/splitText';
+import { applyTextOnArc } from './lib/textPath';
+import { smartPunctuationSelection } from './lib/smartPunctuation';
 import { getKeyboardIncrement } from './lib/preferences';
 import { commitDimension } from './lib/tools/measureTool';
 
@@ -735,8 +745,11 @@ export default function App() {
   const showZigzag = useEditor(s => s.showZigzag);
   const showPucker = useEditor(s => s.showPucker);
   const showTwist = useEditor(s => s.showTwist);
+  const showFreeDistort = useEditor(s => s.showFreeDistort);
   const showStar = useEditor(s => s.showStar);
   const showFindReplace = useEditor(s => s.showFindReplace);
+  const showSingleLineText = useEditor(s => s.showSingleLineText);
+  const showFreeformGradient = useEditor(s => s.showFreeformGradient);
   const showSaturate = useEditor(s => s.showSaturate);
   const showHue = useEditor(s => s.showHue);
   const showSplitGrid = useEditor(s => s.showSplitGrid);
@@ -774,7 +787,7 @@ export default function App() {
     try { window.localStorage.setItem('vs:hc', highContrast ? 'true' : 'false'); }
     catch { /* localStorage may be blocked — ignore */ }
     announce(t(highContrast ? 'High contrast enabled' : 'High contrast disabled'));
-  }, [highContrast]);
+  }, [highContrast, t]);
 
   // Light / dark theme — applied via `data-theme` on <html>; persisted to
   // localStorage so the choice survives reloads. High-contrast still wins
@@ -785,7 +798,7 @@ export default function App() {
     try { window.localStorage.setItem('vs:theme', theme); }
     catch { /* localStorage may be blocked (private mode, file://) — ignore */ }
     announce(t(theme === 'light' ? 'Light theme enabled' : 'Dark theme enabled'));
-  }, [theme]);
+  }, [t, theme]);
 
   // Toggle a body class to drive the mobile slide-over CSS.
   useEffect(() => {
@@ -800,6 +813,7 @@ export default function App() {
       // Resolve a shortcut id against the user's customised keymap.
       // Keeps each branch's shape identical to the original hardcoded ifs.
       const match = (id: string) => comboMatchesEvent(getKeyBinding(id), e);
+      if (e.key === 'Escape' && isIsolationMode()) { e.preventDefault(); exitIsolationMode(); announce(t('Isolation Mode off')); return; }
       // Cmd/Ctrl+K — toggle the global command palette. Checked early so it
       // wins over single-letter tool shortcuts that share the same key.
       if (match('window.commandPalette')) {
@@ -841,6 +855,8 @@ export default function App() {
       if (match('edit.redo')) { e.preventDefault(); redo(); announce(t('Redo')); return; }
       if (match('edit.duplicate')) { e.preventDefault(); duplicateSelection(); announce(t('Duplicate')); return; }
       if (match('edit.transformAgain')) { e.preventDefault(); repeatTransform().then((ok) => { if (ok) announce(t('Transform Again')); }); return; }
+      if (match('object.isolation')) { e.preventDefault(); if (toggleIsolationMode()) announce(t(isIsolationMode() ? 'Isolation Mode on' : 'Isolation Mode off')); return; }
+      if (match('path.averageAnchors')) { e.preventDefault(); const n = averageSelectedAnchors('both'); announce(n ? t('Average Anchor Points') : t('Shift-click two or more path anchors first.')); return; }
       // Clipboard: copy/cut/paste go through the in-app clipboard exported by
       // CanvasContextMenu — the system clipboard can't carry Fabric objects.
       if (match('edit.copy')) { e.preventDefault(); if (copySelection()) announce(t('Copy')); return; }
@@ -880,10 +896,36 @@ export default function App() {
         m('showPlotter', !showPlotter);
         return;
       }
+      if (match('file.new')) {
+        e.preventDefault();
+        void showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true }).then(ok => {
+          if (ok) location.reload();
+        });
+        announce(t('New'));
+        return;
+      }
+      if (match('file.newFromTemplate')) {
+        e.preventDefault();
+        setModal('showTemplates', true);
+        announce(t('New from Template…'));
+        return;
+      }
+      if (match('file.openProject')) {
+        e.preventDefault();
+        void openProjectFromFile();
+        announce(t('Open Project…'));
+        return;
+      }
       if (match('file.saveProject')) {
         e.preventDefault();
         void saveProjectQuick();
         announce(t('Save Project'));
+        return;
+      }
+      if (match('file.saveProjectAs')) {
+        e.preventDefault();
+        void saveProjectToFile();
+        announce(t('Save Project As…'));
         return;
       }
       if (match('view.toggleTheme')) {
@@ -897,6 +939,12 @@ export default function App() {
         e.preventDefault();
         paletteOpenRef.current?.click();
         announce(t('Open SVG / JSON…'));
+        return;
+      }
+      if (match('file.importImage')) {
+        e.preventDefault();
+        paletteImageRef.current?.click();
+        announce(t('Import Image…'));
         return;
       }
       if (match('file.exportSvg')) {
@@ -917,6 +965,12 @@ export default function App() {
         announce(t('Print'));
         return;
       }
+      if (match('file.tilePrint')) {
+        e.preventDefault();
+        setModal('showTilePrint', true);
+        announce(t('Tile Print…'));
+        return;
+      }
       if (match('arrange.forwardFront')) {
         e.preventDefault();
         if (e.shiftKey) { bringToFront(); announce(t('Bring to Front')); }
@@ -929,11 +983,30 @@ export default function App() {
         else { sendBackward(); announce(t('Send Backward')); }
         return;
       }
+      const runAlignShortcut = (action: () => void, minSelection: number, label: string) => {
+        e.preventDefault();
+        if ((getCanvas()?.getActiveObjects().length ?? 0) < minSelection) {
+          toast.warn(t(minSelection === 3 ? 'Select 3 or more objects first.' : 'Select 2 or more objects first.'));
+          return;
+        }
+        action();
+        announce(t(label));
+      };
+      if (match('align.left')) { runAlignShortcut(() => alignSelection('left'), 2, 'Align left'); return; }
+      if (match('align.centerH')) { runAlignShortcut(() => alignSelection('centerH'), 2, 'Align center horizontally'); return; }
+      if (match('align.right')) { runAlignShortcut(() => alignSelection('right'), 2, 'Align right'); return; }
+      if (match('align.top')) { runAlignShortcut(() => alignSelection('top'), 2, 'Align top'); return; }
+      if (match('align.centerV')) { runAlignShortcut(() => alignSelection('centerV'), 2, 'Align center vertically'); return; }
+      if (match('align.bottom')) { runAlignShortcut(() => alignSelection('bottom'), 2, 'Align bottom'); return; }
+      if (match('distribute.horizontal')) { runAlignShortcut(() => distributeSelection('horizontal'), 3, 'Distribute horizontally (equal spacing)'); return; }
+      if (match('distribute.vertical')) { runAlignShortcut(() => distributeSelection('vertical'), 3, 'Distribute vertically (equal spacing)'); return; }
       if (match('edit.flipH')) { e.preventDefault(); flipSelection('x'); announce(t('Flip Horizontal')); return; }
       if (match('edit.flipV')) { e.preventDefault(); flipSelection('y'); announce(t('Flip Vertical')); return; }
       if (match('edit.join')) { e.preventDefault(); if (joinSelection()) announce(t('Join Paths')); else toast.warn(t('Select 1 open path to close, or 2 to join.')); return; }
       if (match('edit.swapFillStroke')) { e.preventDefault(); if (swapFillStroke()) announce(t('Swap Fill / Stroke')); return; }
       if (match('edit.defaultColors')) { e.preventDefault(); defaultColors(); announce(t('Default Fill / Stroke')); return; }
+      if (match('appearance.noFill')) { e.preventDefault(); if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else { applyStyleToSelection({ fill: '' }); announce(t('No Fill')); } return; }
+      if (match('appearance.noStroke')) { e.preventDefault(); if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else { applyStyleToSelection({ stroke: '', strokeWidth: 0 }); announce(t('No Stroke')); } return; }
       if (match('edit.selectAll')) {
         e.preventDefault();
         const c = getCanvas();
@@ -949,10 +1022,100 @@ export default function App() {
         }
         return;
       }
+      if (match('edit.lockSelection')) { e.preventDefault(); const n = lockSelection(); if (n) announce(t('Lock Selection')); else toast.warn(t('Select something first.')); return; }
+      if (match('edit.unlockAll')) { e.preventDefault(); const n = unlockAll(); if (n) announce(t('Unlock All')); else toast.warn(t('No locked objects.')); return; }
       if (match('edit.hideSelection')) { e.preventDefault(); if (hideSelection()) announce(t('Hide Selection')); return; }
       if (match('edit.showAll')) { e.preventDefault(); const n = showAll(); if (n) announce(t('Show All')); return; }
+      if (match('text.createOutlines')) {
+        e.preventDefault();
+        void createOutlinesFromText().then(ok => {
+          if (ok) { toast.success(t('Text converted to outlines')); announce(t('Create Outlines')); }
+          else toast.warn(t('Select a single text object to enable'));
+        });
+        return;
+      }
+      if (match('text.splitLines')) {
+        e.preventDefault();
+        const n = splitTextToLines();
+        if (n) { toast.success(`${n} ${t('lines created')}`); announce(t('Break Text into Lines')); }
+        else toast.warn(t('Select multi-line text first.'));
+        return;
+      }
+      if (match('text.splitLetters')) {
+        e.preventDefault();
+        const n = splitTextToLetters();
+        if (n) { toast.success(`${n} ${t('letters created')}`); announce(t('Break Text into Letters')); }
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.arcDown')) {
+        e.preventDefault();
+        if (applyTextOnArc(true)) announce(t('Text on Arc (Down)'));
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.arcUp')) {
+        e.preventDefault();
+        if (applyTextOnArc(false)) announce(t('Text on Arc (Up)'));
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.smartPunctuation')) {
+        e.preventDefault();
+        const n = smartPunctuationSelection();
+        if (n) { toast.success(`${n} ${t('text objects updated')}`); announce(t('Smart Punctuation')); }
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.caseSentence')) {
+        e.preventDefault();
+        if (changeCaseSelection('sentence')) announce(t('Sentence case'));
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.caseTitle')) {
+        e.preventDefault();
+        if (changeCaseSelection('title')) announce(t('Title Case'));
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.caseLower')) {
+        e.preventDefault();
+        if (changeCaseSelection('lower')) announce(t('lowercase'));
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.caseUpper')) {
+        e.preventDefault();
+        if (changeCaseSelection('upper')) announce(t('UPPERCASE'));
+        else toast.warn(t('Select a text object first.'));
+        return;
+      }
+      if (match('text.singleLine')) {
+        e.preventDefault();
+        setModal('showSingleLineText', true);
+        announce(t('Single-line Text…'));
+        return;
+      }
+      if (match('text.findReplace')) {
+        e.preventDefault();
+        setModal('showFindReplace', true);
+        announce(t('Find & Replace…'));
+        return;
+      }
+      if (match('text.variableData')) {
+        e.preventDefault();
+        if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.'));
+        else { setModal('showVariableData', true); announce(t('Variable Data…')); }
+        return;
+      }
       if (match('text.fontSizeUp')) { e.preventDefault(); if (adjustFontSize(2)) announce(t('Increase Font Size')); return; }
       if (match('text.fontSizeDown')) { e.preventDefault(); if (adjustFontSize(-2)) announce(t('Decrease Font Size')); return; }
+      if (match('text.trackingUp')) { e.preventDefault(); if (adjustTracking(25)) { announce(t('Tracking')); return; } if (!e.key.startsWith('Arrow')) { toast.warn(t('Select a text object first.')); return; } }
+      if (match('text.trackingDown')) { e.preventDefault(); if (adjustTracking(-25)) { announce(t('Tracking')); return; } if (!e.key.startsWith('Arrow')) { toast.warn(t('Select a text object first.')); return; } }
+      if (match('text.leadingUp')) { e.preventDefault(); if (adjustLeading(0.05)) { announce(t('Leading')); return; } if (!e.key.startsWith('Arrow')) { toast.warn(t('Select a text object first.')); return; } }
+      if (match('text.leadingDown')) { e.preventDefault(); if (adjustLeading(-0.05)) { announce(t('Leading')); return; } if (!e.key.startsWith('Arrow')) { toast.warn(t('Select a text object first.')); return; } }
+      if (match('edit.selectInverse')) { e.preventDefault(); const n = selectInverse(); if (n) announce(t('Select Inverse')); return; }
       if (match('edit.selectNextAbove')) { e.preventDefault(); if (selectObjectInStack('up')) announce(t('Select Next Object Above')); return; }
       if (match('edit.selectNextBelow')) { e.preventDefault(); if (selectObjectInStack('down')) announce(t('Select Next Object Below')); return; }
       if (match('edit.deselectAll')) {
@@ -1014,21 +1177,12 @@ export default function App() {
         return;
       }
       // Excluded from BINDINGS: arrow nudge — four keys + Shift multiplier
-      // can't be expressed as a single rebindable combo.
+      // can't be expressed as a single rebindable combo. Text tracking/leading
+      // Alt+arrows live above as rebindable Type shortcuts.
       const arrowMap: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (arrowMap[e.key]) {
         e.preventDefault();
         const [dx, dy] = arrowMap[e.key];
-        // Alt+arrow on a text object adjusts tracking (←/→) or leading (↑/↓),
-        // Illustrator-style; otherwise arrows nudge the selection.
-        if (e.altKey) {
-          const a = getCanvas()?.getActiveObject();
-          if (a && (a.type === 'i-text' || a.type === 'text' || a.type === 'textbox')) {
-            if (dx !== 0) { adjustTracking(dx * 25); announce(t('Tracking')); }
-            else { adjustLeading(-dy * 0.05); announce(t('Leading')); }
-            return;
-          }
-        }
         const inc = getKeyboardIncrement(); const step = e.shiftKey ? inc * 10 : inc; nudgeSelection(dx * step, dy * step); return;
       }
       // Tool shortcuts — each is its own binding so users can rebind them.
@@ -1318,6 +1472,11 @@ export default function App() {
           <TwistDialog />
         </Suspense>
       )}
+      {showFreeDistort && (
+        <Suspense fallback={null}>
+          <FreeDistortDialog />
+        </Suspense>
+      )}
       {showStar && (
         <Suspense fallback={null}>
           <StarDialog />
@@ -1326,6 +1485,16 @@ export default function App() {
       {showFindReplace && (
         <Suspense fallback={null}>
           <FindReplaceDialog />
+        </Suspense>
+      )}
+      {showSingleLineText && (
+        <Suspense fallback={null}>
+          <SingleLineTextDialog />
+        </Suspense>
+      )}
+      {showFreeformGradient && (
+        <Suspense fallback={null}>
+          <FreeformGradientDialog />
         </Suspense>
       )}
       {showSaturate && (
@@ -1397,7 +1566,17 @@ export default function App() {
       <TooltipHost />
       <ConfirmHost />
       <OfflineBanner />
-      <CanvasContextMenu />
+      <IsolationBadge />
+      <CanvasContextMenu
+        onNewDocument={async () => {
+          if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) {
+            location.reload();
+          }
+        }}
+        onOpenFile={() => paletteOpenRef.current?.click()}
+        onImportImage={() => paletteImageRef.current?.click()}
+        onToggleDebug={() => setShowDebug(v => !v)}
+      />
       <CommandPalette
         onToggleAI={() => setShowAI(v => !v)}
         onToggleDebug={() => setShowDebug(v => !v)}

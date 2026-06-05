@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check, ChevronRight } from 'lucide-react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check, ChevronRight, Sheet, Grid3X3 } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, zoomToSelection, getCanvas, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, selectAllObjects, deselectAll, selectSame, selectSameType, selectInverse, selectAllText, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, bringToFront, sendToBack } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, zoomToSelection, getCanvas, duplicateSelection, deleteSelection, autoArrangeSelection, flipSelection, lockSelection, unlockAll, hideSelection, hideOthers, showAll, makeGuidesFromSelection, selectAllObjects, selectVisibleObjects, selectUnlockedObjects, deselectAll, promptRenameSelection, selectSame, selectSameType, selectInverse, selectObjectInStack, selectAllText, selectAllImages, selectAllPaths, selectAllShapes, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, bringToFront, sendToBack, applyStyleToSelection, swapFillStroke, defaultColors, alignSelection, distributeSelection, distributeInArtboard, centerOnArtboard } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
 import { repeatTransform, rotateSelection } from '../lib/transformOps';
 import { reversePathSelection } from '../lib/pathReverse';
@@ -9,20 +9,23 @@ import { addAnchorsToSelection } from '../lib/addAnchors';
 import { cleanUpDocument } from '../lib/cleanUp';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { addArrowheads } from '../lib/arrowheads';
+import { averageSelectedAnchors } from '../lib/pathEdit';
+import { toggleIsolationMode } from '../lib/isolationMode';
 import { fitArtboardToContent } from '../lib/fitArtboard';
 import { createOutlinesFromText } from '../lib/textToOutline';
 import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
-import { changeCaseSelection } from '../lib/textCase';
+import { adjustFontSize, adjustLeading, adjustTracking, changeCaseSelection } from '../lib/textCase';
 import { smartPunctuationSelection } from '../lib/smartPunctuation';
 import { applyTextOnArc } from '../lib/textPath';
 import { exportSelectionSVG, exportSelectionPNG, copySelectionSVG } from '../lib/exportSelection';
-import { exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
+import { createArtboardFromSelection, exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
 import { booleanOp, divideSelection, trimSelection, cropSelection, mergeSelection } from '../lib/booleanOps';
 import { rasterizeSelection } from '../lib/rasterize';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
-import { importImageFile, pasteFromSystemClipboard } from '../lib/io3';
+import { importImageFile, pasteFromSystemClipboard, traceSelectedImage } from '../lib/io3';
+import { copySelection, cutSelection, pasteFromClipboard } from '../lib/clipboard';
 import { getFormat } from '../lib/formats';
 import { resetOnboarding } from '../lib/onboarding';
 import { useT, useI18n, LANGUAGES, t as tStatic, type Lang } from '../lib/i18n';
@@ -33,8 +36,13 @@ import { isTauri, isMac, getOSLabel, platformInfo, ariaKeyshortcuts, type Native
 import { getAutoSaveStatus, subscribeAutoSaveStatus, type AutoSaveStatus } from '../lib/autosave';
 import { setOutlineMode } from '../lib/outlineView';
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
+import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, savePlotterTestCut } from '../lib/cutPrepActions';
+import { applyStrokeAlign } from '../lib/strokeAlign';
+import { applyBlendModeToSelection, applyPatternFill, applyShadowToSelection, applyStrokeStyleToSelection, toggleUniformStroke } from '../lib/effects';
+import { applyBlur, applySepia, applyGrayscale as applyImageGrayscale, applyBrightness as applyImageBrightness, applyContrast, applyHueRotate, clearFilters } from '../lib/filters';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { getBinding } from '../lib/keymap';
 
 interface Props {
   onToggleAI: () => void;
@@ -98,6 +106,12 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   const theme = useEditor(s => s.theme);
   const setTheme = useEditor(s => s.setTheme);
   const outlineMode = useEditor(s => s.outlineMode);
+  const cutPaths = useEditor(s => s.cutPaths);
+  const clearCutPaths = useEditor(s => s.clearCutPaths);
+  const cutPathCount = cutPaths.length;
+  const contourCutCount = cutPaths.filter(path => path.kind === 'outline').length;
+  const traceCutCount = cutPaths.filter(path => path.kind === 'trace').length;
+  const regmarkCutCount = cutPaths.filter(path => path.kind === 'regmark').length;
   // Recent files — subscribed so the menu refreshes after each save / open.
   const [recent, setRecent] = useState<RecentFile[]>([]);
   useEffect(() => subscribeRecent(setRecent), []);
@@ -122,6 +136,97 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
     e.target.value = '';
   };
 
+  const selectionCount = () => getCanvas()?.getActiveObjects().length ?? 0;
+  const openPrintPrep = () => {
+    setModal('openPrintPrep', true);
+    setModal('showPrint', true);
+  };
+
+  const runAutoNest = () => {
+    const n = autoArrangeSelection();
+    if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
+    else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
+  };
+
+  const requireTextSelection = (action: () => void, message = t('Select a text object first.')) => {
+    const hasText = (getCanvas()?.getActiveObjects().some(o => o.type === 'i-text' || o.type === 'text' || o.type === 'textbox')) ?? false;
+    if (!hasText) {
+      toast.warn(message);
+      return;
+    }
+    action();
+  };
+  const adjustTextMetric = (fn: (delta: number) => number, delta: number) => {
+    if (!fn(delta)) toast.warn(t('Select a text object first.'));
+  };
+
+
+
+  const runAlign = (action: () => void, minSelection: number) => {
+    if (selectionCount() < minSelection) {
+      toast.warn(t(minSelection === 3 ? 'Select 3 or more objects first.' : 'Select 2 or more objects first.'));
+      return;
+    }
+    action();
+  };
+  const runArtboardAlign = (action: () => boolean | void) => {
+    const editor = useEditor.getState();
+    if (selectionCount() < 1 || editor.artboards.length === 0) {
+      toast.warn(t('Select something first.'));
+      return;
+    }
+    const ok = action();
+    if (ok === false) toast.warn(t('Select something first.'));
+  };
+
+  const openWithSelectionAction = (action: () => void, message = t('Select something first.')) => {
+    if (selectionCount() < 1) {
+      toast.warn(message);
+      return;
+    }
+    action();
+  };
+
+  const openWithSelection = (modal: Parameters<typeof setModal>[0], message = t('Select something first.'), minSelection = 1) => {
+    if (selectionCount() < minSelection) {
+      toast.warn(message);
+      return;
+    }
+    setModal(modal, true);
+  };
+
+  const clearCutJob = () => {
+    clearCutPaths();
+    toast.success(t('Cut paths cleared'), { title: t('Cut prep') });
+  };
+
+  const clearCutKind = (kind: 'outline' | 'trace' | 'regmark') => {
+    clearCutPaths(kind);
+    const message = kind === 'outline'
+      ? t('Contour cut paths cleared')
+      : kind === 'trace'
+        ? t('Traced cut paths cleared')
+        : t('Registration marks cleared');
+    toast.success(message, { title: t('Cut prep') });
+  };
+
+  const handleTopbarActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-topbar-action]'))
+      .filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
+  };
+
   return (
     // The outer bar is the app's top banner: <header> gives it an implicit
     // `banner` landmark, pairing with the <main> canvas region and the right
@@ -143,14 +248,14 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
 
       <div role="menubar" aria-label={t('Application menu')} className="flex items-center gap-2">
       <Dropdown label={t('File')} width="w-64" items={[
-        { label: t('Save Project'), onClick: () => { void saveProjectQuick(); }, kbd: 'Ctrl+Shift+S' },
-        { label: t('Save Project As…'), onClick: () => { void saveProjectToFile(); } },
-        { label: t('Open Project…'), onClick: () => { void openProjectFromFile(); } },
+        { label: t('Save Project'), onClick: () => { void saveProjectQuick(); }, kbd: getBinding('file.saveProject') },
+        { label: t('Save Project As…'), onClick: () => { void saveProjectToFile(); }, kbd: getBinding('file.saveProjectAs') },
+        { label: t('Open Project…'), onClick: () => { void openProjectFromFile(); }, kbd: getBinding('file.openProject') },
         { sep: true },
-        { label: t('New'), onClick: async () => { if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) location.reload(); }, kbd: 'Ctrl+N' },
-        { label: t('New from Template…'), onClick: () => setModal('showTemplates', true) },
-        { label: t('Open SVG / JSON…'), onClick: () => fileRef.current?.click(), kbd: 'Ctrl+O' },
-        { label: t('Import Image…'), onClick: () => imageRef.current?.click() },
+        { label: t('New'), onClick: async () => { if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) location.reload(); }, kbd: getBinding('file.new') },
+        { label: t('New from Template…'), onClick: () => setModal('showTemplates', true), kbd: getBinding('file.newFromTemplate') },
+        { label: t('Open SVG / JSON…'), onClick: () => fileRef.current?.click(), kbd: getBinding('file.open') },
+        { label: t('Import Image…'), onClick: () => imageRef.current?.click(), kbd: getBinding('file.importImage') },
         { label: t('Paste from Clipboard'), onClick: () => { void pasteFromSystemClipboard().then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }); } },
         { sep: true },
         // File-menu exports route through the format registry — same files,
@@ -159,7 +264,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // single source of truth. `exportPDFReal` (vector PDF) doesn't have a
         // registry entry yet; its options story is heavier and migrates in a
         // later cycle.
-        { label: t('Export SVG'), onClick: () => { void getFormat('svg')?.export?.(); }, kbd: 'Ctrl+S' },
+        { label: t('Export SVG'), onClick: () => { void getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
         { label: t('Export PNG (2×)'), onClick: () => { void getFormat('png')?.export?.(); } },
         { label: t('Export JPG (2×)'), onClick: () => { void getFormat('jpg')?.export?.(); } },
         { label: t('Export PDF'), onClick: () => { void getFormat('pdf')?.export?.(); } },
@@ -173,99 +278,162 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Export Selection as PNG'), onClick: () => { void exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
         { label: t('Copy as SVG'), onClick: () => { void copySelectionSVG().then(r => { if (r === 'ok') toast.success(t('SVG copied to clipboard')); else if (r === 'empty') toast.warn(t('Select something first.')); else toast.warn(t('Clipboard unavailable.')); }); } },
         { sep: true },
-        { label: t('Print…'), onClick: () => setModal('showPrint', true), kbd: 'Ctrl+P' },
-        { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true) },
-        { label: t('Send to Plotter…'), onClick: () => setModal('showPlotter', true) },
+        { label: t('Print…'), onClick: () => setModal('showPrint', true), kbd: getBinding('file.print') },
+        { label: t('Print Prep…'), onClick: openPrintPrep },
+        { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true), kbd: getBinding('file.tilePrint') },
+        { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
+        { label: t('Add positioning marks'), onClick: () => addPlotterRegistrationMarks(t) },
+        {
+          label: t('Weed border'),
+          sub: [
+            { label: t('Border only'), onClick: () => addPlotterWeedBorder(t) },
+            { label: t('Weed rows'), onClick: () => addPlotterWeedBorder(t, 2, 0) },
+            { label: t('Weed columns'), onClick: () => addPlotterWeedBorder(t, 0, 2) },
+            { label: t('2×2'), onClick: () => addPlotterWeedBorder(t, 2, 2) },
+            { label: t('3×2'), onClick: () => addPlotterWeedBorder(t, 3, 2) },
+          ],
+        },
+        {
+          label: t('Bridges'),
+          sub: [
+            { label: t('Light'), onClick: () => addPlotterBridges(t, 2, 0.6) },
+            { label: t('Standard'), onClick: () => addPlotterBridges(t, 4, 1) },
+            { label: t('Heavy'), onClick: () => addPlotterBridges(t, 6, 1.5) },
+          ],
+        },
+        {
+          label: t('Banner Grommet presets'),
+          sub: [
+            { label: t('Small banner'), onClick: () => addPlotterGrommets(t, 15, 300, 8) },
+            { label: t('Standard banner'), onClick: () => addPlotterGrommets(t, 20, 500, 10) },
+            { label: t('Large banner'), onClick: () => addPlotterGrommets(t, 25, 750, 12) },
+            { label: t('Custom…'), onClick: () => openWithSelection('showGrommets') },
+          ],
+        },
+        { label: t('Save Test Cut File'), onClick: () => savePlotterTestCut(t) },
+        { label: t('Clear positioning marks'), onClick: () => clearPlotterRegistrationMarks(t) },
+        { label: t('Clear weed borders'), onClick: () => clearPlotterWeedBorders(t) },
+        { label: t('Clear bridges'), onClick: () => clearPlotterBridges(t) },
+        { label: t('Clear cut paths'), onClick: () => clearCutJob(), disabled: cutPathCount === 0 },
+        { label: t('Send to Plotter…'), onClick: () => setModal('showPlotter', true), kbd: getBinding('window.plotter') },
         ...buildRecentFilesItems(recent),
       ]} />
 
       <Dropdown label={t('Edit')} items={[
-        { label: t('Undo'), onClick: () => undo(), disabled: !canUndo, kbd: 'Ctrl+Z' },
-        { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: 'Ctrl+Y' },
+        { label: t('Undo'), onClick: () => undo(), disabled: !canUndo, kbd: getBinding('edit.undo') },
+        { label: t('Redo'), onClick: () => redo(), disabled: !canRedo, kbd: `${getBinding('edit.redo')} / ${getBinding('edit.redoShift')}` },
         { sep: true },
-        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true) },
-        { label: t('Select All'), onClick: () => { const n = selectAllObjects(); if (!n) toast.warn(t('Nothing to select.')); }, kbd: 'Ctrl+A' },
-        { label: t('Deselect All'), onClick: () => { deselectAll(); }, kbd: 'Ctrl+Shift+A' },
+        { label: t('Cut'), onClick: () => { if (!cutSelection()) toast.warn(t('Select something first.')); }, kbd: getBinding('edit.cut') },
+        { label: t('Copy'), onClick: () => { if (copySelection()) toast.success(t('Copied')); else toast.warn(t('Select something first.')); }, kbd: getBinding('edit.copy') },
+        { label: t('Paste'), onClick: () => { void pasteFromClipboard().then(ok => { if (!ok) toast.warn(t('Clipboard unavailable.')); }); }, kbd: getBinding('edit.paste') },
+        { label: t('Paste in Place'), onClick: () => { void pasteFromClipboard(undefined, true).then(ok => { if (!ok) toast.warn(t('Clipboard unavailable.')); }); }, kbd: getBinding('edit.pasteInPlace') },
+        { label: t('Paste in Front'), onClick: () => { void pasteFromClipboard(undefined, true, 'front').then(ok => { if (!ok) toast.warn(t('Clipboard unavailable.')); }); }, kbd: getBinding('edit.pasteInFront') },
+        { label: t('Paste in Back'), onClick: () => { void pasteFromClipboard(undefined, true, 'back').then(ok => { if (!ok) toast.warn(t('Clipboard unavailable.')); }); }, kbd: getBinding('edit.pasteInBack') },
+        { sep: true },
+        { label: t('Duplicate'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else duplicateSelection(); }, kbd: getBinding('edit.duplicate') },
+        { label: t('Delete'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else deleteSelection(); }, kbd: 'Del / Backspace' },
+        { label: t('Rename Selection…'), onClick: () => { const n = getCanvas()?.getActiveObjects().length ?? 0; if (n < 1) { toast.warn(t('Select something first.')); return; } const renamed = promptRenameSelection(t('Object name')); if (renamed) toast.success(`${renamed} ${t('objects renamed')}`); } },
+        { sep: true },
+        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true), kbd: getBinding('text.findReplace') },
+        { label: t('Select All'), onClick: () => { const n = selectAllObjects(); if (!n) toast.warn(t('Nothing to select.')); }, kbd: getBinding('edit.selectAll') },
+        { label: t('Deselect All'), onClick: () => { deselectAll(); }, kbd: getBinding('edit.deselectAll') },
+        { label: t('Select Visible Objects'), onClick: () => { const n = selectVisibleObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No visible unlocked objects.')); } },
+        { label: t('Select Unlocked Objects'), onClick: () => { const n = selectUnlockedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unlocked objects.')); } },
         { label: t('Select Same'), sub: [
           { label: t('Select Same Fill'), onClick: () => { const n = selectSame('fill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
           { label: t('Select Same Stroke'), onClick: () => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
           { label: t('Select Same Stroke Weight'), onClick: () => { const n = selectSame('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
           { label: t('Select Same Opacity'), onClick: () => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+          { label: t('Select Same Font Family'), onClick: () => { const n = selectSame('fontFamily'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); } },
+          { label: t('Select Same Font Size'), onClick: () => { const n = selectSame('fontSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); } },
+          { label: t('Select Same Blend Mode'), onClick: () => { const n = selectSame('globalCompositeOperation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+          { label: t('Select Same Dash'), onClick: () => { const n = selectSame('strokeDashArray'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+          { label: t('Select Same Line Cap'), onClick: () => { const n = selectSame('strokeLineCap'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+          { label: t('Select Same Line Join'), onClick: () => { const n = selectSame('strokeLineJoin'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
           { label: t('Select Same Type'), onClick: () => { const n = selectSameType(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+          { label: t('Select Same Name'), onClick: () => { const n = selectSame('name'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a named object first.')); } },
         ] },
-        { label: t('Select All Text Objects'), onClick: () => { const n = selectAllText(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text objects.')); } },
-        { label: t('Select Inverse'), onClick: () => { selectInverse(); } },
+        { label: t('Select Object'), sub: [
+          { label: t('Select All Text Objects'), onClick: () => { const n = selectAllText(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text objects.')); } },
+          { label: t('Select All Image Objects'), onClick: () => { const n = selectAllImages(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No image objects.')); } },
+          { label: t('Select All Path Objects'), onClick: () => { const n = selectAllPaths(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No path objects.')); } },
+          { label: t('Select All Shape Objects'), onClick: () => { const n = selectAllShapes(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No shape objects.')); } },
+        ] },
+        { label: t('Select Inverse'), onClick: () => { selectInverse(); }, kbd: getBinding('edit.selectInverse') },
+        { label: t('Select Next Object Above'), onClick: () => { if (!selectObjectInStack('up')) toast.warn(t('Nothing above.')); }, kbd: getBinding('edit.selectNextAbove') },
+        { label: t('Select Next Object Below'), onClick: () => { if (!selectObjectInStack('down')) toast.warn(t('Nothing below.')); }, kbd: getBinding('edit.selectNextBelow') },
         { sep: true },
-        { label: t('Transform…'), onClick: () => setModal('showTransform', true) },
-        { label: t('Resize…'), onClick: () => setModal('showResize', true) },
-        { label: t('Shear…'), onClick: () => setModal('showShear', true) },
-        { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: 'Ctrl+Alt+D' },
-        { label: t('Rotate 90° CW'), onClick: () => { void rotateSelection(90); } },
-        { label: t('Rotate 90° CCW'), onClick: () => { void rotateSelection(-90); } },
-        { label: t('Rotate 180°'), onClick: () => { void rotateSelection(180); } },
-        { label: t('Flip Horizontal'), onClick: () => flipSelection('x'), kbd: 'Shift+H' },
-        { label: t('Flip Vertical'), onClick: () => flipSelection('y'), kbd: 'Shift+V' },
-        { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: 'Ctrl+J' },
+        { label: t('Transform…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showTransform', true); } },
+        { label: t('Resize…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showResize', true); } },
+        { label: t('Shear…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showShear', true); } },
+        { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: getBinding('edit.transformAgain') },
+        { label: t('Rotate 90° CW'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(90); } },
+        { label: t('Rotate 90° CCW'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(-90); } },
+        { label: t('Rotate 180°'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(180); } },
+        { label: t('Flip Horizontal'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else flipSelection('x'); }, kbd: getBinding('edit.flipH') },
+        { label: t('Flip Vertical'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else flipSelection('y'); }, kbd: getBinding('edit.flipV') },
+        { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: getBinding('edit.join') },
         { sep: true },
-        { label: t('Group'), onClick: () => { groupSelection(); }, kbd: 'Ctrl+G' },
-        { label: t('Ungroup'), onClick: () => { ungroupSelection(); }, kbd: 'Ctrl+Shift+G' },
+        { label: t('Group'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 2) toast.warn(t('Select 2 or more objects first.')); else groupSelection(); }, kbd: getBinding('edit.group') },
+        { label: t('Isolation Mode'), onClick: () => { if (!toggleIsolationMode()) toast.warn(t('Select a group first.')); }, kbd: getBinding('object.isolation') },
+        { label: t('Ungroup'), onClick: () => { if (getCanvas()?.getActiveObject()?.type !== 'group') toast.warn(t('Select a group first.')); else ungroupSelection(); }, kbd: getBinding('edit.ungroup') },
         { label: t('Ungroup All'), onClick: () => { const n = ungroupAll(); if (n) toast.success(`${n} ${t('groups ungrouped')}`); else toast.warn(t('Select a group first.')); } },
-        { label: t('Bring to Front'), onClick: () => bringToFront() },
-        { label: t('Bring Forward'), onClick: () => bringForward(), kbd: 'Ctrl+]' },
-        { label: t('Send Backward'), onClick: () => sendBackward(), kbd: 'Ctrl+[' },
-        { label: t('Send to Back'), onClick: () => sendToBack() },
+        { label: t('Bring to Front'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else bringToFront(); }, kbd: `${getBinding('arrange.forwardFront').replace(/]$/, 'Shift+]')}` },
+        { label: t('Bring Forward'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else bringForward(); }, kbd: getBinding('arrange.forwardFront') },
+        { label: t('Send Backward'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else sendBackward(); }, kbd: getBinding('arrange.backwardBack') },
+        { label: t('Send to Back'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else sendToBack(); }, kbd: `${getBinding('arrange.backwardBack').replace(/[[]$/, 'Shift+[')}` },
         { sep: true },
         { label: t('Pathfinder'), sub: [
-          { label: t('Union'), onClick: () => { void booleanOp('union'); } },
-          { label: t('Subtract'), onClick: () => { void booleanOp('subtract'); } },
-          { label: t('Intersect'), onClick: () => { void booleanOp('intersect'); } },
-          { label: t('Exclude'), onClick: () => { void booleanOp('exclude'); } },
-          { label: t('Minus Back'), onClick: () => { void booleanOp('minus-back'); } },
+          { label: t('Union'), onClick: () => { void booleanOp('union').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); } },
+          { label: t('Subtract'), onClick: () => { void booleanOp('subtract').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); } },
+          { label: t('Intersect'), onClick: () => { void booleanOp('intersect').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); } },
+          { label: t('Exclude'), onClick: () => { void booleanOp('exclude').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); } },
+          { label: t('Minus Back'), onClick: () => { void booleanOp('minus-back').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); } },
           { sep: true },
-          { label: t('Divide'), onClick: () => { divideSelection(); } },
-          { label: t('Trim'), onClick: () => { trimSelection(); } },
+          { label: t('Divide'), onClick: () => { const n = divideSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
+          { label: t('Trim'), onClick: () => { const n = trimSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
           { label: t('Merge'), onClick: () => { const n = mergeSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
           { label: t('Crop'), onClick: () => { const n = cropSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
         ] },
-        { label: t('Make Clipping Mask'), onClick: () => { if (!applyClipMask()) toast.warn(t('Select 2 or more objects first.')); }, kbd: 'Ctrl+7' },
-        { label: t('Release Clipping Mask'), onClick: () => { if (!releaseClipMask()) toast.warn(t('Select a clipping group first.')); }, kbd: 'Ctrl+Alt+7' },
-        { label: t('Make Compound Path'), onClick: () => { if (!makeCompoundPath()) toast.warn(t('Select 2 or more objects first.')); }, kbd: 'Ctrl+8' },
-        { label: t('Release Compound Path'), onClick: () => { if (!releaseCompoundPath()) toast.warn(t('Select a compound path first.')); }, kbd: 'Ctrl+Alt+8' },
+        { label: t('Make Clipping Mask'), onClick: () => { if (!applyClipMask()) toast.warn(t('Select 2 or more objects first.')); }, kbd: getBinding('edit.clipMask') },
+        { label: t('Release Clipping Mask'), onClick: () => { if (!releaseClipMask()) toast.warn(t('Select a clipping group first.')); }, kbd: getBinding('edit.releaseClip') },
+        { label: t('Make Compound Path'), onClick: () => { if (!makeCompoundPath()) toast.warn(t('Select 2 or more objects first.')); }, kbd: getBinding('edit.compoundPath') },
+        { label: t('Release Compound Path'), onClick: () => { if (!releaseCompoundPath()) toast.warn(t('Select a compound path first.')); }, kbd: getBinding('edit.releaseCompound') },
         { sep: true },
-        { label: t('Lock Selection'), onClick: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); } },
-        { label: t('Unlock All'), onClick: () => { const n = unlockAll(); toast.success(`${n} ${t('unlocked')}`); } },
-        { label: t('Hide Selection'), onClick: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); }, kbd: 'Ctrl+3' },
+        { label: t('Lock Selection'), onClick: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select something first.')); }, kbd: getBinding('edit.lockSelection') },
+        { label: t('Unlock All'), onClick: () => { const n = unlockAll(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked objects.')); }, kbd: getBinding('edit.unlockAll') },
+        { label: t('Hide Selection'), onClick: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); }, kbd: getBinding('edit.hideSelection') },
         { label: t('Hide Others'), onClick: () => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); } },
-        { label: t('Show All'), onClick: () => { const n = showAll(); toast.success(`${n} ${t('revealed')}`); }, kbd: 'Ctrl+Alt+3' },
+        { label: t('Show All'), onClick: () => { const n = showAll(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden objects.')); }, kbd: getBinding('edit.showAll') },
       ]} />
 
       <Dropdown label={t('Type')} items={[
-        { label: t('Create Outlines'), onClick: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); } },
-        { label: t('Break Text into Letters'), onClick: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); } },
-        { label: t('Break Text into Lines'), onClick: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); } },
+        { label: t('Create Outlines'), onClick: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); }, kbd: getBinding('text.createOutlines') },
+        { label: t('Break Text into Letters'), onClick: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.splitLetters') },
+        { label: t('Break Text into Lines'), onClick: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); }, kbd: getBinding('text.splitLines') },
         { sep: true },
-        { label: t('Text on Arc (Up)'), onClick: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); } },
-        { label: t('Text on Arc (Down)'), onClick: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); } },
+        { label: t('Text on Arc (Up)'), onClick: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.arcUp') },
+        { label: t('Text on Arc (Down)'), onClick: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.arcDown') },
         { sep: true },
         { label: t('Change Case'), sub: [
-          { label: t('UPPERCASE'), onClick: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); } },
-          { label: t('lowercase'), onClick: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); } },
-          { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); } },
-          { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); } },
+          { label: t('UPPERCASE'), onClick: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseUpper') },
+          { label: t('lowercase'), onClick: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseLower') },
+          { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseTitle') },
+          { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseSentence') },
         ] },
-        { label: t('Smart Punctuation'), onClick: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); } },
+        { label: t('Smart Punctuation'), onClick: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.smartPunctuation') },
         { sep: true },
-        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true) },
+        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true), kbd: getBinding('text.findReplace') },
       ]} />
 
       <Dropdown label={t('View')} items={[
-        { label: t('Zoom In'), onClick: () => zoomBy(1.25), kbd: '+' },
-        { label: t('Zoom Out'), onClick: () => zoomBy(1 / 1.25), kbd: '-' },
-        { label: t('Actual Size'), onClick: () => zoomToPercent(100), kbd: '1' },
-        { label: t('Fit to Page'), onClick: () => zoomFit(), kbd: '0' },
-        { label: t('Zoom to Selection'), onClick: () => { if (!zoomToSelection()) toast.warn(t('Select something first.')); }, kbd: 'Ctrl+2' },
+        { label: t('Zoom In'), onClick: () => zoomBy(1.25), kbd: getBinding('view.zoomIn') },
+        { label: t('Zoom Out'), onClick: () => zoomBy(1 / 1.25), kbd: getBinding('view.zoomOut') },
+        { label: t('Actual Size'), onClick: () => zoomToPercent(100), kbd: getBinding('view.actualSize') },
+        { label: t('Fit to Page'), onClick: () => zoomFit(), kbd: getBinding('view.zoomFit') },
+        { label: t('Zoom to Selection'), onClick: () => { if (!zoomToSelection()) toast.warn(t('Select something first.')); }, kbd: getBinding('view.zoomSelection') },
         { sep: true },
-        { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: 'Ctrl+Alt+Y', checked: outlineMode },
+        { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: getBinding('view.outline'), checked: outlineMode },
         { sep: true },
         { label: t('Show Rulers'), onClick: () => setRulersVisible(!rulersVisible), checked: rulersVisible },
         { label: t('Show Grid'), onClick: () => setGridVisible(!gridVisible), checked: gridVisible },
@@ -275,75 +443,216 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { sep: true },
         { label: t('Make Guides from Selection'), onClick: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
         { label: t('Margin Guides…'), onClick: () => setModal('showMarginGuides', true) },
-        { label: t('Show Guides'), onClick: () => { const s = useEditor.getState(); s.setGuidesVisible(!s.guidesVisible); }, checked: guidesVisible, kbd: 'Ctrl+;' },
+        { label: t('Show Guides'), onClick: () => { const s = useEditor.getState(); s.setGuidesVisible(!s.guidesVisible); }, checked: guidesVisible, kbd: getBinding('view.toggleGuides') },
         { label: t('Lock Guides'), onClick: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked), checked: guidesLocked },
         { label: t('Clear Guides'), onClick: () => useEditor.getState().clearUserGuides() },
       ]} />
 
       <Dropdown label={t('Document')} items={[
         { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
+        { label: t('Create Artboard from Selection'), onClick: () => { const ab = createArtboardFromSelection(); if (ab) toast.success(t('Artboard created')); else toast.warn(t('Select something first.')); } },
         { label: t('Fit Artboard to Artwork'), onClick: () => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); } },
         { label: t('Fit Artboard to Selection'), onClick: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
         { sep: true },
         { label: t('Insert'), sub: [
           { label: t('Star / Polygon…'), onClick: () => setModal('showStar', true) },
           { label: t('Split Into Grid…'), onClick: () => setModal('showSplitGrid', true) },
-          { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => setModal('showRepeat', true) },
+          { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showRepeat', true); } },
         ] },
         // Cut Contour suite — opens the multi-tab dialog covering vector
         // offset, bitmap trace, and registration marks. Lives under
         // Document because cut paths are document-level metadata.
-        { label: t('Cut Contour…'), onClick: () => setModal('showCutContour', true), kbd: 'Ctrl+Shift+C' },
+        { label: t('Cut Contour…'), onClick: () => openWithSelection('showCutContour'), kbd: getBinding('window.cutContour') },
+        { label: t('Add positioning marks'), onClick: () => addPlotterRegistrationMarks(t) },
+        { label: t('Weed border'), onClick: () => addPlotterWeedBorder(t) },
+        { label: t('Bridge presets'), sub: [
+          { label: t('Light'), onClick: () => addPlotterBridges(t, 2, 0.6) },
+          { label: t('Standard'), onClick: () => addPlotterBridges(t, 4, 1) },
+          { label: t('Heavy'), onClick: () => addPlotterBridges(t, 6, 1.5) },
+        ] },
+        { label: t('Banner Grommets…'), onClick: () => openWithSelection('showGrommets') },
+        { label: `${t('Banner Grommets')} — ${t('Small banner')}`, onClick: () => addPlotterGrommets(t, 15, 300, 8) },
+        { label: `${t('Banner Grommets')} — ${t('Standard banner')}`, onClick: () => addPlotterGrommets(t, 20, 500, 10) },
+        { label: `${t('Banner Grommets')} — ${t('Large banner')}`, onClick: () => addPlotterGrommets(t, 25, 750, 12) },
+        { label: t('Clear positioning marks'), onClick: () => clearPlotterRegistrationMarks(t) },
+        { label: t('Clear weed borders'), onClick: () => clearPlotterWeedBorders(t) },
+        { label: t('Clear bridges'), onClick: () => clearPlotterBridges(t) },
+        { label: t('Clear contour'), onClick: () => clearCutKind('outline'), disabled: contourCutCount === 0 },
+        { label: t('Clear trace'), onClick: () => clearCutKind('trace'), disabled: traceCutCount === 0 },
+        { label: t('Clear regmarks'), onClick: () => clearCutKind('regmark'), disabled: regmarkCutCount === 0 },
+        { label: t('Clear cut paths'), onClick: () => clearCutJob(), disabled: cutPathCount === 0 },
+        { sep: true },
+        { label: t('Type'), sub: [
+          { label: t('Create Outlines'), onClick: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); }, kbd: getBinding('text.createOutlines') },
+          { label: t('Break Text into Letters'), onClick: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.splitLetters') },
+          { label: t('Break Text into Lines'), onClick: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); }, kbd: getBinding('text.splitLines') },
+          { sep: true },
+          { label: t('Text on Arc (Up)'), onClick: () => requireTextSelection(() => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); }), kbd: getBinding('text.arcUp') },
+          { label: t('Text on Arc (Down)'), onClick: () => requireTextSelection(() => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); }), kbd: getBinding('text.arcDown') },
+          { sep: true },
+          { label: t('Increase Font Size'), onClick: () => adjustTextMetric(adjustFontSize, 2), kbd: getBinding('text.fontSizeUp') },
+          { label: t('Decrease Font Size'), onClick: () => adjustTextMetric(adjustFontSize, -2), kbd: getBinding('text.fontSizeDown') },
+          { label: t('Increase Tracking'), onClick: () => adjustTextMetric(adjustTracking, 25), kbd: getBinding('text.trackingUp') },
+          { label: t('Decrease Tracking'), onClick: () => adjustTextMetric(adjustTracking, -25), kbd: getBinding('text.trackingDown') },
+          { label: t('Increase Leading'), onClick: () => adjustTextMetric(adjustLeading, 0.05), kbd: getBinding('text.leadingUp') },
+          { label: t('Decrease Leading'), onClick: () => adjustTextMetric(adjustLeading, -0.05), kbd: getBinding('text.leadingDown') },
+          { sep: true },
+          { label: t('Single-line Text…'), onClick: () => setModal('showSingleLineText', true), kbd: getBinding('text.singleLine') },
+          { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true), kbd: getBinding('text.findReplace') },
+          { label: t('Change Case'), sub: [
+            { label: t('UPPERCASE'), onClick: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseUpper') },
+            { label: t('lowercase'), onClick: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseLower') },
+            { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseTitle') },
+            { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseSentence') },
+          ] },
+          { label: t('Smart Punctuation'), onClick: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.smartPunctuation') },
+        ] },
         { sep: true },
         // Path / effect operations grouped into flyouts — all also reachable via
         // the command palette + right-click; submenus keep this menu navigable.
         { label: t('Path'), sub: [
           { label: t('Add Anchor Points'), onClick: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
+          { label: t('Average Anchor Points'), onClick: () => { const n = averageSelectedAnchors('both'); if (n) toast.success(`${n} ${t('anchors averaged')}`); else toast.warn(t('Shift-click two or more path anchors first.')); }, kbd: getBinding('path.averageAnchors') },
           { label: t('Outline Stroke to Fill'), onClick: () => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); } },
-          { label: t('Simplify Path…'), onClick: () => setModal('showSimplify', true) },
-          { label: t('Round Corners…'), onClick: () => setModal('showRoundCorners', true) },
-          { label: t('Offset Path…'), onClick: () => setModal('showOffsetPath', true) },
+          { label: t('Simplify Path…'), onClick: () => openWithSelection('showSimplify') },
+          { label: t('Round Corners…'), onClick: () => openWithSelection('showRoundCorners') },
+          { label: t('Offset Path…'), onClick: () => openWithSelection('showOffsetPath') },
           { label: t('Reverse Path Direction'), onClick: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
+          { label: t('Add Arrowhead (Start)'), onClick: () => { const n = addArrowheads('start'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
           { label: t('Add Arrowhead (End)'), onClick: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
           { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
           { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
           { label: t('Rasterize'), onClick: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
         ] },
         { label: t('Distort & Transform'), sub: [
-          { label: t('Roughen…'), onClick: () => setModal('showRoughen', true) },
-          { label: t('Zig Zag…'), onClick: () => setModal('showZigzag', true) },
-          { label: t('Pucker & Bloat…'), onClick: () => setModal('showPucker', true) },
-          { label: t('Twist…'), onClick: () => setModal('showTwist', true) },
-          { label: t('Arc Warp…'), onClick: () => setModal('showWarp', true) },
-          { label: t('Blend…'), onClick: () => setModal('showBlend', true) },
+          { label: t('Roughen…'), onClick: () => openWithSelection('showRoughen') },
+          { label: t('Zig Zag…'), onClick: () => openWithSelection('showZigzag') },
+          { label: t('Pucker & Bloat…'), onClick: () => openWithSelection('showPucker') },
+          { label: t('Twist…'), onClick: () => openWithSelection('showTwist') },
+          { label: t('Free Distort…'), onClick: () => openWithSelection('showFreeDistort') },
+          { label: t('Arc Warp…'), onClick: () => openWithSelection('showWarp') },
+          { label: t('Blend…'), onClick: () => openWithSelection('showBlend', t('Select 2 or more objects first.'), 2) },
         ] },
+        { label: t('Align & Distribute'), sub: [
+          { label: t('Align left'), onClick: () => runAlign(() => alignSelection('left'), 2), kbd: getBinding('align.left') },
+          { label: t('Align center horizontally'), onClick: () => runAlign(() => alignSelection('centerH'), 2), kbd: getBinding('align.centerH') },
+          { label: t('Align right'), onClick: () => runAlign(() => alignSelection('right'), 2), kbd: getBinding('align.right') },
+          { sep: true },
+          { label: t('Align top'), onClick: () => runAlign(() => alignSelection('top'), 2), kbd: getBinding('align.top') },
+          { label: t('Align center vertically'), onClick: () => runAlign(() => alignSelection('centerV'), 2), kbd: getBinding('align.centerV') },
+          { label: t('Align bottom'), onClick: () => runAlign(() => alignSelection('bottom'), 2), kbd: getBinding('align.bottom') },
+          { sep: true },
+          { label: t('Distribute horizontally (equal spacing)'), onClick: () => runAlign(() => distributeSelection('horizontal'), 3), kbd: getBinding('distribute.horizontal') },
+          { label: t('Distribute vertically (equal spacing)'), onClick: () => runAlign(() => distributeSelection('vertical'), 3), kbd: getBinding('distribute.vertical') },
+          { label: t('Distribute horizontally in Artboard'), onClick: () => runArtboardAlign(() => distributeInArtboard('horizontal')) },
+          { label: t('Distribute vertically in Artboard'), onClick: () => runArtboardAlign(() => distributeInArtboard('vertical')) },
+          { label: t('Center on Artboard'), onClick: () => runArtboardAlign(() => centerOnArtboard()) },
+        ] },
+        { sep: true },
+        { label: t('Appearance'), sub: [
+          { label: t('Fill / Stroke'), sub: [
+            { label: t('Swap Fill / Stroke'), onClick: () => { if (!swapFillStroke()) toast.warn(t('Select an object first.')); }, kbd: getBinding('edit.swapFillStroke') },
+            { label: t('Default Fill / Stroke'), onClick: () => defaultColors(), kbd: getBinding('edit.defaultColors') },
+            { sep: true },
+            { label: t('No Fill'), onClick: () => openWithSelectionAction(() => applyStyleToSelection({ fill: '' })), kbd: getBinding('appearance.noFill') },
+            { label: t('No Stroke'), onClick: () => openWithSelectionAction(() => applyStyleToSelection({ stroke: '', strokeWidth: 0 })), kbd: getBinding('appearance.noStroke') },
+          ] },
+          { label: t('Stroke alignment'), sub: [
+            { label: t('Center'), onClick: () => openWithSelectionAction(() => applyStrokeAlign('center')) },
+            { label: t('Inside'), onClick: () => openWithSelectionAction(() => applyStrokeAlign('inside')) },
+            { label: t('Outside'), onClick: () => openWithSelectionAction(() => applyStrokeAlign('outside')) },
+            { sep: true },
+            { label: t('Constant Stroke Width'), onClick: () => { const state = toggleUniformStroke(); if (state === null) toast.warn(t('Select an object first.')); else toast.success(state ? t('Stroke width is now constant') : t('Stroke width now scales')); } },
+          ] },
+          { label: t('Stroke width'), sub: [
+            { label: '0 px', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ strokeWidth: 0 })) },
+            { label: '0.5 px', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ strokeWidth: 0.5 })) },
+            { label: '1 px', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ strokeWidth: 1 })) },
+            { label: '2 px', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ strokeWidth: 2 })) },
+            { label: '4 px', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ strokeWidth: 4 })) },
+            { label: '8 px', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ strokeWidth: 8 })) },
+          ] },
+          { label: t('Stroke style'), sub: [
+            { label: `${t('Dash')} — ${t('Solid')}`, onClick: () => openWithSelectionAction(() => applyStrokeStyleToSelection({ strokeDashArray: [] })) },
+            { label: `${t('Dash')} — ${t('Dashed')}`, onClick: () => openWithSelectionAction(() => applyStrokeStyleToSelection({ strokeDashArray: [10, 5] })) },
+            { label: `${t('Dash')} — ${t('Dotted')}`, onClick: () => openWithSelectionAction(() => applyStrokeStyleToSelection({ strokeDashArray: [2, 6] })) },
+            { label: `${t('Line cap')} — ${t('Round')}`, onClick: () => openWithSelectionAction(() => applyStrokeStyleToSelection({ strokeLineCap: 'round' })) },
+            { label: `${t('Line join')} — ${t('Round')}`, onClick: () => openWithSelectionAction(() => applyStrokeStyleToSelection({ strokeLineJoin: 'round' })) },
+          ] },
+          { label: t('Blend mode'), sub: [
+            { label: t('Normal'), onClick: () => openWithSelectionAction(() => applyBlendModeToSelection('source-over')) },
+            { label: t('Multiply'), onClick: () => openWithSelectionAction(() => applyBlendModeToSelection('multiply')) },
+            { label: t('Screen'), onClick: () => openWithSelectionAction(() => applyBlendModeToSelection('screen')) },
+            { label: t('Overlay'), onClick: () => openWithSelectionAction(() => applyBlendModeToSelection('overlay')) },
+            { label: t('Difference'), onClick: () => openWithSelectionAction(() => applyBlendModeToSelection('difference')) },
+          ] },
+          { label: t('Opacity'), sub: [
+            { label: '100%', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ opacity: 1 })) },
+            { label: '75%', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ opacity: 0.75 })) },
+            { label: '50%', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ opacity: 0.5 })) },
+            { label: '25%', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ opacity: 0.25 })) },
+          ] },
+          { label: t('Pattern Fill'), sub: [
+            { label: t('Checker'), onClick: () => openWithSelectionAction(() => applyPatternFill('checker', 16, '#ffffff', '#111827')) },
+            { label: t('Stripes'), onClick: () => openWithSelectionAction(() => applyPatternFill('stripes', 16, '#ffffff', '#111827')) },
+            { label: t('Dots'), onClick: () => openWithSelectionAction(() => applyPatternFill('dots', 16, '#ffffff', '#111827')) },
+            { label: t('Crosshatch'), onClick: () => openWithSelectionAction(() => applyPatternFill('crosshatch', 16, '#ffffff', '#111827')) },
+          ] },
+          { label: t('Drop shadow'), sub: [
+            { label: t('Soft Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.35)', blur: 12, offsetX: 4, offsetY: 6 })) },
+            { label: t('Hard Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.45)', blur: 0, offsetX: 5, offsetY: 5 })) },
+            { label: t('Glow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 })) },
+            { sep: true },
+            { label: t('Clear Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection(null)) },
+          ] },
+        ] },
+        { sep: true },
         { label: t('Edit Colors'), sub: [
-          { label: t('Recolor Artwork…'), onClick: () => setModal('showRecolor', true) },
+          { label: t('Recolor Artwork…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showRecolor', true); } },
+          { label: t('Freeform Gradient…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showFreeformGradient', true); } },
           { label: t('Invert Colors'), onClick: () => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
           { label: t('Convert to Grayscale'), onClick: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-          { label: t('Saturate…'), onClick: () => setModal('showSaturate', true) },
-          { label: t('Adjust Hue…'), onClick: () => setModal('showHue', true) },
-          { label: t('Adjust Brightness…'), onClick: () => setModal('showBrightness', true) },
+          { label: t('Saturate…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showSaturate', true); } },
+          { label: t('Adjust Hue…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showHue', true); } },
+          { label: t('Adjust Brightness…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showBrightness', true); } },
         ] },
+        { label: t('Image'), sub: [
+          { label: t('Trace Image'), onClick: () => { void traceSelectedImage().then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }); } },
+          { label: t('Rasterize'), onClick: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
+          { sep: true },
+          { label: t('Image Filters'), sub: [
+            { label: t('Blur'), onClick: () => applyBlur(0.08) },
+            { label: t('Sepia'), onClick: () => applySepia() },
+            { label: t('Grayscale'), onClick: () => applyImageGrayscale() },
+            { label: t('Brightness +'), onClick: () => applyImageBrightness(0.12) },
+            { label: t('Brightness -'), onClick: () => applyImageBrightness(-0.12) },
+            { label: t('Contrast +'), onClick: () => applyContrast(0.18) },
+            { label: t('Hue rotate'), onClick: () => applyHueRotate(30) },
+            { label: t('Clear Image Filters'), onClick: () => clearFilters() },
+          ] },
+        ] },
+        { sep: true },
         { label: t('Sign Effects'), sub: [
-          { label: t('Multi-outline…'), onClick: () => setModal('showOutline', true) },
-          { label: t('Rhinestone Template…'), onClick: () => setModal('showRhinestone', true) },
-          { label: t('Banner Grommets…'), onClick: () => setModal('showGrommets', true) },
-          { label: t('Variable Data…'), onClick: () => setModal('showVariableData', true) },
-          { label: t('Auto-arrange (Nest)'), onClick: () => {
-            const n = autoArrangeSelection();
-            if (n > 0) toast.success(`${n} ${t('objects arranged')}`, { title: t('Auto-arrange (Nest)') });
-            else toast.warn(t('Select 2 or more objects first.'), { title: t('Auto-arrange (Nest)') });
-          } },
+          { label: t('Multi-outline…'), onClick: () => openWithSelection('showOutline') },
+          { label: t('Rhinestone Template…'), onClick: () => openWithSelection('showRhinestone') },
+          { label: t('Rhinestone presets'), sub: [
+            { label: t('Fine stones'), onClick: () => addPlotterRhinestones(t, 2, 3) },
+            { label: t('Standard stones'), onClick: () => addPlotterRhinestones(t, 2.8, 4) },
+            { label: t('Bold stones'), onClick: () => addPlotterRhinestones(t, 4.7, 6) },
+            { label: t('Custom…'), onClick: () => openWithSelection('showRhinestone') },
+          ] },
+          { label: t('Banner Grommets…'), onClick: () => openWithSelection('showGrommets') },
+          { label: t('Variable Data…'), onClick: () => openWithSelection('showVariableData'), kbd: getBinding('text.variableData') },
+          { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
         ] },
       ]} />
 
       <Dropdown label={t('Help')} items={[
-        { label: t('Help Center…'), onClick: () => setModal('showHelpCenter', true), kbd: 'F1' },
-        { label: t('Command Palette…'), onClick: () => setModal('showCommandPalette', true), kbd: 'Ctrl+K' },
-        { label: t('Preferences…'), onClick: () => setModal('showPreferences', true), kbd: 'Ctrl+,' },
+        { label: t('Help Center…'), onClick: () => setModal('showHelpCenter', true), kbd: getBinding('help.helpCenter') },
+        { label: t('Command Palette…'), onClick: () => setModal('showCommandPalette', true), kbd: getBinding('window.commandPalette') },
+        { label: t('Preferences…'), onClick: () => setModal('showPreferences', true), kbd: getBinding('window.preferences') },
         { label: t('Onboarding…'), onClick: () => { resetOnboarding(); onShowOnboarding(); } },
-        { label: t('Keyboard Shortcuts'), onClick: () => setModal('showShortcuts', true), kbd: '?' },
+        { label: t('Keyboard Shortcuts'), onClick: () => setModal('showShortcuts', true), kbd: getBinding('help.shortcuts') },
         { label: t('Customize Shortcuts…'), onClick: () => setModal('showKeymapEditor', true) },
         { sep: true },
         // Manual updater check — auto-runs once on boot, but this entry lets
@@ -353,27 +662,42 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Check for Updates…'), onClick: () => {
           void import('../lib/updater').then(m => m.checkAndPrompt({ announceNoUpdate: true }));
         } },
-        { label: t('Light Theme'), onClick: () => setTheme(theme === 'light' ? 'dark' : 'light'), kbd: 'Ctrl+Shift+L', checked: theme === 'light' },
-        { label: t('High Contrast'), onClick: () => setHighContrast(!highContrast), checked: highContrast },
+        { label: theme === 'light' ? t('Dark Theme') : t('Light Theme'), onClick: () => setTheme(theme === 'light' ? 'dark' : 'light'), kbd: getBinding('view.toggleTheme') },
+        { label: highContrast ? t('Disable High Contrast') : t('High Contrast'), onClick: () => setHighContrast(!highContrast) },
         { sep: true },
         // Debug panel moved off the top chrome — it's a developer affordance,
         // not something end users should see as primary. Still reachable
         // via Ctrl+Shift+D (dev-tool convention) or this menu entry.
-        { label: t('Debug Panel'), onClick: onToggleDebug, kbd: 'Ctrl+Shift+D' },
+        { label: t('Debug Panel'), onClick: onToggleDebug, kbd: getBinding('help.debugPanel') },
         { label: t('About'), onClick: () => setShowAbout(true) },
       ]} />
       </div>
 
       <span className="topbar-sep" aria-hidden="true" />
-      <IconBtn title={`${t('Undo')} (Ctrl+Z)`} aria-label={t('Undo')} aria-keyshortcuts={ariaKeyshortcuts('Ctrl+Z')} onClick={() => undo()} disabled={!canUndo}><Undo2 size={14} aria-hidden="true" /></IconBtn>
-      <IconBtn title={`${t('Redo')} (Ctrl+Y)`} aria-label={t('Redo')} aria-keyshortcuts={ariaKeyshortcuts('Ctrl+Y')} onClick={() => redo()} disabled={!canRedo}><Redo2 size={14} aria-hidden="true" /></IconBtn>
+      <div
+        className="flex items-center gap-1"
+        role="toolbar"
+        aria-label={t('History actions')}
+        title={t('Use arrow keys to review top bar actions')}
+        onKeyDown={handleTopbarActionKeys}
+      >
+        <IconBtn data-topbar-action title={`${t('Undo')} (${getBinding('edit.undo')})`} aria-label={t('Undo')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('edit.undo'))} onClick={() => undo()} disabled={!canUndo}><Undo2 size={14} aria-hidden="true" /></IconBtn>
+        <IconBtn data-topbar-action title={`${t('Redo')} (${getBinding('edit.redo')} / ${getBinding('edit.redoShift')})`} aria-label={t('Redo')} aria-keyshortcuts={ariaKeyshortcuts(`${getBinding('edit.redo')} ${getBinding('edit.redoShift')}`)} onClick={() => redo()} disabled={!canRedo}><Redo2 size={14} aria-hidden="true" /></IconBtn>
+      </div>
 
       <span className="topbar-sep" aria-hidden="true" />
       {/* Grid / Snap / Guides — single segmented control. Each pip is independently
           toggleable; the group reads as one cluster. */}
-      <div className="segmented" role="group" aria-label={t('Canvas helpers')}>
+      <div
+        className="segmented"
+        role="toolbar"
+        aria-label={t('Canvas helper actions')}
+        title={t('Use arrow keys to review top bar actions')}
+        onKeyDown={handleTopbarActionKeys}
+      >
         <button
           type="button"
+          data-topbar-action
           title={t('Grid')}
           aria-label={t('Grid')}
           aria-pressed={gridVisible}
@@ -384,6 +708,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         </button>
         <button
           type="button"
+          data-topbar-action
           title={t('Snap to Grid')}
           aria-label={t('Snap to Grid')}
           aria-pressed={snapEnabled}
@@ -394,6 +719,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         </button>
         <button
           type="button"
+          data-topbar-action
           title={t('Smart Guides')}
           aria-label={t('Smart Guides')}
           aria-pressed={smartGuidesEnabled}
@@ -404,6 +730,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         </button>
         <button
           type="button"
+          data-topbar-action
           title={t('Snap to anchor points')}
           aria-label={t('Snap to anchor points')}
           aria-pressed={anchorSnapEnabled}
@@ -421,22 +748,66 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         <ZoomChip zoom={zoom} t={t} />
         <span className="topbar-sep" aria-hidden="true" />
         {/* Secondary — output actions. */}
-        <button type="button" className="btn flex items-center gap-1" title={t('Send to Plotter…')} aria-label={t('Send to Plotter…')} onClick={() => setModal('showPlotter', true)}>
-          <Send size={12} aria-hidden="true" />{t('Plotter')}
-        </button>
-        <button type="button" className="btn flex items-center gap-1" title={`${t('Print…')} (Ctrl+P)`} aria-label={t('Print…')} aria-keyshortcuts={ariaKeyshortcuts('Ctrl+P')} onClick={() => setModal('showPrint', true)}>
-          <Printer size={12} aria-hidden="true" />{t('Print')}
-        </button>
-        <button type="button" className="btn flex items-center gap-1" title={`${t('Export SVG')} (Ctrl+S)`} aria-label={t('Export SVG')} aria-keyshortcuts={ariaKeyshortcuts('Ctrl+S')} onClick={() => { void getFormat('svg')?.export?.(); }}>
-          <FileImage size={12} aria-hidden="true" />{t('Export')}
-        </button>
-        <button type="button" className="btn flex items-center justify-center w-7 h-7 p-0" title={t('Document Settings…')} aria-label={t('Document Settings…')} onClick={() => setModal('showDocSettings', true)}>
-          <Settings2 size={12} aria-hidden="true" />
-        </button>
-        {/* Primary — AI. */}
-        <button type="button" className="btn-primary flex items-center gap-1" title={t('AI Assistant')} aria-label={t('AI Assistant')} onClick={onToggleAI}>
-          <Sparkles size={12} aria-hidden="true" />{t('AI')}
-        </button>
+        <div
+          className="output-actions-toolbar flex items-center gap-2"
+          role="toolbar"
+          aria-label={t('Output actions')}
+          title={t('Use arrow keys to review top bar actions')}
+          onKeyDown={handleTopbarActionKeys}
+        >
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Send to Plotter…')} (${getBinding('window.plotter')})`} aria-label={t('Send to Plotter…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('window.plotter'))} onClick={() => setModal('showPlotter', true)}>
+            <Send size={12} aria-hidden="true" />{t('Plotter')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Cut Contour…')} (${getBinding('window.cutContour')})`} aria-label={t('Cut Contour…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('window.cutContour'))} onClick={() => openWithSelection('showCutContour')}>
+            <Target size={12} aria-hidden="true" />{t('Contour')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Add positioning marks')} aria-label={t('Add positioning marks')} onClick={() => addPlotterRegistrationMarks(t)}>
+            <Target size={12} aria-hidden="true" />{t('Reg')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Weed border')} aria-label={t('Weed border')} onClick={() => addPlotterWeedBorder(t)}>
+            <Grid3X3 size={12} aria-hidden="true" />{t('Weed')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Bridges')} — ${t('Standard')}`} aria-label={`${t('Bridges')} — ${t('Standard')}`} onClick={() => { addPlotterBridges(t, 4, 1); }}>
+            <Grid3X3 size={12} aria-hidden="true" />{t('Bridge')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Clear bridges')} aria-label={t('Clear bridges')} onClick={() => { clearPlotterBridges(t); }}>
+            <Grid3X3 size={12} aria-hidden="true" />{t('Clear')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Banner Grommets…')} aria-label={t('Banner Grommets…')} onClick={() => openWithSelection('showGrommets')}>
+            <Target size={12} aria-hidden="true" />{t('Grommet')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Rhinestone Template…')} aria-label={t('Rhinestone Template…')} onClick={() => openWithSelection('showRhinestone')}>
+            <Sparkles size={12} aria-hidden="true" />{t('Stone')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Variable Data…')} (${getBinding('text.variableData')})`} aria-label={t('Variable Data…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('text.variableData'))} onClick={() => openWithSelection('showVariableData')}>
+            <Hash size={12} aria-hidden="true" />{t('Data')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Save Test Cut File')} aria-label={t('Save Test Cut File')} onClick={() => savePlotterTestCut(t)}>
+            <Send size={12} aria-hidden="true" />{t('Test')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Auto-arrange (Nest)')} aria-label={t('Auto-arrange (Nest)')} onClick={runAutoNest}>
+            <Grid3X3 size={12} aria-hidden="true" />{t('Nest')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Print…')} (${getBinding('file.print')})`} aria-label={t('Print…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.print'))} onClick={() => setModal('showPrint', true)}>
+            <Printer size={12} aria-hidden="true" />{t('Print')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Print Prep…')} aria-label={t('Print Prep…')} onClick={openPrintPrep}>
+            <Printer size={12} aria-hidden="true" />{t('Prep')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Tile Print…')} (${getBinding('file.tilePrint')})`} aria-label={t('Tile Print…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.tilePrint'))} onClick={() => setModal('showTilePrint', true)}>
+            <Sheet size={12} aria-hidden="true" />{t('Tile')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Export SVG')} (${getBinding('file.exportSvg')})`} aria-label={t('Export SVG')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.exportSvg'))} onClick={() => { void getFormat('svg')?.export?.(); }}>
+            <FileImage size={12} aria-hidden="true" />{t('Export')}
+          </button>
+          <button type="button" data-topbar-action className="btn flex items-center justify-center w-7 h-7 p-0" title={t('Document Settings…')} aria-label={t('Document Settings…')} onClick={() => setModal('showDocSettings', true)}>
+            <Settings2 size={12} aria-hidden="true" />
+          </button>
+          {/* Primary — AI. */}
+          <button type="button" data-topbar-action className="btn-primary flex items-center gap-1" title={t('AI Assistant')} aria-label={t('AI Assistant')} onClick={onToggleAI}>
+            <Sparkles size={12} aria-hidden="true" />{t('AI')}
+          </button>
+        </div>
         <LanguageSwitcher />
       </div>
 
@@ -502,6 +873,21 @@ function LanguageSwitcher() {
   // state so SR knows the menu's actual visibility (CSS hover / focus-within
   // doesn't propagate to the a11y tree on its own).
   const [open, setOpen] = useState(false);
+  const handleLanguageMenuKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-language-action]'));
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowDown' || event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
+  };
   return (
     <div
       className="relative group"
@@ -519,6 +905,13 @@ function LanguageSwitcher() {
         aria-label={t('Language')}
         aria-haspopup="menu"
         aria-expanded={open}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+          event.preventDefault();
+          setOpen(true);
+          const buttons = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[data-language-action]') ?? []);
+          buttons[event.key === 'ArrowUp' ? buttons.length - 1 : 0]?.focus();
+        }}
       >
         <Globe size={11} aria-hidden="true" />
         <span>{labelFor(lang)}</span>
@@ -527,11 +920,14 @@ function LanguageSwitcher() {
         className="absolute right-0 top-full mt-1 bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all z-50 w-28 py-1"
         role="menu"
         aria-label={t('Language')}
+        title={t('Use arrow keys to review languages')}
+        onKeyDown={handleLanguageMenuKeys}
       >
         {LANGUAGES.map((l) => (
           <button
             key={l}
             onClick={() => setLang(l)}
+            data-language-action
             role="menuitemradio"
             aria-checked={l === lang}
             aria-label={labelFor(l)}
@@ -752,9 +1148,9 @@ function SaveIndicator() {
       // label both surface the *status* ("Saved 3m ago" / "Unsaved changes")
       // — splitting these gives the tooltip a job beyond echoing what the
       // sighted user can already read on the chip.
-      title={`${t('Save now')} (Ctrl+Shift+S)`}
+      title={`${t('Save now')} (${getBinding('file.saveProject')})`}
       aria-label={label}
-      aria-keyshortcuts={ariaKeyshortcuts('Ctrl+Shift+S')}
+      aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.saveProject'))}
     >
       <span className={`inline-block w-1.5 h-1.5 rounded-full transition-colors ${dotClass}`} aria-hidden="true" />
       <span className="type-caption">{label}</span>
@@ -891,20 +1287,26 @@ function MenuRow({ it }: { it: MenuItem }) {
  */
 function Kbd({ combo }: { combo: string }) {
   const isMacPlatform = isMac();
-  const parts = combo.split('+').map(p => {
-    const k = p.trim();
+  const renderKey = (key: string) => {
+    const k = key.trim();
     if (isMacPlatform && /^Ctrl$/i.test(k)) return '⌘';
     if (isMacPlatform && /^Alt$/i.test(k)) return '⌥';
     if (isMacPlatform && /^Shift$/i.test(k)) return '⇧';
     if (isMacPlatform && /^Meta$/i.test(k)) return '⌘';
     return k;
-  });
+  };
+  const combos = combo.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
   return (
-    <span className="flex items-center gap-0.5" aria-hidden="true">
-      {parts.map((p, i) => (
-        <kbd key={i} className="kbd-menu">
-          {p}
-        </kbd>
+    <span className="flex items-center gap-1" aria-hidden="true">
+      {combos.map((part, comboIndex) => (
+        <span key={`${part}-${comboIndex}`} className="flex items-center gap-0.5">
+          {comboIndex > 0 && <span className="mx-0.5 text-muted">/</span>}
+          {part.split('+').map((p, keyIndex) => (
+            <kbd key={`${part}-${keyIndex}`} className="kbd-menu">
+              {renderKey(p)}
+            </kbd>
+          ))}
+        </span>
       ))}
     </span>
   );

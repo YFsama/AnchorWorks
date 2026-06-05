@@ -130,7 +130,7 @@ export function zoomToArtboard(bbox: { x: number; y: number; width: number; heig
   emitViewport();
 }
 
-/** Frame the active selection in the viewport (Illustrator Ctrl+2). Returns
+/** Frame the active selection in the viewport (selection-view shortcut). Returns
  *  true if it zoomed to a selection, false if it fell back to Fit (nothing
  *  selected) — callers use the result to pick the right announcement. */
 export function zoomToSelection(): boolean {

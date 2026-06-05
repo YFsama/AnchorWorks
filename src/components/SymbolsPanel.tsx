@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, Check, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { ChevronDown, ChevronRight, Plus, Trash2, Check, X, Search } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import {
   getSymbols,
@@ -15,10 +15,14 @@ export function SymbolsPanel() {
   const t = useT();
   const [open, setOpen] = useState(true);
   const [symbols, setSymbols] = useState<SymbolEntry[]>([]);
+  const [query, setQuery] = useState('');
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewedSymbolAction, setReviewedSymbolAction] = useState('');
   // When non-null we're showing the inline "name this symbol" input in place
   // of the Save Selection button.
   const [namingNew, setNamingNew] = useState<string | null>(null);
   const newNameRef = useRef<HTMLInputElement>(null);
+  const firstSymbolRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const refresh = () => setSymbols(getSymbols());
@@ -47,6 +51,54 @@ export function SymbolsPanel() {
     if (!entry) {
       toast.warn(t('Select one or more objects on the canvas first.'));
     }
+  };
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredSymbols = useMemo(() => {
+    if (!normalizedQuery) return symbols;
+    return symbols.filter((symbol) => [
+      symbol.name,
+      symbol.id,
+    ].some((value) => value.toLowerCase().includes(normalizedQuery)));
+  }, [normalizedQuery, symbols]);
+
+  const currentReviewIndex = Math.min(reviewIndex, Math.max(0, filteredSymbols.length - 1));
+
+  const focusSymbolTile = (index: number) => {
+    setReviewIndex(index);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLButtonElement>(`[data-symbol-index="${index}"]`)?.focus();
+    });
+  };
+
+  const handleSymbolGridKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const activeIndex = Number((document.activeElement as HTMLElement | null)?.dataset.symbolIndex ?? 0);
+    const lastIndex = filteredSymbols.length - 1;
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? lastIndex
+        : Math.max(0, Math.min(lastIndex, activeIndex + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' ? 3 : -3)));
+    focusSymbolTile(nextIndex);
+  };
+
+  const handleNamingActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-symbol-naming-action]'));
+    if (buttons.length === 0) return;
+    event.preventDefault();
+    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    const nextButton = buttons[nextIndex];
+    setReviewedSymbolAction(nextButton?.dataset.symbolNamingActionReview ?? nextButton?.getAttribute('aria-label') ?? nextButton?.textContent?.trim() ?? '');
+    nextButton?.focus();
   };
 
   return (
@@ -78,7 +130,17 @@ export function SymbolsPanel() {
               <Plus size={12} aria-hidden="true" /> {t('Save Selection as Symbol')}
             </button>
           ) : (
-            <div className="flex items-center gap-1">
+            <div
+              className="flex items-center gap-1"
+              role="toolbar"
+              aria-label={t('Symbol naming actions')}
+              aria-describedby="symbol-action-review-status"
+              title={t('Use arrow keys to review symbol actions')}
+              onKeyDown={handleNamingActionKeys}
+            >
+              <span id="symbol-action-review-status" className="sr-only" aria-live="polite">
+                {`${t('Reviewing')} ${reviewedSymbolAction || t('Symbol naming actions')}`}
+              </span>
               <input
                 ref={newNameRef}
                 type="text"
@@ -95,8 +157,11 @@ export function SymbolsPanel() {
               />
               <button
                 type="button"
+                data-symbol-naming-action
+                data-symbol-naming-action-review={t('Save symbol')}
                 className="btn p-1"
                 onClick={() => { void commitSave(); }}
+                onFocus={() => setReviewedSymbolAction(t('Save symbol'))}
                 aria-label={t('Save symbol')}
                 title={t('Save (Enter)')}
               >
@@ -104,14 +169,28 @@ export function SymbolsPanel() {
               </button>
               <button
                 type="button"
+                data-symbol-naming-action
+                data-symbol-naming-action-review={t('Cancel')}
                 className="btn p-1"
                 onClick={cancelSave}
+                onFocus={() => setReviewedSymbolAction(t('Cancel'))}
                 aria-label={t('Cancel')}
                 title={t('Cancel (Esc)')}
               >
                 <X size={12} aria-hidden="true" />
               </button>
-            </div>
+              </div>
+          )}
+
+          {symbols.length > 0 && (
+            <LibrarySearch
+              query={query}
+              setQuery={(value) => { setReviewIndex(0); setQuery(value); }}
+              placeholder={t('Search symbols…')}
+              countLabel={normalizedQuery ? `${filteredSymbols.length} / ${symbols.length} ${t('matches')}` : `${symbols.length} ${t('symbols')}`}
+              onInsertFirst={filteredSymbols.length > 0 ? () => { void insertSymbol(filteredSymbols[0].id); } : undefined}
+              onFocusFirst={filteredSymbols.length > 0 ? () => { setReviewIndex(0); firstSymbolRef.current?.focus(); } : undefined}
+            />
           )}
 
           {symbols.length === 0 ? (
@@ -130,12 +209,49 @@ export function SymbolsPanel() {
                 {t('Select shape(s) and use "Save Selection" above to make them reusable.')}
               </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-1.5">
-              {symbols.map((s) => (
-                <SymbolTile key={s.id} symbol={s} />
-              ))}
+          ) : filteredSymbols.length === 0 ? (
+            <div className="flex flex-col items-center text-center px-2 py-3">
+              <div className="text-xs text-ink/90 mb-1">{t('No symbols found.')}</div>
+              <div className="type-caption leading-relaxed max-w-[200px]">
+                {t('Try a symbol name or id.')}
+              </div>
+              {query && (
+                <button
+                  type="button"
+                  className="btn !py-1 !px-2 text-[10px] mt-2"
+                  onClick={() => { setQuery(''); setReviewIndex(0); }}
+                >
+                  {t('Clear search')}
+                </button>
+              )}
             </div>
+          ) : (
+            <>
+              <div id="symbol-grid-review-status" className="sr-only" aria-live="polite">
+                {filteredSymbols[currentReviewIndex]
+                  ? `${t('Reviewing')} ${filteredSymbols[currentReviewIndex].name} ${currentReviewIndex + 1} / ${filteredSymbols.length}. ${t('Press Enter to insert')}`
+                  : t('No symbols found.')}
+              </div>
+              <div
+                className="grid grid-cols-3 gap-1.5"
+                role="grid"
+                aria-label={t('Symbol library results')}
+                title={t('Use arrow keys to review library items')}
+                onKeyDown={handleSymbolGridKeys}
+                aria-describedby="symbol-grid-review-status"
+              >
+                {filteredSymbols.map((s, index) => (
+                  <SymbolTile
+                    key={s.id}
+                    symbol={s}
+                    index={index}
+                    selected={index === currentReviewIndex}
+                    onReview={() => setReviewIndex(index)}
+                    buttonRef={index === 0 ? firstSymbolRef : undefined}
+                  />
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -143,7 +259,114 @@ export function SymbolsPanel() {
   );
 }
 
-function SymbolTile({ symbol }: { symbol: SymbolEntry }) {
+
+function LibrarySearch({
+  query,
+  setQuery,
+  placeholder,
+  countLabel,
+  onInsertFirst,
+  onFocusFirst,
+}: {
+  query: string;
+  setQuery: (value: string) => void;
+  placeholder: string;
+  countLabel: string;
+  onInsertFirst?: () => void;
+  onFocusFirst?: () => void;
+}) {
+  const t = useT();
+  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
+  const handleActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-library-search-action]')).filter((button) => !button.disabled);
+    if (buttons.length === 0) return;
+    event.preventDefault();
+    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    const nextButton = buttons[nextIndex];
+    setReviewedSearchAction(nextButton?.dataset.librarySearchActionReview ?? nextButton?.textContent?.trim() ?? '');
+    nextButton?.focus();
+  };
+  return (
+    <div className="flex items-center gap-1.5 mb-2">
+      <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
+      <input
+        type="search"
+        className="input !py-1 !px-2 text-xs min-w-0 flex-1"
+        placeholder={placeholder}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' && onFocusFirst) {
+            event.preventDefault();
+            onFocusFirst();
+          } else if (event.key === 'Escape' && query) {
+            event.preventDefault();
+            event.stopPropagation();
+            setQuery('');
+          } else if (event.key === 'Enter' && !event.nativeEvent.isComposing && query && onInsertFirst) {
+            event.preventDefault();
+            onInsertFirst();
+          }
+        }}
+        aria-label={placeholder}
+        title={`${t('Press Enter to insert first search result')} · ${t('Press Arrow Down to focus first library item')}`}
+      />
+      <span className="text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">
+        {countLabel}
+      </span>
+      {query && (
+        <div
+          className="contents"
+          role="toolbar"
+          aria-label={t('Library search actions')}
+          aria-describedby="symbol-library-search-action-review-status"
+          title={t('Use arrow keys to review library actions')}
+          onKeyDown={handleActionKeys}
+        >
+          <span id="symbol-library-search-action-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedSearchAction || t('Library search actions')}`}
+          </span>
+          <button
+            type="button"
+            data-library-search-action
+            data-library-search-action-review={t('Insert first search result')}
+            className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+            onClick={onInsertFirst}
+            onFocus={() => setReviewedSearchAction(t('Insert first search result'))}
+            disabled={!onInsertFirst}
+            title={t('Insert first search result')}
+          >
+            {t('Insert First')}
+          </button>
+          <button type="button" data-library-search-action data-library-search-action-review={t('Clear search')} className="btn !py-1 !px-1.5 !text-[10px] shrink-0" onFocus={() => setReviewedSearchAction(t('Clear search'))} onClick={() => setQuery('')} title={t('Clear search')}>
+            {t('Clear search')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SymbolTile({
+  symbol,
+  index,
+  selected,
+  onReview,
+  buttonRef,
+}: {
+  symbol: SymbolEntry;
+  index: number;
+  selected: boolean;
+  onReview: () => void;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}) {
   const t = useT();
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(symbol.name);
@@ -175,18 +398,43 @@ function SymbolTile({ symbol }: { symbol: SymbolEntry }) {
   };
   const cancel = () => { setDraft(symbol.name); setRenaming(false); };
 
-  const beginRename = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const beginRename = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setRenaming(true);
+  };
+  const removeThisSymbol = () => {
+    deleteSymbol(symbol.id);
+    toast.success(t('Symbol removed from library'));
+  };
+  const handleTileKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (renaming) return;
+    if (event.key === 'F2') {
+      event.preventDefault();
+      beginRename();
+      return;
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      removeThisSymbol();
+    }
   };
 
   return (
-    <div className="relative group rounded border border-border bg-panel2 hover:border-accent2 transition-colors overflow-hidden">
+    <div
+      className={`relative group rounded border bg-panel2 hover:border-accent2 focus-within:border-accent2 transition-colors overflow-hidden ${selected ? 'border-accent2 ring-1 ring-accent2/40' : 'border-border'}`}
+      onKeyDown={handleTileKeyDown}
+      aria-keyshortcuts="F2 Delete Backspace"
+    >
       <button
+        ref={buttonRef}
         type="button"
+        role="gridcell"
+        data-symbol-index={index}
+        aria-selected={selected}
         className="block w-full aspect-square p-1"
-        title={`${symbol.name} — ${t('click to insert, double-click to rename')}`}
+        title={`${symbol.name} — ${t('click to insert, double-click to rename')} · ${t('F2 rename · Delete remove')}`}
         aria-label={symbol.name}
+        onFocus={onReview}
         onClick={() => {
           if (renaming) return;
           void insertSymbol(symbol.id);
@@ -236,7 +484,7 @@ function SymbolTile({ symbol }: { symbol: SymbolEntry }) {
         <button
           type="button"
           className="absolute top-0.5 right-0.5 p-0.5 rounded bg-panel/80 text-muted hover:text-danger opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-          onClick={(e) => { e.stopPropagation(); deleteSymbol(symbol.id); }}
+          onClick={(e) => { e.stopPropagation(); removeThisSymbol(); }}
           title={t('Delete symbol')}
           aria-label={t('Delete symbol')}
         >

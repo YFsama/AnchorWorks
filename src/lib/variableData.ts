@@ -12,6 +12,25 @@ import { getCanvas, pushHistory } from './canvasEngine';
 
 const MM_TO_PX = 3.7795; // 96dpi
 
+export type VariableDataPreview = {
+  values: string[];
+  total: number;
+  hidden: number;
+};
+
+export type VariableDataGridSummary = {
+  cols: number;
+  rows: number;
+  cells: number;
+};
+
+export type VariableDataFillOrder = 'rows' | 'columns';
+
+export type VariableDataAutoGap = {
+  gapX: number;
+  gapY: number;
+};
+
 /** Build a numeric sequence as zero-padded strings. */
 export function buildSerialValues(start: number, step: number, count: number, pad: number): string[] {
   const out: string[] = [];
@@ -21,6 +40,69 @@ export function buildSerialValues(start: number, step: number, count: number, pa
     out.push(pad > 0 ? String(Math.trunc(v)).padStart(pad, '0') : String(v));
   }
   return out;
+}
+
+export function estimateVariableDataGaps(widthPx: number, heightPx: number, paddingMm = 10): VariableDataAutoGap {
+  return {
+    gapX: Math.max(5, Math.round(widthPx / MM_TO_PX) + paddingMm),
+    gapY: Math.max(5, Math.round(heightPx / MM_TO_PX) + paddingMm),
+  };
+}
+
+/** Parse pasted or comma-separated badge/list values into clean lines. */
+export function parseVariableListValues(input: string): string[] {
+  return input.split(/[\n,]/).map((value) => value.trim()).filter(Boolean);
+}
+
+/** Remove duplicate pasted list values while preserving first-seen order. */
+export function dedupeVariableListValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Sort list values in natural A-Z order so Door 2 stays before Door 10. */
+export function sortVariableListValues(values: string[]): string[] {
+  return [...values].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+/** Reverse list values without mutating the original pasted list. */
+export function reverseVariableListValues(values: string[]): string[] {
+  return [...values].reverse();
+}
+
+export function summarizeVariableDataGrid(total: number, cols: number): VariableDataGridSummary {
+  const nCols = Math.max(1, Math.floor(cols));
+  const values = Math.max(0, Math.floor(total));
+  return {
+    cols: nCols,
+    rows: values === 0 ? 0 : Math.ceil(values / nCols),
+    cells: values,
+  };
+}
+
+export function getVariableDataGridPosition(index: number, total: number, cols: number, fillOrder: VariableDataFillOrder = 'rows') {
+  const nCols = Math.max(1, Math.floor(cols));
+  if (fillOrder === 'columns') {
+    const rows = Math.max(1, summarizeVariableDataGrid(total, nCols).rows);
+    return { col: Math.floor(index / rows), row: index % rows };
+  }
+  return { col: index % nCols, row: Math.floor(index / nCols) };
+}
+
+/** Summarize generated values for the dialog preview chips. */
+export function previewVariableDataValues(values: string[], limit = 5): VariableDataPreview {
+  const total = values.length;
+  const previewLimit = Math.max(0, Math.floor(limit));
+  return {
+    values: values.slice(0, previewLimit),
+    total,
+    hidden: Math.max(0, total - previewLimit),
+  };
 }
 
 /** Substitute a value into the template's `#` run, or replace the whole text. */
@@ -42,6 +124,7 @@ export async function generateVariableData(
   cols: number,
   gapXmm: number,
   gapYmm: number,
+  fillOrder: VariableDataFillOrder = 'rows',
 ): Promise<number> {
   const c = getCanvas();
   if (!c || values.length === 0) return 0;
@@ -50,11 +133,9 @@ export async function generateVariableData(
   const baseTop = textObj.top ?? 0;
   const gx = gapXmm * MM_TO_PX;
   const gy = gapYmm * MM_TO_PX;
-  const nCols = Math.max(1, cols);
 
   for (let i = 0; i < values.length; i++) {
-    const col = i % nCols;
-    const row = Math.floor(i / nCols);
+    const { col, row } = getVariableDataGridPosition(i, values.length, cols, fillOrder);
     // Reuse the template for the first value; clone for the rest.
     const obj = i === 0 ? textObj : await textObj.clone();
     (obj as unknown as { set: (o: Record<string, unknown>) => void }).set({

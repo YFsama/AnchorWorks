@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { getCanvas, pushHistory } from '../lib/canvasEngine';
 import { clearAutoSave, getLastAutoSave } from '../lib/autosave';
 import { useT } from '../lib/i18n';
@@ -10,6 +10,7 @@ import { useEditor } from '../store/editor';
 export function RecoveryDialog() {
   const t = useT();
   const [entry, setEntry] = useState<ReturnType<typeof getLastAutoSave>>(null);
+  const [focusedAction, setFocusedAction] = useState<'discard' | 'restore'>('discard');
 
   useEffect(() => {
     // Wait a tick so the canvas has a chance to initialize.
@@ -52,7 +53,25 @@ export function RecoveryDialog() {
     setEntry(null);
   };
 
+  const handleRecoveryActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-recovery-action]'));
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    setFocusedAction(buttons[nextIndex]?.dataset.recoveryAction === 'restore' ? 'restore' : 'discard');
+    buttons[nextIndex]?.focus();
+  };
+
   const when = new Date(entry.ts).toLocaleString();
+  const focusedActionLabel = focusedAction === 'restore' ? t('Restore') : t('Discard');
 
   return (
     <div
@@ -68,9 +87,19 @@ export function RecoveryDialog() {
           <div>{t('We found an auto-saved copy of your previous session from')} {when}</div>
           <div className="mt-1">{t('Would you like to restore it?')}</div>
         </div>
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn" onClick={onDiscard}>{t('Discard')}</button>
-          <button type="button" className="btn-primary" onClick={onRestore}>{t('Restore')}</button>
+        <div
+          className="flex justify-end gap-2"
+          role="toolbar"
+          aria-label={t('Recovery actions')}
+          aria-describedby="recovery-action-review-status"
+          title={t('Use arrow keys to review recovery actions')}
+          onKeyDown={handleRecoveryActionKeys}
+        >
+          <div id="recovery-action-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${focusedActionLabel}. ${focusedAction === 'restore' ? t('Would you like to restore it?') : t('Discard')}`}
+          </div>
+          <button type="button" data-recovery-action="discard" className="btn" onFocus={() => setFocusedAction('discard')} onClick={onDiscard}>{t('Discard')}</button>
+          <button type="button" data-recovery-action="restore" className="btn-primary" onFocus={() => setFocusedAction('restore')} onClick={onRestore}>{t('Restore')}</button>
         </div>
       </div>
     </div>

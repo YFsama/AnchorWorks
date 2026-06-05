@@ -107,6 +107,7 @@ export function updateSelection(): void {
     strokeWidth: active.strokeWidth ?? 0,
     opacity: active.opacity ?? 1,
     type: active.type ?? '',
+    name: (active as fabric.FabricObject & { name?: string | null }).name ?? '',
   });
 }
 

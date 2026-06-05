@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type KeyboardEvent } from 'react';
 import { Sparkles, MousePointer2, Send, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import { markOnboarded } from '../lib/onboarding';
@@ -29,6 +29,7 @@ interface Props {
 export function Onboarding({ open, onClose }: Props) {
   const t = useT();
   const [i, setI] = useState(0);
+  const [focusedReview, setFocusedReview] = useState('');
 
   // Build slides reactively so they re-translate when language flips.
   const SLIDES: Slide[] = useMemo(() => [
@@ -119,7 +120,25 @@ export function Onboarding({ open, onClose }: Props) {
   if (!open) return null;
   const next = () => (i < SLIDES.length - 1 ? setI(i + 1) : close());
   const prev = () => setI(Math.max(0, i - 1));
+  const handleOnboardingKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-onboarding-action]'))
+      .filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    setFocusedReview(buttons[nextIndex]?.dataset.onboardingReview ?? '');
+    buttons[nextIndex]?.focus();
+  };
   const s = SLIDES[i];
+  const currentReview = focusedReview || `${t('Slide')} ${i + 1} ${t('of')} ${SLIDES.length}: ${s.title}`;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={close}>
@@ -148,11 +167,24 @@ export function Onboarding({ open, onClose }: Props) {
         </div>
 
         <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-panel2">
-          <div className="flex items-center gap-1.5">
+          <div
+            className="flex items-center gap-1.5"
+            role="toolbar"
+            aria-label={t('Onboarding slides')}
+            aria-describedby="onboarding-review-status"
+            title={t('Use arrow keys to review onboarding actions')}
+            onKeyDown={handleOnboardingKeys}
+          >
+            <div id="onboarding-review-status" className="sr-only" aria-live="polite">
+              {`${t('Reviewing')} ${currentReview}`}
+            </div>
             {SLIDES.map((_, idx) => (
               <button
                 key={idx}
                 type="button"
+                data-onboarding-action
+                data-onboarding-review={`${t('Slide')} ${idx + 1} ${t('of')} ${SLIDES.length}: ${SLIDES[idx].title}`}
+                onFocus={(event) => setFocusedReview(event.currentTarget.dataset.onboardingReview ?? '')}
                 onClick={() => setI(idx)}
                 aria-label={`${t('Slide')} ${idx + 1} ${t('of')} ${SLIDES.length}`}
                 aria-current={idx === i ? 'step' : undefined}
@@ -166,16 +198,33 @@ export function Onboarding({ open, onClose }: Props) {
               />
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div
+            className="flex items-center gap-2"
+            role="toolbar"
+            aria-label={t('Onboarding actions')}
+            aria-describedby="onboarding-review-status"
+            title={t('Use arrow keys to review onboarding actions')}
+            onKeyDown={handleOnboardingKeys}
+          >
             <button
               type="button"
+              data-onboarding-action
+              data-onboarding-review={t('Back')}
               className="btn flex items-center gap-1"
+              onFocus={(event) => setFocusedReview(event.currentTarget.dataset.onboardingReview ?? '')}
               onClick={prev}
               disabled={i === 0}
             >
               <ChevronLeft size={12} aria-hidden="true" />{t('Back')}
             </button>
-            <button type="button" className="btn-primary flex items-center gap-1" onClick={next}>
+            <button
+              type="button"
+              data-onboarding-action
+              data-onboarding-review={i < SLIDES.length - 1 ? t('Next') : t('Get Started')}
+              className="btn-primary flex items-center gap-1"
+              onFocus={(event) => setFocusedReview(event.currentTarget.dataset.onboardingReview ?? '')}
+              onClick={next}
+            >
               {i < SLIDES.length - 1 ? (<>{t('Next')}<ChevronRight size={12} aria-hidden="true" /></>) : t('Get Started')}
             </button>
           </div>

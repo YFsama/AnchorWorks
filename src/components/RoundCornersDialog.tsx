@@ -11,11 +11,15 @@ import { useFocusRestore } from '../lib/hooks/useFocusRestore';
  * Round Corners (Illustrator Effect→Stylize→Round Corners) — fillet the selected
  * path/shape corners by a radius (mm). Undoable, so the user can dial and retry.
  */
+const RADIUS_PRESETS_MM = [1, 2, 3, 5, 10, 20];
+
 export function RoundCornersDialog() {
   const t = useT();
   const open = useEditor(s => s.showRoundCorners);
   const close = useCallback(() => useEditor.getState().setModal('showRoundCorners', false), []);
   const [radius, setRadius] = useState(3);
+  const [reviewedPreset, setReviewedPreset] = useState('');
+  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -26,6 +30,39 @@ export function RoundCornersDialog() {
     if (n > 0) toast.success(`${n} ${t('shapes rounded')}`, { title: t('Round Corners') });
     else toast.warn(t('Select one or more paths/shapes first.'), { title: t('Round Corners') });
     close();
+  };
+
+  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-round-corners-action]'));
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
+    const nextAction = actions[nextIndex];
+    setReviewedFooterAction(nextAction?.dataset.roundCornersActionReview ?? nextAction?.textContent?.trim() ?? '');
+    nextAction?.focus();
+  };
+
+  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-round-corners-preset-action]'));
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
+    const nextRadius = Number(actions[nextIndex]?.dataset.radius);
+    if (Number.isFinite(nextRadius)) setRadius(nextRadius);
+    requestAnimationFrame(() => {
+      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
+      actions[nextIndex]?.focus();
+    });
   };
 
   return (
@@ -57,10 +94,71 @@ export function RoundCornersDialog() {
             aria-label={t('Radius (mm)')}
           />
         </label>
+        <div className="mb-2">
+          <div className="field-label !mb-1">{t('Radius presets')}</div>
+          <div
+            className="grid grid-cols-6 gap-1"
+            role="toolbar"
+            aria-label={t('Radius preset actions')}
+            aria-describedby="round-corners-preset-review-status"
+            title={t('Use arrow keys to review radius presets')}
+            onKeyDown={handlePresetActionKeys}
+          >
+            <div id="round-corners-preset-review-status" className="sr-only" aria-live="polite">
+              {`${t('Reviewing')} ${reviewedPreset || t('Radius presets')}`}
+            </div>
+            {RADIUS_PRESETS_MM.map((value) => {
+              const review = `${t('Radius (mm)')} ${value}`;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  data-round-corners-preset-action
+                  data-radius={value}
+                  data-review={review}
+                  className={`btn !py-1 !px-1 !text-[10px] ${radius === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                  onClick={() => setRadius(value)}
+                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
+                  aria-pressed={radius === value}
+                >
+                  {value}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-        <div className="flex justify-end gap-2 mt-3">
-          <button type="button" className="btn" onClick={close}>{t('Cancel')}</button>
-          <button type="button" className="btn-primary" onClick={apply}>{t('Apply')}</button>
+        <div
+          className="flex justify-end gap-2 mt-3"
+          role="toolbar"
+          aria-label={t('Round Corners actions')}
+          aria-describedby="round-corners-action-review-status"
+          title={t('Use arrow keys to review dialog actions')}
+          onKeyDown={handleFooterActionKeys}
+        >
+          <div id="round-corners-action-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedFooterAction || t('Round Corners actions')}`}
+          </div>
+          <button
+            type="button"
+            data-round-corners-action
+            data-round-corners-action-review={t('Cancel')}
+            className="btn"
+            onClick={close}
+            onFocus={() => setReviewedFooterAction(t('Cancel'))}
+          >
+            {t('Cancel')}
+          </button>
+          <button
+            type="button"
+            data-round-corners-action
+            data-round-corners-action-review={t('Apply')}
+            className="btn-primary"
+            onClick={apply}
+            onFocus={() => setReviewedFooterAction(t('Apply'))}
+          >
+            {t('Apply')}
+          </button>
         </div>
       </div>
     </div>

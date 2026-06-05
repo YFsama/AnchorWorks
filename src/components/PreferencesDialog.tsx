@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { X, Settings, Sparkles, PenTool, Monitor } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { X, Settings, Sparkles, PenTool, Monitor, Search } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { MM_TO_PX } from '../lib/rulerTicks';
 import { useT, useI18n, LANGUAGES, type Lang } from '../lib/i18n';
@@ -47,6 +47,12 @@ interface DraftState {
   anchorSnap: boolean;
 }
 
+const PREFERENCE_RECIPES: Array<{ label: string; title: string; patch: Partial<Pick<DraftState, 'themeChoice' | 'highContrast' | 'snapEnabled' | 'smartGuides' | 'anchorSnap'>> }> = [
+  { label: 'Design focus', title: 'Dark workspace with smart snapping for layout and drawing.', patch: { themeChoice: 'dark', highContrast: false, snapEnabled: true, smartGuides: true, anchorSnap: true } },
+  { label: 'Production prep', title: 'High contrast workspace with every snap aid enabled for cutter prep.', patch: { themeChoice: 'dark', highContrast: true, snapEnabled: true, smartGuides: true, anchorSnap: true } },
+  { label: 'Presentation', title: 'Light low-distraction workspace with snapping aids off.', patch: { themeChoice: 'light', highContrast: false, snapEnabled: false, smartGuides: false, anchorSnap: false } },
+];
+
 function readSystemTheme(): 'dark' | 'light' {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'dark';
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
@@ -79,7 +85,13 @@ export function PreferencesDialog() {
   const close = useCallback(() => useEditor.getState().setModal('showPreferences', false), []);
 
   const [tab, setTab] = useState<TabId>('general');
+  const [prefQuery, setPrefQuery] = useState('');
+  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
+  const [reviewedRecipeAction, setReviewedRecipeAction] = useState('');
+  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<DraftState>(() => makeDraft());
+  const [openedDraft, setOpenedDraft] = useState<DraftState>(() => makeDraft());
 
   // Re-seed the draft each time the dialog opens so external store changes
   // (e.g. theme toggled via Help menu) are reflected on next open. Track the
@@ -88,8 +100,11 @@ export function PreferencesDialog() {
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
-      setDraft(makeDraft());
+      const nextDraft = makeDraft();
+      setDraft(nextDraft);
+      setOpenedDraft(nextDraft);
       setTab('general');
+      setPrefQuery('');
     }
   }
 
@@ -99,6 +114,10 @@ export function PreferencesDialog() {
   useEscapeClose(open, close);
 
   useFocusRestore(open);
+  useEffect(() => {
+    if (!open) return;
+    requestAnimationFrame(() => searchRef.current?.focus());
+  }, [open]);
 
   // Persist the draft. Returns the (possibly mutated) prefs so callers can
   // see the resolved values if needed.
@@ -122,6 +141,75 @@ export function PreferencesDialog() {
 
   const onSave = () => { apply(); close(); };
   const onApply = () => { apply(); };
+  const onReset = () => {
+    setDraft(openedDraft);
+    setTab('general');
+    setPrefQuery('');
+    setReviewedSearchAction('');
+    setReviewedRecipeAction('');
+    setReviewedFooterAction(t('Reset'));
+  };
+  const applyRecipe = (recipePatch: Partial<Pick<DraftState, 'themeChoice' | 'highContrast' | 'snapEnabled' | 'smartGuides' | 'anchorSnap'>>) => {
+    setDraft((current) => ({ ...current, ...recipePatch }));
+    setTab('workspace');
+  };
+
+  const recipeActive = (recipePatch: Partial<Pick<DraftState, 'themeChoice' | 'highContrast' | 'snapEnabled' | 'smartGuides' | 'anchorSnap'>>) =>
+    (Object.entries(recipePatch) as Array<[keyof typeof recipePatch, unknown]>).every(([key, value]) => draft[key] === value);
+  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-pref-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
+    const nextAction = actions[nextIndex];
+    setReviewedFooterAction(nextAction?.dataset.prefActionReview ?? nextAction?.textContent?.trim() ?? '');
+    nextAction?.focus();
+  };
+
+  const handleSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-pref-search-action]'));
+    if (actions.length === 0) return;
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : event.key === 'ArrowRight'
+          ? (activeIndex + 1) % actions.length
+          : (activeIndex - 1 + actions.length) % actions.length;
+    event.preventDefault();
+    const nextAction = actions[nextIndex];
+    setReviewedSearchAction(nextAction?.dataset.prefSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
+    nextAction?.focus();
+  };
+
+  const handleRecipeActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-pref-recipe-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
+    const nextAction = actions[nextIndex];
+    const recipeIndex = Number(nextAction?.dataset.recipeIndex);
+    const recipe = Number.isInteger(recipeIndex) ? PREFERENCE_RECIPES[recipeIndex] : undefined;
+    if (recipe) applyRecipe(recipe.patch);
+    setReviewedRecipeAction(nextAction?.dataset.prefRecipeActionReview ?? nextAction?.textContent?.trim() ?? '');
+    nextAction?.focus();
+  };
 
   // Update a slice of the draft without smashing the rest.
   const patch = useMemo(() => ({
@@ -133,14 +221,20 @@ export function PreferencesDialog() {
       setDraft((d) => ({ ...d, ...p })),
   }), []);
 
-  if (!open) return null;
-
-  const tabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }> }> = [
-    { id: 'general',   label: t('General'),   icon: Settings },
-    { id: 'ai',        label: t('AI'),        icon: Sparkles },
-    { id: 'editor',    label: t('Editor'),    icon: PenTool },
-    { id: 'workspace', label: t('Workspace'), icon: Monitor },
+  const tabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>; keywords: string[] }> = [
+    { id: 'general',   label: t('General'),   icon: Settings, keywords: ['language', 'theme', 'canvas', 'width', 'height', 'background', 'autosave', 'keyboard increment', 'grid size', t('Language'), t('Default theme'), t('Default canvas size'), t('Autosave interval (seconds)'), t('Keyboard increment'), t('Grid size (px)')] },
+    { id: 'ai',        label: t('AI'),        icon: Sparkles, keywords: ['api key', 'model', 'base url', 'vision', 'stream', t('API key'), t('Model'), t('Base URL'), t('Vision'), t('Stream responses')] },
+    { id: 'editor',    label: t('Editor'),    icon: PenTool, keywords: ['snap', 'grid', 'smart guides', 'anchor', t('Snap to Grid'), t('Smart Guides'), t('Snap to anchor points')] },
+    { id: 'workspace', label: t('Workspace'), icon: Monitor, keywords: ['theme', 'light', 'dark', 'system', 'contrast', 'accessibility', t('Default theme'), t('Light Theme'), t('Dark Theme'), t('System'), t('High contrast')] },
   ];
+  const normalizedPrefQuery = prefQuery.trim().toLowerCase();
+  const visibleTabs = normalizedPrefQuery
+    ? tabs.filter((tb) => [tb.id, tb.label, ...tb.keywords].some((value) => value.toLowerCase().includes(normalizedPrefQuery)))
+    : tabs;
+  const activeTabVisible = visibleTabs.some((tb) => tb.id === tab);
+  const activeTab = activeTabVisible ? tab : visibleTabs[0]?.id;
+
+  if (!open) return null;
 
   /** WAI-ARIA tabs pattern: vertical tablist responds to Up/Down to switch
    * tabs, Home/End to jump to first/last. The visible focus + selection sync
@@ -149,15 +243,16 @@ export function PreferencesDialog() {
   const onTabKeyDown = (e: React.KeyboardEvent) => {
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
     e.preventDefault();
-    const idx = tabs.findIndex((tb) => tb.id === tab);
+    if (visibleTabs.length === 0) return;
+    const idx = Math.max(0, visibleTabs.findIndex((tb) => tb.id === activeTab));
     let next = idx;
-    if (e.key === 'ArrowDown') next = (idx + 1) % tabs.length;
-    else if (e.key === 'ArrowUp') next = (idx - 1 + tabs.length) % tabs.length;
+    if (e.key === 'ArrowDown') next = (idx + 1) % visibleTabs.length;
+    else if (e.key === 'ArrowUp') next = (idx - 1 + visibleTabs.length) % visibleTabs.length;
     else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = tabs.length - 1;
+    else if (e.key === 'End') next = visibleTabs.length - 1;
     if (next === idx) return;
-    setTab(tabs[next].id);
-    document.getElementById(`pref-tab-${tabs[next].id}`)?.focus();
+    setTab(visibleTabs[next].id);
+    document.getElementById(`pref-tab-${visibleTabs[next].id}`)?.focus();
   };
 
   return (
@@ -185,17 +280,157 @@ export function PreferencesDialog() {
         </div>
 
         {/* Body: vertical tabs + form */}
+        <div className="px-4 py-2 border-b border-border bg-panel2/40">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="field-label !mb-0">{t('Preference recipes')}</span>
+            <div
+              className="flex flex-wrap items-center gap-1"
+              role="toolbar"
+              aria-label={t('Preference recipe actions')}
+              aria-describedby="preferences-recipe-action-review-status"
+              title={t('Use arrow keys to review preference recipes')}
+              onKeyDown={handleRecipeActionKeys}
+            >
+              <span id="preferences-recipe-action-review-status" className="sr-only" aria-live="polite">
+                {`${t('Reviewing')} ${reviewedRecipeAction || t('Preference recipe actions')}`}
+              </span>
+              {PREFERENCE_RECIPES.map((recipe, index) => {
+                const active = recipeActive(recipe.patch);
+                return (
+                  <button
+                    key={recipe.label}
+                    type="button"
+                    data-pref-recipe-action
+                    data-pref-recipe-action-review={`${t(recipe.label)} · ${t(recipe.title)}`}
+                    data-recipe-index={index}
+                    className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                    onClick={() => applyRecipe(recipe.patch)}
+                    onFocus={(event) => setReviewedRecipeAction(event.currentTarget.dataset.prefRecipeActionReview ?? '')}
+                    title={t(recipe.title)}
+                    aria-pressed={active}
+                  >
+                    {t(recipe.label)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
         <div className="flex flex-1 min-h-0">
           <nav
-            className="w-[140px] shrink-0 bg-panel2 border-r border-border py-2 flex flex-col"
+            className="w-[170px] shrink-0 bg-panel2 border-r border-border py-2 flex flex-col"
             role="tablist"
             aria-label={t('Preferences')}
             aria-orientation="vertical"
             onKeyDown={onTabKeyDown}
           >
-            {tabs.map((tb) => {
+            <div className="px-2 pb-2">
+              <div className="input-num flex items-center gap-1.5 px-2 py-1 focus-within:border-accent2">
+                <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
+                <input
+                  ref={searchRef}
+                  type="search"
+                  className="flex-1 min-w-0 bg-transparent outline-none text-[11px] text-ink placeholder:text-muted/70"
+                  placeholder={t('Search preferences…')}
+                  value={prefQuery}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setPrefQuery(next);
+                    const q = next.trim().toLowerCase();
+                    const first = q
+                      ? tabs.find((tb) => [tb.id, tb.label, ...tb.keywords].some((value) => value.toLowerCase().includes(q)))
+                      : tabs[0];
+                    if (first && first.id !== tab) setTab(first.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing && visibleTabs[0]) {
+                      e.preventDefault();
+                      const first = visibleTabs[0];
+                      setTab(first.id);
+                      requestAnimationFrame(() => document.getElementById(`pref-tab-${first.id}`)?.focus());
+                      return;
+                    }
+                    if (e.key === 'ArrowDown' && visibleTabs[0]) {
+                      e.preventDefault();
+                      const first = visibleTabs[0];
+                      setTab(first.id);
+                      requestAnimationFrame(() => document.getElementById(`pref-tab-${first.id}`)?.focus());
+                      return;
+                    }
+                    if (e.key === 'Escape' && prefQuery) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPrefQuery('');
+                    }
+                  }}
+                  aria-label={t('Search preferences…')}
+                  title={`${t('Press Enter to go to first search result')} · ${t('Press Arrow Down to focus first section')}`}
+                />
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-1 text-[10px] text-muted tabular-nums" aria-live="polite">
+                <span>{normalizedPrefQuery ? `${visibleTabs.length} / ${tabs.length} ${t('matches')}` : `${tabs.length} ${t('sections')}`}</span>
+                <div
+                  className="flex items-center gap-2"
+                  role="toolbar"
+                  aria-label={t('Preferences search actions')}
+                  aria-describedby="preferences-search-action-review-status"
+                  title={t('Use arrow keys to review preferences search actions')}
+                  onKeyDown={handleSearchActionKeys}
+                >
+                  <span id="preferences-search-action-review-status" className="sr-only" aria-live="polite">
+                    {`${t('Reviewing')} ${reviewedSearchAction || t('Preferences search actions')}`}
+                  </span>
+                  {prefQuery && visibleTabs.length > 0 && (
+                    <button
+                      type="button"
+                      className="hover:text-ink underline-offset-2 hover:underline transition-colors disabled:opacity-40 disabled:hover:text-muted disabled:hover:no-underline"
+                      data-pref-search-action
+                      data-pref-search-action-review={t('Go to first search result')}
+                      onFocus={() => setReviewedSearchAction(t('Go to first search result'))}
+                      onClick={() => {
+                        const first = visibleTabs[0];
+                        if (!first) return;
+                        setTab(first.id);
+                        requestAnimationFrame(() => document.getElementById(`pref-tab-${first.id}`)?.focus());
+                      }}
+                      title={t('Go to first search result')}
+                    >
+                      {t('Go First')}
+                    </button>
+                  )}
+                  {prefQuery && (
+                    <button
+                      type="button"
+                      className="hover:text-ink underline-offset-2 hover:underline transition-colors"
+                      data-pref-search-action
+                      data-pref-search-action-review={t('Clear search')}
+                      onFocus={() => setReviewedSearchAction(t('Clear search'))}
+                      onClick={() => setPrefQuery('')}
+                      title={t('Clear search')}
+                    >
+                      {t('Clear search')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            {visibleTabs.length === 0 && (
+              <div className="px-3 py-2 text-[11px] text-muted leading-relaxed">
+                <div>{t('No preferences found.')}</div>
+                {prefQuery && (
+                  <button
+                    type="button"
+                    className="btn !py-1 !px-2 text-[10px] mt-2"
+                    onClick={() => setPrefQuery('')}
+                  >
+                    {t('Clear search')}
+                  </button>
+                )}
+              </div>
+            )}
+            {visibleTabs.map((tb) => {
               const Icon = tb.icon;
-              const active = tab === tb.id;
+              const active = activeTab === tb.id;
               return (
                 <button
                   key={tb.id}
@@ -221,22 +456,47 @@ export function PreferencesDialog() {
           <div
             id="pref-tab-panel"
             role="tabpanel"
-            aria-labelledby={`pref-tab-${tab}`}
+            aria-labelledby={activeTab ? `pref-tab-${activeTab}` : undefined}
             tabIndex={0}
             className="flex-1 overflow-y-auto px-5 py-4 min-w-0 focus:outline-none"
           >
-            {tab === 'general' && <GeneralTab draft={draft} patch={patch} />}
-            {tab === 'ai' && <AITab draft={draft} patch={patch} />}
-            {tab === 'editor' && <EditorTab draft={draft} patch={patch} />}
-            {tab === 'workspace' && <WorkspaceTab draft={draft} patch={patch} />}
+            {activeTab === 'general' && <GeneralTab draft={draft} patch={patch} />}
+            {activeTab === 'ai' && <AITab draft={draft} patch={patch} />}
+            {activeTab === 'editor' && <EditorTab draft={draft} patch={patch} />}
+            {activeTab === 'workspace' && <WorkspaceTab draft={draft} patch={patch} />}
+            {!activeTab && (
+              <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted">
+                <div>{t('No preferences found.')}</div>
+                {prefQuery && (
+                  <button
+                    type="button"
+                    className="btn !py-1 !px-2 text-[10px] mt-2"
+                    onClick={() => setPrefQuery('')}
+                  >
+                    {t('Clear search')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border bg-panel2 shrink-0">
-          <button className="btn" onClick={close}>{t('Cancel')}</button>
-          <button className="btn" onClick={onApply}>{t('Apply')}</button>
-          <button className="btn-primary" onClick={onSave}>{t('Save')}</button>
+        <div
+          className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border bg-panel2 shrink-0"
+          role="toolbar"
+          aria-label={t('Preferences actions')}
+          aria-describedby="preferences-action-review-status"
+          title={t('Use arrow keys to review dialog actions')}
+          onKeyDown={handleFooterActionKeys}
+        >
+          <span id="preferences-action-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedFooterAction || t('Preferences actions')}`}
+          </span>
+          <button type="button" data-pref-action data-pref-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
+          <button type="button" data-pref-action data-pref-action-review={t('Reset')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset'))} onClick={onReset}>{t('Reset')}</button>
+          <button type="button" data-pref-action data-pref-action-review={t('Apply')} className="btn" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={onApply}>{t('Apply')}</button>
+          <button type="button" data-pref-action data-pref-action-review={t('Save')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Save'))} onClick={onSave}>{t('Save')}</button>
         </div>
       </div>
     </div>

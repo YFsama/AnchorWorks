@@ -72,6 +72,9 @@ export function addBridges(cutPaths: CutPath[], count: number, gapMm: number): C
       kind: cp.kind,
       passes: cp.passes,
       color: cp.color,
+      sourceObjectId: cp.sourceObjectId,
+      bridgeSourceId: cp.bridgeSourceId ?? cp.id,
+      bridgeOriginal: cp.bridgeOriginal ?? cp,
     }));
   }
   return out;

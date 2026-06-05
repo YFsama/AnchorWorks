@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { answerConfirm, getCurrentConfirm, subscribeConfirm } from '../lib/confirm';
 import { useT } from '../lib/i18n';
 
@@ -59,6 +59,22 @@ export function ConfirmHost() {
 
   if (!opts) return null;
 
+  const handleConfirmActionKeys = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-confirm-action]'));
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center"
@@ -80,12 +96,19 @@ export function ConfirmHost() {
         >
           {opts.message}
         </div>
-        <div className="flex justify-end gap-2">
-          <button type="button" ref={cancelBtnRef} className="btn" onClick={() => answerConfirm(false)}>
+        <div
+          className="flex justify-end gap-2"
+          role="toolbar"
+          aria-label={t('Confirm actions')}
+          title={t('Use arrow keys to review confirm actions')}
+          onKeyDown={handleConfirmActionKeys}
+        >
+          <button type="button" data-confirm-action ref={cancelBtnRef} className="btn" onClick={() => answerConfirm(false)}>
             {opts.cancelLabel ?? t('Cancel')}
           </button>
           <button
             type="button"
+            data-confirm-action
             ref={confirmBtnRef}
             className={opts.danger ? 'btn-danger' : 'btn-primary'}
             onClick={() => answerConfirm(true)}

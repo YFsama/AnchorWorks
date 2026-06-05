@@ -1,14 +1,16 @@
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { useEditor } from '../store/editor';
 import type { ToolId } from '../types';
 import { useT } from '../lib/i18n';
 import { getTool } from '../lib/tools/types';
+import { getBinding, subscribeKeymap } from '../lib/keymap';
 import { ariaKeyshortcuts } from '../lib/runtime';
 
 // Groups define the visible toolbar layout (hairline `<hr>` between groups
 // so 11 buttons scan as 5 clusters). Each entry is just a ToolId — icon,
-// label, and shortcut all flow from the registry descriptor in
-// registerTools.ts, which is the single source of truth.
+// label and default shortcut flow from the tool registry; the displayed
+// shortcut reads the user-customisable keymap so toolbar hints stay current.
 const toolGroups: ToolId[][] = [
   // Pointer / selection
   ['select'],
@@ -20,12 +22,17 @@ const toolGroups: ToolId[][] = [
   ['text'],
   // Viewport navigation
   ['hand', 'zoom'],
+  // Inspection / sampling
+  ['measure', 'eyedropper'],
 ];
 
 export function Toolbar() {
   const t = useT();
   const tool = useEditor(s => s.tool);
   const setTool = useEditor(s => s.setTool);
+  const [, setKeymapTick] = useState(0);
+
+  useEffect(() => subscribeKeymap(() => setKeymapTick((n) => n + 1)), []);
 
   // WAI-ARIA toolbar pattern: Tab gets you IN, then arrow keys move focus
   // between buttons (roving tabindex). The button currently focused is the
@@ -61,7 +68,7 @@ export function Toolbar() {
             const handler = getTool(id);
             if (!handler?.icon) return null;
             const Icon = handler.icon;
-            const shortcut = handler.shortcut ?? '';
+            const shortcut = getBinding(`tool.${id}`);
             // aria-label carries the localized tool name only; the shortcut
             // metadata lives in aria-keyshortcuts so screen readers can
             // announce it separately ("Rectangle, keyboard shortcut R").

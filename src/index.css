@@ -340,6 +340,13 @@ button { font-family: inherit; }
   }
 
   /* ----- toolbar tool buttons ----- */
+  .toolbar-vertical {
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   .tool-btn {
     @apply w-10 h-10 flex items-center justify-center rounded text-muted transition-all duration-150;
   }
@@ -668,6 +675,18 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
    * themes. */
   box-shadow: 0 1px 0 0 color-mix(in oklab, rgb(var(--color-border)) 60%, transparent);
 }
+
+.output-actions-toolbar {
+  min-width: 0;
+  max-width: min(100%, 58vw);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  padding-bottom: 1px;
+}
+.output-actions-toolbar > [data-topbar-action] {
+  flex: 0 0 auto;
+}
 .topbar-sep {
   display: inline-block;
   width: 1px;
@@ -778,6 +797,7 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
     flex-direction: row !important;
     width: 100% !important;
     height: 48px;
+    max-height: none;
     border-right: none !important;
     border-top: 1px solid rgb(var(--color-border));
     padding: 4px 8px;

@@ -24,16 +24,17 @@ function unionBBox(objs: fabric.FabricObject[]): Box | null {
   return { left, top, width: right - left, height: bottom - top };
 }
 
-/** Fit the first artboard to all artwork or just the selection. Returns true on
- *  success. `marginMm` pads the artboard around the content. */
-export function fitArtboardToContent(scope: 'selection' | 'all', marginMm = 5): boolean {
+/** Fit the requested artboard to all artwork or just the selection. Returns true
+ *  on success. `marginMm` pads the artboard around the content. */
+export function fitArtboardToContent(scope: 'selection' | 'all', marginMm = 5, artboardId?: string): boolean {
   const canvas = getCanvas();
   if (!canvas) return false;
   const abs = getArtboards();
-  if (abs.length === 0) return false;
+  const target = artboardId ?? abs[0]?.id;
+  if (!target) return false;
   const objs = scope === 'selection' ? canvas.getActiveObjects() : canvas.getObjects();
   const bbox = unionBBox(objs);
   if (!bbox) return false;
-  fitArtboard(abs[0].id, bbox, marginMm * MM_TO_PX);
+  fitArtboard(target, bbox, marginMm * MM_TO_PX);
   return true;
 }

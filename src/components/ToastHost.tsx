@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info, X } from 'lucide-react';
 import { subscribeToasts, toast as toastApi, type Toast, type ToastKind } from '../lib/toast';
 import { useT } from '../lib/i18n';
@@ -97,6 +97,21 @@ function KindIcon({ kind }: { kind: ToastKind }) {
 
 function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
   const t = useT();
+  const handleToastActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-toast-action]'));
+    if (buttons.length === 0) return;
+    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % buttons.length
+          : (currentIndex - 1 + buttons.length) % buttons.length;
+    event.preventDefault();
+    buttons[nextIndex]?.focus();
+  };
   // Theme-aware colors are sourced from CSS variables so toasts read correctly
   // in dark, light, and high-contrast modes (regression: hard-coded #1d1d22 /
   // #e7e7ea here made every toast look "stuck in dark mode" in light theme).
@@ -159,26 +174,36 @@ function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
           </div>
         )}
       </div>
-      {toast.action && (
+      <div
+        className="flex items-start gap-1"
+        role="toolbar"
+        aria-label={t('Toast actions')}
+        title={t('Use arrow keys to review toast actions')}
+        onKeyDown={handleToastActionKeys}
+      >
+        {toast.action && (
+          <button
+            type="button"
+            data-toast-action
+            className="btn"
+            style={{ flexShrink: 0, marginTop: -2 }}
+            onClick={() => {
+              try { toast.action!.onClick(); } finally { toastApi.dismiss(toast.id); }
+            }}
+          >
+            {toast.action.label}
+          </button>
+        )}
         <button
           type="button"
-          className="btn"
-          style={{ flexShrink: 0, marginTop: -2 }}
-          onClick={() => {
-            try { toast.action!.onClick(); } finally { toastApi.dismiss(toast.id); }
-          }}
+          data-toast-action
+          aria-label={t('Dismiss')}
+          onClick={() => toastApi.dismiss(toast.id)}
+          className="toast-dismiss"
         >
-          {toast.action.label}
+          <X size={12} aria-hidden="true" />
         </button>
-      )}
-      <button
-        type="button"
-        aria-label={t('Dismiss')}
-        onClick={() => toastApi.dismiss(toast.id)}
-        className="toast-dismiss"
-      >
-        <X size={12} aria-hidden="true" />
-      </button>
+      </div>
     </div>
   );
 }

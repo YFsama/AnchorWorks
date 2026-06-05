@@ -20,6 +20,7 @@
 import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
 import { useEditor } from '../store/editor';
+import { updateSelection } from './selectionApply';
 
 type FabricObject = fabric.FabricObject;
 
@@ -30,6 +31,41 @@ export function deleteSelection(): void {
   canvas.getActiveObjects().forEach(o => canvas.remove(o));
   canvas.discardActiveObject();
   canvas.requestRenderAll();
+}
+
+/** Rename the active object/selection so Layers-panel rows are meaningful. */
+export function renameSelection(name: string): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length === 0) return 0;
+  const trimmed = name.trim();
+  for (const o of objs) {
+    (o as fabric.FabricObject & { name?: string | null }).name = trimmed || null;
+  }
+  canvas.requestRenderAll();
+  updateSelection();
+  canvas.fire('object:modified', { target: objs[0] });
+  return objs.length;
+}
+
+export function getSelectionRenameDefault(): string {
+  const canvas = getCanvas();
+  if (!canvas) return '';
+  const objs = canvas.getActiveObjects();
+  if (objs.length !== 1) return '';
+  const name = (objs[0] as fabric.FabricObject & { name?: unknown }).name;
+  return typeof name === 'string' ? name : '';
+}
+
+export function promptRenameSelection(label = 'Object name'): number | null {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getActiveObjects();
+  if (objs.length === 0) return 0;
+  const name = window.prompt(label, getSelectionRenameDefault());
+  if (name == null) return null;
+  return renameSelection(name);
 }
 
 /** Clone the active selection and offset by +20px so the duplicate is
@@ -69,22 +105,33 @@ export function nudgeSelection(dx: number, dy: number): void {
  * Illustrator's Select → Same → Fill / Stroke Color. Only flat string colours
  * match (gradients/patterns are skipped). Returns the count selected.
  */
-export function selectSame(prop: 'fill' | 'stroke' | 'strokeWidth' | 'opacity'): number {
+export function selectSame(prop: 'fill' | 'stroke' | 'strokeWidth' | 'opacity' | 'fontFamily' | 'fontSize' | 'globalCompositeOperation' | 'strokeLineCap' | 'strokeLineJoin' | 'strokeDashArray' | 'name'): number {
   const canvas = getCanvas();
   if (!canvas) return 0;
   const ref = canvas.getActiveObject();
   if (!ref) return 0;
   const refVal = (ref as unknown as Record<string, unknown>)[prop];
   const isColour = prop === 'fill' || prop === 'stroke';
+  const isTextString = prop === 'fontFamily';
+  const isModeString = prop === 'globalCompositeOperation';
+  const isStrokeStyleString = prop === 'strokeLineCap' || prop === 'strokeLineJoin';
+  const isNameString = prop === 'name';
 
   let predicate: (o: fabric.FabricObject) => boolean;
-  if (isColour) {
+  if (isColour || isTextString || isModeString || isStrokeStyleString || isNameString) {
     if (typeof refVal !== 'string' || !refVal) return 0;
     const norm = (c: string) => c.trim().toLowerCase();
     const target = norm(refVal);
     predicate = (o) => { const v = (o as unknown as Record<string, unknown>)[prop]; return typeof v === 'string' && norm(v) === target; };
+  } else if (prop === 'strokeDashArray') {
+    const target = Array.isArray(refVal) ? refVal.map(Number).filter(Number.isFinite) : [];
+    predicate = (o) => {
+      const v = (o as unknown as Record<string, unknown>)[prop];
+      const arr = Array.isArray(v) ? v.map(Number).filter(Number.isFinite) : [];
+      return arr.length === target.length && arr.every((n, i) => Math.abs(n - target[i]) < 1e-6);
+    };
   } else {
-    // Numeric props (strokeWidth / opacity) — compare with a tiny epsilon.
+    // Numeric props (strokeWidth / opacity / fontSize) — compare with a tiny epsilon.
     if (typeof refVal !== 'number') return 0;
     predicate = (o) => { const v = (o as unknown as Record<string, unknown>)[prop]; return typeof v === 'number' && Math.abs(v - refVal) < 1e-6; };
   }
@@ -264,6 +311,18 @@ export function selectAllText(): number {
   return selectByType(['i-text', 'text', 'textbox']);
 }
 
+export function selectAllImages(): number {
+  return selectByType(['image']);
+}
+
+export function selectAllPaths(): number {
+  return selectByType(['path', 'polyline']);
+}
+
+export function selectAllShapes(): number {
+  return selectByType(['rect', 'circle', 'ellipse', 'line', 'polygon']);
+}
+
 /**
  * Select every object sharing the active object's type (Illustrator/SignMaster
  * "Select Same → Object Type"). The three text variants are folded together so
@@ -294,6 +353,41 @@ export function selectAllObjects(): number {
     !(o as { excludeFromExport?: boolean }).excludeFromExport
     && o.visible !== false
     && o.selectable !== false);
+  canvas.discardActiveObject();
+  if (objs.length === 1) canvas.setActiveObject(objs[0]);
+  else if (objs.length > 1) canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas }));
+  canvas.requestRenderAll();
+  return objs.length;
+}
+
+/** Select every visible, selectable object (SignMaster-style quick batch select).
+ *  Locked objects remain skipped so accidental edits stay protected. */
+export function selectVisibleObjects(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getObjects().filter((o) =>
+    !(o as { excludeFromExport?: boolean }).excludeFromExport
+    && o.visible !== false
+    && o.selectable !== false
+    && !o.lockMovementX
+    && !o.lockMovementY);
+  canvas.discardActiveObject();
+  if (objs.length === 1) canvas.setActiveObject(objs[0]);
+  else if (objs.length > 1) canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas }));
+  canvas.requestRenderAll();
+  return objs.length;
+}
+
+/** Select every unlocked object, including currently hidden artwork so users can
+ *  reveal or inspect protected-vs-editable batches from the menus/palette. */
+export function selectUnlockedObjects(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objs = canvas.getObjects().filter((o) =>
+    !(o as { excludeFromExport?: boolean }).excludeFromExport
+    && o.selectable !== false
+    && !o.lockMovementX
+    && !o.lockMovementY);
   canvas.discardActiveObject();
   if (objs.length === 1) canvas.setActiveObject(objs[0]);
   else if (objs.length > 1) canvas.setActiveObject(new fabric.ActiveSelection(objs, { canvas }));

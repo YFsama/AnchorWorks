@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target, Copy, Frame } from 'lucide-react';
+import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target, Copy, Frame, Search, RotateCw } from 'lucide-react';
 import { zoomToArtboard } from '../lib/canvasEngine';
+import { mmToPx } from '../lib/paperSizes';
+import { fitArtboardToContent } from '../lib/fitArtboard';
 import { toast } from '../lib/toast';
 import { showConfirm } from '../lib/confirm';
 import { useT } from '../lib/i18n';
@@ -22,7 +24,41 @@ import type { Artboard } from '../types';
 export function ArtboardsPanel() {
   const t = useT();
   const [open, setOpen] = useState(true);
+  const [query, setQuery] = useState('');
+  const firstArtboardRef = useRef<HTMLDivElement>(null);
   const artboards = useEditor(s => s.artboards);
+  const dpi = useEditor(s => s.doc.dpi);
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredArtboards = useMemo(() => {
+    if (!normalizedQuery) return artboards;
+    return artboards.filter((artboard) => [
+      artboard.name,
+      artboard.id,
+      `${artboard.width}×${artboard.height}`,
+      `${artboard.width}x${artboard.height}`,
+    ].some((value) => value.toLowerCase().includes(normalizedQuery)));
+  }, [artboards, normalizedQuery]);
+  const [focusedArtboardId, setFocusedArtboardId] = useState(filteredArtboards[0]?.id ?? '');
+  const focusedFilteredIndex = filteredArtboards.findIndex((artboard) => artboard.id === focusedArtboardId);
+  const reviewedArtboardIndex = focusedFilteredIndex >= 0 ? focusedFilteredIndex : 0;
+  const reviewedArtboard = filteredArtboards[reviewedArtboardIndex];
+  const reviewedArtboardSize = reviewedArtboard ? `${Math.round(reviewedArtboard.width)}×${Math.round(reviewedArtboard.height)} px` : '';
+  const handleArtboardListKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+    const rows = Array.from(event.currentTarget.querySelectorAll<HTMLDivElement>('[data-artboard-row]'));
+    if (rows.length === 0) return;
+    event.preventDefault();
+    const activeIndex = rows.indexOf(document.activeElement as HTMLDivElement);
+    const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? rows.length - 1
+        : Math.min(rows.length - 1, Math.max(0, currentIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+    rows[nextIndex]?.focus();
+  };
 
   return (
     <div className="panel-section">
@@ -43,7 +79,11 @@ export function ArtboardsPanel() {
       </h3>
       {open && (
         <div id="artboards-panel-body" className="px-2 pb-3 space-y-2">
-          <div className="flex gap-1">
+          <div className="type-caption leading-relaxed">
+        {t('Artboard row keyboard hint')}
+      </div>
+
+      <div className="flex gap-1">
             <button
               type="button"
               onClick={() => createArtboard()}
@@ -62,6 +102,17 @@ export function ArtboardsPanel() {
             </button>
           </div>
 
+          {artboards.length > 0 && (
+            <PanelSearch
+              query={query}
+              setQuery={setQuery}
+              placeholder={t('Search artboards…')}
+              countLabel={normalizedQuery ? `${filteredArtboards.length} / ${artboards.length} ${t('matches')}` : `${artboards.length} ${t('artboards')}`}
+              onTargetFirst={filteredArtboards.length > 0 ? () => zoomToArtboard(filteredArtboards[0]) : undefined}
+              onFocusFirst={filteredArtboards.length > 0 ? () => firstArtboardRef.current?.focus() : undefined}
+            />
+          )}
+
           {artboards.length === 0 ? (
             <div className="flex flex-col items-center text-center px-2 py-3">
               {/* Two overlapping artboard rectangles — the canonical "multi-page" idea. */}
@@ -76,10 +127,45 @@ export function ArtboardsPanel() {
                 {t('Click "Add Artboard" above to lay out multiple pages side-by-side.')}
               </div>
             </div>
+          ) : filteredArtboards.length === 0 ? (
+            <div className="flex flex-col items-center text-center px-2 py-3">
+              <div className="text-xs text-ink/90 mb-1">{t('No artboards found.')}</div>
+              <div className="type-caption leading-relaxed max-w-[200px]">
+                {t('Try an artboard name, size, or id.')}
+              </div>
+              {query && (
+                <button
+                  type="button"
+                  className="btn !py-1 !px-2 text-[10px] mt-2"
+                  onClick={() => setQuery('')}
+                >
+                  {t('Clear search')}
+                </button>
+              )}
+            </div>
           ) : (
-            <div className="space-y-2">
-              {artboards.map((a) => (
-                <ArtboardRow key={a.id} artboard={a} />
+            <div
+              className="space-y-2"
+              role="listbox"
+              aria-label={t('Artboards')}
+              aria-describedby="artboards-review-status"
+              title={t('Use arrow keys to review artboards')}
+              onKeyDown={handleArtboardListKeys}
+            >
+              <div id="artboards-review-status" className="sr-only" aria-live="polite">
+                {reviewedArtboard
+                  ? `${t('Reviewing')} ${reviewedArtboard.name} ${reviewedArtboardIndex + 1} / ${filteredArtboards.length}. ${reviewedArtboardSize}`
+                  : t('No artboards found.')}
+              </div>
+              {filteredArtboards.map((a, index) => (
+                <ArtboardRow
+                  key={a.id}
+                  artboard={a}
+                  dpi={dpi}
+                  rowRef={index === 0 ? firstArtboardRef : undefined}
+                  selected={a.id === reviewedArtboard?.id}
+                  onReview={() => setFocusedArtboardId(a.id)}
+                />
               ))}
             </div>
           )}
@@ -89,13 +175,129 @@ export function ArtboardsPanel() {
   );
 }
 
-function ArtboardRow({ artboard }: { artboard: Artboard }) {
+
+function PanelSearch({
+  query,
+  setQuery,
+  placeholder,
+  countLabel,
+  onTargetFirst,
+  onFocusFirst,
+}: {
+  query: string;
+  setQuery: (value: string) => void;
+  placeholder: string;
+  countLabel: string;
+  onTargetFirst?: () => void;
+  onFocusFirst?: () => void;
+}) {
+  const t = useT();
+  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
+  const handleSearchActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-artboard-search-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : event.key === 'ArrowRight'
+          ? (activeIndex + 1) % actions.length
+          : (activeIndex - 1 + actions.length) % actions.length;
+    event.preventDefault();
+    const nextAction = actions[nextIndex];
+    setReviewedSearchAction(nextAction?.dataset.artboardSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
+    nextAction?.focus();
+  };
+  return (
+    <div className="flex items-center gap-1.5">
+      <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
+      <input
+        type="search"
+        className="input !py-1 !px-2 text-xs min-w-0 flex-1"
+        placeholder={placeholder}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing && onTargetFirst) {
+            event.preventDefault();
+            onTargetFirst();
+            return;
+          }
+          if (event.key === 'ArrowDown' && onFocusFirst) {
+            event.preventDefault();
+            onFocusFirst();
+            return;
+          }
+          if (event.key === 'Escape' && query) {
+            event.preventDefault();
+            event.stopPropagation();
+            setQuery('');
+          }
+        }}
+        aria-label={placeholder}
+        title={`${t('Press Enter to target first search result')} · ${t('Press Arrow Down to focus first artboard')}`}
+      />
+      <span className="text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">
+        {countLabel}
+      </span>
+      {query && (
+        <div
+          className="flex items-center gap-1.5 shrink-0"
+          role="toolbar"
+          aria-label={t('Artboard search actions')}
+          aria-describedby="artboard-search-action-review-status"
+          title={t('Use arrow keys to review artboard search actions')}
+          onKeyDown={handleSearchActionKeys}
+        >
+          <span id="artboard-search-action-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedSearchAction || t('Artboard search actions')}`}
+          </span>
+          <button
+            type="button"
+            className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+            data-artboard-search-action
+            data-artboard-search-action-review={t('Zoom to first search result')}
+            onClick={onTargetFirst}
+            onFocus={() => setReviewedSearchAction(t('Zoom to first search result'))}
+            disabled={!onTargetFirst}
+            title={t('Zoom to first search result')}
+          >
+            {t('Target First')}
+          </button>
+          <button
+            type="button"
+            className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+            data-artboard-search-action
+            data-artboard-search-action-review={t('Clear search')}
+            onClick={() => setQuery('')}
+            onFocus={() => setReviewedSearchAction(t('Clear search'))}
+            title={t('Clear search')}
+          >
+            {t('Clear search')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ARTBOARD_SIZE_PRESETS = [
+  { label: 'A4', wMm: 210, hMm: 297 },
+  { label: 'Letter', wMm: 216, hMm: 279 },
+  { label: '24×12 in', wMm: 609.6, hMm: 304.8 },
+] as const;
+
+function ArtboardRow({ artboard, dpi, rowRef, selected, onReview }: { artboard: Artboard; dpi: number; rowRef?: React.Ref<HTMLDivElement>; selected: boolean; onReview: () => void }) {
   const t = useT();
   const [name, setName] = useState(artboard.name);
   const [x, setX] = useState(String(artboard.x));
   const [y, setY] = useState(String(artboard.y));
   const [w, setW] = useState(String(artboard.width));
   const [h, setH] = useState(String(artboard.height));
+  const [reviewedRowAction, setReviewedRowAction] = useState('');
 
   // Reflect external changes (e.g. another panel renamed the artboard).
   // Render-time sync against the previous prop reference avoids the
@@ -129,10 +331,106 @@ function ArtboardRow({ artboard }: { artboard: Artboard }) {
     }
   };
 
+  const applySizePreset = (wMm: number, hMm: number) => {
+    const nextWidth = mmToPx(wMm, dpi);
+    const nextHeight = mmToPx(hMm, dpi);
+    setW(String(nextWidth));
+    setH(String(nextHeight));
+    resizeArtboard(artboard.id, nextWidth, nextHeight);
+    toast.success(t('Artboard resized'));
+  };
+  const swapOrientation = () => {
+    const nextWidth = artboard.height;
+    const nextHeight = artboard.width;
+    setW(String(nextWidth));
+    setH(String(nextHeight));
+    resizeArtboard(artboard.id, nextWidth, nextHeight);
+    toast.success(t('Artboard orientation swapped'));
+  };
+  const fitThisArtboard = (scope: 'selection' | 'all') => {
+    const ok = fitArtboardToContent(scope, 5, artboard.id);
+    if (ok) toast.success(t('Artboard fitted'));
+    else toast.warn(scope === 'selection' ? t('Select something first.') : t('Nothing to fit.'));
+  };
+  const nextToolbarButton = (event: KeyboardEvent<HTMLDivElement>, selector: string) => {
+    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector));
+    if (buttons.length === 0) return null;
+    event.preventDefault();
+    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? buttons.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+    const nextButton = buttons[nextIndex] ?? null;
+    setReviewedRowAction(nextButton?.dataset.artboardActionReview ?? nextButton?.textContent?.trim() ?? '');
+    nextButton?.focus();
+    return nextButton;
+  };
+
+  const handleActionGroupKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    nextToolbarButton(event, '[data-artboard-action]');
+  };
+
+  const handleSizePresetKeys = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const button = nextToolbarButton(event, '[data-artboard-action]');
+    const preset = ARTBOARD_SIZE_PRESETS.find((item) => item.label === button?.dataset.sizePreset);
+    if (preset) applySizePreset(preset.wMm, preset.hMm);
+  };
+  const focusArtboard = () => zoomToArtboard({ x: artboard.x, y: artboard.y, width: artboard.width, height: artboard.height });
+  const duplicateThisArtboard = () => {
+    void duplicateArtboard(artboard.id).then((ab) => {
+      if (ab) {
+        zoomToArtboard({ x: ab.x, y: ab.y, width: ab.width, height: ab.height });
+        toast.success(t('Artboard duplicated'));
+      }
+    });
+  };
+  const deleteThisArtboard = async () => {
+    if (await showConfirm({ message: `${t('Delete artboard')} "${artboard.name}"?`, confirmLabel: t('Delete'), danger: true })) deleteArtboard(artboard.id);
+  };
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      focusArtboard();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      duplicateThisArtboard();
+      return;
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      void deleteThisArtboard();
+      return;
+    }
+    if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === 'r') {
+      event.preventDefault();
+      swapOrientation();
+    }
+  };
+
   const slug = artboard.name.replace(/[^a-z0-9-_]+/gi, '_') || artboard.id;
 
   return (
-    <div className="rounded border border-border bg-panel2 p-2 space-y-1.5">
+    <div
+      ref={rowRef}
+      className={`rounded border p-2 space-y-1.5 focus-within:border-accent2 focus:outline-none focus:ring-1 focus:ring-accent2/60 transition-colors ${selected ? 'border-accent2 bg-accent/10 shadow-[0_0_0_1px_rgba(var(--color-accent2),0.25)]' : 'border-border bg-panel2'}`}
+      tabIndex={0}
+      data-artboard-row
+      role="option"
+      aria-selected={selected}
+      aria-label={`${t('Artboard row')}: ${artboard.name}`}
+      aria-keyshortcuts="Enter Control+D Meta+D Delete Backspace R"
+      onFocus={onReview}
+      onKeyDown={handleRowKeyDown}
+    >
       <div className="flex items-center gap-1">
         <input
           value={name}
@@ -151,7 +449,7 @@ function ArtboardRow({ artboard }: { artboard: Artboard }) {
           aria-label={t('Artboard name')}
         />
         <button
-          onClick={() => zoomToArtboard({ x: artboard.x, y: artboard.y, width: artboard.width, height: artboard.height })}
+          onClick={focusArtboard}
           className="p-1 text-muted hover:text-ink transition-colors"
           title={t('Focus this artboard')}
           aria-label={t('Focus this artboard')}
@@ -159,7 +457,7 @@ function ArtboardRow({ artboard }: { artboard: Artboard }) {
           <Target size={12} aria-hidden="true" />
         </button>
         <button
-          onClick={() => { void duplicateArtboard(artboard.id).then((ab) => { if (ab) { zoomToArtboard({ x: ab.x, y: ab.y, width: ab.width, height: ab.height }); toast.success(t('Artboard duplicated')); } }); }}
+          onClick={duplicateThisArtboard}
           className="p-1 text-muted hover:text-ink transition-colors"
           title={t('Duplicate this artboard')}
           aria-label={t('Duplicate this artboard')}
@@ -167,7 +465,7 @@ function ArtboardRow({ artboard }: { artboard: Artboard }) {
           <Copy size={12} aria-hidden="true" />
         </button>
         <button
-          onClick={async () => { if (await showConfirm({ message: `${t('Delete artboard')} "${artboard.name}"?`, confirmLabel: t('Delete'), danger: true })) deleteArtboard(artboard.id); }}
+          onClick={() => { void deleteThisArtboard(); }}
           className="p-1 text-muted hover:text-danger transition-colors"
           title={t('Delete artboard')}
           aria-label={t('Delete artboard')}
@@ -181,6 +479,84 @@ function ArtboardRow({ artboard }: { artboard: Artboard }) {
         <Field label="Y" value={y} onChange={setY} onCommit={commitPos} />
         <Field label="W" value={w} onChange={setW} onCommit={commitSize} />
         <Field label="H" value={h} onChange={setH} onCommit={commitSize} />
+      </div>
+
+      <div>
+        <div className="field-label !mb-1">{t('Artboard size presets')}</div>
+        <div
+          className="flex flex-wrap gap-1"
+          role="toolbar"
+          aria-label={t('Artboard size presets')}
+          aria-describedby={`artboard-row-action-review-${artboard.id}`}
+          title={t('Use arrow keys to review artboard row actions')}
+          onKeyDown={handleSizePresetKeys}
+        >
+          <span id={`artboard-row-action-review-${artboard.id}`} className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewedRowAction || t('Artboard size presets')}`}
+          </span>
+          {ARTBOARD_SIZE_PRESETS.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              data-artboard-action
+              data-artboard-size-preset-action
+              data-size-preset={preset.label}
+              data-artboard-action-review={`${t('Apply artboard size preset')} ${preset.label}`}
+              className="btn !py-1 !px-1.5 !text-[10px]"
+              onClick={() => applySizePreset(preset.wMm, preset.hMm)}
+              onFocus={() => setReviewedRowAction(`${t('Apply artboard size preset')} ${preset.label}`)}
+              title={t('Apply artboard size preset')}
+            >
+              {preset.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            data-artboard-action
+            data-artboard-action-review={t('Swap artboard width and height')}
+            className="btn !py-1 !px-1.5 !text-[10px] flex items-center gap-1"
+            onClick={swapOrientation}
+            onFocus={() => setReviewedRowAction(t('Swap artboard width and height'))}
+            title={t('Swap artboard width and height')}
+          >
+            <RotateCw size={10} aria-hidden="true" /> {t('Swap W/H')}
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div className="field-label !mb-1">{t('Fit artboard')}</div>
+        <div
+          className="grid grid-cols-2 gap-1"
+          role="toolbar"
+          aria-label={t('Fit artboard')}
+          aria-describedby={`artboard-row-action-review-${artboard.id}`}
+          title={t('Use arrow keys to review artboard row actions')}
+          onKeyDown={handleActionGroupKeys}
+        >
+          <button
+            type="button"
+            data-artboard-action
+            data-artboard-action-review={t('Fit this artboard to selection')}
+            className="btn !py-1 !px-1.5 !text-[10px]"
+            onClick={() => fitThisArtboard('selection')}
+            onFocus={() => setReviewedRowAction(t('Fit this artboard to selection'))}
+            title={t('Fit this artboard to selection')}
+          >
+            {t('Fit Selection')}
+          </button>
+          <button
+            type="button"
+            data-artboard-action
+            data-artboard-action-review={t('Fit this artboard to artwork')}
+            className="btn !py-1 !px-1.5 !text-[10px]"
+            onClick={() => fitThisArtboard('all')}
+            onFocus={() => setReviewedRowAction(t('Fit this artboard to artwork'))}
+            title={t('Fit this artboard to artwork')}
+          >
+            {t('Fit Artwork')}
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-1">

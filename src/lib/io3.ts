@@ -324,6 +324,10 @@ export interface TilePrintOptions {
   /** Glue overlap in CANVAS px shared between neighbouring tiles, so the
    *  printed pages can be taped together with a margin. 0 = butt-join. */
   overlapPx?: number;
+  /** Optional canvas-space bounds to crop instead of the whole canvas. */
+  bounds?: { left: number; top: number; width: number; height: number };
+  /** Physical page margin in CSS pixels. */
+  marginPx?: number;
 }
 
 /**
@@ -361,21 +365,31 @@ export function exportPDFMultiPage(svgs: string[]): void {
 }
 
 /**
- * Split the current canvas into a grid of `pageW x pageH` pixel tiles and
- * send each tile as its own print page. Uses canvas raster snapshots so the
- * pages are guaranteed to line up regardless of vector content.
+ * Split the requested canvas bounds into a grid of `pageW x pageH` pixel tiles
+ * and send each tile as its own print page. Uses raster snapshots so the pages
+ * are guaranteed to line up regardless of vector content.
  */
 export function tilePrint(opts: TilePrintOptions): void {
   const canvas = getCanvas();
   if (!canvas) return;
-  const cw = canvas.getWidth();
-  const ch = canvas.getHeight();
+  const source = opts.bounds && opts.bounds.width > 0 && opts.bounds.height > 0
+    ? opts.bounds
+    : { left: 0, top: 0, width: canvas.getWidth(), height: canvas.getHeight() };
+  const cw = source.width;
+  const ch = source.height;
   const cols = opts.cols ?? Math.max(1, Math.ceil(cw / opts.pageW));
   const rows = opts.rows ?? Math.max(1, Math.ceil(ch / opts.pageH));
 
-  // Capture a high-res snapshot of the whole canvas once, then crop tiles.
+  // Capture a high-res snapshot of the chosen source bounds once, then crop tiles.
   const multiplier = 2;
-  const fullUrl = canvas.toDataURL({ format: 'png', multiplier });
+  const fullUrl = canvas.toDataURL({
+    format: 'png',
+    multiplier,
+    left: source.left,
+    top: source.top,
+    width: source.width,
+    height: source.height,
+  });
 
   // Overlap is given in canvas px; the snapshot is `multiplier`× that.
   const overlap = Math.max(0, opts.overlapPx ?? 0) * multiplier;
@@ -408,27 +422,28 @@ export function tilePrint(opts: TilePrintOptions): void {
         tileDataUrls.push(tmp.toDataURL('image/png'));
       }
     }
-    sendTilesToPrint(tileDataUrls, opts.pageW, opts.pageH, cols, rows);
+    sendTilesToPrint(tileDataUrls, opts.pageW, opts.pageH, cols, rows, Math.max(0, opts.marginPx ?? 0));
   };
   img.src = fullUrl;
 }
 
-function sendTilesToPrint(tiles: string[], pageW: number, pageH: number, cols: number, rows: number) {
+function sendTilesToPrint(tiles: string[], pageW: number, pageH: number, cols: number, rows: number, marginPx: number) {
   const pages = tiles
     .map((url, i) => {
       const r = Math.floor(i / cols) + 1;
       const c = (i % cols) + 1;
       return `<div class="page">
         <div class="label">Tile ${r}/${rows} × ${c}/${cols}</div>
-        <img src="${url}" />
+        <div class="tile"><img src="${url}" /></div>
       </div>`;
     })
     .join('');
   const html = `<!doctype html><html><head><title>Tile Print</title><style>
     @page { size: ${pageW}px ${pageH}px; margin: 0; }
     html, body { margin: 0; padding: 0; background: #fff; }
-    .page { width: ${pageW}px; height: ${pageH}px; position: relative; page-break-after: always; overflow: hidden; }
+    .page { width: ${pageW}px; height: ${pageH}px; position: relative; page-break-after: always; overflow: hidden; box-sizing: border-box; padding: ${marginPx}px; }
     .page:last-child { page-break-after: auto; }
+    .tile { width: 100%; height: 100%; overflow: hidden; }
     .page img { width: 100%; height: 100%; object-fit: fill; display: block; }
     .label { position: absolute; top: 4px; left: 6px; font: 10px system-ui, sans-serif; color: #888; }
   </style></head><body>
