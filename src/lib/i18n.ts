@@ -908,6 +908,17 @@ const dict: Record<string, Record<Lang, string>> = {
     en: 'Direct USB sending needs the desktop app or Chrome/Edge over HTTPS / localhost. Use Save File instead.',
     zh: '直接 USB 发送需要桌面应用，或在 HTTPS / localhost 上使用 Chrome/Edge。请改用「保存文件」。',
   },
+  'Desktop USB port': { en: 'Desktop USB port', zh: '桌面 USB 端口' },
+  'No serial ports detected': { en: 'No serial ports detected', zh: '未检测到串口' },
+  'Auto-select USB port': { en: 'Auto-select USB port', zh: '自动选择 USB 端口' },
+  'Choose the cutter USB serial port before sending.': {
+    en: 'Choose the cutter USB serial port before sending.',
+    zh: '发送前请选择刻字机 USB 串口。',
+  },
+  'Desktop app can send directly to OS serial ports.': {
+    en: 'Desktop app can send directly to OS serial ports.',
+    zh: '桌面应用可直接发送到系统串口。',
+  },
   'Material': { en: 'Material', zh: '材料' },
   'Search materials…': { en: 'Search materials…', zh: '搜索材料…' },
   'No materials found.': { en: 'No materials found.', zh: '未找到材料。' },

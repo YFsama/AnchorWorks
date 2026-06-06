@@ -7,6 +7,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.12.0] — 2026-06-05
 
 ### Added
+- **Desktop plotter USB picker**: the Send to Plotter dialog now lists OS serial ports in the Tauri desktop app, lets operators refresh/select the cutter USB port, and uses that selection for Test cut and Send via USB instead of relying on ambiguous auto-detection.
 - **Workflow parity polish**: added more keyboard-browsable dialog actions, preset review status, and reset baselines across production dialogs so sign, print, and path-editing workflows are safer to explore before applying.
 - **Roughen reset**: the Roughen effect now exposes a footer Reset action that restores the default 1 mm Size and 3 mm Detail while clearing stale recipe review status.
 - **Preferences reset**: Preferences now includes a footer Reset action that restores the draft captured when the dialog opened and clears stale search / recipe review state before applying or saving.

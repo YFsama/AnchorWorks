@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type PlotterOptions } from '../lib/plotter';
+import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { addPlotterBridges, addPlotterRegistrationMarks, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders } from '../lib/cutPrepActions';
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { optimizeOrder, cutStats, estimateSeconds, formatDuration, type PolyLite } from '../lib/cutOptimize';
@@ -91,6 +91,10 @@ export function PlotterDialog() {
   const [reviewedWeedPreset, setReviewedWeedPreset] = useState('');
   const [reviewedBridgePreset, setReviewedBridgePreset] = useState('');
   const [reviewedPrepAction, setReviewedPrepAction] = useState('');
+  const [nativePorts, setNativePorts] = useState<NativeSerialPort[]>([]);
+  const [selectedPort, setSelectedPort] = useState('');
+  const [portsLoading, setPortsLoading] = useState(false);
+  const [portsError, setPortsError] = useState('');
 
   const cutPaths = useEditor(s => s.cutPaths);
   const clearCutPaths = useEditor(s => s.clearCutPaths);
@@ -154,6 +158,43 @@ export function PlotterDialog() {
   // Live job estimate — the numbers a sign shop checks before feeding a
   // metre of vinyl. Built in mm-space from the cut paths (passes expanded),
   // ordered the same way the output will be so travel/time are honest.
+  const native = isTauri();
+  const webSerial = typeof navigator !== 'undefined' && 'serial' in navigator;
+  const canSend = native || webSerial;
+
+  const refreshSerialPorts = useCallback(async () => {
+    if (!native) return;
+    setPortsLoading(true);
+    setPortsError('');
+    try {
+      const ports = (await listSerialPorts()) ?? [];
+      setNativePorts(ports);
+      setSelectedPort((current) => {
+        if (current && ports.some((port) => port.path === current)) return current;
+        if (ports.length === 1) return ports[0].path;
+        return ports.find((port) => port.kind === 'usb')?.path ?? '';
+      });
+    } catch (error) {
+      setNativePorts([]);
+      setSelectedPort('');
+      setPortsError((error as Error).message);
+    } finally {
+      setPortsLoading(false);
+    }
+  }, [native]);
+
+  useEffect(() => {
+    if (!open || !native) return;
+    const timer = window.setTimeout(() => { void refreshSerialPorts(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, native, refreshSerialPorts]);
+
+  const formatNativePort = (port: NativeSerialPort) => {
+    const details = [port.product, port.manufacturer, port.kind.toUpperCase()].filter(Boolean).join(' · ');
+    const ids = port.vid !== undefined && port.pid !== undefined ? ` · ${port.vid.toString(16).padStart(4, '0')}:${port.pid.toString(16).padStart(4, '0')}` : '';
+    return `${port.path}${details ? ` — ${details}` : ''}${ids}`;
+  };
+
   const stats = useMemo(() => {
     let polys: PolyLite[] = [];
     for (const c of previewPaths) {
@@ -180,9 +221,6 @@ export function PlotterDialog() {
   // EITHER one enables the direct "Send via USB" path; when neither is
   // present we steer the user to "Save File", which works literally
   // everywhere and is the normal cutter-software workflow anyway.
-  const native = isTauri();
-  const webSerial = typeof navigator !== 'undefined' && 'serial' in navigator;
-  const canSend = native || webSerial;
 
   // In cut-path mode, ship the colour-filtered set; otherwise let
   // buildPlotterOutput fall back to the canvas SVG.
@@ -346,7 +384,7 @@ export function PlotterDialog() {
     setBusy(true);
     try {
       const out = code || buildOut();
-      await sendOverSerial(out);
+      await sendOverSerial(out, undefined, native ? selectedPort || undefined : undefined);
       toast.success(t('✅ Sent to plotter'));
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
@@ -450,7 +488,7 @@ export function PlotterDialog() {
     if (!canSend) { download(`test-cut.${format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl')}`, out, 'text/plain'); return; }
     setBusy(true);
     try {
-      await sendOverSerial(out);
+      await sendOverSerial(out, undefined, native ? selectedPort || undefined : undefined);
       toast.success(t('✅ Test cut sent'));
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
@@ -1392,6 +1430,37 @@ export function PlotterDialog() {
           {outputBlocked && (
             <div className="-mt-2 mb-3 rounded border border-warning/50 bg-warning/10 px-2 py-1.5 text-[10px] text-warning">
               {outputBlockedReason}
+            </div>
+          )}
+
+          {native && (
+            <div className="mb-3 rounded border border-border bg-panel2/60 p-2 text-[11px]">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <label className="font-medium text-ink" htmlFor="plotter-native-port">{t('Desktop USB port')}</label>
+                <button type="button" className="btn !py-1 !px-2 !text-[10px]" onClick={refreshSerialPorts} disabled={portsLoading}>
+                  {portsLoading ? t('Refreshing…') : t('Refresh')}
+                </button>
+              </div>
+              <select
+                id="plotter-native-port"
+                className="input"
+                value={selectedPort}
+                onChange={(event) => setSelectedPort(event.target.value)}
+                disabled={portsLoading || nativePorts.length === 0}
+                aria-label={t('Desktop USB port')}
+              >
+                <option value="">{nativePorts.length === 0 ? t('No serial ports detected') : t('Auto-select USB port')}</option>
+                {nativePorts.map((port) => (
+                  <option key={port.path} value={port.path}>{formatNativePort(port)}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-[10px] text-muted">
+                {portsError
+                  ? portsError
+                  : nativePorts.length > 1
+                    ? t('Choose the cutter USB serial port before sending.')
+                    : t('Desktop app can send directly to OS serial ports.')}
+              </p>
             </div>
           )}
 
