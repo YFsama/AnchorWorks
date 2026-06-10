@@ -51,6 +51,27 @@ function collectLeaves(obj: FabricObject): FabricObject[] {
   return [obj];
 }
 
+export function countClipPathsInObject(obj: FabricObject): number {
+  let count = obj.clipPath ? 1 : 0;
+  if (obj.type === 'group') {
+    for (const child of (obj as fabric.Group).getObjects()) count += countClipPathsInObject(child as FabricObject);
+  }
+  return count;
+}
+
+function stripClipPaths(obj: FabricObject): number {
+  let count = 0;
+  if (obj.clipPath) {
+    obj.set({ clipPath: undefined } as Partial<FabricObject>);
+    obj.setCoords();
+    count += 1;
+  }
+  if (obj.type === 'group') {
+    for (const child of (obj as fabric.Group).getObjects()) count += stripClipPaths(child as FabricObject);
+  }
+  return count;
+}
+
 /**
  * Convert any Fabric object into a `fabric.Path` whose geometry matches the
  * object's outline in scene (canvas) coordinates. Used to build the clipPath
@@ -251,131 +272,150 @@ export function releaseClipMask(): boolean {
   return true;
 }
 
+export function expandClippingMask(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const selected = canvas.getActiveObjects().slice();
+  if (!selected.length) return 0;
+
+  let expanded = 0;
+  const leaves: FabricObject[] = [];
+  canvas.discardActiveObject();
+  for (const object of selected) {
+    expanded += stripClipPaths(object);
+    if (object.type === 'group') {
+      const items = (object as fabric.Group).removeAll() as FabricObject[];
+      canvas.remove(object);
+      items.forEach((item) => {
+        canvas.add(item);
+        leaves.push(...collectLeaves(item));
+      });
+      expanded += 1;
+    } else {
+      leaves.push(object);
+    }
+  }
+
+  if (expanded === 0) return 0;
+  canvas.setActiveObject(leaves.length === 1 ? leaves[0] : new fabric.ActiveSelection(leaves, { canvas }));
+  canvas.requestRenderAll();
+  pushHistory();
+  return expanded;
+}
+
 /**
  * Combine 2+ selected paths/closed shapes into one `fabric.Path` with
  * even-odd fill rule. The top-most object's fill/stroke is inherited
  * (matches Illustrator's "Make Compound Path" behaviour).
  */
-export function makeCompoundPath(): boolean {
-  const canvas = getCanvas();
-  if (!canvas) return false;
-  const objs = canvas.getActiveObjects();
-  if (objs.length < 2) return false;
-
-  const sorted = sortByZIndex(objs);
+export function makeCompoundPathFromObjects(canvas: fabric.Canvas, objects: FabricObject[]): fabric.Path | null {
+  if (objects.length < 2) return null;
+  const sorted = sortByZIndex(objects);
   const subpaths: string[] = [];
-  for (const o of sorted) {
-    const d = objectToScenePathD(o);
-    if (d) subpaths.push(d);
+  for (const object of sorted) {
+    const pathData = objectToScenePathD(object);
+    if (pathData) subpaths.push(pathData);
   }
-  if (subpaths.length < 2) return false;
-
-  // Ensure each subpath is closed — otherwise even-odd fill rules can leak.
-  const ensureClosed = (d: string) => (/Z\s*$/i.test(d) ? d : `${d} Z`);
-  const combinedD = subpaths.map(ensureClosed).join(' ');
-
+  if (subpaths.length < 2) return null;
+  const ensureClosed = (pathData: string) => (/Z\s*$/i.test(pathData) ? pathData : `${pathData} Z`);
   const topMost = sorted[sorted.length - 1];
-  const path = new fabric.Path(combinedD, {
+  const path = new fabric.Path(subpaths.map(ensureClosed).join(' '), {
     fill: (topMost.fill as string) ?? '#3d9bff',
     stroke: (topMost.stroke as string) ?? '',
     strokeWidth: topMost.strokeWidth ?? 0,
     opacity: topMost.opacity ?? 1,
     fillRule: 'evenodd',
   });
-
-  // Remove all originals, then add the compound path.
-  sorted.forEach((o) => canvas.remove(o));
+  sorted.forEach((object) => canvas.remove(object));
   canvas.add(path);
+  return path;
+}
+
+export function makeCompoundPath(): boolean {
+  const canvas = getCanvas();
+  if (!canvas) return false;
+  const path = makeCompoundPathFromObjects(canvas, canvas.getActiveObjects() as FabricObject[]);
+  if (!path) return false;
   canvas.discardActiveObject();
   canvas.setActiveObject(path);
   canvas.requestRenderAll();
   pushHistory();
   return true;
 }
-
 /**
  * Split a compound path (one whose `d` contains multiple `M` commands) back
  * into individual `fabric.Path` objects, each positioned at the same scene
  * location. Returns true if at least one path was split.
  */
+export function releaseCompoundPathObjects(canvas: fabric.Canvas, objects: FabricObject[]): { count: number; created: FabricObject[] } {
+  const created: FabricObject[] = [];
+  let count = 0;
+  for (const object of objects) {
+    if (object.type !== 'path') continue;
+    const path = object as fabric.Path;
+    const commands = path.path as unknown as Array<[string, ...number[]]>;
+    const groups = splitSubpaths(commands);
+    if (groups.length < 2) continue;
+
+    const matrix = path.calcTransformMatrix();
+    const offsetX = path.pathOffset.x;
+    const offsetY = path.pathOffset.y;
+    const fill = (path.fill as string) ?? '';
+    const stroke = (path.stroke as string) ?? '';
+    const strokeWidth = path.strokeWidth ?? 0;
+    const opacity = path.opacity ?? 1;
+    const piecesForPath: FabricObject[] = [];
+
+    for (const group of groups) {
+      const pieces: string[] = [];
+      for (const command of group) {
+        const kind = command[0];
+        const point = (x: number, y: number): [number, number] => {
+          const localX = x - offsetX;
+          const localY = y - offsetY;
+          return [matrix[0] * localX + matrix[2] * localY + matrix[4], matrix[1] * localX + matrix[3] * localY + matrix[5]];
+        };
+        if (kind === 'M' || kind === 'L') {
+          const [x, y] = point(command[1] as number, command[2] as number);
+          pieces.push(`${kind} ${x} ${y}`);
+        } else if (kind === 'Q') {
+          const [x1, y1] = point(command[1] as number, command[2] as number);
+          const [x2, y2] = point(command[3] as number, command[4] as number);
+          pieces.push(`Q ${x1} ${y1} ${x2} ${y2}`);
+        } else if (kind === 'C') {
+          const [x1, y1] = point(command[1] as number, command[2] as number);
+          const [x2, y2] = point(command[3] as number, command[4] as number);
+          const [x3, y3] = point(command[5] as number, command[6] as number);
+          pieces.push(`C ${x1} ${y1} ${x2} ${y2} ${x3} ${y3}`);
+        } else if (kind === 'Z' || kind === 'z') {
+          pieces.push('Z');
+        }
+      }
+      if (!pieces.length) continue;
+      piecesForPath.push(new fabric.Path(pieces.join(' '), { fill, stroke, strokeWidth, opacity }));
+    }
+    if (piecesForPath.length < 2) continue;
+    canvas.remove(path);
+    for (const piece of piecesForPath) canvas.add(piece);
+    created.push(...piecesForPath);
+    count++;
+  }
+  return { count, created };
+}
+
 export function releaseCompoundPath(): boolean {
   const canvas = getCanvas();
   if (!canvas) return false;
-  const objs = canvas.getActiveObjects();
-  if (!objs.length) return false;
-
-  let any = false;
-  const out: FabricObject[] = [];
-  for (const o of objs) {
-    if (o.type !== 'path') { out.push(o); continue; }
-    const p = o as fabric.Path;
-    const commands = p.path as unknown as Array<[string, ...number[]]>;
-    const groups = splitSubpaths(commands);
-    if (groups.length < 2) { out.push(o); continue; }
-
-    // Capture the transform / offset so each subpath sits in the same scene
-    // location as the original. We translate each command into scene coords,
-    // build a fresh fabric.Path, and let Fabric recompute the bounding box.
-    const m = p.calcTransformMatrix();
-    const ox = p.pathOffset.x;
-    const oy = p.pathOffset.y;
-    const fill = (p.fill as string) ?? '';
-    const stroke = (p.stroke as string) ?? '';
-    const strokeWidth = p.strokeWidth ?? 0;
-    const opacity = p.opacity ?? 1;
-
-    for (const group of groups) {
-      const cmds: string[] = [];
-      for (const cmd of group) {
-        const c = cmd[0];
-        const xy = (x: number, y: number): [number, number] => {
-          const lx = x - ox;
-          const ly = y - oy;
-          return [m[0] * lx + m[2] * ly + m[4], m[1] * lx + m[3] * ly + m[5]];
-        };
-        if (c === 'M' || c === 'L') {
-          const [x, y] = xy(cmd[1] as number, cmd[2] as number);
-          cmds.push(`${c} ${x} ${y}`);
-        } else if (c === 'Q') {
-          const [x1, y1] = xy(cmd[1] as number, cmd[2] as number);
-          const [x2, y2] = xy(cmd[3] as number, cmd[4] as number);
-          cmds.push(`Q ${x1} ${y1} ${x2} ${y2}`);
-        } else if (c === 'C') {
-          const [x1, y1] = xy(cmd[1] as number, cmd[2] as number);
-          const [x2, y2] = xy(cmd[3] as number, cmd[4] as number);
-          const [x3, y3] = xy(cmd[5] as number, cmd[6] as number);
-          cmds.push(`C ${x1} ${y1} ${x2} ${y2} ${x3} ${y3}`);
-        } else if (c === 'Z' || c === 'z') {
-          cmds.push('Z');
-        }
-      }
-      if (!cmds.length) continue;
-      const piece = new fabric.Path(cmds.join(' '), {
-        fill, stroke, strokeWidth, opacity,
-      });
-      out.push(piece);
-    }
-
-    canvas.remove(p);
-    any = true;
-  }
-
-  if (!any) return false;
-
-  // Add any new paths and rebuild an active selection from the split pieces.
-  const added: FabricObject[] = [];
-  for (const o of out) {
-    if (!canvas.getObjects().includes(o)) {
-      canvas.add(o);
-      added.push(o);
-    }
-  }
+  const objects = canvas.getActiveObjects();
+  if (!objects.length) return false;
+  const { count, created } = releaseCompoundPathObjects(canvas, objects as FabricObject[]);
+  if (count === 0) return false;
   canvas.discardActiveObject();
-  if (added.length >= 2) {
-    const sel = new fabric.ActiveSelection(added, { canvas });
-    canvas.setActiveObject(sel);
-  } else if (added.length === 1) {
-    canvas.setActiveObject(added[0]);
+  if (created.length >= 2) {
+    const selection = new fabric.ActiveSelection(created, { canvas });
+    canvas.setActiveObject(selection);
+  } else if (created.length === 1) {
+    canvas.setActiveObject(created[0]);
   }
   canvas.requestRenderAll();
   pushHistory();

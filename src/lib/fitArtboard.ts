@@ -11,6 +11,33 @@ const MM_TO_PX = 3.7795;
 
 interface Box { left: number; top: number; width: number; height: number; }
 
+function overlaps(box: Box, artboard: Box): boolean {
+  return !(box.left + box.width < artboard.left
+    || box.left > artboard.left + artboard.width
+    || box.top + box.height < artboard.top
+    || box.top > artboard.top + artboard.height);
+}
+
+function activeArtboardId(): string | null {
+  const canvas = getCanvas();
+  const active = canvas?.getActiveObject();
+  if (!active) return null;
+  const activeBox = active.getBoundingRect();
+  return getArtboards().find((artboard) => overlaps(activeBox, {
+    left: artboard.x,
+    top: artboard.y,
+    width: artboard.width,
+    height: artboard.height,
+  }))?.id ?? null;
+}
+
+function objectsOnArtboard(objs: fabric.FabricObject[], artboardId: string): fabric.FabricObject[] {
+  const artboard = getArtboards().find((item) => item.id === artboardId);
+  if (!artboard) return [];
+  const artboardBox = { left: artboard.x, top: artboard.y, width: artboard.width, height: artboard.height };
+  return objs.filter((object) => overlaps(object.getBoundingRect(), artboardBox));
+}
+
 /** Union bounding box of `objs` in scene px, or null if none qualify. */
 function unionBBox(objs: fabric.FabricObject[]): Box | null {
   const rects = objs
@@ -33,6 +60,19 @@ export function fitArtboardToContent(scope: 'selection' | 'all', marginMm = 5, a
   const target = artboardId ?? abs[0]?.id;
   if (!target) return false;
   const objs = scope === 'selection' ? canvas.getActiveObjects() : canvas.getObjects();
+  const bbox = unionBBox(objs);
+  if (!bbox) return false;
+  fitArtboard(target, bbox, marginMm * MM_TO_PX);
+  return true;
+}
+
+/** Fit the active object's artboard to artwork intersecting that artboard or to the current selection. */
+export function fitActiveArtboardToContent(scope: 'selection' | 'all', marginMm = 5): boolean {
+  const canvas = getCanvas();
+  if (!canvas) return false;
+  const target = activeArtboardId();
+  if (!target) return false;
+  const objs = scope === 'selection' ? canvas.getActiveObjects() : objectsOnArtboard(canvas.getObjects(), target);
   const bbox = unionBBox(objs);
   if (!bbox) return false;
   fitArtboard(target, bbox, marginMm * MM_TO_PX);

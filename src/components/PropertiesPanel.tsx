@@ -3,7 +3,16 @@ import { RowInputIdContext, useRowInputId } from '../lib/rowInputIdContext';
 import { RowInput, RowSelect } from './RowInput';
 import { useEditor } from '../store/editor';
 import { applyStyleToSelection, applyTransformToSelection, bringForward, sendBackward, bringToFront, sendToBack, groupSelection, ungroupSelection, deleteSelection, duplicateSelection, renameSelection, getCanvas } from '../lib/canvasEngine';
-import { collectSelectionColors } from '../lib/selectionApply';
+import { addSavedSwatchColor, applySwatchToSelection, collectSelectionColorsIntoSwatches, loadSwatches, normalizeSwatchColor, replaceSavedSwatchWithColor, saveSwatches, selectObjectsUsingSwatch } from '../lib/globalSwatches';
+import {
+  applyGraphicStyleToSelection,
+  loadGraphicStyles,
+  removeGraphicStyle,
+  saveGraphicStyleFromSelection,
+  saveGraphicStyles,
+  selectObjectsUsingGraphicStyle,
+  type GraphicStyle,
+} from '../lib/graphicStyles';
 import {
   applyGradientToSelection,
   applyShadowToSelection,
@@ -17,6 +26,8 @@ import {
   type PatternKind,
 } from '../lib/effects';
 import { applyStrokeAlign, getStrokeAlign, type StrokeAlign } from '../lib/strokeAlign';
+import { applyWidthProfileToSelection, type WidthProfile, WIDTH_PROFILES } from '../lib/variableWidth';
+import { BRUSH_PRESETS, type BrushPresetId } from '../lib/brushPresets';
 import { ariaKeyshortcuts } from '../lib/runtime';
 import {
   applyBlur,
@@ -27,7 +38,7 @@ import {
   applyHueRotate,
   clearFilters,
 } from '../lib/filters';
-import { Copy, Trash2, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, Group, Ungroup, Pipette, Plus, X, Sparkles } from 'lucide-react';
+import { Copy, Trash2, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown, Group, Ungroup, Pipette, Plus, X, Sparkles, MousePointerClick } from 'lucide-react';
 import { FontPicker } from './FontPicker';
 import { CharacterPanel } from './CharacterPanel';
 import { ContrastChecker } from './ContrastChecker';
@@ -87,6 +98,8 @@ export function PropertiesPanel() {
   const selectionIds = useEditor(s => s.selectionIds);
   const style = useEditor(s => s.style);
   const setStyle = useEditor(s => s.setStyle);
+  const brushPreset = useEditor(s => s.brushPreset);
+  const setBrushPreset = useEditor(s => s.setBrushPreset);
   const shadow = useEditor(s => s.shadow);
   const setShadow = useEditor(s => s.setShadow);
   const palette = useEditor(s => s.palette);
@@ -643,6 +656,7 @@ export function PropertiesPanel() {
           </button>
         </div>
         <Swatches />
+        <GraphicStyles />
         <div className="flex items-center gap-2 mb-2">
           <button
             type="button"
@@ -719,6 +733,17 @@ export function PropertiesPanel() {
               })}
             </div>
           </div>
+        </Row>
+        <Row label={t('Brush preset')}>
+          <RowSelect
+            value={brushPreset}
+            aria-label={t('Brush preset')}
+            onChange={(event) => setBrushPreset(event.target.value as BrushPresetId)}
+          >
+            {BRUSH_PRESETS.map((preset) => (
+              <option key={preset.id} value={preset.id}>{t(preset.label)}</option>
+            ))}
+          </RowSelect>
         </Row>
         <Row label={t('Opacity')}>
           {/* Slider + percent readout — matches the Blur/Bright/Contrast/Hue
@@ -1546,6 +1571,26 @@ export function PropertiesPanel() {
             <span>{t('Keep stroke width when scaling')}</span>
           </label>
         </Row>
+        <Row label={t('Width profile')}>
+          <div
+            className="grid grid-cols-3 gap-1"
+            role="group"
+            aria-label={t('Width profile')}
+            title={t('Apply variable width profile')}
+          >
+            {WIDTH_PROFILES.map((profile) => (
+              <button
+                key={profile}
+                type="button"
+                className="btn !py-1 !px-1 !text-[10px]"
+                title={widthProfileLabel(profile, t)}
+                onClick={() => applyWidthProfileToSelection(profile)}
+              >
+                {widthProfileShortLabel(profile, t)}
+              </button>
+            ))}
+          </div>
+        </Row>
       </div>
 
       {/* Blend mode */}
@@ -1969,6 +2014,29 @@ function lineJoinLabel(join: CanvasLineJoin, t: (key: string) => string): string
   return t('Bevel');
 }
 
+
+function widthProfileLabel(profile: WidthProfile, t: (key: string) => string): string {
+  switch (profile) {
+    case 'taper-start': return t('Taper Start');
+    case 'taper-end': return t('Taper End');
+    case 'taper-both': return t('Taper Both');
+    case 'bulge': return t('Bulge');
+    case 'hourglass': return t('Hourglass');
+    default: return t('Uniform');
+  }
+}
+
+function widthProfileShortLabel(profile: WidthProfile, t: (key: string) => string): string {
+  switch (profile) {
+    case 'taper-start': return t('Start');
+    case 'taper-end': return t('End');
+    case 'taper-both': return t('Both');
+    case 'bulge': return t('Bulge');
+    case 'hourglass': return t('Hourglass');
+    default: return t('Uniform');
+  }
+}
+
 function strokeAlignLabel(mode: StrokeAlign, t: (key: string) => string): string {
   if (mode === 'center') return t('Center');
   if (mode === 'inside') return t('Inside');
@@ -2035,66 +2103,50 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 }
 
 // ---------- Swatches ----------
-const SWATCH_KEY = 'vector.swatches';
-const DEFAULT_SWATCHES: string[] = [
-  '#000000', '#ffffff', '#9a9aa6', '#3a3a44',
-  '#ff3d3d', '#ff7a3d', '#ffc83d', '#f1ff3d',
-  '#7aff3d', '#3dff7a', '#3dffd0', '#3dd0ff',
-  '#3d9bff', '#3d5fff', '#7a3dff', '#c83dff',
-  '#ff3dc8', '#ff3d7a', '#7a4f2b', '#2b4f7a',
-  '#0f3d2b', '#5b2b3d', '#2b1b2b', '#15151a',
-];
-
-function loadSwatches(): string[] {
-  try {
-    const raw = localStorage.getItem(SWATCH_KEY);
-    if (!raw) return DEFAULT_SWATCHES.slice();
-    const arr = JSON.parse(raw);
-    if (Array.isArray(arr)) return arr.filter((c) => typeof c === 'string');
-  } catch { /* ignore */ }
-  return DEFAULT_SWATCHES.slice();
-}
-
-function saveSwatches(arr: string[]) {
-  try { localStorage.setItem(SWATCH_KEY, JSON.stringify(arr)); } catch { /* ignore */ }
-}
-
 function Swatches() {
   const t = useT();
   const [swatches, setSwatches] = useState<string[]>(() => loadSwatches());
+  const [activeSwatch, setActiveSwatch] = useState<string | null>(null);
   const style = useEditor(s => s.style);
-  const setStyle = useEditor(s => s.setStyle);
 
   useEffect(() => { saveSwatches(swatches); }, [swatches]);
 
   const onClick = (e: React.MouseEvent, color: string) => {
     e.preventDefault();
-    if (e.altKey) {
-      setStyle({ stroke: color });
-      applyStyleToSelection({ stroke: color });
-    } else {
-      setStyle({ fill: color });
-      applyStyleToSelection({ fill: color });
-    }
+    setActiveSwatch(color);
+    applySwatchToSelection(color, e.altKey ? 'stroke' : 'fill');
   };
 
   const onContext = (e: React.MouseEvent, idx: number) => {
     e.preventDefault();
+    if (activeSwatch && normalizeSwatchColor(activeSwatch) === normalizeSwatchColor(swatches[idx])) setActiveSwatch(null);
     setSwatches(swatches.filter((_, i) => i !== idx));
   };
 
   const addCurrent = () => {
     const c = style.fill;
     if (!c || typeof c !== 'string') return;
-    if (swatches.includes(c)) return;
-    setSwatches([...swatches, c]);
+    const next = addSavedSwatchColor(c);
+    if (next.length !== swatches.length) setSwatches(next);
   };
 
   // Harvest every solid fill/stroke colour used in the selection into swatches.
   const collectColors = () => {
-    const have = new Set(swatches.map((c) => c.toLowerCase()));
-    const fresh = collectSelectionColors().filter((c) => !have.has(c.toLowerCase()));
-    if (fresh.length) setSwatches([...swatches, ...fresh]);
+    const result = collectSelectionColorsIntoSwatches();
+    if (result.added) setSwatches(result.swatches);
+  };
+
+  const replaceGlobal = () => {
+    const target = typeof style.fill === 'string' ? style.fill : '';
+    if (!activeSwatch || !target || normalizeSwatchColor(activeSwatch) === normalizeSwatchColor(target)) return;
+    const result = replaceSavedSwatchWithColor(activeSwatch, target);
+    setSwatches(result.swatches);
+    setActiveSwatch(target);
+  };
+
+  const selectSwatchArt = () => {
+    if (!activeSwatch) return;
+    selectObjectsUsingSwatch(activeSwatch);
   };
 
   return (
@@ -2111,7 +2163,7 @@ function Swatches() {
             title={c}
             onClick={(e) => onClick(e, c)}
             onContextMenu={(e) => onContext(e, i)}
-            className="w-5 h-5 rounded-sm border border-border hover:scale-110 transition-transform"
+            className={`w-5 h-5 rounded-sm border hover:scale-110 transition-transform ${activeSwatch && normalizeSwatchColor(activeSwatch) === normalizeSwatchColor(c) ? 'border-accent ring-1 ring-accent' : 'border-border'}`}
             style={{ backgroundColor: c }}
           />
         ))}
@@ -2129,6 +2181,107 @@ function Swatches() {
           onClick={collectColors}
           className="w-5 h-5 rounded-sm border border-border bg-panel2 text-muted hover:text-ink hover:bg-panel3 transition-colors flex items-center justify-center"
         ><Pipette size={11} aria-hidden="true" /></button>
+        <button
+          type="button"
+          title={t('Select art using selected swatch')}
+          aria-label={t('Select art using selected swatch')}
+          disabled={!activeSwatch}
+          onClick={selectSwatchArt}
+          className="w-5 h-5 rounded-sm border border-border bg-panel2 text-muted hover:text-ink hover:bg-panel3 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+        ><MousePointerClick size={11} aria-hidden="true" /></button>
+        <button
+          type="button"
+          title={t('Replace selected global swatch with current fill')}
+          aria-label={t('Replace selected global swatch with current fill')}
+          disabled={!activeSwatch || typeof style.fill !== 'string' || normalizeSwatchColor(activeSwatch) === normalizeSwatchColor(style.fill)}
+          onClick={replaceGlobal}
+          className="h-5 px-1 rounded-sm border border-border bg-panel2 text-muted hover:text-ink hover:bg-panel3 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-[10px] leading-none"
+        >{t('Global')}</button>
+      </div>
+    </div>
+  );
+}
+
+
+// ---------- Graphic Styles ----------
+function GraphicStyles() {
+  const t = useT();
+  const [styles, setStyles] = useState<GraphicStyle[]>(() => loadGraphicStyles());
+  const hasSelection = useEditor(s => s.selectionIds.length > 0);
+
+  useEffect(() => { saveGraphicStyles(styles); }, [styles]);
+
+  const applyStyle = (style: GraphicStyle) => {
+    applyGraphicStyleToSelection(style);
+  };
+
+  const addFromSelection = () => {
+    const next = saveGraphicStyleFromSelection(`${t('Style')} ${styles.length + 1}`);
+    if (!next) return;
+    setStyles([...styles, next]);
+  };
+
+  const removeStyle = (event: React.MouseEvent, id: string) => {
+    event.preventDefault();
+    if (removeGraphicStyle(id)) setStyles(loadGraphicStyles());
+  };
+
+  const selectStyleArt = (event: React.MouseEvent, style: GraphicStyle) => {
+    event.preventDefault();
+    event.stopPropagation();
+    selectObjectsUsingGraphicStyle(style);
+  };
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between text-muted text-[10px] mb-1">
+        <span>{t('Graphic Styles')}</span>
+        <span className="opacity-60">{t('Click = apply · right-click = remove')}</span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {styles.map((style) => (
+          <span key={style.id} className="relative group/style">
+            <button
+              type="button"
+              title={`${style.name} · ${t('Click to apply graphic style')}`}
+              aria-label={`${t('Apply graphic style')} ${style.name}`}
+              aria-disabled={!hasSelection}
+              onClick={() => { if (hasSelection) applyStyle(style); }}
+              onContextMenu={(event) => removeStyle(event, style.id)}
+              className={`w-8 h-7 rounded border border-border bg-panel2 hover:border-accent2 transition overflow-hidden ${hasSelection ? '' : 'opacity-45'}`}
+            >
+              <span
+                aria-hidden="true"
+                className="block w-full h-full"
+                style={{
+                  background: style.fill || 'transparent',
+                  border: `${Math.max(1, Math.min(4, style.strokeWidth || 1))}px solid ${style.stroke || 'transparent'}`,
+                  opacity: style.opacity,
+                  boxShadow: style.shadow ? `${style.shadow.offsetX / 2}px ${style.shadow.offsetY / 2}px ${Math.max(1, style.shadow.blur / 3)}px ${style.shadow.color}` : 'none',
+                }}
+              />
+            </button>
+            <button
+              type="button"
+              title={t('Select art using graphic style')}
+              aria-label={`${t('Select art using graphic style')} ${style.name}`}
+              onClick={(event) => selectStyleArt(event, style)}
+              className="absolute -top-1 -right-1 w-4 h-4 rounded-full border border-border bg-panel2 text-muted hover:text-accent2 hover:border-accent2 opacity-0 group-hover/style:opacity-100 focus-visible:opacity-100 transition-opacity flex items-center justify-center"
+            >
+              <MousePointerClick size={9} aria-hidden="true" />
+            </button>
+          </span>
+        ))}
+        <button
+          type="button"
+          title={t('Save selection as graphic style')}
+          aria-label={t('Save selection as graphic style')}
+          onClick={addFromSelection}
+          disabled={!hasSelection}
+          className="w-8 h-7 rounded border border-border bg-panel2 text-muted hover:text-ink hover:bg-panel3 transition-colors flex items-center justify-center text-[11px] leading-none disabled:opacity-45"
+        >
+          <span aria-hidden="true">+</span>
+        </button>
       </div>
     </div>
   );

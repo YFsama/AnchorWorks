@@ -18,10 +18,35 @@ function toD(pts: Pt[], closed: boolean): string {
   return parts.join(' ');
 }
 
+export function canOffsetPathObject(object: fabric.FabricObject): boolean {
+  return object.type === 'path' || object.type === 'rect' || object.type === 'polygon' || object.type === 'ellipse' || object.type === 'circle';
+}
+
+export function offsetPathObject(canvas: fabric.Canvas, object: fabric.FabricObject, offsetMm: number): fabric.Path | null {
+  if (!canOffsetPathObject(object) || !Number.isFinite(offsetMm) || offsetMm === 0) return null;
+  const distance = offsetMm * MM_TO_PX;
+  const parts: string[] = [];
+  for (const cutPath of buildOutlineCutPaths([object], 0, 1)) {
+    const points = cutPath.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
+    for (const ring of offsetPolyline(points, distance, cutPath.closed)) {
+      if (ring.length >= 2) parts.push(toD(ring, cutPath.closed));
+    }
+  }
+  if (parts.length === 0) return null;
+  const path = new fabric.Path(parts.join(' '), {
+    fill: (object.fill as string) ?? '',
+    stroke: (object.stroke as string) ?? '',
+    strokeWidth: object.strokeWidth ?? 0,
+    opacity: object.opacity ?? 1,
+  });
+  canvas.add(path);
+  return path;
+}
+
 /** True when the selection has a path/shape to offset. */
 export function canOffsetPath(): boolean {
   const c = getCanvas();
-  return !!c && c.getActiveObjects().some(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon' || o.type === 'ellipse' || o.type === 'circle');
+  return !!c && c.getActiveObjects().some(canOffsetPathObject);
 }
 
 /** Add an offset copy of every selected path/shape. Returns the count added. */
@@ -30,26 +55,11 @@ export function offsetPathSelection(offsetMm: number): number {
   if (!canvas || offsetMm === 0) return 0;
   const objs = canvas.getActiveObjects();
   if (objs.length === 0) return 0;
-  const dist = offsetMm * MM_TO_PX;
 
   const created: fabric.FabricObject[] = [];
   for (const obj of objs) {
-    const parts: string[] = [];
-    for (const cp of buildOutlineCutPaths([obj], 0, 1)) {
-      const px = cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
-      for (const ring of offsetPolyline(px, dist, cp.closed)) {
-        if (ring.length >= 2) parts.push(toD(ring, cp.closed));
-      }
-    }
-    if (parts.length === 0) continue;
-    const np = new fabric.Path(parts.join(' '), {
-      fill: (obj.fill as string) ?? '',
-      stroke: (obj.stroke as string) ?? '',
-      strokeWidth: obj.strokeWidth ?? 0,
-      opacity: obj.opacity ?? 1,
-    });
-    canvas.add(np);
-    created.push(np);
+    const path = offsetPathObject(canvas as fabric.Canvas, obj, offsetMm);
+    if (path) created.push(path);
   }
 
   if (created.length === 0) return 0;

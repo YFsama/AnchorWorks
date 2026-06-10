@@ -60,38 +60,47 @@ export function puckerBloatPolyline(pts: Pt[], closed: boolean, amount: number):
   return out;
 }
 
+export function canPuckerObject(object: fabric.FabricObject): boolean {
+  return object.type === 'path' || object.type === 'rect' || object.type === 'polygon' || object.type === 'ellipse';
+}
+
+export function puckerObject(canvas: fabric.Canvas, object: fabric.FabricObject, amount: number): fabric.Path | null {
+  if (!canPuckerObject(object) || amount === 0) return null;
+  const amt = Math.max(-1, Math.min(1, amount));
+  const parts: string[] = [];
+  for (const cutPath of buildOutlineCutPaths([object], 0, 1)) {
+    const points = cutPath.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
+    const puckered = puckerBloatPolyline(points, cutPath.closed, amt);
+    if (puckered.length >= 2) parts.push(toD(puckered, cutPath.closed));
+  }
+  if (parts.length === 0) return null;
+  const path = new fabric.Path(parts.join(' '), {
+    fill: (object.fill as string) ?? '',
+    stroke: (object.stroke as string) ?? '',
+    strokeWidth: object.strokeWidth ?? 0,
+    opacity: object.opacity ?? 1,
+  });
+  canvas.remove(object);
+  canvas.add(path);
+  return path;
+}
+
 /** True when the selection has a path/shape to pucker. */
 export function canPucker(): boolean {
   const c = getCanvas();
-  return !!c && c.getActiveObjects().some(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon' || o.type === 'ellipse');
+  return !!c && c.getActiveObjects().some(canPuckerObject);
 }
 
 /** Pucker/bloat every selected path/shape. `amount` is -1..1. Returns the count. */
 export function puckerSelection(amount: number): number {
   const canvas = getCanvas();
   if (!canvas || amount === 0) return 0;
-  const objs = canvas.getActiveObjects().filter(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon' || o.type === 'ellipse');
+  const objs = canvas.getActiveObjects().filter(canPuckerObject);
   if (objs.length === 0) return 0;
-  const amt = Math.max(-1, Math.min(1, amount));
 
   let count = 0;
   for (const obj of objs) {
-    const parts: string[] = [];
-    for (const cp of buildOutlineCutPaths([obj], 0, 1)) {
-      const px = cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
-      const pb = puckerBloatPolyline(px, cp.closed, amt);
-      if (pb.length >= 2) parts.push(toD(pb, cp.closed));
-    }
-    if (parts.length === 0) continue;
-    const np = new fabric.Path(parts.join(' '), {
-      fill: (obj.fill as string) ?? '',
-      stroke: (obj.stroke as string) ?? '',
-      strokeWidth: obj.strokeWidth ?? 0,
-      opacity: obj.opacity ?? 1,
-    });
-    canvas.remove(obj);
-    canvas.add(np);
-    count++;
+    if (puckerObject(canvas as fabric.Canvas, obj, amount)) count++;
   }
   if (count > 0) {
     canvas.discardActiveObject();

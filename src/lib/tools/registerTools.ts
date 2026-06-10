@@ -42,6 +42,7 @@ import { useEditor } from '../../store/editor';
 import { zoomToPoint } from '../viewport';
 import { enterPathEdit, exitPathEdit } from '../pathEdit';
 import { PressureBrush } from '../pressureBrush';
+import { computeBrushBaseWidth, getBrushPreset } from '../brushPresets';
 import { panBegin } from '../panSession';
 import {
   MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Type, Hand, ZoomIn, Ruler, Pipette,
@@ -169,15 +170,19 @@ export function registerBuiltInTools(): void {
       canvas.isDrawingMode = true;
       const style = useEditor.getState().style;
       const hasPenSupport = typeof window !== 'undefined' && 'PointerEvent' in window && navigator.maxTouchPoints > 0;
-      if (hasPenSupport) {
+      const brushPreset = useEditor.getState().brushPreset;
+      const preset = getBrushPreset(brushPreset);
+      if (hasPenSupport || brushPreset !== 'basic') {
         const pb = new PressureBrush(canvas);
         pb.color = style.stroke;
-        pb.baseWidth = Math.max(1, style.strokeWidth) * 3;
+        pb.baseWidth = computeBrushBaseWidth(style.strokeWidth, brushPreset);
+        pb.minWidthRatio = preset.minWidthRatio;
+        pb.speedSensitivity = preset.speedSensitivity;
         canvas.freeDrawingBrush = pb;
       } else {
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
         canvas.freeDrawingBrush.color = style.stroke;
-        canvas.freeDrawingBrush.width = Math.max(1, style.strokeWidth);
+        canvas.freeDrawingBrush.width = computeBrushBaseWidth(style.strokeWidth, brushPreset);
       }
     },
   });

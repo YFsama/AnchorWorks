@@ -53,40 +53,49 @@ function toD(pts: Pt[], closed: boolean): string {
   return parts.join(' ');
 }
 
+export function canRoundCornersObject(object: fabric.FabricObject): boolean {
+  return object.type === 'path' || object.type === 'rect' || object.type === 'polygon';
+}
+
+export function roundCornersObject(canvas: fabric.Canvas, object: fabric.FabricObject, radiusMm: number): fabric.Path | null {
+  if (!canRoundCornersObject(object) || radiusMm <= 0) return null;
+  const r = radiusMm * MM_TO_PX;
+  const cuts = buildOutlineCutPaths([object], 0, 1);
+  const parts: string[] = [];
+  for (const cp of cuts) {
+    const px = cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
+    const rounded = roundPolyline(px, cp.closed, r);
+    if (rounded.length < 2) continue;
+    parts.push(toD(rounded, cp.closed));
+  }
+  if (parts.length === 0) return null;
+  const path = new fabric.Path(parts.join(' '), {
+    fill: (object.fill as string) ?? '',
+    stroke: (object.stroke as string) ?? '',
+    strokeWidth: object.strokeWidth ?? 0,
+    opacity: object.opacity ?? 1,
+  });
+  canvas.remove(object);
+  canvas.add(path);
+  return path;
+}
+
 /** True when the selection has a path to round. */
 export function canRoundCorners(): boolean {
   const c = getCanvas();
-  return !!c && c.getActiveObjects().some(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon');
+  return !!c && c.getActiveObjects().some(canRoundCornersObject);
 }
 
 /** Round the corners of every selected path/shape by `radiusMm`. Returns count. */
 export function roundCornersOnSelection(radiusMm: number): number {
   const canvas = getCanvas();
-  if (!canvas) return 0;
-  const objs = canvas.getActiveObjects().filter(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon');
+  if (!canvas || radiusMm <= 0) return 0;
+  const objs = canvas.getActiveObjects().filter(canRoundCornersObject);
   if (objs.length === 0) return 0;
-  const r = radiusMm * MM_TO_PX;
 
   let count = 0;
   for (const obj of objs) {
-    const cuts = buildOutlineCutPaths([obj], 0, 1);
-    const parts: string[] = [];
-    for (const cp of cuts) {
-      const px = cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
-      const rounded = roundPolyline(px, cp.closed, r);
-      if (rounded.length < 2) continue;
-      parts.push(toD(rounded, cp.closed));
-    }
-    if (parts.length === 0) continue;
-    const np = new fabric.Path(parts.join(' '), {
-      fill: (obj.fill as string) ?? '',
-      stroke: (obj.stroke as string) ?? '',
-      strokeWidth: obj.strokeWidth ?? 0,
-      opacity: obj.opacity ?? 1,
-    });
-    canvas.remove(obj);
-    canvas.add(np);
-    count++;
+    if (roundCornersObject(canvas, obj, radiusMm)) count++;
   }
   if (count > 0) {
     canvas.discardActiveObject();

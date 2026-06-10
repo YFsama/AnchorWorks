@@ -17,6 +17,24 @@ function ringToD(pts: Pt[]): string {
   return pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${(x * MM_TO_PX).toFixed(2)} ${(y * MM_TO_PX).toFixed(2)}`).join(' ') + ' Z';
 }
 
+export function outlineStrokeObjectToFill(canvas: fabric.Canvas, obj: fabric.FabricObject): fabric.Path | null {
+  if ((obj.strokeWidth ?? 0) <= 0 || typeof obj.stroke !== 'string' || !obj.stroke) return null;
+  const cps = outlineStrokeToCutPaths([obj]);
+  if (cps.length === 0) return null;
+  const d = cps.map(cp => ringToD(cp.points)).join(' ');
+  const fillPath = new fabric.Path(d, {
+    fill: obj.stroke as string,
+    stroke: '',
+    strokeWidth: 0,
+    opacity: obj.opacity ?? 1,
+    fillRule: 'evenodd',
+  });
+  obj.set({ stroke: '', strokeWidth: 0 });
+  obj.setCoords();
+  canvas.add(fillPath);
+  return fillPath;
+}
+
 /** True when the selection has a stroked object to outline. */
 export function canOutlineStrokeFill(): boolean {
   const c = getCanvas();
@@ -33,20 +51,8 @@ export function outlineStrokeToFillSelection(): number {
 
   let count = 0;
   for (const obj of objs) {
-    const cps = outlineStrokeToCutPaths([obj]);
-    if (cps.length === 0) continue;
-    const d = cps.map(cp => ringToD(cp.points)).join(' ');
-    const fillPath = new fabric.Path(d, {
-      fill: obj.stroke as string,
-      stroke: '',
-      strokeWidth: 0,
-      opacity: obj.opacity ?? 1,
-      fillRule: 'evenodd',
-    });
-    // Drop the stroke from the source so the new shape isn't doubled.
-    obj.set({ stroke: '', strokeWidth: 0 });
-    obj.setCoords();
-    canvas.add(fillPath);
+    const fillPath = outlineStrokeObjectToFill(canvas as fabric.Canvas, obj);
+    if (!fillPath) continue;
     count++;
   }
   if (count > 0) {

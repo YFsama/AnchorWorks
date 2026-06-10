@@ -54,6 +54,10 @@ function objectCorners(bounds: { left: number; top: number; width: number; heigh
   };
 }
 
+export function canFreeDistortObject(object: fabric.FabricObject): boolean {
+  return object.type === 'path' || object.type === 'rect' || object.type === 'polygon' || object.type === 'ellipse';
+}
+
 function distortedParts(obj: fabric.FabricObject, offsets: FreeDistortCorners): string[] {
   const loops = sourceLoops(obj);
   const bounds = boundsOfLoops(loops);
@@ -75,7 +79,7 @@ export function updateFreeDistortPreview(offsets: FreeDistortCorners): number {
   const canvas = getCanvas();
   if (!canvas) return 0;
   clearFreeDistortPreview();
-  const objs = canvas.getActiveObjects().filter(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon' || o.type === 'ellipse');
+  const objs = canvas.getActiveObjects().filter(canFreeDistortObject);
   let count = 0;
   for (const obj of objs) {
     const parts = distortedParts(obj, offsets);
@@ -98,25 +102,30 @@ export function updateFreeDistortPreview(offsets: FreeDistortCorners): number {
   return count;
 }
 
+export function freeDistortObject(canvas: fabric.Canvas, object: fabric.FabricObject, offsets: FreeDistortCorners): fabric.Path | null {
+  if (!canFreeDistortObject(object)) return null;
+  const parts = distortedParts(object, offsets);
+  if (!parts.length) return null;
+  const path = new fabric.Path(parts.join(' '), {
+    fill: (object.fill as string) ?? '',
+    stroke: (object.stroke as string) ?? '',
+    strokeWidth: object.strokeWidth ?? 0,
+    opacity: object.opacity ?? 1,
+  });
+  canvas.remove(object);
+  canvas.add(path);
+  return path;
+}
+
 export function freeDistortSelection(offsets: FreeDistortCorners): number {
   const canvas = getCanvas();
   if (!canvas) return 0;
   clearFreeDistortPreview();
-  const objs = canvas.getActiveObjects().filter(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon' || o.type === 'ellipse');
+  const objs = canvas.getActiveObjects().filter(canFreeDistortObject);
   if (!objs.length) return 0;
   let count = 0;
   for (const obj of objs) {
-    const parts = distortedParts(obj, offsets);
-    if (!parts.length) continue;
-    const np = new fabric.Path(parts.join(' '), {
-      fill: (obj.fill as string) ?? '',
-      stroke: (obj.stroke as string) ?? '',
-      strokeWidth: obj.strokeWidth ?? 0,
-      opacity: obj.opacity ?? 1,
-    });
-    canvas.remove(obj);
-    canvas.add(np);
-    count++;
+    if (freeDistortObject(canvas, obj, offsets)) count++;
   }
   if (count > 0) {
     canvas.discardActiveObject();

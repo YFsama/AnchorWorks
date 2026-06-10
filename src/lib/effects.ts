@@ -10,6 +10,95 @@ export type GradientType = 'linear' | 'radial';
  * @param type   'linear' | 'radial'
  * @param angle  Degrees, used only for linear gradients (0 = left→right)
  */
+function isFabricGradient(value: unknown): value is fabric.Gradient<'linear' | 'radial'> {
+  return !!value && typeof value === 'object' && 'colorStops' in value && 'type' in value;
+}
+
+
+function alphaPaint(value: unknown, alpha: number): string | null {
+  if (typeof value !== 'string' || !value.trim() || alpha >= 1) return null;
+  const paint = value.trim();
+  const hex = paint.replace('#', '');
+  if (/^[0-9a-f]{3}$/i.test(hex)) {
+    const red = parseInt(hex[0] + hex[0], 16);
+    const green = parseInt(hex[1] + hex[1], 16);
+    const blue = parseInt(hex[2] + hex[2], 16);
+    return `rgba(${red}, ${green}, ${blue}, ${Number(alpha.toFixed(3))})`;
+  }
+  if (/^[0-9a-f]{6}$/i.test(hex)) {
+    const red = parseInt(hex.slice(0, 2), 16);
+    const green = parseInt(hex.slice(2, 4), 16);
+    const blue = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${Number(alpha.toFixed(3))})`;
+  }
+  const rgb = /^rgba?\(([^)]+)\)$/i.exec(paint);
+  if (!rgb) return null;
+  const parts = rgb[1].split(',').map(part => Number(part.trim()));
+  if (parts.length !== 3 && parts.length !== 4) return null;
+  if (!parts.every(Number.isFinite)) return null;
+  const sourceAlpha = parts.length === 4 ? Math.max(0, Math.min(1, parts[3])) : 1;
+  return `rgba(${Math.max(0, Math.min(255, parts[0]))}, ${Math.max(0, Math.min(255, parts[1]))}, ${Math.max(0, Math.min(255, parts[2]))}, ${Number((sourceAlpha * alpha).toFixed(3))})`;
+}
+
+export function flattenTransparencyObject(object: fabric.FabricObject): boolean {
+  const opacity = Math.max(0, Math.min(1, Number(object.opacity ?? 1)));
+  const blendMode = object.globalCompositeOperation;
+  const hasBlendMode = typeof blendMode === 'string' && blendMode !== 'source-over';
+  if (opacity >= 1 && !hasBlendMode) return false;
+  const fill = alphaPaint(object.fill, opacity);
+  const stroke = alphaPaint(object.stroke, opacity);
+  const updates: Record<string, unknown> = { opacity: 1 };
+  if (fill) updates.fill = fill;
+  if (stroke) updates.stroke = stroke;
+  object.set(updates);
+  object.globalCompositeOperation = 'source-over';
+  const shadow = object.shadow as fabric.Shadow | null | undefined;
+  if (shadow && opacity < 1) {
+    const color = alphaPaint(shadow.color, opacity) ?? shadow.color;
+    object.set('shadow', new fabric.Shadow({ color, blur: shadow.blur, offsetX: shadow.offsetX, offsetY: shadow.offsetY }));
+  }
+  object.setCoords();
+  return true;
+}
+
+export function flattenTransparencySelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  let count = 0;
+  for (const object of canvas.getActiveObjects()) {
+    if (flattenTransparencyObject(object)) count += 1;
+  }
+  if (count > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return count;
+}
+
+export function clearGradientFillFromObject(object: fabric.FabricObject): boolean {
+  const fill = object.fill;
+  if (!isFabricGradient(fill)) return false;
+  const stops = Array.isArray(fill.colorStops) ? fill.colorStops : [];
+  const firstColor = typeof stops[0]?.color === 'string' ? stops[0].color : '#ffffff';
+  object.set({ fill: firstColor });
+  object.setCoords();
+  return true;
+}
+
+export function clearGradientFillSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  let count = 0;
+  for (const object of canvas.getActiveObjects()) {
+    if (clearGradientFillFromObject(object)) count += 1;
+  }
+  if (count > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return count;
+}
+
 export function applyGradientToSelection(
   stops: GradientStop[],
   type: GradientType,
@@ -84,6 +173,66 @@ export type ShadowSpec = {
   offsetY: number;
 };
 
+export type ExpandedShadowSpec = ShadowSpec & { opacity: number };
+
+type ShadowLike = Partial<ShadowSpec> & { color?: string; affectStroke?: boolean; nonScaling?: boolean };
+
+export function extractExpandedShadowSpec(shadow: ShadowLike | null | undefined): ExpandedShadowSpec | null {
+  if (!shadow || typeof shadow.color !== 'string' || !shadow.color) return null;
+  return {
+    color: shadow.color,
+    blur: Number.isFinite(shadow.blur) ? Math.max(0, Number(shadow.blur)) : 0,
+    offsetX: Number.isFinite(shadow.offsetX) ? Number(shadow.offsetX) : 0,
+    offsetY: Number.isFinite(shadow.offsetY) ? Number(shadow.offsetY) : 0,
+    opacity: 0.45,
+  };
+}
+
+function applyExpandedShadowAppearance(object: fabric.FabricObject, spec: ExpandedShadowSpec): void {
+  object.set({
+    left: (object.left ?? 0) + spec.offsetX,
+    top: (object.top ?? 0) + spec.offsetY,
+    fill: spec.color,
+    stroke: '',
+    strokeWidth: 0,
+    opacity: Math.min(1, Math.max(0, spec.opacity)),
+    shadow: spec.blur > 0 ? new fabric.Shadow({ color: spec.color, blur: spec.blur, offsetX: 0, offsetY: 0 }) : null,
+    globalCompositeOperation: 'source-over',
+  });
+  object.setCoords();
+}
+
+export async function expandDropShadowObjects(canvas: fabric.Canvas, objects: fabric.FabricObject[]): Promise<{ count: number; created: fabric.FabricObject[] }> {
+  const created: fabric.FabricObject[] = [];
+  let count = 0;
+  for (const object of objects) {
+    const spec = extractExpandedShadowSpec(object.shadow as ShadowLike | null | undefined);
+    if (!spec) continue;
+    const clone = await object.clone();
+    applyExpandedShadowAppearance(clone as fabric.FabricObject, spec);
+    object.shadow = null;
+    object.setCoords();
+    canvas.add(clone as fabric.FabricObject);
+    canvas.sendObjectToBack(clone as fabric.FabricObject);
+    created.push(clone as fabric.FabricObject);
+    count += 1;
+  }
+  return { count, created };
+}
+
+export async function expandDropShadowSelection(): Promise<number> {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const { count, created } = await expandDropShadowObjects(canvas, canvas.getActiveObjects());
+  if (count > 0) {
+    canvas.discardActiveObject();
+    canvas.setActiveObject(created.length === 1 ? created[0] : new fabric.ActiveSelection(created, { canvas }));
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return count;
+}
+
 /** Apply (or remove with null) a drop shadow on all selected objects. */
 export function applyShadowToSelection(shadow: ShadowSpec | null) {
   const canvas = getCanvas();
@@ -154,6 +303,52 @@ export function applyBlendModeToSelection(mode: GlobalCompositeOperation) {
   });
   canvas.requestRenderAll();
   pushHistory();
+}
+
+export type OverprintTarget = 'fill' | 'stroke' | 'both';
+
+type OverprintObject = fabric.FabricObject & {
+  overprint?: boolean;
+  fillOverprint?: boolean;
+  strokeOverprint?: boolean;
+  overprintFill?: boolean;
+  overprintStroke?: boolean;
+};
+
+export function setOverprintOnObject(object: fabric.FabricObject, target: OverprintTarget, enabled: boolean): boolean {
+  const overprintObject = object as OverprintObject;
+  const updates: Partial<OverprintObject> = {};
+  if (target === 'fill' || target === 'both') {
+    if (overprintObject.fillOverprint !== enabled || overprintObject.overprintFill !== enabled) {
+      updates.fillOverprint = enabled;
+      updates.overprintFill = enabled;
+    }
+  }
+  if (target === 'stroke' || target === 'both') {
+    if (overprintObject.strokeOverprint !== enabled || overprintObject.overprintStroke !== enabled) {
+      updates.strokeOverprint = enabled;
+      updates.overprintStroke = enabled;
+    }
+  }
+  if (target === 'both' && overprintObject.overprint !== enabled) updates.overprint = enabled;
+  if (Object.keys(updates).length === 0) return false;
+  Object.assign(overprintObject, updates);
+  object.setCoords();
+  return true;
+}
+
+export function applyOverprintToSelection(target: OverprintTarget, enabled: boolean): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  let count = 0;
+  for (const object of canvas.getActiveObjects()) {
+    if (setOverprintOnObject(object, target, enabled)) count += 1;
+  }
+  if (count > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return count;
 }
 
 /**
@@ -238,6 +433,32 @@ function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: n
 
 export type PatternKind = 'checker' | 'stripes' | 'dots' | 'crosshatch';
 
+export type PatternSpec = { kind: PatternKind; size: number; color1: string; color2: string };
+type PatternedObject = fabric.FabricObject & { patternSpec?: PatternSpec };
+
+export function buildExpandedPatternTiles(bounds: { left: number; top: number; width: number; height: number }, spec: PatternSpec): Array<{ left: number; top: number; width: number; height: number; fill: string }> {
+  const size = Math.max(2, Math.floor(spec.size));
+  const cols = Math.max(1, Math.ceil(bounds.width / size));
+  const rows = Math.max(1, Math.ceil(bounds.height / size));
+  const tiles: Array<{ left: number; top: number; width: number; height: number; fill: string }> = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const left = bounds.left + col * size;
+      const top = bounds.top + row * size;
+      if (spec.kind === 'checker') {
+        tiles.push({ left, top, width: size, height: size, fill: (row + col) % 2 === 0 ? spec.color2 : spec.color1 });
+      } else if (spec.kind === 'dots') {
+        tiles.push({ left: left + size * 0.25, top: top + size * 0.25, width: size * 0.5, height: size * 0.5, fill: spec.color2 });
+      } else {
+        tiles.push({ left, top, width: size, height: Math.max(1, size * 0.18), fill: spec.color2 });
+        if (spec.kind === 'crosshatch') tiles.push({ left, top: top + size * 0.5, width: size, height: Math.max(1, size * 0.18), fill: spec.color2 });
+      }
+    }
+  }
+  return tiles;
+}
+
+
 /** Render a small repeating tile of the requested pattern to an offscreen canvas. */
 function makePatternCanvas(
   kind: PatternKind,
@@ -306,6 +527,29 @@ function makePatternCanvas(
 }
 
 /** Apply a procedurally-generated repeating pattern as the fill of the selection. */
+export function clearPatternFillFromObject(object: PatternedObject): boolean {
+  const spec = object.patternSpec;
+  if (!spec) return false;
+  object.set({ fill: spec.color1 });
+  delete object.patternSpec;
+  object.setCoords();
+  return true;
+}
+
+export function clearPatternFillSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  let count = 0;
+  for (const object of canvas.getActiveObjects()) {
+    if (clearPatternFillFromObject(object as PatternedObject)) count += 1;
+  }
+  if (count > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return count;
+}
+
 export function applyPatternFill(
   kind: PatternKind,
   size: number,
@@ -324,11 +568,66 @@ export function applyPatternFill(
       repeat: 'repeat',
     });
     o.set({ fill: pattern });
+    (o as PatternedObject).patternSpec = { kind, size, color1, color2 };
     o.setCoords();
   });
 
   canvas.requestRenderAll();
   pushHistory();
+}
+
+export function expandPatternFillObjects(canvas: fabric.Canvas, objects: fabric.FabricObject[]): { count: number; created: fabric.FabricObject[] } {
+  const created: fabric.FabricObject[] = [];
+  let count = 0;
+  for (const object of objects) {
+    const spec = (object as PatternedObject).patternSpec;
+    if (!spec) continue;
+    const bounds = object.getBoundingRect();
+    const background = new fabric.Rect({ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, fill: spec.color1, stroke: '', strokeWidth: 0, opacity: object.opacity ?? 1 });
+    const tiles = buildExpandedPatternTiles(bounds, spec).map((tile) => new fabric.Rect({ ...tile, stroke: '', strokeWidth: 0, opacity: object.opacity ?? 1 }));
+    object.set({ fill: '', stroke: object.stroke, strokeWidth: object.strokeWidth ?? 0 });
+    delete (object as PatternedObject).patternSpec;
+    object.setCoords();
+    canvas.add(background, ...tiles);
+    created.push(background, ...tiles);
+    count += 1;
+  }
+  return { count, created };
+}
+
+export function expandPatternFillSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const { count, created } = expandPatternFillObjects(canvas, canvas.getActiveObjects());
+  if (count > 0) {
+    canvas.discardActiveObject();
+    canvas.setActiveObject(created.length === 1 ? created[0] : new fabric.ActiveSelection(created, { canvas }));
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return count;
+}
+
+export async function expandAppearanceSelection(): Promise<number> {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const objects = canvas.getActiveObjects();
+  if (objects.length === 0) return 0;
+  const created: fabric.FabricObject[] = [];
+  let count = 0;
+  const patternResult = expandPatternFillObjects(canvas, objects);
+  count += patternResult.count;
+  created.push(...patternResult.created);
+  const shadowResult = await expandDropShadowObjects(canvas, objects);
+  count += shadowResult.count;
+  created.push(...shadowResult.created);
+  for (const object of objects) if (flattenTransparencyObject(object)) count += 1;
+  if (count === 0) return 0;
+  canvas.discardActiveObject();
+  if (created.length > 0) canvas.setActiveObject(created.length === 1 ? created[0] : new fabric.ActiveSelection(created, { canvas }));
+  canvas.requestRenderAll();
+  pushHistory();
+  return count;
 }
 
 /**

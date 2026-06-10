@@ -4,6 +4,7 @@ import {
   releaseClipMask,
   makeCompoundPath,
   releaseCompoundPath,
+  countClipPathsInObject,
 } from '../masks';
 import { getCanvas } from '../canvasEngine';
 
@@ -38,11 +39,19 @@ describe('masks — no-canvas guards', () => {
     expect(releaseCompoundPath()).toBe(false);
   });
 
-  it('all four exports are functions', () => {
+  it('all mask and compound exports are functions', () => {
     expect(typeof applyClipMask).toBe('function');
     expect(typeof releaseClipMask).toBe('function');
     expect(typeof makeCompoundPath).toBe('function');
     expect(typeof releaseCompoundPath).toBe('function');
+  });
+
+  it('counts clip paths recursively for clipping-mask expansion', () => {
+    const leaf = { clipPath: {} };
+    const group = { type: 'group', getObjects: () => [leaf, { clipPath: {} }] };
+
+    expect(countClipPathsInObject(group as never)).toBe(2);
+    expect(countClipPathsInObject({} as never)).toBe(0);
   });
 
   // Behavioural coverage requires a real fabric.Canvas — punt for now.

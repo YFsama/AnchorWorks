@@ -3,7 +3,7 @@
  *
  * On tool activation we remember the objects that were selected (the
  * recipients). Each click then samples the appearance (fill / stroke /
- * stroke-width / opacity) of the object under the cursor and applies it to
+ * stroke-width / opacity / blend / stroke style / shadow / pattern metadata) of the object under the cursor and applies it to
  * every remembered recipient — exactly like Illustrator's Eyedropper, which
  * copies the clicked artwork's look onto the current selection.
  *
@@ -16,8 +16,18 @@ import { toast } from '../toast';
 import { t } from '../i18n';
 import type { ToolMouseCtx } from './types';
 
+type ShadowSnapshot = { color: string; blur: number; offsetX: number; offsetY: number };
+type PatternSnapshot = { kind: string; size: number; color1: string; color2: string };
+
 /** Appearance properties an eyedropper transfers. */
-type Appearance = Pick<fabric.FabricObject, 'fill' | 'stroke' | 'strokeWidth' | 'opacity'>;
+export type EyedropperAppearance = Pick<fabric.FabricObject, 'fill' | 'stroke' | 'strokeWidth' | 'opacity' | 'strokeLineCap' | 'strokeLineJoin'> & {
+  strokeDashArray: number[] | null;
+  globalCompositeOperation: GlobalCompositeOperation;
+  shadow: ShadowSnapshot | null;
+  patternSpec: PatternSnapshot | null;
+};
+
+type AppearanceObject = fabric.FabricObject & { patternSpec?: PatternSnapshot; shadow?: fabric.Shadow | ShadowSnapshot | null };
 
 const TEXT_TYPES = new Set(['i-text', 'text', 'textbox']);
 const TEXT_KEYS = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'charSpacing', 'lineHeight', 'textAlign', 'underline', 'linethrough'] as const;
@@ -47,16 +57,30 @@ export function eyedropperClear(): void {
 
 /** Read a usable appearance off the source — descend a group to the first
  *  leaf that actually carries a fill/stroke so clicking a group still works. */
-function readAppearance(source: fabric.FabricObject): Appearance {
+export function readEyedropperAppearance(source: fabric.FabricObject): EyedropperAppearance {
   let leaf = source;
   for (const o of walk(source)) {
     if (o.fill || o.stroke) { leaf = o; break; }
   }
+  const appearanceLeaf = leaf as AppearanceObject;
+  const shadow = appearanceLeaf.shadow;
+  const patternSpec = appearanceLeaf.patternSpec;
   return {
     fill: leaf.fill,
     stroke: leaf.stroke,
     strokeWidth: leaf.strokeWidth,
     opacity: leaf.opacity,
+    strokeDashArray: Array.isArray(leaf.strokeDashArray) ? leaf.strokeDashArray.slice() : null,
+    strokeLineCap: leaf.strokeLineCap,
+    strokeLineJoin: leaf.strokeLineJoin,
+    globalCompositeOperation: leaf.globalCompositeOperation ?? 'source-over',
+    shadow: shadow ? {
+      color: typeof shadow.color === 'string' ? shadow.color : 'rgba(0,0,0,0.35)',
+      blur: Number.isFinite(shadow.blur) ? Number(shadow.blur) : 0,
+      offsetX: Number.isFinite(shadow.offsetX) ? Number(shadow.offsetX) : 0,
+      offsetY: Number.isFinite(shadow.offsetY) ? Number(shadow.offsetY) : 0,
+    } : null,
+    patternSpec: patternSpec ? { ...patternSpec } : null,
   };
 }
 
@@ -75,10 +99,23 @@ function readTextStyle(source: fabric.FabricObject): TextStyle | null {
 
 /** Paint a set of objects (descending groups) with one appearance; also copy
  *  `textStyle` onto any text recipients (Illustrator's eyedropper carries type). */
-function paint(objs: fabric.FabricObject[], look: Appearance, textStyle: TextStyle | null): void {
+export function applyEyedropperAppearance(objs: fabric.FabricObject[], look: EyedropperAppearance, textStyle: TextStyle | null): void {
   for (const r of objs) {
     for (const o of walk(r)) {
-      o.set(look);
+      o.set({
+        fill: look.fill,
+        stroke: look.stroke,
+        strokeWidth: look.strokeWidth,
+        opacity: look.opacity,
+        strokeDashArray: look.strokeDashArray ? look.strokeDashArray.slice() : null,
+        strokeLineCap: look.strokeLineCap,
+        strokeLineJoin: look.strokeLineJoin,
+      });
+      o.globalCompositeOperation = look.globalCompositeOperation;
+      o.shadow = look.shadow ? new fabric.Shadow(look.shadow) : null;
+      const patterned = o as AppearanceObject;
+      if (look.patternSpec) patterned.patternSpec = { ...look.patternSpec };
+      else delete patterned.patternSpec;
       if (textStyle && TEXT_TYPES.has(o.type ?? '')) o.set(textStyle);
       o.setCoords();
     }
@@ -104,7 +141,7 @@ export function eyedropperPick(ctx: ToolMouseCtx): void {
       toast.warn(t('Select objects first, then click one to copy its look.'));
       return;
     }
-    paint([source], readAppearance(live[0]), readTextStyle(live[0]));
+    applyEyedropperAppearance([source], readEyedropperAppearance(live[0]), readTextStyle(live[0]));
     canvas.requestRenderAll();
     pushHistory();
     toast.success(t('Appearance applied'));
@@ -117,7 +154,7 @@ export function eyedropperPick(ctx: ToolMouseCtx): void {
     return;
   }
 
-  paint(targets, readAppearance(source), readTextStyle(source));
+  applyEyedropperAppearance(targets, readEyedropperAppearance(source), readTextStyle(source));
   canvas.discardActiveObject();
   canvas.setActiveObject(
     targets.length === 1 ? targets[0] : new fabric.ActiveSelection(targets, { canvas }),

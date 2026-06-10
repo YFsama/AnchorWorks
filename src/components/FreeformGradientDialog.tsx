@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { X, Plus, Trash2, Sparkles } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { addFreeformGradient, type FreeformGradientStop } from '../lib/freeformGradient';
+import { addFreeformGradient, type FreeformGradientMode, type FreeformGradientStop } from '../lib/freeformGradient';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
@@ -70,6 +70,7 @@ export function FreeformGradientDialog() {
   const [width, setWidth] = useState(480);
   const [height, setHeight] = useState(320);
   const [stops, setStops] = useState<FreeformGradientStop[]>(DEFAULT_STOPS);
+  const [mode, setMode] = useState<FreeformGradientMode>('freeform');
   const [reviewedPreset, setReviewedPreset] = useState('');
   const [reviewedFooterAction, setReviewedFooterAction] = useState('');
   const activePreset = GRADIENT_PRESETS.find((preset) => width === preset.width && height === preset.height && stopsEqual(stops, preset.stops))?.label ?? '';
@@ -80,8 +81,8 @@ export function FreeformGradientDialog() {
 
   const updateStop = (index: number, patch: Partial<FreeformGradientStop>) => setStops(stops.map((stop, i) => i === index ? { ...stop, ...patch } : stop));
   const apply = async () => {
-    const ok = await addFreeformGradient(width, height, stops);
-    if (ok) toast.success(t('Freeform gradient added'), { title: t('Freeform Gradient') });
+    const ok = await addFreeformGradient(width, height, stops, mode);
+    if (ok) toast.success(t(mode === 'mesh' ? 'Gradient mesh added' : 'Freeform gradient added'), { title: t('Freeform Gradient') });
     else toast.warn(t('Add at least two color stops.'), { title: t('Freeform Gradient') });
     close();
   };
@@ -129,7 +130,19 @@ export function FreeformGradientDialog() {
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) close(); }} role="dialog" aria-modal="true" aria-labelledby="freeform-gradient-title">
       <div className="bg-panel border border-border rounded-lg w-[460px] p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3"><h2 id="freeform-gradient-title" className="dialog-title flex items-center gap-2"><Sparkles size={14} aria-hidden="true" /> {t('Freeform Gradient')}</h2><button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button></div>
-        <p className="text-xs text-muted leading-relaxed mb-3">{t('Creates a rasterized freeform gradient from draggable-style color stops; it exports reliably where SVG mesh gradients are unsupported.')}</p>
+        <p className="text-xs text-muted leading-relaxed mb-3">{t('Creates rasterized freeform and mesh-style gradients from color stops; they export reliably where SVG mesh gradients are unsupported.')}</p>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <label>
+            <div className="field-label">{t('Gradient mode')}</div>
+            <select className="input-num" value={mode} onChange={(e) => setMode(e.target.value as FreeformGradientMode)}>
+              <option value="freeform">{t('Freeform spots')}</option>
+              <option value="mesh">{t('Mesh surface')}</option>
+            </select>
+          </label>
+          <div className="text-[10px] text-muted leading-relaxed rounded border border-border bg-panel2 p-2">
+            {mode === 'mesh' ? t('Mesh mode blends the nearest corner stops bilinearly and lets interior stops pull the surface like Illustrator mesh points.') : t('Freeform mode blends soft radial color stops for poster-style glows and backgrounds.')}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <label><div className="field-label">{t('Width')}</div><input type="number" className="input-num" min={16} value={width} onChange={(e) => setWidth(Math.max(16, parseInt(e.target.value, 10) || 480))} /></label>
           <label><div className="field-label">{t('Height')}</div><input type="number" className="input-num" min={16} value={height} onChange={(e) => setHeight(Math.max(16, parseInt(e.target.value, 10) || 320))} /></label>

@@ -3,7 +3,7 @@ import {
   Eye, EyeOff, Lock, Unlock, Trash2, MousePointerClick, EyeIcon,
   Square, Circle, Slash, Pentagon, Spline, Type as TypeIcon,
   Image as ImageIcon, Group as GroupIcon, BoxSelect, Shapes,
-  GripVertical, Search, Copy,
+  GripVertical, Search, Copy, ChevronsUp, ChevronsDown, ChevronUp, ChevronDown, ArrowUpDown,
 } from 'lucide-react';
 import { getCanvas, pushHistory, selectVisibleObjects, selectUnlockedObjects, hideOthers, showAll, unlockAll } from '../lib/canvasEngine';
 import * as fabric from 'fabric';
@@ -11,6 +11,9 @@ import { useT } from '../lib/i18n';
 import { useEditor } from '../store/editor';
 import { toast } from '../lib/toast';
 import { showConfirm } from '../lib/confirm';
+import { loadGraphicStyles } from '../lib/graphicStyles';
+import type { FreeDistortCorners } from '../lib/freeDistort';
+import { LAYER_BLEND_MODES, addAnchorsToLayerObjectsById, applyGraphicStyleToLayerObjectsById, changeLayerObjectNameCaseById, cleanLayerObjectNamesById, cleanUpLayerObjectsById, clearLayerObjectAppearanceById, clearLayerObjectGradientFillById, clearLayerObjectImageFiltersById, clearLayerObjectPatternFillById, detachLayerSymbolInstancesById, expandLayerObjectAppearanceById, expandLayerObjectClippingMasksById, blendLayerObjectsById, flattenLayerObjectTransparencyById, freeDistortLayerObjectsById, grommetLayerObjectsById, groupLayerObjectsById, knifeSplitLayerObjectsById, makeLayerCompoundPathById, moveLayerObjectsById, multiOutlineLayerObjectsById, normalizeLayerBlendMode, offsetLayerObjectsById, outlineLayerObjectStrokesById, puckerLayerObjectsById, roughenLayerObjectsById, zigzagLayerObjectsById, twistLayerObjectsById, normalizeLayerBoolean, normalizeLayerDash, normalizeLayerPaint, normalizeLayerStrokeCap, normalizeLayerStrokeJoin, renumberLayerObjectsById, releaseLayerCompoundPathsById, releaseLayerObjectClippingMasksById, replaceLayerObjectNamesById, rhinestoneLayerObjectsById, reverseLayerObjectsById, roundCornersLayerObjectsById, scissorsSplitLayerObjectsById, selectSameLayerAppearanceById, selectSameLayerAssetById, selectSameLayerComplexAppearanceById, selectSameLayerGeometryById, selectSameLayerObjectById, selectSameLayerProductionById, selectSameLayerTextById, setLayerObjectBlendModeById, setLayerObjectDashById, setLayerObjectGeometryById, setLayerObjectGeometryPairById, setLayerObjectMiterLimitById, setLayerObjectOpacityById, setLayerObjectOverprintById, setLayerObjectPaintById, setLayerObjectPrintMarkKindById, setLayerObjectShadowById, setLayerObjectStrokeStyleById, setLayerObjectStrokeUniformById, setLayerObjectStrokeWidthById, setLayerObjectTextStyleById, simplifyLayerObjectsById, smoothLayerObjectsById, splitLayerObjectsIntoGridById, targetLayerObjectsById, ungroupLayerObjectsById, variableWidthLayerObjectsById, warpLayerObjectsById, type LayerGeometryPairSetTarget, type LayerGeometrySetTarget, type LayerNameCaseMode, type LayerOverprintTarget, type LayerPaintTarget, type LayerStackDestination, type LayerSameAppearanceTarget, type LayerSameAssetTarget, type LayerSameComplexAppearanceTarget, type LayerSameGeometryTarget, type LayerSameObjectTarget, type LayerSameProductionTarget, type LayerSameTextTarget, type LayerStrokeStyleTarget, type LayerTextStyleTarget } from '../lib/layerOps';
 
 interface ObjRow {
   id: string;
@@ -133,9 +136,10 @@ export function LayersPanel() {
       if (obj.visible === false) counts.hidden += 1;
       if (!obj.lockMovementX) counts.unlocked += 1;
       if (obj.lockMovementX || obj.lockMovementY || obj.lockScalingX || obj.lockScalingY || obj.lockRotation) counts.locked += 1;
+      if (obj.type === 'group') counts.groups += 1;
       counts.total += 1;
       return counts;
-    }, { selectable: 0, visible: 0, hidden: 0, unlocked: 0, locked: 0, total: 0 });
+    }, { selectable: 0, visible: 0, hidden: 0, unlocked: 0, locked: 0, groups: 0, total: 0 });
   }, [filteredRows]);
 
   useEffect(() => {
@@ -283,6 +287,20 @@ export function LayersPanel() {
     c.setActiveObject(matches.length === 1 ? matches[0] : new fabric.ActiveSelection(matches, { canvas: c }));
     c.requestRenderAll();
     toast.success(`${matches.length} ${t('selected')}`);
+  };
+  const targetLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const result = targetLayerObjectsById(filteredRows.map(({ row }) => row.id));
+    if (result.selected === 0) {
+      toast.warn(t('No matching layers.'));
+      return;
+    }
+    refreshNow();
+    const details = [
+      result.revealed ? `${result.revealed} ${t('revealed')}` : '',
+      result.unlocked ? `${result.unlocked} ${t('unlocked')}` : '',
+    ].filter(Boolean);
+    toast.success(`${result.selected} ${t('targeted')}${details.length ? ` · ${details.join(' · ')}` : ''}`);
   };
   const selectFirstLayerMatchFromPanel = () => {
     const c = getCanvas();
@@ -440,6 +458,1008 @@ export function LayersPanel() {
     refreshNow();
     toast.success(`${matches.length} ${t('objects renamed')}`);
   };
+  const renumberLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const prefix = window.prompt(t('Layer name prefix'), normalizedLayerQuery || t('Layer'));
+    if (prefix == null) return;
+    const startRaw = window.prompt(t('Start number'), '1');
+    if (startRaw == null) return;
+    const start = Number(startRaw.trim());
+    if (!Number.isFinite(start)) {
+      toast.warn(t('Invalid start number.'));
+      return;
+    }
+    const n = renumberLayerObjectsById(filteredRows.map(({ row }) => row.id), { prefix, start });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects renamed')}`);
+    } else {
+      toast.warn(t('No matching layers.'));
+    }
+  };
+  const replaceLayerMatchNamesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const find = window.prompt(t('Find in layer names'), normalizedLayerQuery);
+    if (find == null) return;
+    const replace = window.prompt(t('Replace with'), '');
+    if (replace == null) return;
+    const n = replaceLayerObjectNamesById(filteredRows.map(({ row }) => row.id), { find, replace });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects renamed')}`);
+    } else {
+      toast.warn(t('No layer names changed.'));
+    }
+  };
+  const changeLayerMatchNameCaseFromPanel = (mode: LayerNameCaseMode) => {
+    if (!normalizedLayerQuery) return;
+    const n = changeLayerObjectNameCaseById(filteredRows.map(({ row }) => row.id), mode);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects renamed')}`);
+    } else {
+      toast.warn(t('No layer names changed.'));
+    }
+  };
+  const cleanLayerMatchNamesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = cleanLayerObjectNamesById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects renamed')}`);
+    } else {
+      toast.warn(t('No layer names changed.'));
+    }
+  };
+  const setLayerMatchOpacityFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching layer opacity'), '100%');
+    if (raw == null) return;
+    const trimmed = raw.trim();
+    const value = Number(trimmed.replace(/%$/, ''));
+    if (!Number.isFinite(value)) {
+      toast.warn(t('Invalid opacity.'));
+      return;
+    }
+    const opacity = trimmed.endsWith('%') || value > 1 ? value / 100 : value;
+    if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) {
+      toast.warn(t('Invalid opacity.'));
+      return;
+    }
+    const n = setLayerObjectOpacityById(filteredRows.map(({ row }) => row.id), { opacity });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('opacity updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchBlendModeFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching layer blend mode'), LAYER_BLEND_MODES.join(', '));
+    if (raw == null) return;
+    const blendMode = normalizeLayerBlendMode(raw);
+    if (!blendMode) {
+      toast.warn(t('Invalid blend mode.'));
+      return;
+    }
+    const n = setLayerObjectBlendModeById(filteredRows.map(({ row }) => row.id), { blendMode });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('blend modes updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchPaintFromPanel = (target: LayerPaintTarget) => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(target === 'fill' ? t('Set matching layer fill') : t('Set matching layer stroke'), target === 'fill' ? '#3d9bff' : '#111827');
+    if (raw == null) return;
+    const paint = normalizeLayerPaint(raw);
+    if (paint == null) {
+      toast.warn(t('Invalid color.'));
+      return;
+    }
+    const n = setLayerObjectPaintById(filteredRows.map(({ row }) => row.id), { target, paint });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${target === 'fill' ? t('fills updated') : t('strokes updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchStrokeWidthFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching layer stroke width'), '1');
+    if (raw == null) return;
+    const value = Number(raw.trim().replace(/px$/i, ''));
+    if (!Number.isFinite(value) || value < 0) {
+      toast.warn(t('Invalid stroke width.'));
+      return;
+    }
+    const n = setLayerObjectStrokeWidthById(filteredRows.map(({ row }) => row.id), { strokeWidth: value });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('stroke widths updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchStrokeStyleFromPanel = (target: LayerStrokeStyleTarget) => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(target === 'cap' ? t('Set matching layer line cap') : t('Set matching layer line join'), target === 'cap' ? 'butt, round, square' : 'miter, round, bevel');
+    if (raw == null) return;
+    const value = target === 'cap' ? normalizeLayerStrokeCap(raw) : normalizeLayerStrokeJoin(raw);
+    if (!value) {
+      toast.warn(target === 'cap' ? t('Invalid line cap.') : t('Invalid line join.'));
+      return;
+    }
+    const n = setLayerObjectStrokeStyleById(filteredRows.map(({ row }) => row.id), { target, value });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${target === 'cap' ? t('line caps updated') : t('line joins updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchDashFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching layer dash'), 'solid, dashed, dotted, or 10 5');
+    if (raw == null) return;
+    const dash = normalizeLayerDash(raw);
+    if (!dash) {
+      toast.warn(t('Invalid dash pattern.'));
+      return;
+    }
+    const n = setLayerObjectDashById(filteredRows.map(({ row }) => row.id), { dash });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('dash patterns updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchMiterLimitFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching layer miter limit'), '4');
+    if (raw == null) return;
+    const value = Number(raw.trim());
+    if (!Number.isFinite(value) || value < 0) {
+      toast.warn(t('Invalid miter limit.'));
+      return;
+    }
+    const n = setLayerObjectMiterLimitById(filteredRows.map(({ row }) => row.id), { miterLimit: value });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('miter limits updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const setLayerMatchShadowFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const ids = filteredRows.map(({ row }) => row.id);
+    const raw = window.prompt(t('Set matching layer shadow'), '#000000 8 4 4, or none');
+    if (raw == null) return;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    if (trimmed.toLowerCase() === 'none') {
+      const n = setLayerObjectShadowById(ids, { color: null });
+      if (n) {
+        refreshNow();
+        toast.success(`${n} ${t('shadows updated')}`);
+      } else {
+        toast.warn(t('No matching layers changed.'));
+      }
+      return;
+    }
+    const [color, blurRaw = '0', offsetXRaw = '0', offsetYRaw = '0'] = trimmed.split(/\s+/);
+    const blur = Number(blurRaw);
+    const offsetX = Number(offsetXRaw);
+    const offsetY = Number(offsetYRaw);
+    if (!color || !Number.isFinite(blur) || !Number.isFinite(offsetX) || !Number.isFinite(offsetY)) {
+      toast.warn(t('Invalid shadow value.'));
+      return;
+    }
+    const n = setLayerObjectShadowById(ids, { color, blur, offsetX, offsetY });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('shadows updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const setLayerMatchOverprintFromPanel = (target: LayerOverprintTarget) => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching layer overprint'), 'on/off');
+    if (raw == null) return;
+    const overprint = normalizeLayerBoolean(raw);
+    if (overprint == null) {
+      toast.warn(t('Invalid overprint value.'));
+      return;
+    }
+    const n = setLayerObjectOverprintById(filteredRows.map(({ row }) => row.id), { target, overprint });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('overprint flags updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchPrintMarkKindFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching layer print mark kind'), 'crop, registration, bleed, page-info, or none');
+    if (raw == null) return;
+    const trimmed = raw.trim();
+    const printMarkKind = /^(none|clear|off)$/i.test(trimmed) ? null : trimmed;
+    const n = setLayerObjectPrintMarkKindById(filteredRows.map(({ row }) => row.id), { printMarkKind });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('print mark kinds updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchTextStyleFromPanel = (target: LayerTextStyleTarget) => {
+    if (!normalizedLayerQuery) return;
+    const defaults: Record<LayerTextStyleTarget, string> = {
+      fontFamily: 'Inter',
+      fontSize: '16',
+      fontWeight: '400',
+      fontStyle: 'normal',
+      textAlign: 'left, center, right, justify',
+      underline: 'on/off',
+      linethrough: 'on/off',
+      overline: 'on/off',
+      charSpacing: '0',
+      lineHeight: '1.2',
+    };
+    const raw = window.prompt(t('Set matching layer text style'), defaults[target]);
+    if (raw == null) return;
+    const value = target === 'fontFamily' || target === 'fontWeight' || target === 'fontStyle' || target === 'textAlign' || target === 'underline' || target === 'linethrough' || target === 'overline'
+      ? raw.trim()
+      : Number(raw.trim().replace(/px$/i, ''));
+    if ((typeof value === 'string' && !value) || (typeof value === 'number' && !Number.isFinite(value))) {
+      toast.warn(t('Invalid text style.'));
+      return;
+    }
+    const n = setLayerObjectTextStyleById(filteredRows.map(({ row }) => row.id), { target, value });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('text styles updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchGeometryFromPanel = (target: LayerGeometrySetTarget) => {
+    if (!normalizedLayerQuery) return;
+    const defaults: Record<LayerGeometrySetTarget, string> = {
+      x: '0',
+      y: '0',
+      centerX: '0',
+      centerY: '0',
+      right: '100',
+      bottom: '100',
+      width: '100',
+      height: '100',
+      rotation: '0',
+      scaleX: '1',
+      scaleY: '1',
+      skewX: '0',
+      skewY: '0',
+    };
+    const raw = window.prompt(t('Set matching layer geometry'), defaults[target]);
+    if (raw == null) return;
+    const value = Number(raw.trim().replace(/(?:px|°|deg)$/i, ''));
+    if (!Number.isFinite(value) || ((target === 'width' || target === 'height' || target === 'scaleX' || target === 'scaleY') && value <= 0)) {
+      toast.warn(t('Invalid geometry value.'));
+      return;
+    }
+    const n = setLayerObjectGeometryById(filteredRows.map(({ row }) => row.id), { target, value });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('geometry updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchGeometryPairFromPanel = (target: LayerGeometryPairSetTarget) => {
+    if (!normalizedLayerQuery) return;
+    const defaults: Record<LayerGeometryPairSetTarget, string> = {
+      position: '0, 0',
+      center: '0, 0',
+      size: '100, 100',
+      scale: '1, 1',
+      skew: '0, 0',
+      bounds: '0, 0, 100, 100',
+    };
+    const raw = window.prompt(t('Set matching layer geometry'), defaults[target]);
+    if (raw == null) return;
+    const values = raw.trim().replace(/(?:px|°|deg)/gi, '').split(/[\s,]+/).map(Number);
+    const valid = values.every(Number.isFinite)
+      && ((target === 'bounds' && values.length >= 4 && values[2] > values[0] && values[3] > values[1])
+        || (target !== 'bounds' && values.length >= 2 && (!(target === 'size' || target === 'scale') || (values[0] > 0 && values[1] > 0))));
+    if (!valid) {
+      toast.warn(t('Invalid geometry value.'));
+      return;
+    }
+    const n = setLayerObjectGeometryPairById(filteredRows.map(({ row }) => row.id), { target, values });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('geometry updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+
+
+
+
+
+
+  const selectSameLayerComplexAppearanceFromPanel = (target: LayerSameComplexAppearanceTarget) => {
+    if (!normalizedLayerQuery) return;
+    const n = selectSameLayerComplexAppearanceById(filteredRows.map(({ row }) => row.id), target);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('selected')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const grommetLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Grommet inset spacing and diameter'), '20, 500, 10');
+    if (raw == null) return;
+    const values = raw.split(/[\s,;/]+/).map(Number).filter(Number.isFinite);
+    const insetMm = values[0];
+    const maxSpacingMm = values[1] ?? 500;
+    const diameterMm = values[2] ?? 10;
+    if (!Number.isFinite(insetMm) || !Number.isFinite(maxSpacingMm) || !Number.isFinite(diameterMm) || insetMm < 0 || maxSpacingMm <= 0 || diameterMm <= 0) {
+      toast.warn(t('Invalid grommet values.'));
+      return;
+    }
+    const paths = grommetLayerObjectsById(filteredRows.map(({ row }) => row.id), { insetMm, maxSpacingMm, diameterMm });
+    if (paths.length) {
+      const editor = useEditor.getState();
+      editor.addCutPaths(paths);
+      editor.setCutPathsVisible(true);
+      refreshNow();
+      toast.success(`${paths.length} ${t('grommets added')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const rhinestoneLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Rhinestone spacing and diameter'), '4, 2.8');
+    if (raw == null) return;
+    const values = raw.split(/[\s,;/]+/).map(Number).filter(Number.isFinite);
+    const spacingMm = values[0];
+    const diameterMm = values[1] ?? 2.8;
+    if (!Number.isFinite(spacingMm) || !Number.isFinite(diameterMm) || spacingMm <= 0 || diameterMm <= 0) {
+      toast.warn(t('Invalid rhinestone values.'));
+      return;
+    }
+    const paths = rhinestoneLayerObjectsById(filteredRows.map(({ row }) => row.id), { spacingMm, diameterMm });
+    if (paths.length) {
+      const editor = useEditor.getState();
+      editor.addCutPaths(paths);
+      editor.setCutPathsVisible(true);
+      refreshNow();
+      toast.success(`${paths.length} ${t('stones placed')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const blendLayerMatchesFromPanel = async () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Blend steps and options'), '5 steps page');
+    if (raw == null) return;
+    const parts = raw.trim().split(/[\s,;/]+/).filter(Boolean);
+    const steps = Number(parts[0]);
+    const spacingToken = (parts[1] ?? 'steps').toLowerCase();
+    const orientationToken = (parts[2] ?? 'page').toLowerCase();
+    const spacingMode = spacingToken === 'distance' ? 'specifiedDistance' : spacingToken === 'smooth' || spacingToken === 'smoothcolor' ? 'smoothColor' : spacingToken === 'steps' ? 'specifiedSteps' : null;
+    const orientation = orientationToken === 'path' ? 'path' : orientationToken === 'page' ? 'page' : null;
+    if (!Number.isFinite(steps) || steps < 1 || !spacingMode || !orientation) {
+      toast.warn(t('Invalid blend values.'));
+      return;
+    }
+    const n = await blendLayerObjectsById(filteredRows.map(({ row }) => row.id), { steps: Math.round(steps), spacingMode, orientation });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('blend steps created')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const variableWidthLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Variable Width profile'), 'bulge');
+    if (raw == null) return;
+    const profileMap: Record<string, 'uniform' | 'taper-start' | 'taper-end' | 'taper-both' | 'bulge' | 'hourglass'> = {
+      uniform: 'uniform',
+      'taper-start': 'taper-start',
+      'taper start': 'taper-start',
+      start: 'taper-start',
+      'taper-end': 'taper-end',
+      'taper end': 'taper-end',
+      end: 'taper-end',
+      'taper-both': 'taper-both',
+      'taper both': 'taper-both',
+      both: 'taper-both',
+      bulge: 'bulge',
+      hourglass: 'hourglass',
+    };
+    const profile = profileMap[raw.trim().toLowerCase().replace(/[_]+/g, '-')];
+    if (!profile) {
+      toast.warn(t('Invalid variable width profile.'));
+      return;
+    }
+    const n = variableWidthLayerObjectsById(filteredRows.map(({ row }) => row.id), { profile });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('width profiles applied')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const multiOutlineLayerMatchesFromPanel = async () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Multi-outline width and colors'), '2, #ffffff, #000000');
+    if (raw == null) return;
+    const parts = raw.split(/[\s,;/]+/).map((part) => part.trim()).filter(Boolean);
+    const widthMm = Number(parts[0]?.replace(/mm$/i, ''));
+    const colors = parts.slice(1).filter((color) => /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color) || /^(?:rgb|rgba|hsl|hsla)\(/i.test(color));
+    if (!Number.isFinite(widthMm) || widthMm <= 0 || colors.length === 0) {
+      toast.warn(t('Invalid multi-outline values.'));
+      return;
+    }
+    const n = await multiOutlineLayerObjectsById(filteredRows.map(({ row }) => row.id), { colors, widthMm });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('outline(s) added')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const warpLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Warp bend and style'), '50 arc');
+    if (raw == null) return;
+    const parts = raw.trim().split(/[\s,;/]+/).filter(Boolean);
+    const bendPct = Number(parts[0]?.replace(/%$/i, ''));
+    const style = (parts[1] ?? 'arc').toLowerCase();
+    if (!Number.isFinite(bendPct) || bendPct === 0 || !['arc', 'rise', 'flag', 'wave'].includes(style)) {
+      toast.warn(t('Invalid warp values.'));
+      return;
+    }
+    const n = warpLayerObjectsById(filteredRows.map(({ row }) => row.id), { bendPct, style: style as 'arc' | 'rise' | 'flag' | 'wave' });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects warped')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const freeDistortLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Free Distort preset or offsets'), 'left perspective');
+    if (raw == null) return;
+    const normalized = raw.trim().toLowerCase().replace(/[-_]+/g, ' ');
+    const presets: Record<string, FreeDistortCorners> = {
+      left: { tl: [18, -16], tr: [0, 0], br: [0, 0], bl: [18, 16] },
+      'left perspective': { tl: [18, -16], tr: [0, 0], br: [0, 0], bl: [18, 16] },
+      right: { tl: [0, 0], tr: [-18, -16], br: [-18, 16], bl: [0, 0] },
+      'right perspective': { tl: [0, 0], tr: [-18, -16], br: [-18, 16], bl: [0, 0] },
+      skew: { tl: [12, 0], tr: [12, 0], br: [-12, 0], bl: [-12, 0] },
+      'top taper': { tl: [14, 8], tr: [-14, 8], br: [0, 0], bl: [0, 0] },
+      'bottom taper': { tl: [0, 0], tr: [0, 0], br: [-14, -8], bl: [14, -8] },
+      flag: { tl: [0, -10], tr: [10, 6], br: [0, 10], bl: [-10, -6] },
+      'flag wave': { tl: [0, -10], tr: [10, 6], br: [0, 10], bl: [-10, -6] },
+    };
+    const values = normalized.split(/[\s,;/]+/).map(Number).filter(Number.isFinite);
+    const offsets = presets[normalized] ?? (values.length >= 8
+      ? { tl: [values[0] * 3.7795, values[1] * 3.7795], tr: [values[2] * 3.7795, values[3] * 3.7795], br: [values[4] * 3.7795, values[5] * 3.7795], bl: [values[6] * 3.7795, values[7] * 3.7795] } as FreeDistortCorners
+      : null);
+    if (!offsets) {
+      toast.warn(t('Invalid free distort values.'));
+      return;
+    }
+    const n = freeDistortLayerObjectsById(filteredRows.map(({ row }) => row.id), { offsets });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects free-distorted')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const roundCornersLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Round Corners radius'), '2');
+    if (raw == null) return;
+    const radiusMm = Number(raw.trim().replace(/mm$/i, ''));
+    if (!Number.isFinite(radiusMm) || radiusMm <= 0) {
+      toast.warn(t('Invalid round corners radius.'));
+      return;
+    }
+    const n = roundCornersLayerObjectsById(filteredRows.map(({ row }) => row.id), { radiusMm });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects rounded')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const twistLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Twist angle'), '45');
+    if (raw == null) return;
+    const angleDeg = Number(raw.trim().replace(/°$/u, ''));
+    if (!Number.isFinite(angleDeg) || angleDeg === 0) {
+      toast.warn(t('Invalid twist angle.'));
+      return;
+    }
+    const n = twistLayerObjectsById(filteredRows.map(({ row }) => row.id), { angleDeg });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects twisted')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const zigzagLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Zig Zag size ridges and style'), '1, 8, corner');
+    if (raw == null) return;
+    const parts = raw.split(/[\s,;/]+/).map((part) => part.trim()).filter(Boolean);
+    const sizeMm = Number(parts[0]);
+    const ridges = Number(parts[1] ?? 8);
+    const style = (parts[2] ?? 'corner').toLowerCase();
+    const smooth = /^(smooth|sine|wave|wavy)$/i.test(style);
+    const corner = /^(corner|sharp|zigzag|zig-zag)$/i.test(style);
+    if (!Number.isFinite(sizeMm) || !Number.isFinite(ridges) || sizeMm <= 0 || ridges < 1 || (!smooth && !corner)) {
+      toast.warn(t('Invalid zig zag values.'));
+      return;
+    }
+    const n = zigzagLayerObjectsById(filteredRows.map(({ row }) => row.id), { sizeMm, ridges, smooth });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects zig-zagged')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const roughenLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Roughen size and detail'), '1, 2');
+    if (raw == null) return;
+    const values = raw.split(/[\s,;/]+/).map(Number).filter(Number.isFinite);
+    const sizeMm = values[0];
+    const detailMm = values[1] ?? 2;
+    if (!Number.isFinite(sizeMm) || !Number.isFinite(detailMm) || sizeMm <= 0 || detailMm <= 0) {
+      toast.warn(t('Invalid roughen values.'));
+      return;
+    }
+    const n = roughenLayerObjectsById(filteredRows.map(({ row }) => row.id), { sizeMm, detailMm });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects roughened')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const puckerLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching Pucker & Bloat amount'), '25%');
+    if (raw == null) return;
+    const trimmed = raw.trim();
+    const value = Number(trimmed.replace(/%$/i, ''));
+    const amount = trimmed.endsWith('%') || Math.abs(value) > 1 ? value / 100 : value;
+    if (!Number.isFinite(amount) || amount < -1 || amount > 1 || amount === 0) {
+      toast.warn(t('Invalid pucker value.'));
+      return;
+    }
+    const n = puckerLayerObjectsById(filteredRows.map(({ row }) => row.id), { amount });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects puckered')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const knifeSplitLayerMatchesFromPanel = (axis: 'horizontal' | 'vertical') => {
+    if (!normalizedLayerQuery) return;
+    const n = knifeSplitLayerObjectsById(filteredRows.map(({ row }) => row.id), axis);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('objects knife-split')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const scissorsSplitLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = scissorsSplitLayerObjectsById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('paths split')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const splitLayerMatchesIntoGridFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Split matching layer objects into grid'), '2 2 0');
+    if (raw == null) return;
+    const values = raw.trim().split(/[\s,×x]+/).map(Number).filter(Number.isFinite);
+    const [rows, cols, gutterMm = 0] = values;
+    if (!Number.isFinite(rows) || !Number.isFinite(cols) || rows < 1 || cols < 1 || !Number.isFinite(gutterMm) || gutterMm < 0) {
+      toast.warn(t('Invalid split grid value.'));
+      return;
+    }
+    const n = splitLayerObjectsIntoGridById(filteredRows.map(({ row }) => row.id), { rows, cols, gutterMm });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('cells created')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const cleanUpLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = cleanUpLayerObjectsById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('stray objects removed')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const addAnchorsToLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = addAnchorsToLayerObjectsById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('paths subdivided')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const reverseLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = reverseLayerObjectsById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('paths reversed')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const simplifyLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Simplify matching layer paths (px tolerance)'), '1.5');
+    if (raw == null) return;
+    const tolerancePx = Number(raw.trim().replace(/px$/i, ''));
+    if (!Number.isFinite(tolerancePx) || tolerancePx < 0.1) {
+      toast.warn(t('Invalid simplify value.'));
+      return;
+    }
+    const n = simplifyLayerObjectsById(filteredRows.map(({ row }) => row.id), { tolerancePx });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('paths simplified')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const smoothLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Smooth matching layer paths'), '1');
+    if (raw == null) return;
+    const iterations = Number(raw.trim());
+    if (!Number.isFinite(iterations) || iterations < 1 || iterations > 5) {
+      toast.warn(t('Invalid smooth value.'));
+      return;
+    }
+    const n = smoothLayerObjectsById(filteredRows.map(({ row }) => row.id), { iterations });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('paths smoothed')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const offsetLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Offset matching layer paths (mm)'), '2');
+    if (raw == null) return;
+    const offsetMm = Number(raw.trim().replace(/mm$/i, ''));
+    if (!Number.isFinite(offsetMm) || offsetMm === 0) {
+      toast.warn(t('Invalid offset value.'));
+      return;
+    }
+    const n = offsetLayerObjectsById(filteredRows.map(({ row }) => row.id), { offsetMm });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('offset paths added')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const outlineLayerMatchStrokesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = outlineLayerObjectStrokesById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('strokes outlined')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const makeLayerMatchCompoundPathFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = makeLayerCompoundPathById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('compound paths made')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const releaseLayerMatchCompoundPathsFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = releaseLayerCompoundPathsById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('compound paths released')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const expandLayerMatchClippingMasksFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = expandLayerObjectClippingMasksById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('clip masks expanded')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const releaseLayerMatchClippingMasksFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = releaseLayerObjectClippingMasksById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('clipping masks released')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const selectSameLayerTextFromPanel = (target: LayerSameTextTarget) => {
+    if (!normalizedLayerQuery) return;
+    const n = selectSameLayerTextById(filteredRows.map(({ row }) => row.id), target);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('selected')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const detachLayerMatchSymbolsFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = detachLayerSymbolInstancesById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('symbol instances detached')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const selectSameLayerAssetFromPanel = (target: LayerSameAssetTarget) => {
+    if (!normalizedLayerQuery) return;
+    const n = selectSameLayerAssetById(filteredRows.map(({ row }) => row.id), target);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('selected')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+
+  const clearLayerMatchComplexAppearanceFromPanel = (target: 'gradientFill' | 'pattern') => {
+    if (!normalizedLayerQuery) return;
+    const ids = filteredRows.map(({ row }) => row.id);
+    const n = target === 'gradientFill' ? clearLayerObjectGradientFillById(ids) : clearLayerObjectPatternFillById(ids);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${target === 'gradientFill' ? t('gradient fills cleared') : t('pattern fills cleared')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const clearLayerMatchImageFiltersFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = clearLayerObjectImageFiltersById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('image filters cleared')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const selectSameLayerProductionFromPanel = (target: LayerSameProductionTarget) => {
+    if (!normalizedLayerQuery) return;
+    const n = selectSameLayerProductionById(filteredRows.map(({ row }) => row.id), target);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('selected')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const selectSameLayerGeometryFromPanel = (target: LayerSameGeometryTarget) => {
+    if (!normalizedLayerQuery) return;
+    const n = selectSameLayerGeometryById(filteredRows.map(({ row }) => row.id), target);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('selected')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const selectSameLayerObjectFromPanel = (target: LayerSameObjectTarget) => {
+    if (!normalizedLayerQuery) return;
+    const n = selectSameLayerObjectById(filteredRows.map(({ row }) => row.id), target);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('selected')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const selectSameLayerAppearanceFromPanel = (target: LayerSameAppearanceTarget) => {
+    if (!normalizedLayerQuery) return;
+    const n = selectSameLayerAppearanceById(filteredRows.map(({ row }) => row.id), target);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('selected')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+
+  const expandLayerMatchAppearanceFromPanel = async () => {
+    if (!normalizedLayerQuery) return;
+    const n = await expandLayerObjectAppearanceById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('appearances expanded')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const flattenLayerMatchTransparencyFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = flattenLayerObjectTransparencyById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('transparencies flattened')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+
+  const applyGraphicStyleToLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const styles = loadGraphicStyles();
+    if (styles.length === 0) {
+      toast.warn(t('No graphic styles available.'));
+      return;
+    }
+    const raw = window.prompt(
+      t('Apply graphic style to matching layers'),
+      styles.map((style, index) => `${index + 1}. ${style.name}`).join(' · '),
+    );
+    if (raw == null) return;
+    const query = raw.trim().toLowerCase();
+    const numericIndex = Number.parseInt(query, 10);
+    const style = Number.isFinite(numericIndex) && String(numericIndex) === query
+      ? styles[numericIndex - 1]
+      : styles.find((item) => item.id.toLowerCase() === query || item.name.toLowerCase() === query);
+    if (!style) {
+      toast.warn(t('Graphic style not found.'));
+      return;
+    }
+    const n = applyGraphicStyleToLayerObjectsById(filteredRows.map(({ row }) => row.id), style);
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('graphic styles applied')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const clearLayerMatchAppearanceFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = clearLayerObjectAppearanceById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('appearances cleared')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
+  const setLayerMatchStrokeUniformFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const raw = window.prompt(t('Set matching constant stroke width'), 'on/off');
+    if (raw == null) return;
+    const strokeUniform = normalizeLayerBoolean(raw);
+    if (strokeUniform == null) {
+      toast.warn(t('Invalid on/off value.'));
+      return;
+    }
+    const n = setLayerObjectStrokeUniformById(filteredRows.map(({ row }) => row.id), { strokeUniform });
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('constant stroke widths updated')}`);
+    } else {
+      toast.warn(t('No matching layers changed.'));
+    }
+  };
   const duplicateLayerMatchesFromPanel = async () => {
     const c = getCanvas();
     if (!c || !normalizedLayerQuery) return;
@@ -494,6 +1514,46 @@ export function LayersPanel() {
     pushHistory();
     refreshNow();
     toast.success(`${matches.length} ${t('deleted')}`);
+  };
+  const moveLayerMatchesStackFromPanel = (destination: LayerStackDestination) => {
+    if (!normalizedLayerQuery) return;
+    const ids = filteredRows.map(({ row }) => row.id);
+    const n = moveLayerObjectsById(ids, destination);
+    if (n) {
+      refreshNow();
+      const label = destination === 'front'
+        ? t('moved to front')
+        : destination === 'back'
+          ? t('moved to back')
+          : destination === 'forward'
+            ? t('moved forward')
+            : destination === 'backward'
+              ? t('moved backward')
+              : t('reversed');
+      toast.success(`${n} ${label}`);
+    } else {
+      toast.warn(t('No matching layers.'));
+    }
+  };
+  const groupLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = groupLayerObjectsById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('grouped')}`);
+    } else {
+      toast.warn(t('Select at least two matching layers.'));
+    }
+  };
+  const ungroupLayerMatchesFromPanel = () => {
+    if (!normalizedLayerQuery) return;
+    const n = ungroupLayerObjectsById(filteredRows.map(({ row }) => row.id));
+    if (n) {
+      refreshNow();
+      toast.success(`${n} ${t('groups ungrouped')}`);
+    } else {
+      toast.warn(t('No matching groups.'));
+    }
   };
 
   // ---------- Keyboard navigation (Up/Down/Home/End/F2/Enter/Delete/Ctrl+D/V/L)
@@ -754,6 +1814,18 @@ export function LayersPanel() {
               <button
                 type="button"
                 data-layer-action
+                data-layer-action-review={t('Target matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={targetLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Target matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Show, unlock, and select matching layers')}
+              >
+                {t('Target Matches')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
                 data-layer-action-review={t('Solo matching layers')}
                 className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
                 onClick={soloLayerMatchesFromPanel}
@@ -826,6 +1898,1550 @@ export function LayersPanel() {
               <button
                 type="button"
                 data-layer-action
+                data-layer-action-review={t('Renumber matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={renumberLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Renumber matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Renumber matching layers')}
+              >
+                {t('Renumber Matches')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Find and replace matching layer names')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={replaceLayerMatchNamesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Find and replace matching layer names'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Find and replace matching layer names')}
+              >
+                {t('Replace Names')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('UPPERCASE')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => changeLayerMatchNameCaseFromPanel('upper')}
+                onFocus={() => setReviewedLayerAction(t('UPPERCASE'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('UPPERCASE')}
+              >
+                {t('UPPERCASE')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('lowercase')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => changeLayerMatchNameCaseFromPanel('lower')}
+                onFocus={() => setReviewedLayerAction(t('lowercase'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('lowercase')}
+              >
+                {t('lowercase')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Title Case')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => changeLayerMatchNameCaseFromPanel('title')}
+                onFocus={() => setReviewedLayerAction(t('Title Case'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Title Case')}
+              >
+                {t('Title Case')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Sentence case')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => changeLayerMatchNameCaseFromPanel('sentence')}
+                onFocus={() => setReviewedLayerAction(t('Sentence case'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Sentence case')}
+              >
+                {t('Sentence case')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Clean matching layer names')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={cleanLayerMatchNamesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Clean matching layer names'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Trim and collapse spaces in matching layer names')}
+              >
+                {t('Clean Names')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer opacity')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchOpacityFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer opacity'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer opacity')}
+              >
+                {t('Set Opacity')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer blend mode')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchBlendModeFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer blend mode'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer blend mode')}
+              >
+                {t('Set Blend')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer fill')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchPaintFromPanel('fill')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer fill'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer fill')}
+              >
+                {t('Set Fill')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer stroke')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchPaintFromPanel('stroke')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer stroke'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer stroke')}
+              >
+                {t('Set Stroke')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer stroke width')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchStrokeWidthFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer stroke width'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer stroke width')}
+              >
+                {t('Set Stroke W')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer line cap')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchStrokeStyleFromPanel('cap')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer line cap'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer line cap')}
+              >
+                {t('Set Cap')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer line join')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchStrokeStyleFromPanel('join')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer line join'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer line join')}
+              >
+                {t('Set Join')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer dash')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchDashFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer dash'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer dash')}
+              >
+                {t('Set Dash')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer miter limit')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchMiterLimitFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer miter limit'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer miter limit')}
+              >
+                {t('Set Miter')}
+              </button>
+
+
+
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer overprint')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchOverprintFromPanel('both')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer overprint'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer overprint')}
+              >
+                {t('Set Overprint')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer print mark kind')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchPrintMarkKindFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer print mark kind'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer print mark kind')}
+              >
+                {t('Set Print Mark')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer font family')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('fontFamily')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer font family'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer font family')}
+              >
+                {t('Set Font')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer font size')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('fontSize')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer font size'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer font size')}
+              >
+                {t('Set Font Size')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer font weight')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('fontWeight')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer font weight'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer font weight')}
+              >
+                {t('Set Weight')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer font style')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('fontStyle')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer font style'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer font style')}
+              >
+                {t('Set Italic')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer text alignment')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('textAlign')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer text alignment'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer text alignment')}
+              >
+                {t('Set Align')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer underline')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('underline')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer underline'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer underline')}
+              >
+                {t('Set Underline')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer strikethrough')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('linethrough')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer strikethrough'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer strikethrough')}
+              >
+                {t('Set Strike')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer overline')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('overline')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer overline'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer overline')}
+              >
+                {t('Set Overline')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer tracking')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('charSpacing')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer tracking'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer tracking')}
+              >
+                {t('Set Tracking')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer leading')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchTextStyleFromPanel('lineHeight')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer leading'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer leading')}
+              >
+                {t('Set Leading')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer x position')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('x')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer x position'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer x position')}
+              >
+                {t('Set X')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer y position')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('y')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer y position'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer y position')}
+              >
+                {t('Set Y')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer center x')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('centerX')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer center x'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer center x')}
+              >
+                {t('Set Center X')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer center y')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('centerY')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer center y'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer center y')}
+              >
+                {t('Set Center Y')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer right edge')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('right')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer right edge'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer right edge')}
+              >
+                {t('Set Right')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer bottom edge')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('bottom')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer bottom edge'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer bottom edge')}
+              >
+                {t('Set Bottom')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer position')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryPairFromPanel('position')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer position'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer position')}
+              >
+                {t('Set Position')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer center')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryPairFromPanel('center')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer center'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer center')}
+              >
+                {t('Set Center')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer bounds')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryPairFromPanel('bounds')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer bounds'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer bounds')}
+              >
+                {t('Set Bounds')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer width')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('width')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer width'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer width')}
+              >
+                {t('Set Width')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer height')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('height')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer height'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer height')}
+              >
+                {t('Set Height')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer size')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryPairFromPanel('size')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer size'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer size')}
+              >
+                {t('Set Size')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer rotation')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('rotation')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer rotation'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer rotation')}
+              >
+                {t('Set Rotate')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer horizontal scale')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('scaleX')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer horizontal scale'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer horizontal scale')}
+              >
+                {t('Set Scale X')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer vertical scale')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('scaleY')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer vertical scale'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer vertical scale')}
+              >
+                {t('Set Scale Y')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer scale')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryPairFromPanel('scale')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer scale'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer scale')}
+              >
+                {t('Set Scale')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer horizontal skew')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('skewX')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer horizontal skew'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer horizontal skew')}
+              >
+                {t('Set Skew X')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer vertical skew')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryFromPanel('skewY')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer vertical skew'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer vertical skew')}
+              >
+                {t('Set Skew Y')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer skew')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => setLayerMatchGeometryPairFromPanel('skew')}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer skew'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer skew')}
+              >
+                {t('Set Skew')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same object type in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerObjectFromPanel('type')}
+                onFocus={() => setReviewedLayerAction(t('Select same object type in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same object type in matching layers')}
+              >
+                {t('Same Type')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same visibility in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerObjectFromPanel('visibility')}
+                onFocus={() => setReviewedLayerAction(t('Select same visibility in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same visibility in matching layers')}
+              >
+                {t('Same Visibility')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same lock state in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerObjectFromPanel('lock')}
+                onFocus={() => setReviewedLayerAction(t('Select same lock state in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same lock state in matching layers')}
+              >
+                {t('Same Lock')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same named state in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerObjectFromPanel('named')}
+                onFocus={() => setReviewedLayerAction(t('Select same named state in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same named state in matching layers')}
+              >
+                {t('Same Named')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same name prefix in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerObjectFromPanel('namePrefix')}
+                onFocus={() => setReviewedLayerAction(t('Select same name prefix in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same name prefix in matching layers')}
+              >
+                {t('Same Prefix')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same width in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('width')}
+                onFocus={() => setReviewedLayerAction(t('Select same width in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same width in matching layers')}
+              >
+                {t('Same Width')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same height in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('height')}
+                onFocus={() => setReviewedLayerAction(t('Select same height in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same height in matching layers')}
+              >
+                {t('Same Height')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same size in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('size')}
+                onFocus={() => setReviewedLayerAction(t('Select same size in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same size in matching layers')}
+              >
+                {t('Same Size')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same area in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('area')}
+                onFocus={() => setReviewedLayerAction(t('Select same area in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same area in matching layers')}
+              >
+                {t('Same Area')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same aspect ratio in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('aspectRatio')}
+                onFocus={() => setReviewedLayerAction(t('Select same aspect ratio in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same aspect ratio in matching layers')}
+              >
+                {t('Same Aspect')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same rotation in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('rotation')}
+                onFocus={() => setReviewedLayerAction(t('Select same rotation in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same rotation in matching layers')}
+              >
+                {t('Same Rotation')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same scale in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('scale')}
+                onFocus={() => setReviewedLayerAction(t('Select same scale in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same scale in matching layers')}
+              >
+                {t('Same Scale')}
+              </button>
+
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same right edge in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('right')}
+                onFocus={() => setReviewedLayerAction(t('Select same right edge in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same right edge in matching layers')}
+              >
+                {t('Same Right')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same bottom edge in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('bottom')}
+                onFocus={() => setReviewedLayerAction(t('Select same bottom edge in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same bottom edge in matching layers')}
+              >
+                {t('Same Bottom')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same x position in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('x')}
+                onFocus={() => setReviewedLayerAction(t('Select same x position in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same x position in matching layers')}
+              >
+                {t('Same X')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same y position in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('y')}
+                onFocus={() => setReviewedLayerAction(t('Select same y position in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same y position in matching layers')}
+              >
+                {t('Same Y')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same position in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('position')}
+                onFocus={() => setReviewedLayerAction(t('Select same position in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same position in matching layers')}
+              >
+                {t('Same Position')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same center in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('center')}
+                onFocus={() => setReviewedLayerAction(t('Select same center in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same center in matching layers')}
+              >
+                {t('Same Center')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same bounds in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('bounds')}
+                onFocus={() => setReviewedLayerAction(t('Select same bounds in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same bounds in matching layers')}
+              >
+                {t('Same Bounds')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same skew in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerGeometryFromPanel('skew')}
+                onFocus={() => setReviewedLayerAction(t('Select same skew in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same skew in matching layers')}
+              >
+                {t('Same Skew')}
+              </button>
+
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Clear matching gradient fills')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => clearLayerMatchComplexAppearanceFromPanel('gradientFill')}
+                onFocus={() => setReviewedLayerAction(t('Clear matching gradient fills'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Clear matching gradient fills')}
+              >
+                {t('Clear Gradients')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same gradient fill in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerComplexAppearanceFromPanel('gradientFill')}
+                onFocus={() => setReviewedLayerAction(t('Select same gradient fill in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same gradient fill in matching layers')}
+              >
+                {t('Same Gradient')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Clear matching pattern fills')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => clearLayerMatchComplexAppearanceFromPanel('pattern')}
+                onFocus={() => setReviewedLayerAction(t('Clear matching pattern fills'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Clear matching pattern fills')}
+              >
+                {t('Clear Patterns')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same pattern in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerComplexAppearanceFromPanel('pattern')}
+                onFocus={() => setReviewedLayerAction(t('Select same pattern in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same pattern in matching layers')}
+              >
+                {t('Same Pattern')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Grommet matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={grommetLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Grommet matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Grommet matching objects')}
+              >
+                {t('Grommet')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Rhinestone matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={rhinestoneLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Rhinestone matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Rhinestone matching objects')}
+              >
+                {t('Rhinestone')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Blend matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => { void blendLayerMatchesFromPanel(); }}
+                onFocus={() => setReviewedLayerAction(t('Blend matching objects'))}
+                disabled={layerMatchCounts.total < 2}
+                title={t('Blend matching objects')}
+              >
+                {t('Blend')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Variable Width matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={variableWidthLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Variable Width matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Variable Width matching objects')}
+              >
+                {t('Width profile')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Multi-outline matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => { void multiOutlineLayerMatchesFromPanel(); }}
+                onFocus={() => setReviewedLayerAction(t('Multi-outline matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Multi-outline matching objects')}
+              >
+                {t('Multi-outline')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Warp matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={warpLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Warp matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Warp matching objects')}
+              >
+                {t('Arc Warp')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Free Distort matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={freeDistortLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Free Distort matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Free Distort matching objects')}
+              >
+                {t('Free Distort')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Round corners matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={roundCornersLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Round corners matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Round corners matching objects')}
+              >
+                {t('Round Corners')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Twist matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={twistLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Twist matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Twist matching objects')}
+              >
+                {t('Twist')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Zig Zag matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={zigzagLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Zig Zag matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Zig Zag matching objects')}
+              >
+                {t('Zig Zag')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Roughen matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={roughenLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Roughen matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Roughen matching objects')}
+              >
+                {t('Roughen')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Pucker or bloat matching objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={puckerLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Pucker or bloat matching objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Pucker or bloat matching objects')}
+              >
+                {t('Pucker/Bloat')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Knife split matching objects horizontally')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => knifeSplitLayerMatchesFromPanel('horizontal')}
+                onFocus={() => setReviewedLayerAction(t('Knife split matching objects horizontally'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Knife split matching objects horizontally')}
+              >
+                {t('Knife H')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Knife split matching objects vertically')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => knifeSplitLayerMatchesFromPanel('vertical')}
+                onFocus={() => setReviewedLayerAction(t('Knife split matching objects vertically'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Knife split matching objects vertically')}
+              >
+                {t('Knife V')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Split matching open paths at midpoint')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={scissorsSplitLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Split matching open paths at midpoint'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Split matching open paths at midpoint')}
+              >
+                {t('Scissors')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Split matching objects into grid')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={splitLayerMatchesIntoGridFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Split matching objects into grid'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Split matching objects into grid')}
+              >
+                {t('Split Grid')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Clean up matching stray objects')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={cleanUpLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Clean up matching stray objects'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Clean up matching stray objects')}
+              >
+                {t('Clean Up')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Add anchors to matching paths')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={addAnchorsToLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Add anchors to matching paths'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Add anchors to matching paths')}
+              >
+                {t('Add Anchors')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Reverse matching path direction')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={reverseLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Reverse matching path direction'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Reverse matching path direction')}
+              >
+                {t('Reverse Path')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Simplify matching layer paths')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={simplifyLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Simplify matching layer paths'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Simplify matching layer paths')}
+              >
+                {t('Simplify Path')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Smooth matching layer paths')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={smoothLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Smooth matching layer paths'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Smooth matching layer paths')}
+              >
+                {t('Smooth Path')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Offset matching layer paths')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={offsetLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Offset matching layer paths'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Offset matching layer paths')}
+              >
+                {t('Offset Path')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Outline strokes in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={outlineLayerMatchStrokesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Outline strokes in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Outline strokes in matching layers')}
+              >
+                {t('Outline Stroke')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Make matching compound path')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={makeLayerMatchCompoundPathFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Make matching compound path'))}
+                disabled={layerMatchCounts.total < 2}
+                title={t('Make matching compound path')}
+              >
+                {t('Make Compound')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Release matching compound paths')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={releaseLayerMatchCompoundPathsFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Release matching compound paths'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Release matching compound paths')}
+              >
+                {t('Release Compound')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Expand matching clipping masks')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={expandLayerMatchClippingMasksFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Expand matching clipping masks'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Expand matching clipping masks')}
+              >
+                {t('Expand Clips')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Release matching clipping masks')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={releaseLayerMatchClippingMasksFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Release matching clipping masks'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Release matching clipping masks')}
+              >
+                {t('Release Clips')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same clipping mask in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerComplexAppearanceFromPanel('clipPath')}
+                onFocus={() => setReviewedLayerAction(t('Select same clipping mask in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same clipping mask in matching layers')}
+              >
+                {t('Same Clip')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same font family in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerTextFromPanel('fontFamily')}
+                onFocus={() => setReviewedLayerAction(t('Select same font family in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same font family in matching layers')}
+              >
+                {t('Same Font')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same font size in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerTextFromPanel('fontSize')}
+                onFocus={() => setReviewedLayerAction(t('Select same font size in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same font size in matching layers')}
+              >
+                {t('Same Font Size')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same text appearance in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerTextFromPanel('textAppearance')}
+                onFocus={() => setReviewedLayerAction(t('Select same text appearance in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same text appearance in matching layers')}
+              >
+                {t('Same Text Style')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Break matching symbol links')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={detachLayerMatchSymbolsFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Break matching symbol links'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Break matching symbol links')}
+              >
+                {t('Break Symbols')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same symbol in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAssetFromPanel('symbol')}
+                onFocus={() => setReviewedLayerAction(t('Select same symbol in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same symbol in matching layers')}
+              >
+                {t('Same Symbol')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same image source in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAssetFromPanel('imageSource')}
+                onFocus={() => setReviewedLayerAction(t('Select same image source in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same image source in matching layers')}
+              >
+                {t('Same Image')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Clear matching image filters')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={clearLayerMatchImageFiltersFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Clear matching image filters'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Clear matching image filters')}
+              >
+                {t('Clear Image FX')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same image filters in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAssetFromPanel('imageFilters')}
+                onFocus={() => setReviewedLayerAction(t('Select same image filters in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same image filters in matching layers')}
+              >
+                {t('Same Image FX')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same overprint in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerProductionFromPanel('overprint')}
+                onFocus={() => setReviewedLayerAction(t('Select same overprint in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same overprint in matching layers')}
+              >
+                {t('Same Overprint')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same print mark type in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerProductionFromPanel('printMarkKind')}
+                onFocus={() => setReviewedLayerAction(t('Select same print mark type in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same print mark type in matching layers')}
+              >
+                {t('Same Print Mark')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same appearance in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('appearance')}
+                onFocus={() => setReviewedLayerAction(t('Select same appearance in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same appearance in matching layers')}
+              >
+                {t('Select Same Style')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same fill in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('fill')}
+                onFocus={() => setReviewedLayerAction(t('Select same fill in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same fill in matching layers')}
+              >
+                {t('Same Fill')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same stroke in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('stroke')}
+                onFocus={() => setReviewedLayerAction(t('Select same stroke in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same stroke in matching layers')}
+              >
+                {t('Same Stroke')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same stroke width in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('strokeWidth')}
+                onFocus={() => setReviewedLayerAction(t('Select same stroke width in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same stroke width in matching layers')}
+              >
+                {t('Same Stroke W')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same line cap in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('strokeCap')}
+                onFocus={() => setReviewedLayerAction(t('Select same line cap in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same line cap in matching layers')}
+              >
+                {t('Same Cap')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same line join in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('strokeJoin')}
+                onFocus={() => setReviewedLayerAction(t('Select same line join in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same line join in matching layers')}
+              >
+                {t('Same Join')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same dash in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('dash')}
+                onFocus={() => setReviewedLayerAction(t('Select same dash in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same dash in matching layers')}
+              >
+                {t('Same Dash')}
+              </button>
+
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same miter limit in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('miterLimit')}
+                onFocus={() => setReviewedLayerAction(t('Select same miter limit in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same miter limit in matching layers')}
+              >
+                {t('Same Miter')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same constant stroke in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('strokeUniform')}
+                onFocus={() => setReviewedLayerAction(t('Select same constant stroke in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same constant stroke in matching layers')}
+              >
+                {t('Same Constant Stroke')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching layer shadow')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchShadowFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching layer shadow'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching layer shadow')}
+              >
+                {t('Set Shadow')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same shadow in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('shadow')}
+                onFocus={() => setReviewedLayerAction(t('Select same shadow in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same shadow in matching layers')}
+              >
+                {t('Same Shadow')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same opacity in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('opacity')}
+                onFocus={() => setReviewedLayerAction(t('Select same opacity in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same opacity in matching layers')}
+              >
+                {t('Same Opacity')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Select same blend mode in matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => selectSameLayerAppearanceFromPanel('blendMode')}
+                onFocus={() => setReviewedLayerAction(t('Select same blend mode in matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Select same blend mode in matching layers')}
+              >
+                {t('Same Blend')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Expand matching appearance')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={() => { void expandLayerMatchAppearanceFromPanel(); }}
+                onFocus={() => setReviewedLayerAction(t('Expand matching appearance'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Expand matching appearance')}
+              >
+                {t('Expand Appearance')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Flatten matching transparency')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={flattenLayerMatchTransparencyFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Flatten matching transparency'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Flatten matching transparency')}
+              >
+                {t('Flatten Transparency')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Apply graphic style to matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={applyGraphicStyleToLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Apply graphic style to matching layers'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Apply graphic style to matching layers')}
+              >
+                {t('Apply Style')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Clear matching layer appearance')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={clearLayerMatchAppearanceFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Clear matching layer appearance'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Clear matching layer appearance')}
+              >
+                {t('Clear Appearance')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Set matching constant stroke width')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={setLayerMatchStrokeUniformFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Set matching constant stroke width'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Set matching constant stroke width')}
+              >
+                {t('Set Constant Stroke')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
                 data-layer-action-review={t('Duplicate matching layers')}
                 className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
                 onClick={() => { void duplicateLayerMatchesFromPanel(); }}
@@ -838,6 +3454,30 @@ export function LayersPanel() {
               <button
                 type="button"
                 data-layer-action
+                data-layer-action-review={t('Group matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={groupLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Group matching layers'))}
+                disabled={layerMatchCounts.total < 2}
+                title={t('Group matching layers')}
+              >
+                {t('Group Matches')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Ungroup matching layers')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
+                onClick={ungroupLayerMatchesFromPanel}
+                onFocus={() => setReviewedLayerAction(t('Ungroup matching layers'))}
+                disabled={layerMatchCounts.groups === 0}
+                title={t('Ungroup matching layers')}
+              >
+                {t('Ungroup Matches')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
                 data-layer-action-review={t('Delete matching layers')}
                 className="btn !py-1 !px-1.5 !text-[10px] shrink-0 text-danger hover:border-danger/60"
                 onClick={() => { void deleteLayerMatchesFromPanel(); }}
@@ -846,6 +3486,66 @@ export function LayersPanel() {
                 title={t('Delete matching layers')}
               >
                 {t('Delete Matches')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Move matching layers forward')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0 inline-flex items-center gap-1"
+                onClick={() => moveLayerMatchesStackFromPanel('forward')}
+                onFocus={() => setReviewedLayerAction(t('Move matching layers forward'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Move matching layers forward')}
+              >
+                <ChevronUp size={10} aria-hidden="true" /> {t('Forward')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Move matching layers to front')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0 inline-flex items-center gap-1"
+                onClick={() => moveLayerMatchesStackFromPanel('front')}
+                onFocus={() => setReviewedLayerAction(t('Move matching layers to front'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Move matching layers to front')}
+              >
+                <ChevronsUp size={10} aria-hidden="true" /> {t('To Front')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Move matching layers backward')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0 inline-flex items-center gap-1"
+                onClick={() => moveLayerMatchesStackFromPanel('backward')}
+                onFocus={() => setReviewedLayerAction(t('Move matching layers backward'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Move matching layers backward')}
+              >
+                <ChevronDown size={10} aria-hidden="true" /> {t('Backward')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Reverse matching layer order')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0 inline-flex items-center gap-1"
+                onClick={() => moveLayerMatchesStackFromPanel('reverse')}
+                onFocus={() => setReviewedLayerAction(t('Reverse matching layer order'))}
+                disabled={layerMatchCounts.total < 2}
+                title={t('Reverse matching layer order')}
+              >
+                <ArrowUpDown size={10} aria-hidden="true" /> {t('Reverse')}
+              </button>
+              <button
+                type="button"
+                data-layer-action
+                data-layer-action-review={t('Move matching layers to back')}
+                className="btn !py-1 !px-1.5 !text-[10px] shrink-0 inline-flex items-center gap-1"
+                onClick={() => moveLayerMatchesStackFromPanel('back')}
+                onFocus={() => setReviewedLayerAction(t('Move matching layers to back'))}
+                disabled={layerMatchCounts.total === 0}
+                title={t('Move matching layers to back')}
+              >
+                <ChevronsDown size={10} aria-hidden="true" /> {t('To Back')}
               </button>
               <button
                 type="button"

@@ -16,6 +16,33 @@ export interface TransformParams {
   /** Transform Each — pivot every object on its OWN centre instead of the
    *  selection's shared centre (Illustrator Object→Transform→Transform Each). */
   each: boolean;
+  /** Scale strokes and effects alongside geometry (Illustrator Transform option). */
+  scaleStrokesEffects?: boolean;
+}
+
+function transformScaleFactor(p: TransformParams): number {
+  const sx = p.scale > 0 ? p.scale : 1;
+  const sy = (p.scaleY ?? p.scale) > 0 ? (p.scaleY ?? p.scale) : sx;
+  return Math.sqrt(Math.abs(sx * sy));
+}
+
+function scaleShadowEffect(target: fabric.FabricObject, factor: number): void {
+  const shadow = target.shadow;
+  if (!shadow || typeof shadow !== 'object') return;
+  const source = shadow as { color?: unknown; blur?: unknown; offsetX?: unknown; offsetY?: unknown };
+  target.set('shadow', new fabric.Shadow({
+    color: typeof source.color === 'string' ? source.color : 'rgba(0,0,0,0.3)',
+    blur: (Number(source.blur) || 0) * factor,
+    offsetX: (Number(source.offsetX) || 0) * factor,
+    offsetY: (Number(source.offsetY) || 0) * factor,
+  }));
+}
+
+function scaleStrokeAndEffects(target: fabric.FabricObject, factor: number): void {
+  if (!Number.isFinite(factor) || factor <= 0 || factor === 1) return;
+  const strokeWidth = Number(target.strokeWidth);
+  if (Number.isFinite(strokeWidth) && strokeWidth > 0) target.set('strokeWidth', strokeWidth * factor);
+  scaleShadowEffect(target, factor);
 }
 
 /** Scale + rotate about the target's own centre, then move. */
@@ -25,6 +52,7 @@ function transformAboutCentre(target: fabric.FabricObject, p: TransformParams): 
   const sy = p.scaleY ?? p.scale;
   if (sx > 0 && sx !== 1) target.scaleX = (target.scaleX ?? 1) * sx;
   if (sy > 0 && sy !== 1) target.scaleY = (target.scaleY ?? 1) * sy;
+  if (p.scaleStrokesEffects) scaleStrokeAndEffects(target, transformScaleFactor(p));
   if (p.rotate) target.set('angle', (target.angle ?? 0) + p.rotate);
   target.setPositionByOrigin(centre, 'center', 'center');
   if (p.dx || p.dy) target.set({ left: (target.left ?? 0) + p.dx, top: (target.top ?? 0) + p.dy });
@@ -35,6 +63,27 @@ function transformAboutCentre(target: fabric.FabricObject, p: TransformParams): 
  *  rotate). Thin wrapper over applyTransform so it also feeds Transform Again. */
 export function rotateSelection(deg: number): Promise<boolean> {
   return applyTransform({ dx: 0, dy: 0, scale: 1, rotate: deg, copy: false, each: false });
+}
+
+function reflectObjectAcrossAxis(target: fabric.FabricObject, angleDeg: number): void {
+  const centre = target.getCenterPoint();
+  const angle = ((angleDeg % 180) + 180) % 180;
+  target.rotate((target.angle ?? 0) - angle);
+  target.set('flipY', !target.flipY);
+  target.rotate((target.angle ?? 0) + angle);
+  target.setPositionByOrigin(centre, 'center', 'center');
+  target.setCoords();
+}
+
+export function reflectSelection(angleDeg: number): boolean {
+  const canvas = getCanvas();
+  if (!canvas) return false;
+  const objects = canvas.getActiveObjects();
+  if (objects.length === 0) return false;
+  for (const object of objects) reflectObjectAcrossAxis(object, angleDeg);
+  canvas.requestRenderAll();
+  pushHistory();
+  return true;
 }
 
 /**

@@ -67,38 +67,48 @@ export function zigzagPolyline(pts: Pt[], closed: boolean, sizePx: number, ridge
   return out;
 }
 
+export function canZigzagObject(object: fabric.FabricObject): boolean {
+  return object.type === 'path' || object.type === 'rect' || object.type === 'polygon' || object.type === 'ellipse';
+}
+
+export function zigzagObject(canvas: fabric.Canvas, object: fabric.FabricObject, sizeMm: number, ridges: number, smooth: boolean): fabric.Path | null {
+  if (!canZigzagObject(object) || sizeMm <= 0 || ridges < 1) return null;
+  const sizePx = sizeMm * MM_TO_PX;
+  const roundedRidges = Math.round(ridges);
+  const parts: string[] = [];
+  for (const cp of buildOutlineCutPaths([object], 0, 1)) {
+    const px = cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
+    const zz = zigzagPolyline(px, cp.closed, sizePx, roundedRidges, smooth);
+    if (zz.length >= 2) parts.push(toD(zz, cp.closed));
+  }
+  if (parts.length === 0) return null;
+  const path = new fabric.Path(parts.join(' '), {
+    fill: (object.fill as string) ?? '',
+    stroke: (object.stroke as string) ?? '',
+    strokeWidth: object.strokeWidth ?? 0,
+    opacity: object.opacity ?? 1,
+  });
+  canvas.remove(object);
+  canvas.add(path);
+  return path;
+}
+
 /** True when the selection has a path/shape to zig-zag. */
 export function canZigzag(): boolean {
   const c = getCanvas();
-  return !!c && c.getActiveObjects().some(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon' || o.type === 'ellipse');
+  return !!c && c.getActiveObjects().some(canZigzagObject);
 }
 
 /** Zig-zag every selected path/shape. Returns the number transformed. */
 export function zigzagSelection(sizeMm: number, ridges: number, smooth: boolean): number {
   const canvas = getCanvas();
   if (!canvas || sizeMm <= 0 || ridges < 1) return 0;
-  const objs = canvas.getActiveObjects().filter(o => o.type === 'path' || o.type === 'rect' || o.type === 'polygon' || o.type === 'ellipse');
+  const objs = canvas.getActiveObjects().filter(canZigzagObject);
   if (objs.length === 0) return 0;
-  const sizePx = sizeMm * MM_TO_PX;
 
   let count = 0;
   for (const obj of objs) {
-    const parts: string[] = [];
-    for (const cp of buildOutlineCutPaths([obj], 0, 1)) {
-      const px = cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
-      const zz = zigzagPolyline(px, cp.closed, sizePx, Math.round(ridges), smooth);
-      if (zz.length >= 2) parts.push(toD(zz, cp.closed));
-    }
-    if (parts.length === 0) continue;
-    const np = new fabric.Path(parts.join(' '), {
-      fill: (obj.fill as string) ?? '',
-      stroke: (obj.stroke as string) ?? '',
-      strokeWidth: obj.strokeWidth ?? 0,
-      opacity: obj.opacity ?? 1,
-    });
-    canvas.remove(obj);
-    canvas.add(np);
-    count++;
+    if (zigzagObject(canvas, obj, sizeMm, ridges, smooth)) count++;
   }
   if (count > 0) {
     canvas.discardActiveObject();

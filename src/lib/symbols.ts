@@ -8,9 +8,11 @@
 
 import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
+import { updateSelection } from './selectionApply';
 import type { SymbolEntry } from '../types';
 
-const STORAGE_KEY = 'vector.symbols';
+export const SYMBOLS_STORAGE_KEY = 'vector.symbols';
+const STORAGE_KEY = SYMBOLS_STORAGE_KEY;
 const LIMIT = 20;
 
 function notify() {
@@ -26,6 +28,10 @@ export function getSymbols(): SymbolEntry[] {
   } catch {
     return [];
   }
+}
+
+export function writeSymbolsForTest(list: SymbolEntry[]) {
+  writeAll(list);
 }
 
 function writeAll(list: SymbolEntry[]) {
@@ -181,6 +187,7 @@ export async function insertSymbol(id: string, x?: number, y?: number): Promise<
   }
 
   for (const o of enlived) {
+    (o as fabric.FabricObject & { symbolId?: string }).symbolId = id;
     o.set({ left: (o.left ?? 0) + cx, top: (o.top ?? 0) + cy });
     o.setCoords();
     canvas.add(o);
@@ -194,4 +201,105 @@ export async function insertSymbol(id: string, x?: number, y?: number): Promise<
   }
   canvas.requestRenderAll();
   pushHistory();
+}
+
+
+function activeSymbolId(objects: fabric.FabricObject[]): string | null {
+  const ids = new Set(objects.map(object => (object as fabric.FabricObject & { symbolId?: string }).symbolId).filter((id): id is string => typeof id === 'string' && !!id));
+  return ids.size === 1 ? [...ids][0] : null;
+}
+
+
+function clearSymbolMetadata(object: fabric.FabricObject): number {
+  let changed = 0;
+  const tagged = object as fabric.FabricObject & { symbolId?: string; _objects?: fabric.FabricObject[] };
+  if (typeof tagged.symbolId === 'string' && tagged.symbolId) {
+    delete tagged.symbolId;
+    changed += 1;
+  }
+  for (const child of tagged._objects ?? []) changed += clearSymbolMetadata(child);
+  return changed;
+}
+
+export function detachSymbolMetadataFromObjects(objects: fabric.FabricObject[]): number {
+  let changed = 0;
+  for (const object of objects) changed += clearSymbolMetadata(object);
+  return changed;
+}
+
+export function countSymbolInstanceMatches(object: fabric.FabricObject, symbolId: string): number {
+  if (!symbolId) return 0;
+  let count = 0;
+  const tagged = object as fabric.FabricObject & { symbolId?: string; _objects?: fabric.FabricObject[] };
+  if (tagged.symbolId === symbolId) count += 1;
+  for (const child of tagged._objects ?? []) count += countSymbolInstanceMatches(child, symbolId);
+  return count;
+}
+
+
+function hasAnySymbolInstance(object: fabric.FabricObject): boolean {
+  const tagged = object as fabric.FabricObject & { symbolId?: string; _objects?: fabric.FabricObject[] };
+  if (typeof tagged.symbolId === 'string' && tagged.symbolId.trim()) return true;
+  return (tagged._objects ?? []).some(hasAnySymbolInstance);
+}
+
+export function selectAllSymbolInstances(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const matches = canvas.getObjects().filter((object) => {
+    if ((object as { excludeFromExport?: boolean }).excludeFromExport) return false;
+    return hasAnySymbolInstance(object);
+  });
+  if (matches.length === 0) return 0;
+
+  canvas.discardActiveObject();
+  canvas.setActiveObject(matches.length === 1 ? matches[0] : new fabric.ActiveSelection(matches, { canvas }));
+  canvas.requestRenderAll();
+  updateSelection();
+  return matches.length;
+}
+
+export function selectSymbolInstances(symbolId: string): number {
+  const canvas = getCanvas();
+  if (!canvas || !symbolId) return 0;
+  const matches = canvas.getObjects().filter((object) => {
+    if ((object as { excludeFromExport?: boolean }).excludeFromExport) return false;
+    return countSymbolInstanceMatches(object, symbolId) > 0;
+  });
+  if (matches.length === 0) return 0;
+
+  canvas.discardActiveObject();
+  canvas.setActiveObject(matches.length === 1 ? matches[0] : new fabric.ActiveSelection(matches, { canvas }));
+  canvas.requestRenderAll();
+  updateSelection();
+  return matches.length;
+}
+
+export function detachSymbolInstancesFromSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const changed = detachSymbolMetadataFromObjects(canvas.getActiveObjects());
+  if (changed > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+  }
+  return changed;
+}
+
+export async function redefineSymbolFromSelection(): Promise<SymbolEntry | null> {
+  const canvas = getCanvas();
+  if (!canvas) return null;
+  const active = canvas.getActiveObjects();
+  if (!active.length) return null;
+  const id = activeSymbolId(active);
+  if (!id) return null;
+  const existing = getSymbols().find(symbol => symbol.id === id);
+  if (!existing) return null;
+  const replacement = await saveSelectionAsSymbol(existing.name);
+  if (!replacement) return null;
+  const list = getSymbols().filter(symbol => symbol.id !== replacement.id && symbol.id !== id);
+  const next = [{ ...replacement, id, name: existing.name, addedAt: Date.now() }, ...list].slice(0, LIMIT);
+  writeAll(next);
+  active.forEach(object => { (object as fabric.FabricObject & { symbolId?: string }).symbolId = id; });
+  return next[0];
 }

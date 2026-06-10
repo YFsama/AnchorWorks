@@ -28,6 +28,15 @@ customizer; status bar + **version chip**; layers/properties/align/symbols/
 artboards/character/inspect/debug panels; preferences; help; onboarding;
 i18n en/zh; themes; toasts; undo/redo; autosave.
 
+2026-06-08: Measure proof asset archive panel: proof packets now include source/export/photo/note archive details, with manual add/update commands for final asset handoff.
+2026-06-08: Measure proof file verification panel: proof packets now include version/checksum/reviewer/note verification details, with manual add/update commands for final file QA and archive traceability.
+2026-06-08: Rich black / registration color preflight selectors: Select Object and command palette can isolate CMYK rich-black over-inking risks and all-plates registration-color artwork, including active-artboard scoped audits.
+2026-06-08: Prepress color repair commands: command palette and Select Object menu can convert rich-black and registration/all-plates artwork to 100K process black while preserving generated print marks, with undo/history coverage.
+2026-06-08: Total ink coverage selector: Select Object menu and command palette can isolate CMYK artwork over the 300% total ink limit globally or within the active artboard for separations/TAC preflight.
+2026-06-08: Total ink coverage repair command: command palette and Select Object menu can proportionally reduce CMY channels to keep CMYK artwork under 300% TAC while preserving K and ignoring registration/overlay paints.
+2026-06-08: White overprint preflight and repair: Select Object menu and command palette can isolate white fill/stroke artwork with overprint enabled and clear only the risky white overprint flags while preserving other overprint settings.
+2026-06-08: Spot color separation selector: Select Object menu and command palette can isolate spot/separation/PANTONE artwork globally or on the active artboard for Illustrator-like separations preview audits.
+
 ---
 
 ## P0 — sign-making essentials (cut/print correctness)
@@ -92,7 +101,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] **User guides from rulers** — drag off the top/left ruler to drop a
       persistent guide (Rulers.tsx startGuide); GuidesLayer.tsx renders them +
       the live drag; store userGuides/guidesLocked; Lock/Clear Guides in View
-      menu + command palette. (Snap-to-guide is a follow-up.) 2026-06-02.
+      menu + command palette. 2026-06-02. Snap-to-guide follow-up completed:
+      shape creation points now snap to visible ruler guides through maybeSnap(),
+      matching moved-object guide snapping. 2026-06-07.
 - [x] **Dimension / measure tool** — new 'measure' tool (M): measureTool.ts +
       MeasureLayer.tsx draw a click-drag segment with a px/mm/angle readout; never
       mutates the document. Auto-listed in toolbar/palette/keymap. (Persistent
@@ -112,21 +123,596 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       2026-06-02.
 
 ## P3 — stretch (harder / niche)
-- [~] **Single-line / engraving fonts** — BLOCKED: needs a bundled single-stroke
-      (Hershey) font dataset — a sizable data asset. Like opentype.js, shouldn't be
-      added silently in the loop; surface to the user for a dedicated run.
+- [x] **Single-line / engraving fonts** — upgraded from seven-segment strokes to
+      an embedded engineering single-line vector alphabet with curves, numbers,
+      and common engraving punctuation; no external font payload required.
+      2026-06-07.
 - [x] **Rhinestone / hotfix templates** — rhinestone.ts rhinestoneFromSelection()
       drops Ø-sized stones every N mm along the selection outline as cut-path
       circles; RhinestoneDialog (SS presets). Command palette + right-click.
       2026-06-02.
-- [~] **Gradient mesh** — BLOCKED: SVG/Fabric have no mesh-gradient primitive
-      (SVG2 mesh isn't shipped in browsers); a real implementation needs a bespoke
-      patch renderer. Out of scope for a surgical change — dedicated effort.
-- [~] **Isolation mode** — BLOCKED: Fabric v6 has no clean in-place group-child
-      editing (`interactive`/`subTargetCheck` aren't in the typings, no dblclick
-      infra); a faithful version needs significant bespoke interaction work.
+- [x] **Gradient mesh** — FreeformGradientDialog now has a Mesh Surface mode:
+      rasterizes a corner-preserving bilinear mesh with interior stop influence,
+      giving Illustrator-like mesh color surfaces despite SVG/Fabric limitations.
+      2026-06-07.
+- [x] **Isolation mode** — group isolation now works through command palette,
+      shortcut/right-click, Esc exit, and Illustrator-style double-click entry;
+      it temporarily ungroups children for editing and restores a group on exit.
+      2026-06-07.
 
 ## Operation-convenience refinements (when the actionable backlog is blocked)
+- [x] **Graphic Styles** — PropertiesPanel now has Illustrator-style reusable
+      appearance presets: save the active object's fill/stroke/opacity/blend/
+      dash/caps/joins/shadow as a style, persist it, and apply it to selections.
+      2026-06-07.
+- [x] **Select by Graphic Style** — Graphic Style tiles can now select every
+      object matching that saved appearance signature, making reusable style cleanup
+      work like Illustrator's Graphic Styles panel. 2026-06-07.
+- [x] **Graphic Styles menu/palette parity** — Appearance menu, command palette,
+      and right-click Appearance submenu now save the selection as a reusable
+      graphic style, apply saved styles, and select matching artwork without
+      opening Properties, closer to Illustrator's panel/menu workflow. 2026-06-07.
+- [x] **Clear Appearance** — Appearance menu and command palette can reset
+      selected objects to default fill/stroke/opacity, clearing blend modes, dash
+      styling, caps/joins, and shadows for Illustrator-like appearance cleanup.
+      2026-06-07.
+- [x] **Layers search Set Shadow** — Layers search actions can now batch
+      apply or clear drop shadows across filtered matches with color, blur, and
+      offset controls, extending Illustrator-style appearance cleanup from the
+      Layers panel. 2026-06-08.
+- [x] **Layers search Clear Image FX** — Layers search actions can now
+      batch-clear raster image filters across filtered image matches, pairing
+      Select Same Image FX with cleanup operations for Illustrator-like placed
+      image production fixes. 2026-06-08.
+- [x] **Layers search Clear Gradients/Patterns** — Layers search actions now
+      batch-clear live gradient fills and pattern-fill metadata across filtered
+      matches, pairing Same Gradient/Same Pattern discovery with Illustrator-like
+      appearance cleanup directly in the Layers panel. 2026-06-08.
+- [x] **Layers search Release Clips** — Layers search actions can now
+      release clipping masks across filtered matches, pairing Same Clip discovery
+      with Illustrator-like mask cleanup directly in the Layers panel. 2026-06-08.
+- [x] **Layers search Expand Clips** — Layers search actions can now
+      expand clipping masks across filtered matches, clearing clip paths and
+      ungrouping matching clipping groups into editable artwork from the Layers
+      panel. 2026-06-08.
+- [x] **Layers search Release Compound** — Layers search actions can now
+      release matching compound paths into editable subpaths, bringing another
+      Illustrator path-cleanup workflow directly to filtered layer results.
+      2026-06-08.
+- [x] **Layers search Make Compound** — Layers search actions can now
+      combine filtered vector matches into a single even-odd compound path using
+      the same path assembly as Object > Compound Path, completing make/release
+      compound cleanup from the Layers panel. 2026-06-08.
+- [x] **Layers search Outline Stroke** — Layers search actions can now
+      outline strokes on filtered matches into editable even-odd filled paths,
+      reusing Object > Path > Outline Stroke semantics for batch layer cleanup.
+      2026-06-08.
+- [x] **Layers search Offset Path** — Layers search actions can now
+      add positive or negative offset copies for filtered vector matches in mm,
+      bringing Object > Path > Offset Path into search-scoped cleanup workflows.
+      2026-06-08.
+- [x] **Layers search Smooth Path** — Layers search actions can now
+      smooth filtered vector matches with bounded multi-pass path smoothing,
+      bringing Object > Path > Smooth into search-scoped cleanup workflows.
+      2026-06-08.
+- [x] **Layers search Simplify Path** — Layers search actions can now
+      simplify filtered path matches with Douglas-Peucker tolerance control,
+      bringing Object > Path > Simplify into search-scoped cleanup workflows.
+      2026-06-08.
+- [x] **Layers search Reverse Path** — Layers search actions can now
+      reverse path direction across filtered path matches, bringing Object > Path
+      > Reverse Path Direction into search-scoped cleanup workflows.
+      2026-06-08.
+- [x] **Layers search Add Anchors** — Layers search actions can now
+      add midpoint anchors to filtered path matches in place, bringing Object >
+      Path > Add Anchor Points into search-scoped path editing workflows.
+      2026-06-08.
+- [x] **Layers search Clean Up** — Layers search actions can now
+      remove matching empty text, stray points, and zero-size junk without touching
+      nonmatching cleanup candidates, bringing Object > Path > Clean Up into
+      search-scoped document repair workflows. 2026-06-08.
+- [x] **Layers search Split Into Grid** — Layers search actions can now
+      replace filtered objects with rows×columns grid rectangles using optional
+      gutter spacing, bringing Object > Path > Split Into Grid into search-scoped
+      layout production workflows. 2026-06-08.
+- [x] **Layers search Scissors** — Layers search actions can now
+      split filtered open path matches at their midpoint while leaving closed and
+      nonmatching paths intact, bringing Scissors-style path cutting into
+      search-scoped cleanup workflows. 2026-06-08.
+- [x] **Layers search Knife Split** — Layers search actions can now
+      split filtered closed shapes horizontally or vertically through their center,
+      bringing Knife-style shape cutting into search-scoped path cleanup workflows.
+      2026-06-08.
+- [x] **Layers search Pucker/Bloat** — Layers search actions can now
+      apply signed Pucker & Bloat distortion to filtered path/shape matches,
+      bringing Effect > Distort & Transform cleanup into search-scoped workflows.
+      2026-06-08.
+- [x] **Layers search Roughen** — Layers search actions can now
+      roughen filtered path/shape matches with size/detail prompts, bringing
+      Effect > Distort & Transform > Roughen into search-scoped cleanup workflows.
+      2026-06-08.
+- [x] **Layers search Zig Zag** — Layers search actions can now
+      apply corner or smooth Zig Zag waves to filtered path/shape matches with
+      size/ridge prompts, extending Distort & Transform cleanup from search.
+      2026-06-08.
+- [x] **Layers search Twist** — Layers search actions can now
+      twist filtered path/shape matches by a signed angle, making Distort &
+      Transform spiral cleanup available directly from filtered layer results.
+      2026-06-08.
+- [x] **Layers search Round Corners** — Layers search actions can now
+      round filtered path/rectangle/polygon matches by radius, bringing Stylize >
+      Round Corners into search-scoped import cleanup workflows. 2026-06-08.
+- [x] **Layers search Free Distort** — Layers search actions can now
+      apply Free Distort presets or eight-value corner offsets to filtered path/
+      shape matches, bringing envelope-style perspective cleanup into search.
+      2026-06-08.
+- [x] **Layers search Warp** — Layers search actions can now
+      apply Arc/Rise/Flag/Wave warp styles to filtered path/shape matches across
+      a shared search-result frame, bringing envelope warp cleanup into Layers.
+      2026-06-08.
+- [x] **Layers search Multi-outline** — Layers search actions can now
+      add stacked multi-colour contour outlines behind filtered matches, bringing
+      sign-style Outline effects into search-scoped production cleanup. 2026-06-08.
+- [x] **Layers search Variable Width** — Layers search actions can now
+      expand filtered open stroked paths with uniform, taper, bulge, or hourglass
+      variable-width profiles for Illustrator-like stroke cleanup. 2026-06-08.
+- [x] **Layers search Blend** — Layers search actions can now
+      create Illustrator-style blend steps between filtered matches using step,
+      spacing, and orientation options while preserving blend metadata. 2026-06-08.
+- [x] **Layers search Rhinestone** — Layers search actions can now
+      generate hotfix/rhinestone cut-path templates from filtered matches with
+      spacing and stone-diameter controls, extending production cleanup. 2026-06-08.
+- [x] **Layers search Banner Grommets** — Layers search actions can now
+      generate banner grommet cut-path templates from filtered matches with
+      inset, max-spacing, and diameter controls for production finishing. 2026-06-08.
+- [x] **Measure annotation surface parity** — live distance/angle overlay now
+      includes a first-class Pin measurement command in View/menu search plus
+      Enter, so production drawings can preserve editable dimension annotations.
+      2026-06-08.
+- [x] **Selection dimensions** — Measure commands can now generate editable
+      width and height dimension annotations around the active selection bounds,
+      speeding shop drawings and Illustrator-like production markups. 2026-06-08.
+- [x] **Selection area labels** — Measure commands can now add editable
+      area/perimeter labels at the selection centre, giving production reviewers
+      quick square-mm and perimeter estimates without opening Inspector. 2026-06-08.
+- [x] **Selection center marks** — Measure commands can now add editable
+      crosshair/circle centre marks with mm coordinate labels for the selection
+      bounds, improving alignment and production registration workflows. 2026-06-08.
+- [x] **Selection corner marks** — Measure commands can now add editable
+      L-shaped marks at all selection bounds corners for trim, placement, and
+      production registration workflows. 2026-06-08.
+- [x] **Selection production mark set** — Measure commands can now add a
+      single editable group containing width/height dimensions, area/perimeter
+      label, centre mark, and corner marks for production proofing. 2026-06-08.
+- [x] **Selection margin frame** — Measure commands can now prompt for a
+      mm clearance and add an editable dashed safe-area frame around the selection,
+      supporting proofing, bleed, and placement reviews. 2026-06-08.
+- [x] **Selection inset frame** — Measure commands can now prompt for a
+      mm inset and add an editable dashed internal safe-area frame, complementing
+      outside margin frames for placement and trim reviews. 2026-06-08.
+- [x] **Measure annotation management** — generated measure/production
+      annotations now carry metadata, and menu/search commands can select or clear
+      all of them for cleanup after proofing. 2026-06-08.
+- [x] **Measure annotation lock workflow** — generated measure/production
+      annotations can now be locked or unlocked in bulk from View/menu search,
+      protecting proofing marks from accidental edits while artwork is adjusted. 2026-06-08.
+- [x] **Measure annotation visibility workflow** — generated measure/production
+      annotations can now be hidden or shown in bulk from View/menu search, so
+      complex artwork can be edited without deleting proofing marks. 2026-06-08.
+- [x] **Measure annotation arrange workflow** — generated measure/production
+      annotations can now be brought to front in bulk from View/menu search, keeping
+      proofing dimensions readable above dense artwork. 2026-06-08.
+- [x] **Measure annotation proof mode** — View/menu search can now prepare
+      all generated measure/production annotations for proofing in one action by
+      showing, bringing forward, and locking them. 2026-06-08.
+- [x] **Measure annotation edit mode** — View/menu search can now restore
+      generated measure/production annotations for editing in one action by showing,
+      bringing forward, unlocking, and selecting them. 2026-06-08.
+- [x] **Measure annotation duplication** — View/menu search can now duplicate
+      existing measure/production annotations onto the current artwork selection,
+      speeding repeated proof markups across multi-object or multi-layout jobs. 2026-06-08.
+- [x] **Measure annotation guide conversion** — View/menu search can now create
+      persistent ruler guides from generated measure/production annotation bounds,
+      turning proof marks into reusable Illustrator-like alignment guides. 2026-06-08.
+- [x] **Measure annotation center guides** — View/menu search can now create
+      persistent horizontal/vertical center guides from generated measure/production
+      annotation bounds for Illustrator-like centerline alignment. 2026-06-08.
+- [x] **Measure annotation full guide set** — View/menu search can now create
+      boundary plus center ruler guides from generated measure/production annotation
+      bounds in one action for faster Illustrator-like alignment setup. 2026-06-08.
+- [x] **Measure annotation margin guides** — View/menu search can now create
+      persistent ruler guides offset outward from measure/production annotation bounds
+      by a prompted mm margin for bleed and safe-area alignment. 2026-06-08.
+- [x] **Measure annotation margin full guide set** — View/menu search can now
+      create boundary guides offset by a prompted mm margin plus original center guides
+      from measure/production annotations in one action. 2026-06-08.
+- [x] **Measure annotation print marks** — View/menu search can now convert
+      measure/production annotation bounds into crop marks, registration marks,
+      bleed indicators, and page info with a prompted bleed value. 2026-06-08.
+- [x] **Measure annotation cut contour** — View/menu search can now turn
+      measure/production annotation bounds into a visible plotter outline with
+      a prompted non-negative offset for sticker and print-and-cut setup. 2026-06-08.
+- [x] **Measure annotation bridged cut contour** — View/menu search can now
+      create a bridged plotter outline from measure/production annotation bounds
+      with prompted offset, bridge count, and gap values for stencil/tabbed cuts. 2026-06-08.
+- [x] **Measure annotation plotter positioning marks** — View/menu search can now
+      replace plotter regmarks from measure/production annotation bounds with a
+      prompted offset, aligning print-and-cut setup to proof geometry. 2026-06-08.
+- [x] **Measure annotation weed border** — View/menu search can now create
+      a plotter weed border from measure/production annotation bounds with a
+      prompted margin, keeping vinyl waste removal aligned to proof geometry. 2026-06-08.
+- [x] **Measure annotation weed grid** — View/menu search can now create
+      a weed border plus prompted row/column divider cuts from measure/production
+      annotation bounds for large vinyl waste removal. 2026-06-08.
+- [x] **Measure annotation banner grommets** — View/menu search can now
+      generate banner eyelet cut paths from measure/production annotation bounds
+      with prompted inset, spacing, and diameter values. 2026-06-08.
+- [x] **Measure annotation rhinestone template** — View/menu search can now
+      place hotfix/rhinestone template circles along measure/production annotation
+      outlines with prompted spacing and diameter values. 2026-06-08.
+- [x] **Measure annotation print-and-cut prep package** — View/menu search can now
+      create print marks, cut contour, plotter positioning marks, weed border, and
+      full guide set from measure/production annotation bounds in one prompted flow. 2026-06-08.
+- [x] **Measure annotation banner finishing package** — View/menu search can now
+      create banner grommets, weed border/grid cuts, and full guide set from
+      measure/production annotation bounds in one prompted flow. 2026-06-08.
+- [x] **Measure annotation stencil cut package** — View/menu search can now
+      create bridged stencil/sandblast cut outlines, weed border/grid cuts, and
+      full guide set from measure/production annotation bounds in one prompted flow. 2026-06-08.
+- [x] **Measure annotation rhinestone template package** — View/menu search can now
+      create hotfix/rhinestone template circles, weed border, and full guide set
+      from measure/production annotation bounds in one prompted flow. 2026-06-08.
+- [x] **Measure annotation proof page package** — View/menu search can now
+- [x] Measure annotation multi proof pages — batch-create one proof artboard, print-mark set, and guide package per measurement annotation for multi-panel review sheets.
+- [x] Measure proof page review labels — proof page generation now adds exportable page labels with proof number, trim size, margin, and bleed values for client/shop review sheets. 2026-06-08.
+- [x] Measure proof page trim/artwork frames — proof page generation now adds exportable dashed trim and artwork frames alongside print marks, labels, artboards, and guides for clearer approval sheets. 2026-06-08.
+- [x] Measure proof page legends — proof page generation now adds exportable legends explaining trim/page, artwork bounds, and bleed styling for clearer approval handoffs. 2026-06-08.
+- [x] Measure proof page approval checklist — proof page generation now adds exportable approval checklists with production review items and signature/date lines for client sign-off. 2026-06-08.
+- [x] Measure proof page colour control bars — proof page generation now adds exportable CMYK/RGB/gray control bars for print colour review on approval sheets. 2026-06-08.
+- [x] Measure proof page 100mm scale bars — proof page generation now adds exportable 100 mm scale-check rulers with 10 mm ticks so printed approvals can be physically verified. 2026-06-08.
+- [x] Measure proof page job info panels — proof page generation now adds exportable job/revision/prepared/notes fields per proof sheet for client and production handoff. 2026-06-08.
+- [x] Measure proof page production specs — proof page generation now adds exportable artwork/trim/margin/bleed spec panels for production-ready approval sheets. 2026-06-08.
+- [x] Measure proof page safety notes — proof page generation now adds exportable safe-margin and cut/finish verification notes for production approval sheets. 2026-06-08.
+- [x] Measure proof sheet cleanup — View/menu search can now clear all generated proof sheet print marks, frames, labels, legends, control bars, specs, and notes while keeping the source measure annotations. 2026-06-08.
+- [x] Measure proof approval status stamps — proof page generation now adds exportable Draft/Approved/Changes Required status stamps, with View/menu search commands to batch update all proof sheets for Illustrator-like client approval handoff. 2026-06-08.
+- [x] Measure proof job metadata updates — View/menu search can now batch-fill generated proof job info panels with job name, revision, prepared-by, and notes so client/shop proof sheets can be templated after generation. 2026-06-08.
+- [x] Measure proof export filename labels — proof page generation now adds exportable suggested PDF filename labels that auto-refresh from job name, revision, approval status, and page number for production handoff. 2026-06-08.
+- [x] Measure proof preflight summaries — proof page generation now adds exportable preflight summary panels covering size, bleed, safe margin, trim marks, and filename readiness for Illustrator-like print approval handoff. 2026-06-08.
+- [x] Measure proof manifest summaries — batch proof generation now adds an exportable manifest panel summarising job, revision, page count, approval status mix, and suggested files; View/menu search can add or refresh the manifest for existing proof sheets. 2026-06-08.
+- [x] Measure proof dynamic preflight refresh — proof preflight panels now track the generated filename and approval status, refreshing automatically when job metadata or Draft/Approved/Changes state changes. 2026-06-08.
+- [x] Measure proof signoff metadata — approval checklists now carry batch-fillable signer, date, and note metadata with View/menu search prompts for client/shop signoff handoff. 2026-06-08.
+- [x] Measure proof checklist state sync — approval checklist boxes now move between empty, checked, and issue states when proof sheets are marked Draft, Approved, or Changes Required, matching client review workflows. 2026-06-08.
+- [x] Measure proof status selection — View/menu search can now select Draft, Approved, or Changes Required proof review objects by status for focused batch inspection and cleanup. 2026-06-08.
+- [x] Measure proof signoff manifest rollup — proof manifest panels now include completed signoff counts and refresh when signer/date metadata changes, making batch approval readiness visible. 2026-06-08.
+- [x] Measure proof revision history panel — proof sheets can now add/export a revision-history panel that rolls up revision, prepared-by, page count, approvals, changes, signoff completion, and notes, refreshing with job/status/signoff metadata for Illustrator-like production review packets. 2026-06-08.
+- [x] Measure proof approval audit panel — proof packets now include/export an approval-audit panel that highlights production blockers across draft, changes-required, and unsigned pages, refreshing as approval and signoff metadata changes. 2026-06-08.
+- [x] Measure proof package cover sheet — proof packets now include/export a package cover summarising job, revision, prepared-by, page count, approval mix, signoff readiness, output files, and release/hold status for Illustrator-like client/production handoff. 2026-06-08.
+- [x] Measure proof delivery checklist — proof packets now include/export a pre-delivery checklist that marks job metadata, revision, prepared-by, page count, filename readiness, approvals, changes, drafts, and signoff completion before release. 2026-06-08.
+- [x] Measure proof delivery blocker selection — View/menu search can now select proof pages and summary panels that block release due to missing metadata, draft/changes status, or incomplete signoff, making pre-delivery cleanup work like Illustrator preflight issue isolation. 2026-06-08.
+- [x] Measure proof release/hold stamp — proof packets now include/export a release status stamp that flips between RELEASE HOLD and RELEASE READY from delivery checklist readiness, giving production handoff an Illustrator-like visual approval gate. 2026-06-08.
+- [x] Measure proof package index — proof packets now include/export a package index listing each proof page's status, signoff state, and suggested output filename for Illustrator-like multi-page delivery handoff. 2026-06-08.
+- [x] Measure proof delivery contact panel — proof packets now include/export client, contact, email, and phone handoff metadata with View/menu search commands to add and update the panel for Illustrator-like client approval packets. 2026-06-08.
+      create a margin artboard, print marks, and full guide set from measure/production
+      annotation bounds in one prompted proofing flow. 2026-06-08.
+- [x] **Measure annotation artboard creation** — View/menu search can now create
+      a new artboard from generated measure/production annotation bounds, turning
+      proof markups into Illustrator-like page/crop regions. 2026-06-08.
+- [x] **Measure annotation margin artboards** — View/menu search can now create
+      new artboards from measure/production annotation bounds with a prompted mm
+      margin for bleed, safe area, and print-ready proof pages. 2026-06-08.
+- [x] **Measure annotation artboard resize** — View/menu search can now resize
+      the relevant existing artboard to generated measure/production annotation
+      bounds, avoiding extra pages when proof crop regions change. 2026-06-08.
+- [x] **Measure annotation margin artboard resize** — View/menu search can now
+      resize the relevant existing artboard to measure/production annotation bounds
+      with a prompted mm margin for iterative bleed and safety adjustments. 2026-06-08.
+- [x] **Layers search Break Symbols** — Layers search actions can now
+      detach linked symbol metadata across filtered matches and nested symbol
+      children, pairing Same Symbol discovery with Illustrator-like symbol cleanup
+      directly in the Layers panel. 2026-06-08.
+- [x] **Layers search Flatten Transparency** — Layers search actions can now
+      batch-flatten opacity and blend-mode artwork across filtered matches, baking
+      alpha into fills/strokes/shadows for Illustrator-like transparency cleanup
+      without leaving the Layers panel. 2026-06-08.
+- [x] **Layers search Expand Appearance** — Layers search actions can now
+      batch-expand matching pattern fills, drop shadows, and transparency cleanup
+      into editable artwork, closing a complex Illustrator-style appearance workflow
+      directly from filtered layer results. 2026-06-08.
+- [x] **Flatten Transparency command** — Appearance menu, command palette, and
+      right-click Appearance now normalize selected opacity/blend-mode artwork by
+      baking object opacity into flat fill/stroke/shadow alpha and resetting opacity
+      plus blend mode for Illustrator-like transparency cleanup. 2026-06-07.
+- [x] **Unified Expand Appearance command** — Appearance menu, command palette,
+      and right-click now run one Illustrator-style expansion pass that expands
+      pattern fills, drop shadows, and flattened transparency in a single history
+      step while keeping the individual commands available. 2026-06-07.
+- [x] **Clear Gradient Fill** — Appearance menu and command palette can remove
+      live gradient fills while restoring the first stop as a solid colour, giving
+      imported/experimental artwork a quick Illustrator-like cleanup path.
+      2026-06-07.
+- [x] **Overprint fill/stroke controls** — Appearance menu, command palette, and
+      right-click Appearance can mark fill, stroke, or both as overprint metadata
+      and clear it again, pairing with Select Overprint Objects for Illustrator-like
+      print separation preflight. 2026-06-07.
+- [x] **Variable Width Profiles** — PropertiesPanel + command palette can expand
+      open stroked paths into filled variable-width shapes (uniform/taper/bulge/
+      hourglass), approximating Illustrator's Width Profile workflow. 2026-06-07.
+- [x] **Scissors at midpoint** — Path menu + command palette can split selected
+      open paths at half their travelled length into two editable open paths,
+      covering the common Illustrator Scissors cut-path workflow. 2026-06-07.
+- [x] **Smooth Path command** — pathSmooth.ts adds a Chaikin smoothing pass that
+      rebuilds selected paths/shapes as editable paths, with Path menu, command
+      palette, and right-click Path Effects access for Illustrator-style cleanup
+      of jagged traced artwork. 2026-06-07.
+- [x] **Shape Builder same-fill merge** — Pathfinder menu + command palette can
+      union same-colour filled regions independently, cleaning fragmented artwork
+      like Illustrator Shape Builder without merging different colours. 2026-06-07.
+- [x] **Redefine Symbol** — inserted symbols now carry instance metadata; the
+      Symbols panel + command palette can redefine the master symbol from the
+      selected instance, matching Illustrator's reusable symbol workflow. 2026-06-07.
+- [x] **Global Swatch Replace** — Swatches can mark a color and replace all
+      matching solid fills/strokes across the canvas with the current fill, while
+      updating/deduping the stored swatch list for Illustrator-like global color
+      edits. 2026-06-07.
+- [x] **Select by Swatch surface parity** — global swatch storage now lives in
+      globalSwatches.ts, and MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx expose select-art-by-swatch commands for every saved
+      swatch, matching Illustrator swatch cleanup beyond the Properties panel.
+      2026-06-07.
+- [x] **Global Swatch Replace surface parity** — replaceSavedSwatchWithColor()
+      centralizes canvas replacement plus stored-swatch dedupe, and MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx now replace any saved swatch
+      with the current fill from menu/search/right-click workflows. 2026-06-07.
+- [x] **Scale Strokes & Effects transform option** — TransformDialog.tsx now
+      exposes Illustrator's Scale Strokes & Effects checkbox, and transformOps.ts
+      scales stroke widths plus drop-shadow blur/offsets for selection-centre and
+      Transform Each workflows. 2026-06-07.
+- [x] **Diagonal Reflect transform commands** — transformOps.ts now supports
+      arbitrary-angle reflection and Object/Transform, command palette, and
+      right-click surfaces expose 45° and 135° reflect commands beyond simple
+      horizontal/vertical flips. 2026-06-07.
+- [x] **Swatch add/collect surface parity** — addSavedSwatchColor() and
+      collectSelectionColorsIntoSwatches() centralize palette updates, while
+      MenuBar.tsx, CommandPalette.tsx, and CanvasContextMenu.tsx expose Add
+      current fill and Collect colours from selection outside Properties. 2026-06-07.
+- [x] **Swatch apply surface parity** — applySwatchToSelection() centralizes
+      saved-swatch fill/stroke application, and PropertiesPanel.tsx, MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx expose fill and stroke apply
+      workflows for every saved swatch. 2026-06-07.
+- [x] **Break Symbol Link** — Symbols panel, Document menu, and command palette
+      can detach selected symbol instances by removing instance metadata, so users
+      can expand/edit placed symbols independently like Illustrator. 2026-06-07.
+- [x] **Select Symbol Instances** — Symbols panel tiles now expose a select-instances
+      action that selects every placed instance of that library symbol, including
+      nested tagged children, matching Illustrator symbol-management cleanup.
+      2026-06-07.
+- [x] **Select Symbol Instances surface parity** — MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx now expose library-symbol
+      instance selection by symbol name, so reusable symbol cleanup is reachable
+      from menus, search, right-click, and the Symbols panel. 2026-06-07.
+- [x] **Select all symbol instances** — selectAllSymbolInstances() audits every
+      linked symbol instance regardless of which saved symbol entry it belongs to;
+      Select Object, Symbols menu, command palette, and right-click. 2026-06-07.
+- [x] **Brush Presets** — Pencil now uses a persisted Illustrator-like brush
+      preset library (Basic/Calligraphy/Marker/Inking) that controls pressure
+      width, minimum width, and speed thinning; Properties exposes the preset.
+      2026-06-07.
+- [x] **Knife center split** — Path menu and command palette can knife-split
+      selected closed shapes horizontally or vertically through their center,
+      producing separate editable filled pieces via polygon clipping. 2026-06-07.
+- [x] **Recolor sort mappings** — Recolor Artwork now adds hue and luminance
+      sort actions so complex palettes can be reassigned in predictable color-wheel
+      or lightness order, closer to Illustrator's advanced recolor controls.
+      2026-06-07.
+- [x] **Expand Drop Shadow** — Appearance menu and command palette can expand
+      selected drop shadows into separate editable shadow artwork, clearing the
+      live effect from originals for Illustrator-like Expand Appearance workflows.
+      2026-06-07.
+- [x] **Expand Pattern Fill** — Pattern fills now carry expansion metadata;
+      Appearance menu and command palette can convert them into separate editable
+      tile artwork while clearing the live pattern fill from the source object.
+      2026-06-07.
+- [x] **Clear Pattern Fill** — Appearance menu and command palette can remove
+      live pattern metadata while restoring the solid base colour, matching
+      Illustrator-style appearance cleanup without expanding tiles. 2026-06-07.
+- [x] **Expand Clipping Mask** — Arrange menu and command palette can release
+      clipping paths and ungroup clipping groups into normal editable contents,
+      matching Illustrator's expand/edit masked-art workflow. 2026-06-07.
+- [x] **Select Same advanced appearance** — Select Same now matches
+      drop shadows, pattern fills, symbol instances, and clipping-mask presence
+      from the Edit menu and command palette for faster complex-art cleanup.
+      2026-06-07.
+- [x] **Select Same full appearance** — Select Same now compares complete
+      appearance signatures across fill/stroke/width/opacity/blend/dash/caps/joins/
+      shadows/patterns from the Edit menu and command palette. 2026-06-07.
+- [x] **Select Same Fill & Stroke** — selectionOps.ts now exposes a combined
+      fill/stroke color signature, and MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx surface the Illustrator-style Select Same Fill &
+      Stroke command for faster two-color artwork cleanup. 2026-06-07.
+- [x] **Select Same Stroke Appearance** — selectionOps.ts now matches stroke
+      color, weight, dash array, cap, and join together, with MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx exposing the combined
+      Illustrator-style stroke-appearance selection command. 2026-06-07.
+- [x] **Select Same Text Appearance** — selectionOps.ts now matches text
+      family, size, weight, style, tracking, and leading together, with MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx exposing the combined
+      Illustrator-style text-appearance selection command. 2026-06-07.
+- [x] **Select Same Fill Appearance** — selectionOps.ts now matches solid
+      fills, live gradient fills, pattern fills, opacity, and blend mode together,
+      with MenuBar.tsx, CommandPalette.tsx, and CanvasContextMenu.tsx exposing the
+      Illustrator-style fill-appearance selection command. 2026-06-07.
+- [x] **Select Same Position** — selectionOps.ts now matches object left/top
+      coordinates together, with MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx exposing an Illustrator-style same-position selection
+      command for stacked and duplicated artwork cleanup. 2026-06-07.
+- [x] **Select Same X/Y Position** — selectionOps.ts now matches left-only
+      and top-only coordinates separately, with MenuBar.tsx, CommandPalette.tsx,
+      and CanvasContextMenu.tsx exposing Illustrator-style same-X and same-Y
+      position selection commands for aligned artwork cleanup. 2026-06-07.
+- [x] **Select Same Center** — selectionOps.ts now matches center X, center Y,
+      and combined center point from scaled bounds, with MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx exposing Illustrator-style
+      same-center selection commands for aligned and stacked artwork. 2026-06-07.
+- [x] **Select Same Width/Height** — selectionOps.ts now matches scaled width
+      and scaled height independently in addition to full object size, with
+      MenuBar.tsx, CommandPalette.tsx, and CanvasContextMenu.tsx exposing
+      Illustrator-style dimension-specific selection commands. 2026-06-07.
+- [x] **Select Same Bounds/Edges** — selectionOps.ts now matches right edge,
+      bottom edge, and full scaled bounds independently, with MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx exposing Illustrator-style
+      bounding-box selection commands for precise layout cleanup. 2026-06-07.
+- [x] **Select Same Object Size** — selectionOps.ts now matches scaled
+      object width and height together, with MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx exposing an Illustrator-style same-size selection
+      command for repeated sign-layout cleanup. 2026-06-07.
+- [x] **Select Same Area/Aspect Ratio** — selectionOps.ts now matches scaled
+      visible area and width:height ratio independently, with MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx exposing Illustrator-style
+      proportional and footprint selection for layout cleanup. 2026-06-07.
+- [x] **Blend expanded appearance interpolation** — blend.ts now interpolates
+      object width/height, skew, stroke weight, dash arrays, shadows, blend mode
+      transitions, caps/joins, and flat colours via a tested buildBlendProps()
+      helper for richer Illustrator Object→Blend behaviour. 2026-06-07.
+- [x] **Blend multi-object spine** — blend.ts now treats three-or-more
+      selected objects as adjacent blend segments in z-order instead of blending
+      only the first and last endpoints, with buildBlendSequence() tests covering
+      multi-stop Illustrator-style Object→Blend workflows. 2026-06-07.
+- [x] **Blend z-order insertion** — blendSelection() now moves generated
+      intermediate objects between their source endpoints in canvas stacking order
+      instead of appending every blend step to the front, with buildBlendInsertPlan()
+      coverage for Illustrator-like layer order. 2026-06-07.
+- [x] **Blend RGB/RGBA colour interpolation** — blendColor() now handles
+      Fabric rgb()/rgba() strings in addition to hex values, preserving alpha while
+      interpolating fills, strokes, and shadow colours for richer Illustrator-like
+      blends. 2026-06-07.
+- [x] **Blend reverse spine option** — BlendDialog.tsx now exposes a Reverse
+      blend spine checkbox and blendSelection()/buildBlendSequence() accept a
+      reverse option, enabling Illustrator-like reverse multi-stop blend direction
+      without manually reordering objects. 2026-06-07.
+- [x] **Blend specified-distance spacing** — BlendDialog.tsx now adds
+      Specified Steps / Specified Distance spacing controls, while blend.ts resolves
+      per-segment intermediate counts from endpoint distance for Illustrator-like
+      Blend Options workflows. 2026-06-07.
+- [x] **Blend Smooth Color spacing** — BlendDialog.tsx now includes the
+      Smooth Color spacing mode, and blend.ts estimates per-segment steps from
+      fill/stroke/shadow colour distance for Illustrator-like automatic colour
+      blends. 2026-06-07.
+- [x] **Blend orientation options** — BlendDialog.tsx now exposes Align to
+      Page / Align to Path, and blend.ts can rotate generated blend steps to each
+      segment direction for Illustrator-like Blend Options orientation workflows.
+      2026-06-07.
+- [x] **Blend step-count preview** — BlendDialog.tsx now shows a live
+      estimated intermediate-object count using blend.ts estimateBlendStepCount(),
+      so Specified Distance, Smooth Color, reverse, and multi-stop blends are
+      predictable before applying. 2026-06-07.
+- [x] **Apply Blend Options to existing blends** — BlendDialog.tsx now has an
+      Apply Options action that rebuilds selected blend steps or blends referenced
+      by selected endpoints with new spacing, step count, orientation, and reverse
+      settings, matching Illustrator's editable Object→Blend→Blend Options flow.
+      2026-06-07.
+- [x] **Relink Blend Endpoint command** — Object/Blend, command palette, and
+      context menu can now replace one source endpoint of an existing blend with
+      another selected object, refreshing related generated steps while preserving
+      their spacing/orientation metadata. 2026-06-07.
+- [x] **Blend shortest rotation interpolation** — blend.ts now interpolates
+      page-aligned blend rotations through the shortest angular delta, preventing
+      350°→10° blends from spinning the long way around. 2026-06-07.
+- [x] **Blend text and corner attribute interpolation** — blend.ts now
+      interpolates optional text metrics (fontSize, tracking, leading) and rounded
+      shape attributes (rx, ry, radius) when both endpoints provide them, improving
+      Illustrator-like blends between labels and rounded geometry. 2026-06-07.
+- [x] **Blend generated-step metadata** — blendSelection() now tags each
+      generated intermediate object with __blend metadata (pair index, step index,
+      t, spacing, orientation, reverse), enabling future Illustrator-like expand,
+      select, and cleanup workflows. 2026-06-07.
+- [x] **Blend step selection/release/expand commands** — blend.ts now exposes
+      metadata-aware Select Blend Steps, Select Related Blend Steps, Expand Blend
+      Steps, and Release Blend Steps operations in the menu bar, command palette,
+      and canvas context menu, turning generated blends into manageable Illustrator-like
+      workflow objects. 2026-06-07.
+- [x] **Endpoint-aware blend metadata** — generated blend steps now store a
+      stable blendId plus source endpoint object ids, so Select Related Blend Steps
+      follows the exact source pair instead of matching unrelated steps that share
+      only pair index or spacing options. 2026-06-07.
+- [x] **Blend endpoint reselection** — Select Blend Endpoints now uses stored
+      source endpoint ids to jump from generated blend steps back to their original
+      editable source objects from the menu bar, command palette, or context menu.
+      2026-06-07.
+- [x] **Update Blend Steps command** — generated blend steps can now be refreshed
+      from their current source endpoint geometry and appearance via Object/command
+      palette/context-menu actions, approximating Illustrator's Update Blend workflow
+      after endpoints are edited. 2026-06-07.
+- [x] **Update All Blend Steps command** — the Object menu, command palette,
+      and context menu now expose a document-scope update action that refreshes every
+      generated blend step with stored endpoint ids, useful after editing multiple
+      endpoints across a complex artwork. 2026-06-07.
+- [x] **Expand/Release All Blend Steps commands** — Object/Blend, command
+      palette, and context-menu actions now support document-scope expansion and
+      release of every generated blend step, letting complex artwork be cleaned up
+      or made permanently editable without manually selecting each blend. 2026-06-07.
+- [x] **Select Blend Group command** — generated blend steps can now select
+      their complete editable blend group (source endpoints plus related intermediate
+      steps) from Object/Blend, the command palette, or context menu, improving
+      Illustrator-like group-level blend editing workflows. 2026-06-07.
+- [x] **Endpoint-driven Blend selection** — selecting a blend endpoint can now
+      find related generated steps or the full source-plus-steps blend group, so
+      users can navigate blends from either endpoints or intermediate objects like
+      Illustrator-style editable blend structures. 2026-06-07.
+- [x] **Endpoint-driven Update Blend** — selecting a source endpoint and running
+      Update Blend Steps now refreshes generated steps that reference that endpoint,
+      matching Illustrator-style workflows where users edit endpoints first and then
+      update the blend without manually selecting intermediate objects. 2026-06-07.
+- [x] **Endpoint-driven Expand/Release Blend** — selecting a blend source
+      endpoint and running Expand or Release Blend Steps now targets related generated
+      steps, enabling endpoint-first cleanup or permanent-edit workflows without
+      selecting intermediate blend objects manually. 2026-06-07.
+- [x] **Reverse Blend Steps command** — generated blend steps can now swap
+      source endpoints, reverse step order, refresh interpolated geometry/appearance,
+      and run from selected steps, selected endpoints, or document scope via Object,
+      command palette, and context-menu actions. 2026-06-07.
+- [x] **Select All Blend Endpoints command** — Object/Blend, command palette,
+      and context menu now expose a document-wide endpoint selection command that
+      collects every source object referenced by generated blend metadata, making
+      complex blend endpoint edits faster. 2026-06-07.
+- [x] **Select All Blend Groups command** — Object/Blend, command palette,
+      and context menu now select every generated blend step plus its referenced
+      source endpoints across the document, enabling document-wide blend inspection
+      and editing workflows. 2026-06-07.
+- [x] **Remove Orphan Blend Steps command** — Blend cleanup now removes generated
+      steps whose source endpoints are missing or whose legacy metadata lacks endpoint
+      references, with Object/Blend, command palette, and context-menu access for
+      repairing complex edited documents. 2026-06-07.
+- [x] **Select Orphan Blend Steps command** — Blend cleanup now also supports
+      selecting orphan generated steps before deletion, including legacy metadata
+      without endpoint ids, from Object/Blend, command palette, and context menu.
+      2026-06-07.
+- [x] **Select Same Scale** — selectionOps.ts now matches scaleX and scaleY
+      transform values together, with MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx exposing an Illustrator-style same-scale selection
+      command for non-uniformly transformed imported art. 2026-06-07.
+- [x] **Select Same Skew** — selectionOps.ts now matches skewX and skewY
+      transform values together, with MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx exposing an Illustrator-style same-skew selection
+      command for shear-transformed layouts. 2026-06-07.
+- [x] **Select Same Transform** — selectionOps.ts now combines scale,
+      skew, and normalized rotation into one transform signature, with MenuBar.tsx,
+      CommandPalette.tsx, and CanvasContextMenu.tsx exposing an Illustrator-style
+      same-transform selection command for complex imported artwork. 2026-06-07.
+- [x] **Select Same Rotation** — selectionOps.ts now normalizes object angles
+      and matches rotation across artwork, with MenuBar.tsx, CommandPalette.tsx,
+      and CanvasContextMenu.tsx exposing an Illustrator-style same-rotation
+      selection command for transformed/imported layouts. 2026-06-07.
+- [x] **Select Same Gradient Fill** — Select Same can now match Fabric
+      gradient fills by type, coordinates, and color stops from the Edit menu and
+      command palette for imported SVG/gradient artwork cleanup. 2026-06-07.
+- [x] **Select Same Overprint** — Select Same can now match fill/stroke overprint
+      metadata combinations from the Edit menu, command palette, and right-click,
+      pairing the overprint controls with Illustrator-like print preflight cleanup.
+      2026-06-07.
+- [x] **Select Same Print Mark Type** — Select Same can now match generated crop,
+      registration, bleed, and page-info print marks by `printMarkKind` from the
+      Edit menu, command palette, and right-click for Illustrator-like prepress
+      mark cleanup. 2026-06-07.
 - [x] Surface the new sign/effect operations (Multi-outline, Recolor, Rhinestone,
       Variable Data, Auto-arrange/Nest) in the Document menu — previously command
       palette + right-click only. 2026-06-02.
@@ -147,6 +733,388 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Lock / Unlock — lockSelection()/unlockAll() (selectionOps.ts) lock move/
       scale/rotate (matches the Layers-panel lock, serialises); Edit menu +
       command palette. 2026-06-02.
+- [x] Lock Others — lockOthers() (selectionOps.ts) freezes every unlocked,
+      unselected exportable object while preserving the active selection for
+      complex-artwork isolation; Edit menu, command palette, and right-click.
+      2026-06-07.
+- [x] Select Locked Objects — selectionOps.ts can now select protected/locked
+      artwork from the Edit menu, command palette, and right-click menu so users
+      can find and manage locked content in dense Illustrator-like documents.
+      2026-06-07.
+- [x] Unlock Selection — unlockSelection() releases only the selected locked
+      artwork while leaving other protected objects untouched; available from the
+      Edit menu, command palette, and right-click menu. 2026-06-07.
+- [x] Release Guides — releaseGuides() converts persistent ruler guides into
+      editable dashed line objects and clears the guide overlay, matching
+      Illustrator's View→Guides→Release Guides workflow from menu, command
+      palette, and right-click. 2026-06-07.
+- [x] Hidden-object management — selectHiddenObjects() and showSelection() let
+      users find hidden artwork and reveal only selected hidden objects without
+      exposing the whole document; Edit menu, command palette, and right-click.
+      2026-06-07.
+- [x] Select clipping-masked objects — selectClippingMaskedObjects() finds all
+      artwork carrying a clipPath so complex mask-heavy documents can be audited
+      from Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select open path objects — selectOpenPathObjects() finds unclosed path,
+      polyline, and line artwork before Join/Clean Up/Outline workflows; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select all group objects — selectAllGroups() finds grouped artwork before
+      Ungroup/Isolation Mode audits; Select Object, command palette, and right-click.
+      2026-06-07.
+- [x] Select point/area text objects — selectPointTextObjects() and
+      selectAreaTextObjects() split point labels from textbox/area text for
+      Illustrator-style typography audits; Select Object, palette, and right-click.
+      2026-06-07.
+- [x] Select overflowing text objects — selectOverflowingTextObjects() finds area
+      text whose measured content height exceeds its text box or is explicitly
+      marked overflow/hidden, matching overset-text preflight audits; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select empty text objects — selectEmptyTextObjects() finds whitespace-only
+      point/area text left behind by imports or edits before Clean Up / outline
+      conversion; Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select text-on-path objects — Text on Path / Text on Arc generated glyph
+      groups now carry __textOnPath metadata and selectTextOnPathObjects() audits
+      curved typography before outline, expand, or badge-layout edits; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select missing-font text objects — selectMissingFontTextObjects() finds text
+      using explicit missing-font flags or families outside the registered font
+      picker list so typography preflight can isolate substitutions before export;
+      Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select custom text spacing objects — selectCustomTextSpacingObjects() finds
+      text with non-default tracking or leading so typography audits can isolate
+      manual spacing before style normalization or export; Select Object, command
+      palette, and right-click. 2026-06-07.
+- [x] Select decorated text objects — selectDecoratedTextObjects() finds text with
+      underline, strikethrough, or overline flags so typography audits can isolate
+      special inline decorations before style cleanup/export; Select Object,
+      command palette, and right-click. 2026-06-07.
+- [x] Select non-left-aligned text objects — selectNonLeftAlignedTextObjects()
+      finds center, right, and justified text so paragraph alignment audits can
+      isolate non-default type before batch normalization/export; Select Object,
+      command palette, and right-click. 2026-06-07.
+- [x] Select styled text objects — selectStyledTextObjects() finds bold,
+      italic, oblique, and heavy-weight text so typography audits can isolate
+      local font styling before normalization/export; Select Object, command
+      palette, and right-click. 2026-06-07.
+- [x] Select transformed text objects — selectTransformedTextObjects() finds
+      scaled, rotated, or skewed text so preflight audits can catch locally
+      distorted typography before outlining, normalization, or export; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select mixed-style text objects — selectMixedStyleTextObjects() finds
+      character-level inline formatting so typography audits can isolate local
+      overrides before style cleanup, outlining, or export; Select Object,
+      command palette, and right-click. 2026-06-07.
+- [x] Select named/unnamed objects — selectNamedObjects() and selectUnnamedObjects()
+      audit layer/object naming hygiene before exports or scripted workflows; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select filtered image objects — selectFilteredImageObjects() finds raster
+      images carrying live Fabric filters before Clear Filters / export audits; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select cropped image objects — selectCroppedImageObjects() finds placed
+      raster artwork with crop offsets or reduced crop dimensions before image
+      relink/export audits; Select Object, command palette, and right-click.
+      2026-06-07.
+- [x] Select embedded image objects — selectEmbeddedImageObjects() finds placed
+      raster artwork backed by embedded data URLs so users can audit document
+      weight versus linked-image workflows; Select Object, command palette, and
+      right-click. 2026-06-07.
+- [x] Select linked image objects — selectLinkedImageObjects() finds placed raster
+      artwork backed by external/file URLs so users can audit relink/export
+      dependencies separately from embedded images; Select Object, command palette,
+      and right-click. 2026-06-07.
+- [x] Select missing linked image objects — selectMissingLinkedImageObjects() finds
+      linked raster artwork with explicit missing/broken flags or failed image
+      elements so packaging/relink audits can isolate broken dependencies; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select transformed image objects — selectTransformedImageObjects() finds
+      scaled, rotated, or skewed placed rasters so preflight audits can normalize
+      image geometry before packaging, tracing, or export; Select Object, command
+      palette, and right-click. 2026-06-07.
+- [x] Select low-resolution image objects — selectLowResolutionImageObjects()
+      estimates effective raster PPI after placement scale and finds images below
+      the 150ppi audit threshold before print/export; Select Object, command
+      palette, and right-click. 2026-06-07.
+- [x] Select high-resolution image objects — selectHighResolutionImageObjects()
+      estimates effective raster PPI after placement scale and finds images above
+      the 450ppi downsample audit threshold before print/export packaging; Select
+      Object, command palette, and right-click. 2026-06-07.
+- [x] Select transformed objects — selectTransformedObjects() finds any selectable
+      artwork with non-default scale, rotation, or skew so geometry preflight can
+      isolate transformed items before expand, normalize, or export workflows;
+      Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select compound path objects — selectCompoundPathObjects() finds multi-subpath
+      even-odd paths before Release Compound Path / fill-rule audits; Select Object,
+      command palette, and right-click. 2026-06-07.
+- [x] Select stray point objects — selectStrayPointObjects() finds Move-only empty
+      path anchors so imported artwork cleanup can remove Illustrator-style stray
+      points before joining, outlining, or export; Select Object, command palette,
+      and right-click. 2026-06-07.
+- [x] Select zero-length path objects — selectZeroLengthPathObjects() finds
+      degenerate line/path segments whose endpoints collapse to the same anchor,
+      separating them from pure stray points for cleanup before join/outline/export;
+      Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select unpainted objects — selectUnpaintedObjects() finds objects with no
+      visible fill and no visible stroke for imported-artwork audits; Select Object,
+      command palette, and right-click. 2026-06-07.
+- [x] Select drop-shadow objects — selectDropShadowObjects() selects every object
+      with a live Fabric shadow/glow for effect audits before Expand Appearance or
+      Clear Shadow; Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select transparency objects — selectTransparencyObjects() finds opacity and
+      non-normal blend-mode artwork so complex appearance stacks can be audited
+      before flattening/export; Select Object, palette, and right-click. 2026-06-07.
+- [x] Select dashed-stroke objects — selectDashedStrokeObjects() finds perforation,
+      cut-line, and decorative dashed strokes before expand/outline workflows;
+      Select Object, palette, and right-click. 2026-06-07.
+- [x] Select thin-stroke objects — selectThinStrokeObjects() finds painted strokes
+      below the 0.25px hairline threshold so print/cut preflight can isolate fragile
+      vector lines before outlining or export; Select Object, command palette, and
+      right-click. 2026-06-07.
+- [x] Select overprint objects — selectOverprintObjects() finds imported fill/stroke
+      overprint metadata from common SVG/PDF-style fields so print separation and
+      trapping audits can isolate risky artwork; Select Object, command palette,
+      and right-click. 2026-06-07.
+- [x] Select print-mark objects — selectPrintMarkObjects() finds editable crop,
+      registration, bleed, and page-info objects generated by Add Print Marks so
+      prepress handoff marks can be isolated before moving, locking, or cleanup;
+      Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select same-artboard objects — selectSameArtboardObjects() infers the
+      active object's artboard and selects all printable objects intersecting that
+      page, including bleed-crossing artwork, for Illustrator-like current-page
+      edits in multi-artboard documents. 2026-06-07.
+- [x] Select other-artboards objects — selectOtherArtboardsObjects() selects
+      printable artwork outside the active object's artboard, making it easy to
+      isolate, lock, hide, or audit non-current pages in complex multi-artboard
+      documents. 2026-06-07.
+- [x] Lock/Hide other artboards — lockOtherArtboards() and
+      hideOtherArtboards() isolate the active object's artboard by protecting or
+      concealing printable artwork on other pages while preserving generated
+      overlays; menu, palette, right-click, and tests. 2026-06-07.
+- [x] Unlock/Show active artboard — unlockActiveArtboard() and
+      showActiveArtboard() restore editability/visibility only on the active
+      object's page after artboard isolation, preserving other pages and overlays;
+      menu, palette, right-click, and tests. 2026-06-07.
+- [x] Lock/Hide active artboard — lockActiveArtboard() and
+      hideActiveArtboard() apply page-scoped protection or concealment to the
+      active object's artboard, completing symmetric current/other artboard
+      isolation commands across menu, palette, right-click, and tests. 2026-06-07.
+- [x] Unlock/Show other artboards — unlockOtherArtboards() and
+      showOtherArtboards() restore editability/visibility outside the active
+      object's artboard, completing both sides of multi-artboard isolate/restore
+      controls across menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select outside-artboard objects — selectOutsideArtboardObjects() finds
+      selectable artwork whose bounding box is fully outside the first artboard,
+      catching pasteboard leftovers before print/export/package workflows;
+      Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select outside-any-artboard objects — selectOutsideAnyArtboardObjects()
+      audits multi-artboard documents by selecting only artwork outside every
+      artboard, avoiding false positives from valid second/third artboard content;
+      Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select inside-artboard objects — selectInsideArtboardObjects() finds
+      selectable artwork fully contained by the first artboard, completing an
+      Illustrator-like inside / overflow / outside artboard audit split for
+      print/export preflight; Select Object, command palette, and right-click.
+      2026-06-07.
+- [x] Select inside-any-artboard objects — selectInsideAnyArtboardObjects()
+      audits multi-artboard documents by finding artwork fully contained by any
+      artboard, so valid second/third artboard artwork can be isolated without
+      first-artboard bias; Select Object, palette, and right-click. 2026-06-07.
+- [x] Select overflowing-artboard objects — selectOverflowingArtboardObjects()
+      finds artwork intersecting the first artboard while crossing a trim edge,
+      isolating bleed/clip risks separately from fully off-page leftovers;
+      Select Object, command palette, and right-click. 2026-06-07.
+- [x] Select overflowing-any-artboard objects —
+      selectOverflowingAnyArtboardObjects() finds artwork crossing any artboard
+      trim edge in multi-artboard documents for bleed/clip audits without
+      first-artboard bias; Select Object, palette, and right-click. 2026-06-07.
+- [x] Select Same Artboard Placement — Select Same can match the active
+      object's inside / overflowing / outside first-artboard bucket, letting
+      prepress cleanup batch-select artwork by trim relationship from menu,
+      command palette, and right-click. 2026-06-07.
+- [x] Select Same Any-Artboard Placement — Select Same can match the active
+      object's multi-artboard placement bucket (inside any, overflowing any, or
+      outside every artboard), giving complex multi-artboard preflight the same
+      batch-cleanup affordance as first-artboard audits. 2026-06-07.
+- [x] Select active-artboard inside/overflowing objects —
+      selectInsideActiveArtboardObjects() and
+      selectOverflowingActiveArtboardObjects() split the current page into exact
+      contained vs trim-crossing artwork, closing the gap between broad same-page
+      selection and multi-artboard preflight cleanup; menu, palette, right-click,
+      and tests. 2026-06-07.
+- [x] Select locked/hidden active-artboard objects —
+      selectLockedActiveArtboardObjects() and
+      selectHiddenActiveArtboardObjects() scope layer-state audits to the active
+      object's page, so complex multi-artboard documents can find protected or
+      invisible artwork without selecting every page; menu, palette, right-click,
+      and tests. 2026-06-07.
+- [x] Select visible/unlocked active-artboard objects —
+      selectVisibleActiveArtboardObjects() and
+      selectUnlockedActiveArtboardObjects() scope editable/visible batch picks to
+      the active object's page, completing the per-page layer-state selection
+      quartet for multi-artboard cleanup; menu, palette, right-click, and tests.
+      2026-06-07.
+- [x] Select named/unnamed active-artboard objects —
+      selectNamedActiveArtboardObjects() and
+      selectUnnamedActiveArtboardObjects() scope layer/object naming audits to the
+      active object's page for multi-artboard rename cleanup; menu, palette,
+      right-click, and tests. 2026-06-07.
+- [x] Select path-preflight active-artboard objects —
+      selectClippingMaskedActiveArtboardObjects(),
+      selectOpenPathActiveArtboardObjects(), and
+      selectCompoundPathActiveArtboardObjects() scope mask/open-path/compound-path
+      cleanup audits to the active page; menu, palette, right-click, and tests.
+      2026-06-07.
+- [x] Select cleanup active-artboard objects —
+      selectStrayPointActiveArtboardObjects(),
+      selectZeroLengthPathActiveArtboardObjects(), and
+      selectUnpaintedActiveArtboardObjects() scope degenerate-path and no-paint
+      cleanup audits to the active page; menu, palette, right-click, and tests.
+      2026-06-07.
+- [x] Select appearance/prepress active-artboard objects —
+      selectDropShadowActiveArtboardObjects(),
+      selectTransparencyActiveArtboardObjects(),
+      selectDashedStrokeActiveArtboardObjects(),
+      selectThinStrokeActiveArtboardObjects(), and
+      selectOverprintActiveArtboardObjects() scope appearance and print-risk audits
+      to the active page; menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select stroke/fill active-artboard objects —
+      selectCustomStrokeActiveArtboardObjects(),
+      selectNonScalingStrokeActiveArtboardObjects(),
+      selectPatternFillActiveArtboardObjects(), and
+      selectGradientFillActiveArtboardObjects() scope stroke/fill appearance audits
+      to the active page; menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select transformed/print-mark active-artboard objects —
+      selectTransformedActiveArtboardObjects() and
+      selectPrintMarkActiveArtboardObjects() scope geometry and print-handoff audits
+      to the active page; menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select text active-artboard objects —
+      selectAllTextActiveArtboardObjects(), selectPointTextActiveArtboardObjects(),
+      selectAreaTextActiveArtboardObjects(), selectOverflowingTextActiveArtboardObjects(),
+      and selectEmptyTextActiveArtboardObjects() scope typography cleanup audits to
+      the active page; menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select image active-artboard objects —
+      selectAllImagesActiveArtboardObjects(), filtered/cropped/embedded/linked/missing,
+      transformed, and low/high-resolution image active-artboard selectors scope raster
+      preflight cleanup to the active page; menu, palette, right-click, and tests.
+      2026-06-07.
+- [x] Select advanced text active-artboard objects —
+      text-on-path, missing-font, custom-spacing, decorated, non-left-aligned,
+      styled, transformed, and mixed-style text active-artboard selectors scope
+      typography preflight cleanup to the active page; menu, palette, right-click,
+      and tests. 2026-06-07.
+- [x] Select type active-artboard objects —
+      selectAllPathsActiveArtboardObjects(), selectAllShapesActiveArtboardObjects(),
+      and selectAllGroupsActiveArtboardObjects() scope object-type cleanup picks to
+      the active page; menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select Same Type active-artboard objects —
+      selectSameTypeActiveArtboardObjects() limits same-object-kind cleanup to the
+      active page while preserving text subtype folding; menu, palette, right-click,
+      and tests. 2026-06-07.
+- [x] Select Same appearance active-artboard objects —
+      selectSameActiveArtboard() scopes high-frequency Select Same Fill/Stroke,
+      Fill & Stroke, Fill Appearance, Stroke Appearance, and full Appearance
+      cleanup to the active page; menu, palette, right-click, and tests.
+      2026-06-07.
+- [x] Select Same geometry active-artboard objects —
+      Select Same position, bounds, edges, center, dimensions, area/aspect, scale,
+      skew, rotation, and transform now have active-page commands backed by
+      selectSameActiveArtboard(); menu, palette, right-click, and tests.
+      2026-06-07.
+- [x] Select Same text/opacity active-artboard objects —
+      Select Same stroke weight, opacity, font family, font size, text appearance,
+      and blend mode now have active-page commands backed by selectSameActiveArtboard();
+      menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select Same effects/prepress active-artboard objects —
+      Select Same shadow, pattern fill, gradient fill, overprint, print mark type,
+      symbol, and clipping mask now have active-page commands backed by
+      selectSameActiveArtboard(); menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select Same stroke/name/placement active-artboard objects —
+      Select Same dash, line cap, line join, object name, artboard placement, and
+      any-artboard placement now have active-page commands backed by
+      selectSameActiveArtboard(); menu, palette, right-click, and tests. 2026-06-07.
+- [x] Active artboard fit commands — Fit Active Artboard to Artwork / Selection
+      now resize the artboard containing the active object instead of always using
+      the first artboard, matching Illustrator multi-artboard cleanup workflows;
+      menu, palette, right-click, and tests. 2026-06-07.
+- [x] Select Active Artboard Objects — selectActiveArtboardObjects() provides a
+      direct Select menu / palette / right-click command for selecting all exportable
+      artwork intersecting the active object's artboard, matching Illustrator
+      multi-artboard page cleanup. 2026-06-07.
+- [x] Duplicate Active Artboard — duplicateActiveArtboard() duplicates the
+      artboard containing the active object with its page artwork, exposed from
+      Document, command palette, and right-click Artboard workflows for
+      Illustrator-like multi-page layout reuse. 2026-06-07.
+- [x] Delete Active Artboard — deleteActiveArtboard() removes the artboard
+      containing the active object with confirmation from Document, command palette,
+      and right-click Artboard workflows for Illustrator-like multi-page cleanup.
+      2026-06-07.
+- [x] Rename Active Artboard — renameActiveArtboard() and promptRenameActiveArtboard()
+      rename the artboard containing the active object from Document, command palette,
+      and right-click Artboard workflows for Illustrator-like page organization.
+      2026-06-07.
+- [x] Zoom to Active Artboard — zoomToActiveArtboard() frames the artboard
+      containing the active object from View, command palette, and right-click
+      workflows, matching Illustrator-style current-page navigation. 2026-06-07.
+- [x] Export Active Artboard — exportActiveArtboardAsSVG() and
+      exportActiveArtboardAsPNG() export the artboard containing the active
+      object from File, command palette, and right-click workflows for
+      Illustrator-like single-page delivery. 2026-06-07.
+- [x] Export Artboard Range — parseArtboardRange(), exportArtboardRangeAsFiles(),
+      and exportArtboardRangeAsPNG() support Illustrator-style ranges like
+      1,3-5 from File, command palette, and right-click workflows. 2026-06-07.
+- [x] ArtboardsPanel selected export — exportArtboardsByIdAsFiles() and
+      exportArtboardsByIdAsPNG() let checked panel rows export selected
+      artboards directly as separate SVG/PNG files. 2026-06-07.
+- [x] Rearrange Artboards — rearrangeArtboards() lays out artboards into
+      a grid and moves contained artwork with each page, exposed from Document,
+      ArtboardsPanel, command palette, and right-click workflows for
+      Illustrator-like multi-page organization. 2026-06-07.
+- [x] Rearrange Artboards options — promptRearrangeArtboards() adds shared
+      columns, spacing, and move-artwork prompts across Document,
+      ArtboardsPanel, command palette, and right-click workflows. 2026-06-07.
+- [x] Duplicate Active Artboard Frame — duplicateActiveArtboardFrame()
+      duplicates only the current artboard rectangle without copying artwork,
+      exposed from Document, command palette, and right-click workflows for
+      Illustrator-like blank-page variants. 2026-06-07.
+- [x] Previous / Next Artboard navigation — zoomToAdjacentArtboard() cycles
+      through artboards from the active object or viewport center, exposed from
+      View, command palette, and right-click workflows for Illustrator-like
+      page browsing. 2026-06-07.
+- [x] Fit All Artboards in Window — zoomToAllArtboards() frames the union
+      of every artboard from View, command palette, and right-click workflows
+      for Illustrator-like multi-page overview navigation. 2026-06-07.
+- [x] Active Artboard order commands — reorderActiveArtboard() moves the
+      current artboard earlier/later or to first/last in the artboard array,
+      updating export and navigation order from Document, command palette, and
+      right-click workflows. 2026-06-07.
+- [x] Sort Artboards by Position — sortArtboardsByPosition() rewrites the
+      artboard array to match top-to-bottom, left-to-right page layout, exposed
+      from Document, command palette, and right-click workflows to repair export
+      and navigation order after manual layout edits. 2026-06-07.
+- [x] Renumber Artboards by Position — renumberArtboardsByPosition() sorts
+      by visual page layout and rewrites names to Artboard 1..n (or localized
+      prefix), exposed from Document, command palette, and right-click workflows
+      for Illustrator-like export filename cleanup. 2026-06-07.
+- [x] ArtboardsPanel row order controls — each artboard row now exposes
+      First/Earlier/Later/Last order actions backed by reorderArtboard(), so
+      users can repair export/navigation sequence directly in the panel.
+      2026-06-07.
+- [x] ArtboardsPanel order cleanup shortcuts — the panel header now exposes
+      Sort by Position and Renumber actions backed by sortArtboardsByPosition()
+      and renumberArtboardsByPosition() for Illustrator-like export cleanup.
+      2026-06-07.
+- [x] ArtboardsPanel duplicate-frame row action — each artboard row now
+      exposes a frame-only duplicate button backed by duplicateArtboardFrame(),
+      matching Illustrator workflows for blank same-size page variants.
+      2026-06-07.
+- [x] Select custom-stroke objects — selectCustomStrokeObjects() finds painted
+      strokes with non-default caps, joins, or miter limits for imported linework
+      audits before Outline Stroke; Select Object, palette, and right-click. 2026-06-07.
+- [x] Select non-scaling stroke objects — selectNonScalingStrokeObjects() finds
+      `strokeUniform` artwork for Scale Strokes & Effects audits before resizing
+      logos/signage; Select Object, palette, and right-click. 2026-06-07.
+- [x] Select pattern/gradient fill objects — selectPatternFillObjects() and
+      selectGradientFillObjects() locate rich fill artwork before Clear/Expand
+      Appearance; Select Object, command palette, and right-click. 2026-06-07.
 - [x] Hide / Show All — hideSelection()/showAll() (selectionOps.ts) toggle
       `visible` (matches the Layers-panel eye, serialises); Edit menu + command
       palette. 2026-06-02.
@@ -222,6 +1190,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       so it auto-lists in toolbar/keymap/shortcuts. Also fixed a Ctrl+Shift+D
       collision (Transform Again moved to Ctrl+Alt+D; it had shadowed the Debug
       Panel). 2026-06-02.
+- [x] Eyedropper rich appearance — eyedropperTool.ts now also samples
+      stroke dash/caps/joins, blend mode, drop shadow, and pattern metadata for
+      fuller Illustrator-like appearance transfer. 2026-06-07.
 - [x] Deselect All — selectionOps.ts deselectAll()/selectAllObjects() give the
       Select→Deselect (Ctrl+Shift+A) command a real keymap binding + Edit-menu
       pair + command-palette entry; previously only Escape cleared a selection.
@@ -294,6 +1265,9 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       HSL saturation (−100..+100%) via new rgbToHsl/hslToRgb/saturateRGB
       (Illustrator Edit→Edit Colors→Saturate); SaturateDialog slider + Document menu
       + command palette. +3 tests (HSL round-trip, factor 0/1). 2026-06-02.
+- [x] Select cleanup candidates — cleanUp.ts selectCleanupObjects() selects empty
+      text, stray paths, and zero-size junk for audit before deletion; Object→Path,
+      command palette, and right-click Clean Up. 2026-06-07.
 - [x] Clean Up — cleanUp.ts cleanUpDocument() removes empty text objects, stray
       single-anchor paths, and zero-size objects (Illustrator Object→Path→Clean Up),
       handy after imports; Document menu + command palette. 2026-06-02.
@@ -331,6 +1305,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       AlignRef align the selection to a designated object's bounds (it stays put),
       resolving the earlier "deferred — Fabric doesn't track click order" note via an
       explicit Set Key button + Key Object option in the Align panel. 2026-06-02.
+- [x] Align-to-key command parity — MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx now expose Set Key Object plus all six Align to Key
+      Object actions, so Illustrator-style key-object alignment is available from
+      menus, search, and right-click without opening the Align panel. 2026-06-07.
 - [x] Fit Artboard to Artwork / Selection — fitArtboard.ts fitArtboardToContent() +
       artboards.ts fitArtboard() resize+reposition the first artboard to wrap all
       art (or the selection) with a mm margin (Illustrator Fit to Artwork Bounds);
@@ -370,10 +1348,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Union/Subtract/Intersect/Exclude/Minus Back + Divide/Trim (booleanOps.ts);
       the boolean ops were Align-panel/palette-only, absent from the menu bar.
       2026-06-03.
-- [~] Swatches panel — ALREADY PRESENT: PropertiesPanel has a full Swatches
+- [x] Swatches panel — PropertiesPanel has a full Illustrator-like Swatches
       section (default palette, localStorage `vector.swatches`, click=fill /
-      Alt=stroke / right-click=remove / + add current). My duplicate panel was
-      reverted; grep harder next time. 2026-06-03.
+      Alt=stroke / right-click=remove / + add current), plus collect colours,
+      global replace, and select artwork using the active swatch. 2026-06-07.
 - [x] Collect colours into swatches — added a Pipette button to the existing
       PropertiesPanel Swatches that harvests every solid fill/stroke in the
       selection (collectSelectionColors) into the palette, deduped. 2026-06-03.
@@ -492,6 +1470,10 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       the selection across the first artboard with equal gaps incl. edge margins;
       the Align panel's equal-spacing buttons use it when Align-To is set to Artboard
       (Illustrator Distribute + Align To Artboard). 2026-06-03.
+- [x] Align-to-artboard command parity — MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx now expose all six Align to Artboard actions beside
+      distribute/center artboard commands, matching Illustrator's Align To Artboard
+      workflow from menu, search, and right-click surfaces. 2026-06-07.
 - [x] Center on Artboard — centerOnArtboard() (alignDistribute.ts) centres each
       selected object on the first artboard on both axes in one shot; command palette.
       2026-06-03.
@@ -590,6 +1572,14 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
 - [x] Edge distribution — alignDistribute.ts distributeByAnchor(dir,'start'|'center'|'end')
       adds top/bottom/left/right-edge distribute (Illustrator's 6-op set); AlignPanel.tsx
       second distribute row with 4 edge buttons. 2026-06-03.
+- [x] Edge distribution command parity — MenuBar.tsx, CommandPalette.tsx, and
+      CanvasContextMenu.tsx now expose horizontal/vertical center distribution plus
+      left/right/top/bottom edge distribution, so Illustrator's full distribute set
+      is reachable from menus, search, and right-click. 2026-06-07.
+- [x] Key-object distribution command parity — MenuBar.tsx, CommandPalette.tsx,
+      and CanvasContextMenu.tsx now expose the same six center/edge distribution
+      commands against the current key object, matching Illustrator's key-object
+      distribute workflow outside the Align panel. 2026-06-07.
 - [x] Custom dash pattern — PropertiesPanel.tsx Advanced stroke gains a Custom dash field
       parsing space/comma-separated lengths into strokeDashArray (perforation/cut lines);
       presets were the only option. 2026-06-03.
@@ -796,6 +1786,14 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       Select Same expose dash/cap/join batch selection for imported linework cleanup,
       dashed cut lines, and dimension/sign strokes. README + USER_GUIDE updated.
       2026-06-03.
+- [x] Right-click advanced Select Same — CanvasContextMenu.tsx now mirrors
+      appearance, shadow, pattern, gradient, symbol, and clipping-mask Select Same
+      modes for fast on-canvas cleanup without opening the menu bar or palette.
+      2026-06-07.
+- [x] Right-click appearance cleanup parity — CanvasContextMenu.tsx now mirrors
+      Clear Appearance, Clear Gradient Fill, Clear/Expand Pattern Fill, and
+      Expand Drop Shadow from the menu bar and command palette so complex
+      appearance cleanup can finish directly from the canvas. 2026-06-07.
 - [x] Command-palette export parity — CommandPalette.tsx now exposes Export DXF
       (paths) and Export JSON using the shared format registry, matching the File menu
       for CAD handoff and automation/backup workflows from keyboard search. USER_GUIDE
@@ -973,6 +1971,13 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       flag so File menu, command palette, and right-click Print / Output can
       open Print with the Print Prep section expanded for crop marks, registration
       marks, and bleed setup. USER_GUIDE updated. 2026-06-03.
+
+
+- [x] Editable print marks on canvas — printMarks.ts can generate crop marks,
+      registration targets, bleed indicator, and page-info text around the first
+      artboard as selectable Fabric objects; File menu, command palette, and
+      right-click Print / Output can add or clear them for Illustrator-like
+      prepress layout handoff. 2026-06-07.
 
 
 - [x] One-click plotter prep shortcuts — shared cutPrepActions now let File menu,
@@ -4650,6 +5655,134 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       flows while keeping multi-select batch rename blank. README and
       USER_GUIDE updated. 2026-06-05.
 
+- [x] Layers search Replace Names — replaceLayerObjectNamesById() applies
+      scoped find/replace to names on matching layer rows, enabling Illustrator-like
+      cleanup of imported object labels without touching unrelated rows. 2026-06-07.
+- [x] Layers search Change Case — changeLayerObjectNameCaseById() and
+      LayersPanel.tsx now apply uppercase, lowercase, Title Case, or Sentence case
+      to filtered layer/object names without touching unrelated rows. 2026-06-07.
+- [x] Layers search Clean Names — cleanLayerObjectNamesById() trims and
+      collapses whitespace on filtered layer/object names, clearing whitespace-only
+      labels for Illustrator-like cleanup after importing messy artwork. 2026-06-07.
+- [x] Layers search Set Opacity — setLayerObjectOpacityById() and
+      LayersPanel.tsx now apply a prompted opacity value to filtered layer/object
+      matches for Illustrator-like batch appearance cleanup. 2026-06-07.
+- [x] Layers search Set Blend Mode — setLayerObjectBlendModeById() and
+      LayersPanel.tsx now apply a prompted blend/compositing mode to filtered
+      layer/object matches for Illustrator-like batch appearance cleanup. 2026-06-07.
+- [x] Layers search Set Fill/Stroke — setLayerObjectPaintById() and
+      LayersPanel.tsx now apply prompted fill or stroke paint to filtered
+      layer/object matches, including `none` for cleanup. 2026-06-07.
+- [x] Layers search Set Stroke Width — setLayerObjectStrokeWidthById()
+      and LayersPanel.tsx now apply a prompted stroke width to filtered layer/object
+      matches for Illustrator-like batch line-weight cleanup. 2026-06-07.
+- [x] Layers search Set Cap/Join — setLayerObjectStrokeStyleById()
+      and LayersPanel.tsx now apply prompted line cap or line join values to filtered
+      layer/object matches for Illustrator-like advanced stroke cleanup. 2026-06-07.
+- [x] Layers search Set Dash — setLayerObjectDashById() and
+      LayersPanel.tsx now apply solid/dashed/dotted or custom numeric dash arrays
+      to filtered layer/object matches for Illustrator-like stroke cleanup. 2026-06-07.
+- [x] Layers search Set Miter Limit — setLayerObjectMiterLimitById()
+      and LayersPanel.tsx now apply prompted stroke miter limits to filtered
+      layer/object matches for Illustrator-like advanced stroke cleanup. 2026-06-07.
+- [x] Layers search Set Production Flags — setLayerObjectOverprintById(),
+      setLayerObjectPrintMarkKindById(), and LayersPanel.tsx now batch-toggle
+      overprint metadata and print-mark kind on filtered layer/object matches for
+      Illustrator-like print-preflight cleanup. 2026-06-08.
+- [x] Layers search Set Text Style — setLayerObjectTextStyleById()
+      and LayersPanel.tsx now batch-apply font family, font size, weight, style,
+      paragraph alignment, underline, strikethrough, overline, tracking, and
+      leading to filtered text layer/object matches for Illustrator-like typography
+      cleanup in dense imported layouts. 2026-06-08.
+- [x] Layers search Set Geometry — setLayerObjectGeometryById()
+      and LayersPanel.tsx now batch-apply X/Y position, center X/Y, right/bottom
+      edges, width, height, rotation, horizontal/vertical scale, and
+      horizontal/vertical skew to filtered layer/object matches for Illustrator-like
+      transform cleanup in dense production layouts. 2026-06-08.
+- [x] Layers search Set Paired Geometry — setLayerObjectGeometryPairById()
+      and LayersPanel.tsx now batch-apply position, center, size, scale, skew, and
+      full bounds from comma/space separated values to filtered layer/object matches
+      for Illustrator-like Transform panel cleanup. 2026-06-08.
+- [x] Layers search Constant Stroke Width — setLayerObjectStrokeUniformById()
+      and LayersPanel.tsx now toggle constant/scaled stroke width on filtered
+      layer/object matches for Illustrator-like scale-stroke cleanup. 2026-06-07.
+- [x] Layers search Clear Appearance — clearLayerObjectAppearanceById()
+      and LayersPanel.tsx now reset fill, stroke, opacity, blend, dash, caps,
+      joins, and shadow on filtered layer/object matches for Illustrator-like
+      Appearance panel cleanup without touching unrelated rows. 2026-06-07.
+- [x] Layers search Apply Graphic Style — applyGraphicStyleToLayerObjectsById()
+      and LayersPanel.tsx now apply saved Graphic Styles to filtered layer/object
+      matches by number, ID, or name for Illustrator-like Appearance panel batch
+      styling without changing unrelated artwork. 2026-06-07.
+- [x] Layers search Select Same Appearance — selectMatchingLayerAppearanceById()
+      and LayersPanel.tsx now select only filtered layer/object matches sharing
+      the active-or-first match's full graphic-style signature, enabling
+      Illustrator-like Select Same cleanup inside search results. 2026-06-07.
+- [x] Layers search Select Same Fill/Stroke/Opacity/Blend —
+      selectSameLayerAppearanceById() and LayersPanel.tsx now scope Select Same
+      variants to filtered layer/object matches for Illustrator-like targeted
+      appearance cleanup without selecting unrelated artwork. 2026-06-07.
+- [x] Layers search Select Same Stroke Details — selectSameLayerAppearanceById()
+      and LayersPanel.tsx now scope stroke width, cap, join, and dash Select Same
+      variants to filtered layer/object matches for Illustrator-like advanced
+      stroke cleanup workflows. 2026-06-07.
+- [x] Layers search Select Same Effects — selectSameLayerAppearanceById()
+      and LayersPanel.tsx now scope miter limit, constant stroke width, and shadow
+      Select Same variants to filtered matches for Illustrator-like advanced
+      Appearance cleanup. 2026-06-07.
+- [x] Layers search Select Same Structure — selectSameLayerObjectById()
+      and LayersPanel.tsx now scope object type, visibility, and lock-state Select
+      Same variants to filtered layer/object matches for Illustrator-like layer
+      audits and cleanup in complex documents. 2026-06-07.
+- [x] Layers search Select Same Naming — selectSameLayerObjectById()
+      and LayersPanel.tsx now scope named/unnamed state and name-prefix Select Same
+      variants to filtered layer/object matches for Illustrator-like imported-file
+      naming audits and cleanup. 2026-06-07.
+- [x] Layers search Select Same Geometry — selectSameLayerGeometryById()
+      and LayersPanel.tsx now scope width, height, size, aspect-ratio, rotation,
+      and scale Select Same variants to filtered layer/object matches for
+      Illustrator-like layout cleanup. 2026-06-07.
+- [x] Layers search Select Same Position/Bounds — selectSameLayerGeometryById()
+      and LayersPanel.tsx now scope x/y position, full position, center, and bounds
+      Select Same variants to filtered layer/object matches for Illustrator-like
+      layout audits in dense documents. 2026-06-07.
+- [x] Layers search Select Same Edges/Area/Skew — selectSameLayerGeometryById()
+      and LayersPanel.tsx now scope right edge, bottom edge, area, and skew Select
+      Same variants to filtered layer/object matches for Illustrator-like transform
+      audits and cleanup. 2026-06-07.
+- [x] Layers search Select Same Production Flags — selectSameLayerProductionById()
+      and LayersPanel.tsx now scope overprint and print-mark-kind Select Same
+      variants to filtered layer/object matches for Illustrator-like print-preflight
+      audits. 2026-06-07.
+- [x] Layers search Select Same Complex Appearance —
+      selectSameLayerComplexAppearanceById() and LayersPanel.tsx now scope
+      gradient fills, pattern specs, and clipping-mask presence to filtered
+      layer/object matches for Illustrator-like Appearance cleanup. 2026-06-07.
+- [x] Layers search Select Same Text — selectSameLayerTextById()
+      and LayersPanel.tsx now scope font family, font size, and full text
+      appearance Select Same variants to filtered layer/object matches for
+      Illustrator-like typography cleanup. 2026-06-07.
+- [x] Layers search Select Same Assets — selectSameLayerAssetById()
+      and LayersPanel.tsx now scope symbol instances, image source, and image
+      filter-stack Select Same variants to filtered layer/object matches for
+      Illustrator-like linked artwork and placed-image cleanup. 2026-06-07.
+- [x] Layers search Group Matches — groupLayerObjectsById() and
+      LayersPanel.tsx now turn filtered layer/object matches into a selected group
+      from the Layers panel, replacing root-level matches at the top matched stack
+      slot for Illustrator-like structure cleanup. 2026-06-07.
+- [x] Layers search Ungroup Matches — ungroupLayerObjectsById() and
+      LayersPanel.tsx now release filtered matching groups back into the root stack
+      and select their children for Illustrator-like structure cleanup. 2026-06-07.
+- [x] Layers search Renumber Matches — renumberLayerObjectsById() applies
+      prefix plus sequential numbers to matching layer rows from one prompt flow,
+      improving Illustrator-like layer/object organization. 2026-06-07.
+- [x] Layers search Target Matches — targetLayerObjectsById() reveals,
+      unlocks, and selects matching layer rows from one Layers panel action,
+      matching Illustrator's target/current-layer recovery workflow. 2026-06-07.
+- [x] Layers search stack ordering — moveLayerObjectsById() lets search
+      matches move forward, backward, to front, to back, or reverse order
+      directly from the Layers panel, matching Illustrator-style layer list
+      stack management. 2026-06-07.
 - [x] Layers search Rename Matches — LayersPanel.tsx now adds a keyboard-
       browsable Rename Matches action for active layer searches, prompting once
       with the current search text and applying that name (or clearing names
@@ -4862,3 +5995,268 @@ i18n en/zh; themes; toasts; undo/redo; autosave.
       cutter operators a direct recovery path from bad contour / trace / regmark
       jobs without opening menus. README, USER_GUIDE, CHANGELOG, and i18n
       updated. 2026-06-05.
+- Measure proof delivery schedule panel: proof packets now include an exportable due/ship/method/notes schedule panel, with manual add/update commands for production handoff timing.
+- Measure proof delivery route panel: proof packets now include carrier/service/account/address routing details, with manual add/update commands for shipping handoff control.
+- Measure proof fulfillment handoff panel: proof packets now include quantity/packaging/owner/tracking details, with manual add/update commands for final production handoff.
+- Measure proof install handoff panel: proof packets now include installer/date/site/notes details, with manual add/update commands for installation-stage production handoff.
+- Measure proof site readiness panel: proof packets now include permit/access/power/risk readiness details, with manual add/update commands for installation planning.
+- Measure proof install punch list panel: proof packets now include open item/owner/due/resolution tracking, with manual add/update commands for post-install closure.
+- Measure proof client acceptance panel: proof packets now include accepted-by/date/status/notes closure details, with manual add/update commands for client signoff after install.
+- Measure proof warranty info panel: proof packets now include term/coverage/contact/notes warranty details, with manual add/update commands for post-acceptance support handoff.
+- Measure proof care instructions panel: proof packets now include cleaning/chemical/inspection/note care guidance, with manual add/update commands for customer maintenance handoff.
+
+- Spot color process-conversion repair: Select/Object prepress commands can now convert PANTONE/spot/separation paints to process CMYK, preserving supplied CMYK alternates and falling back to 100K for unmapped inks.
+
+- Active-artboard spot conversion repair: prepress commands can now convert only spot/separation paints intersecting the active artboard, preserving other artboards for multi-artboard production jobs.
+
+- Active-artboard prepress repair set: white-overprint, rich-black, total-ink-limit, and registration-color repairs now support active-artboard scoping for multi-artboard production cleanup.
+
+- RGB color prepress audit and conversion: command palette and Select Object menu can isolate RGB/screen-color artwork globally or by active artboard and convert it to process CMYK for print handoff.
+
+- Grayscale/DeviceGray prepress audit and conversion: command palette and Select Object menu can isolate grayscale artwork globally or by active artboard and convert it to K-only process CMYK.
+
+- Lab/CIELAB prepress audit and conversion: command palette and Select Object menu can isolate Lab artwork globally or by active artboard and convert it through sRGB to process CMYK for print handoff.
+
+- Non-CMYK color batch preflight: command palette and Select Object menu can isolate and convert mixed spot, RGB, grayscale, and Lab artwork globally or by active artboard in one CMYK-only handoff pass.
+
+- Thin-stroke repair command: preflight can now raise printable hairline strokes to the 0.25pt safety threshold globally or by active artboard.
+
+- Dashed-stroke repair command: preflight can now clear printable dash patterns to solid strokes globally or by active artboard for output-safe paths.
+
+- Transparency flatten repair command: preflight can now normalize opacity and blend modes to print-safe solid/source-over appearance globally or by active artboard.
+
+- All-overprint repair command: preflight can now clear imported fill/stroke/global overprint flags, including metadata payloads, globally or by active artboard for knockout-safe output.
+
+- Fix-all prepress risks command: Select Object and command palette can now run a one-click production cleanup pass for transparency, dash patterns, hairlines, overprint, non-CMYK paints, rich black, over-ink, and registration colors globally or by active artboard.
+
+- Cleanup repair commands: preflight can now remove stray-point paths and zero-length geometry globally or by active artboard, matching Illustrator cleanup workflows for imported artwork.
+
+- Unpainted-artwork cleanup repair: preflight can now remove invisible no-fill/no-stroke objects globally or by active artboard for cleaner imported Illustrator/PDF artwork.
+
+- Fix-all cleanup objects command: preflight can now remove stray points, zero-length paths, and unpainted invisible artwork in one global or active-artboard cleanup pass for messy imported files.
+
+- Empty-text cleanup repair: preflight can now remove whitespace-only point/area text objects globally or by active artboard, and the fix-all cleanup pass includes them for imported AI/PDF text junk.
+
+- Zero-size cleanup repair: preflight can now select and remove zero-width/zero-height imported objects globally or by active artboard, and fix-all cleanup includes them without confusing them with zero-length paths.
+- Empty-group cleanup repair: preflight can now select and remove empty imported groups or groups containing only cleanup junk globally or by active artboard, and the fix-all cleanup pass includes them while preserving real painted groups.
+- Hidden-artwork cleanup repair: preflight can now explicitly remove hidden exportable artwork globally or by active artboard after review, giving imported Illustrator/PDF cleanup a safe opt-in delete path without folding hidden alternates into Fix All Cleanup.
+- Fully transparent cleanup repair: preflight can now select and explicitly remove zero-opacity exported artwork globally or by active artboard after review, separating invisible imported junk from normal transparency flattening.
+- Pasteboard/outside-artboard cleanup repair: preflight can now remove artwork fully outside the first artboard or outside every artboard, preserving overlapping trim-edge artwork and non-exporting overlays for Illustrator-like production handoff cleanup.
+- Missing linked-image cleanup repair: Links/preflight workflows can now remove broken linked-image placeholders globally or by active artboard after review, preserving healthy links, embedded images, and non-exporting overlays.
+- Cropped-image review repair: image/preflight workflows can now clear crop offsets and crop dimensions globally or by active artboard, exposing hidden placed-image pixels for Illustrator-like Links/asset review without deleting the image object.
+- Filtered-image review repair: image/preflight workflows can now clear live raster filters globally or by active artboard, supporting Illustrator-like placed-image appearance review before print/export handoff.
+- Low-resolution image preflight repair: Links/preflight workflows can now mark low effective-PPI placed images globally or by active artboard with persistent review metadata and a visible red outline for print handoff triage.
+- High-resolution image preflight repair: Links/package workflows can now mark over-sampled placed images globally or by active artboard with optimization metadata and a visible amber review outline for downsample/export triage.
+- Combined image preflight repair: Links/preflight workflows can now run a single non-destructive image handoff fix globally or by active artboard, clearing live raster filters and crops while marking low/high effective-PPI images for review.
+- Transformed-image preflight repair: Links/preflight workflows can now mark scaled, rotated, or skewed placed images globally or by active artboard with transform metadata and visible review styling, and the combined image preflight pass preserves PPI findings while adding transform review details.
+- Image preflight review selection: Links/preflight workflows can now select every placed-image handoff issue in one pass globally or by active artboard, covering live filters, crops, transforms, and low/high effective-PPI risks before applying fixes.
+- Image preflight review style preservation: Links/preflight review markers now preserve each image object's original stroke, stroke width, and stroke-uniform style in metadata before applying visible review outlines, keeping future cleanup/revert workflows non-destructive.
+- Image preflight review marker cleanup: Links/preflight workflows can now clear review metadata globally or by active artboard and restore saved image stroke styling, completing a non-destructive review/fix/cleanup loop for placed-image handoff.
+- Image preflight review marker selection: Links/preflight workflows can now select already-marked placed-image review objects globally or by active artboard, enabling a final cleanup review before restoring original styles and clearing metadata.
+- Image preflight summary reporting: Links/preflight workflows can now report placed-image issue counts globally or by active artboard, covering filters, crops, transforms, low/high effective-PPI, missing links, and review markers before review/fix/cleanup.
+- Missing-link combined image preflight: Links/preflight select-all and non-destructive fix-all workflows now include missing linked placed images globally or by active artboard, marking them with review metadata instead of deleting placeholders so cleanup/relink review remains possible.
+- Linked-image embedding workflow: Links workflows can now embed loaded linked placed images globally or by active artboard, converting available bitmap payloads to data URLs while preserving the original link source metadata for package/review traceability.
+- Embedded-image link restore workflow: Links workflows can now restore embedded placed images back to their preserved original linked sources globally or by active artboard, completing a reversible embed/unembed loop for package and handoff review.
+- Image links summary reporting: Links workflows can now report placed-image asset state globally or by active artboard, including total images, linked, embedded, missing, embeddable, restorable, and unknown-source counts before package/relink/embed decisions.
+- Actionable Links selection: Links workflows can now select embeddable linked images and restorable embedded-link images globally or by active artboard, turning summary counts into direct object review targets before embed/unembed operations.
+- Unknown-source image selection: Links workflows can now select placed images that have neither embedded data nor link source metadata globally or by active artboard, making unknown asset origins actionable before packaging or relinking.
+- Not-embeddable linked image audit: Links workflows can now report and select linked placed images that are present but cannot currently be embedded globally or by active artboard, surfacing CORS/unavailable bitmap payload risks before package handoff.
+- Image handoff-risk selector: Links workflows now include global and active-artboard commands that select placed-image package risks in one pass, combining missing links, unknown-source images, and linked images that are present but not embeddable before package/collect handoff.
+- Image handoff report export: Links workflows now generate copyable document and active-artboard image handoff reports summarizing missing links, not-embeddable linked images, unknown-source assets, embeddable links, and restorable embedded links for package/collect review.
+- Image handoff report asset details: Package/collect handoff reports now include per-image asset rows with document order, display name, status, and source/original-source fallback, making Links audits actionable instead of only summary-level.
+- Image handoff report resolution details: Package/collect image reports now include per-asset pixel dimensions and effective PPI, using existing natural-dimension metadata and placement scale to surface print-resolution risks directly in Links handoff notes.
+- Image handoff report severity/actions: Package/collect Links reports now label every placed-image row with error/warning/info/ok severity and a concrete next action, turning handoff notes into prioritized preflight instructions.
+- Image handoff report severity summary: Package/collect Links reports now include top-level error/warning/info/ok counts derived from per-asset severities, making the overall handoff risk level visible before reading individual rows.
+- Image handoff TSV export: Links package/collect reporting now has document and active-artboard TSV copy commands with spreadsheet-ready columns for index, asset name, severity, status, action, pixels, effective PPI, and source.
+- Image handoff JSON export: Links package/collect reporting now has document and active-artboard JSON copy commands with machine-readable scope, status, summary counts, severity counts, and per-asset action rows for automation or ticketing integrations.
+- Image source manifest export: Links package/collect reporting now includes document and active-artboard source manifests grouped by required handoff action, separating relink, replace/embed, provenance review, collect/embed, restore-link, collect-only, and ready image sources.
+
+- [x] Links package collect source list parity — added copyable deduplicated linked-file source lists for document and active-artboard handoff workflows.
+
+- [x] Links missing relink list parity — added copyable deduplicated missing linked-image path lists for document and active-artboard package preflight handoff workflows.
+
+- [x] Links package checklist parity — added copyable document/active-artboard image package checklists that group relink, collect, manual-review, and ready asset steps for handoff.
+
+- [x] Links package plan JSON parity — added copyable document/active-artboard machine-readable image package plans for relink, collect, manual-review, ready assets, and automation handoff.
+
+- [x] Links collect destination manifest parity — added copyable TSV source-to-Links package path manifests with safe filenames, duplicate-name suffixing, and active-artboard scoping.
+
+- [x] Links package plan collect-destination parity — Package Plan JSON now includes source-to-Links destination records so automation can copy/rename collected linked images deterministically.
+
+- [x] Links package README parity — added copyable document/active-artboard package README handoff notes with contents, collected destinations, relink items, manual review, and ready assets.
+
+- [x] Links package file tree parity — added copyable document/active-artboard package tree previews that show document, README, reports, package plan, and collected Links files.
+
+- [x] Links package bundle JSON parity — added copyable document/active-artboard virtual package bundles containing README, tree, reports, checklist, plan JSON, destination TSV, and source manifest file contents.
+
+- [x] Links package blockers parity — added copyable document/active-artboard package gate reports that list only missing, not-embeddable, and unknown-source image blockers.
+
+- [x] Links package gate JSON parity — added copyable document/active-artboard machine-readable package pass/fail gates with blocker counts and blocker detail arrays.
+
+- [x] Links package gate artifact parity — Package bundle JSON and file-tree previews now include `image-package-gate.json` so automated package handoff has a visible pass/fail gate file.
+
+- [x] Links package collect script parity — added document/active-artboard copy commands plus bundle/tree artifacts for `collect-linked-images.sh`, generating shell-safe `cp` steps from collected linked-image destinations.
+
+- [x] Links package PowerShell collect script parity — added Windows-friendly `collect-linked-images.ps1` package artifacts and copy commands for document/active-artboard linked-image collection.
+
+- [x] Links package verify script parity — added POSIX and PowerShell package verification scripts plus copy commands so collected Links files can be checked after handoff packaging.
+
+- [x] Links package verify manifest parity — added document/active-artboard machine-readable `image-package-verify-manifest.json` artifacts and copy commands listing every expected collected Links file for automation gates.
+
+- [x] Links package README automation parity — package README now documents collect scripts, verify scripts, and `image-package-verify-manifest.json` so handoff recipients can run and audit package automation.
+
+- [x] Links package file index parity — added copyable document/active-artboard `image-package-file-index.json` artifacts listing every virtual package file, kind, and byte count for audit and automation handoff.
+
+- [x] Links package file index digest parity — `image-package-file-index.json` now includes deterministic per-file digests alongside kind and byte counts for package audit comparisons.
+
+- [x] Links package audit JSON parity — added document/active-artboard `image-package-audit.json` with package gate status, expected Links manifest, file count, and per-file digests for final handoff audit.
+
+- [x] Links package README audit artifact parity — package README now documents `image-package-file-index.json` and `image-package-audit.json` so recipients know where to validate file digests and gate status.
+
+- [x] Links package audit report parity — added document/active-artboard `image-package-audit.md` reports with gate status, expected Links count, package file count, and file digest rows for human production review.
+
+- [x] Links package digest TSV parity — added document/active-artboard `image-package-digests.tsv` copy commands and package artifacts with spreadsheet-ready path, kind, byte, and digest rows.
+
+- [x] Links package signoff parity — added document/active-artboard `image-package-signoff.md` copy commands and package artifacts with gate status, verification checklist, and designer/prepress signoff lines.
+
+- [x] Links package signoff JSON parity — added document/active-artboard `image-package-signoff.json` artifacts and copy commands with machine-readable checklist items and designer/prepress signature fields.
+
+- [x] Links package signoff TSV parity — added document/active-artboard `image-package-signoff.tsv` artifacts and copy commands with spreadsheet-ready checklist/signature rows for production signoff tracking. 2026-06-08.
+
+- [x] Links package delivery manifest parity — added document/active-artboard `image-package-delivery-manifest.json` and `.tsv` artifacts plus copy commands for external QA deliverable readiness checks. 2026-06-08.
+
+- [x] Links package release gate parity — added document/active-artboard `image-package-release-gate.json`, `.md`, and `.tsv` artifacts plus copy commands that hold final delivery until package gate, deliverables, signoff, and digest checks are cleared. 2026-06-08.
+
+- [x] Links package release gate verifier parity — added document/active-artboard `verify-package-release-gate.sh` and `.ps1` artifacts plus copy commands so CI/package handoff can fail while releaseStatus remains on hold. 2026-06-08.
+
+- [x] Links package CI manifest parity — added document/active-artboard `image-package-ci-manifest.json` artifacts and copy commands listing required release files plus shell/PowerShell verification steps for automated handoff pipelines. 2026-06-08.
+
+- [x] Links package GitHub Actions workflow parity — added document/active-artboard `image-package-github-actions.yml` artifacts and copy commands with ready-to-copy CI steps for Links verification, release gate checks, and QA artifact upload. 2026-06-08.
+
+- [x] Links package GitLab CI workflow parity — added document/active-artboard `image-package-gitlab-ci.yml` artifacts and copy commands with ready-to-copy CI jobs for Links verification, release gate checks, and QA artifact retention. 2026-06-08.
+
+- [x] Links package Azure Pipelines workflow parity — added document/active-artboard `image-package-azure-pipelines.yml` artifacts and copy commands with ready-to-copy pipeline steps for Links verification, release gate checks, and QA artifact publishing. 2026-06-08.
+
+- [x] Links package CircleCI workflow parity — added document/active-artboard `image-package-circleci.yml` artifacts and copy commands with ready-to-copy CircleCI jobs for Links verification, release gate checks, and QA artifact storage. 2026-06-08.
+
+- [x] Links package Jenkins pipeline parity — added document/active-artboard `image-package-jenkinsfile` artifacts and copy commands with ready-to-copy Jenkins stages for Links verification, release gate checks, and QA artifact archiving. 2026-06-08.
+
+- [x] Links package Bitbucket Pipelines parity — added document/active-artboard `image-package-bitbucket-pipelines.yml` artifacts and copy commands with ready-to-copy pipeline steps for Links verification, release gate checks, and QA artifact retention. 2026-06-08.
+
+- [x] Links package Buildkite pipeline parity — added document/active-artboard `image-package-buildkite.yml` artifacts and copy commands with ready-to-copy Buildkite steps for Links verification, release gate checks, and QA artifact retention. 2026-06-08.
+
+- [x] Links package Drone CI pipeline parity — added document/active-artboard `image-package-drone.yml` artifacts and copy commands with ready-to-copy Drone CI steps for Links verification, release gate checks, and external QA artifact publishing. 2026-06-08.
+
+- [x] Links package TeamCity Kotlin DSL parity — added document/active-artboard `image-package-teamcity.kts` artifacts and copy commands with ready-to-copy TeamCity build steps for Links verification, release gate checks, and QA artifact publishing. 2026-06-08.
+
+- [x] Links package provenance manifest parity — added document/active-artboard `image-package-provenance.json` and `.tsv` artifacts plus copy commands so package handoff captures every placed image source, status, proof requirement, and traceability row. 2026-06-08.
+
+- [x] Links package acceptance checklist parity — added document/active-artboard `image-package-acceptance.json` and `.tsv` artifacts plus copy commands so package handoff tracks production, prepress, producer, and client/shop acceptance before closeout. 2026-06-08.
+
+- [x] Links package delivery receipt parity — added document/active-artboard `image-package-delivery-receipt.md`, `.json`, and `.tsv` artifacts plus copy commands so package handoff has a recipient-facing closeout receipt tied to release gate and acceptance status. 2026-06-08.
+
+- [x] Links package release notes parity — added document/active-artboard `image-package-release-notes.md`, `.json`, and `.tsv` artifacts plus copy commands so package handoff includes client/shop-facing release status, highlights, blockers, pending closeout items, and collected Links summary. 2026-06-08.
+
+- [x] Links package SBOM parity — added document/active-artboard `image-package-sbom.json` and `.tsv` artifacts plus copy commands so package handoff has an audit-friendly bill of materials for linked, embedded, and provenance-review image components. 2026-06-08.
+
+- [x] Links package attestation parity — added document/active-artboard `image-package-attestation.json` and `.tsv` artifacts plus copy commands so package handoff can assert SBOM generation, provenance manifest generation, release gate evaluation, and digest manifest availability. 2026-06-08.
+
+- [x] Links package risk register parity — added document/active-artboard image-package-risk-register.md, .json, and .tsv outputs for producer/prepress triage of placed-image blockers, residual risks, owners, mitigations, package impact, and release readiness.
+
+- [x] Links package verification summary parity — added document/active-artboard image-package-verification-summary.md, .json, and .tsv outputs that summarize Links verification, release gate, risk register, SBOM, and attestation readiness for human review and CI archive handoff.
+
+- [x] Links package client README parity — added document/active-artboard image-package-client-readme.md and .json outputs with recipient-facing open/review/acceptance steps, required review artifacts, Links expectations, and delivery hold status for external handoff.
+
+- [x] Links package change log parity — added document/active-artboard image-package-change-log.md, .json, and .tsv outputs for package version, revision, client/shop request, risk, verification, and release gate evidence tracking.
+
+- [x] Links package relink map parity — added document/active-artboard image-package-relink-map.md, .json, and .tsv outputs mapping original placed-image sources to packaged Links targets, unresolved relink states, and recipient relink instructions.
+
+- [x] Links package rights manifest parity — added document/active-artboard image-package-rights-manifest.md, .json, and .tsv outputs for placed-image license proof, usage scope, blocked/unverified rights review, and delivery approval evidence.
+
+- [x] Links package prepress ticket parity — added document/active-artboard image-package-prepress-ticket.md, .json, and .tsv outputs for operator-facing production tasks, owners, holds, Links collection, rights proof, relink resolution, risk clearance, and release gate evidence.
+
+- [x] Links package printer intake parity — added document/active-artboard image-package-printer-intake.md, .json, and .tsv outputs for print-shop receiving fields, intake checklist, delivery manifest review, prepress ticket holds, rights proof, Links receipt, and release gate evidence.
+- [x] Links package shop proof checklist parity — added document/active-artboard image-package-shop-proof-checklist.md, .json, and .tsv outputs for print-shop proof rounds, proof file approval fields, intake acceptance, prepress ticket clearance, rights proof, verification summary, and release gate signoff evidence.
+- [x] Links package production handoff parity — added document/active-artboard image-package-production-handoff.json and .tsv outputs for press scheduling, shop custody, production owners, intake/proof/prepress/release evidence, holds, and next production actions.
+- [x] Links package print release approval parity — added document/active-artboard image-package-print-release-approval.md, .json, and .tsv outputs for final print release fields, client/shop signers, delivery/rights/proof/production/gate evidence, blockers, and press approval state.
+- [x] Links package vendor QA parity — added document/active-artboard image-package-vendor-qa.md, .json, and .tsv outputs for supplier QA acceptance, vendor job fields, verification/delivery/production/print-release/release-gate evidence, dispositions, holds, and vendor release status.
+- [x] Links package press run ticket parity — added document/active-artboard image-package-press-run-ticket.md, .json, and .tsv outputs for press run fields, operator setup checks, prepress/production/approval/vendor-QA/release-gate evidence, holds, and production-start actions.
+- [x] Links package postpress inspection parity — added document/active-artboard image-package-postpress-inspection.md, .json, and .tsv outputs for finished-goods inspection fields, press/vendor-QA/print-approval/delivery-receipt/release-gate evidence, defects, holds, and corrective actions.
+- [x] Links package finished goods release parity — added document/active-artboard image-package-finished-goods-release.md, .json, and .tsv outputs for shipment fields, postpress/acceptance/delivery-receipt/release-notes/release-gate evidence, holds, release actions, and finished-goods status.
+- [x] Links package shipment handoff parity — added document/active-artboard image-package-shipment-handoff.md, .json, and .tsv outputs for carrier/service/tracking/recipient fields, finished-goods/delivery-manifest/delivery-receipt/release-notes/release-gate evidence, custody actions, holds, and shipment status.
+- [x] Links package delivery confirmation parity — added document/active-artboard image-package-delivery-confirmation.md, .json, and .tsv outputs for delivered-at/received-by/signature/exception fields, shipment/receipt/acceptance/release-notes/release-gate evidence, holds, follow-up actions, and final delivery status.
+- [x] Links package closeout certificate parity — added document/active-artboard image-package-closeout-certificate.md, .json, and .tsv outputs for certificate/archive/retention fields, delivery/acceptance/attestation/verification/release-gate evidence, holds, archive actions, and final closeout status.
+- [x] Links package archive manifest parity — added document/active-artboard image-package-archive-manifest.md, .json, and .tsv outputs for archive ID/location/retention fields, closeout/file-index/audit/attestation/release-gate evidence, holds, retention actions, and archive status.
+- [x] Links package retention schedule parity — added document/active-artboard image-package-retention-schedule.md, .json, and .tsv outputs for retention policy/start/until fields, legal holds, review triggers, disposal approvals, archive/closeout/audit evidence, and disposition actions.
+- [x] Links package disposition certificate parity — added document/active-artboard image-package-disposition-certificate.md, .json, and .tsv outputs for retain/delete disposition decisions, legal-hold clearance, approver/witness fields, retention/archive/release/rights evidence, and final disposal certificate actions.
+- [x] Links package destruction log parity — added document/active-artboard image-package-destruction-log.md, .json, and .tsv outputs for destruction/retained-exception execution, operator/witness fields, certificate hashes, disposition/retention/archive evidence, linked-source actions, and final proof logging.
+- [x] Links package archive retrieval request parity — added document/active-artboard image-package-retrieval-request.md, .json, and .tsv outputs for archive restore requests, requester/purpose/approval fields, retention/destruction/archive evidence, file-index matching, custody release, return due, and destroy-after-use controls.
+- [x] Links package retrieval fulfillment parity — added document/active-artboard image-package-retrieval-fulfillment.md, .json, and .tsv outputs for actual archive restore receipts, custody recipient, checksum verification, restored package/link evidence, return due, returned-by fields, and destroy-after-use outcome logging.
+- [x] Links package retrieval return receipt parity — added document/active-artboard image-package-retrieval-return-receipt.md, .json, and .tsv outputs for returned/re-frozen/destroy-after-use closure, returned-by/received-by fields, archive re-freeze evidence, file-index matching, exceptions, final custodian signoff, and custody closure.
+- [x] Links package custody ledger parity — added document/active-artboard image-package-custody-ledger.md, .json, and .tsv outputs for end-to-end custody stages across delivery, closeout, archive freeze, retrieval request, retrieval fulfillment, and return closure with actors, evidence, holds, and next actions.
+- [x] Links package custody exceptions parity — added document/active-artboard image-package-custody-exceptions.md, .json, and .tsv outputs for chain-of-custody holds, pending evidence, release-gate blockers, owners, severity, remediation due fields, and audit-ready exception rows.
+- [x] Links package custody remediation plan parity — added document/active-artboard image-package-custody-remediation-plan.md, .json, and .tsv outputs that convert custody exceptions into owner-assigned remediation tasks with priority, status, due fields, evidence, verification steps, and final audit signoff fields.
+- [x] Links package custody remediation verification parity — added document/active-artboard image-package-custody-remediation-verification.md, .json, and .tsv outputs for remediation completion checks, critical exception clearance, evidence verification, verifier/residual-risk/audit-signoff fields, and final custody signoff proof.
+- [x] Links package final custody signoff parity — added document/active-artboard image-package-final-custody-signoff.md, .json, and .tsv outputs for final custodian, release manager, archive owner, client/shop recipient, residual-condition fields, release-gate/custody-exception/remediation-verification evidence, and signed custody handoff proof.
+- [x] Links package final package seal parity — added document/active-artboard image-package-final-package-seal.md, .json, and .tsv outputs for tamper-evident package sealing, seal ID/witness/hash-authority fields, digest review, final custody signoff evidence, linked-asset lock confirmation, and reseal policy tracking.
+- [x] Links package final package seal verification parity — added document/active-artboard image-package-final-package-seal-verification.md, .json, and .tsv outputs for independent seal review, digest spot-checks, witness confirmation, linked-asset lock verification, seal ID/sample fields, exception decisions, and reseal approval tracking.
+- [x] Links package reseal remediation plan parity — added document/active-artboard image-package-reseal-remediation-plan.md, .json, and .tsv outputs that convert final package seal verification holds into owner-assigned reseal tasks with priority, status, due fields, evidence, approval decisions, and regenerate-digests/reissue-seal guidance.
+- [x] Links package reseal remediation verification parity — added document/active-artboard image-package-reseal-remediation-verification.md, .json, and .tsv outputs for reseal task completion checks, package blocker clearance, regenerated digest proof, reissued seal ID/witness/residual-risk fields, and final reissue approval evidence.
+- [x] Links package reissued seal certificate parity — added document/active-artboard image-package-reissued-seal-certificate.md, .json, and .tsv outputs for post-remediation reissued seal ID, authority/witness/issued-at fields, regenerated digest binding, blocker clearance, custody release, and signed certificate evidence.
+- [x] Links package post-reseal release authorization parity — added document/active-artboard image-package-post-reseal-release-authorization.md, .json, and .tsv outputs for final post-reseal shipment/archive/client release approval, approver/authorized-at/release-target/custody-recipient fields, reissued seal certificate evidence, linked asset lock confirmation, and residual-condition tracking.
+- [x] Links package post-reseal release execution receipt parity — added document/active-artboard image-package-post-reseal-release-execution-receipt.md, .json, and .tsv outputs for actual post-reseal release execution, executor/executed-at/release-target/custody-recipient/transfer-reference fields, custody ledger/archive/delivery evidence, blocker checks, linked asset seal confirmation, and exception notes.
+- [x] Links package post-reseal release execution verification parity — added document/active-artboard image-package-post-reseal-release-execution-verification.md, .json, and .tsv outputs for independent release execution review, recipient transfer confirmation, custody ledger/archive update checks, blocker verification, linked asset seal comparison, verifier fields, and residual exception tracking.
+- [x] Links package post-reseal closeout certificate parity — added document/active-artboard image-package-post-reseal-closeout-certificate.md, .json, and .tsv outputs for final post-reseal archive/client/shop closeout, certificate ID/closed-by/closed-at/release-target/archive-location fields, execution verification evidence, archive/retention/custody updates, blocker checks, and residual exception tracking.
+- [x] Links package post-reseal archive update parity — added document/active-artboard image-package-post-reseal-archive-update.md, .json, and .tsv outputs for archive manifest, retention, custody ledger, retrieval-readiness, linked asset completeness, blocker checks, archive lock, and residual exception tracking after post-reseal closeout.
+- [x] Links package post-reseal retention update parity — added document/active-artboard image-package-post-reseal-retention-update.md, .json, and .tsv outputs for retention class, policy citation, legal hold, matter ID, disposal review date, notification owner, linked asset retention coverage, archive lock, blocker checks, and residual exception tracking after post-reseal archive update.
+- [x] Links package post-reseal retention verification parity — added document/active-artboard image-package-post-reseal-retention-verification.md, .json, and .tsv outputs for independent retention policy, legal hold, disposal review workflow, archive lock approval, linked asset inheritance, blocker checks, reviewer fields, and residual exception verification after retention update.
+- [x] Links package post-reseal archive lock certificate parity — added document/active-artboard image-package-post-reseal-archive-lock-certificate.md, .json, and .tsv outputs for immutable archive lock certificate ID, lock approver, archive lock URI, storage tier, retention lock mode, legal hold, custody ledger freeze, linked asset lock inheritance, blocker checks, and residual exception tracking after retention verification.
+- [x] Links package post-reseal archive lock verification parity — added document/active-artboard image-package-post-reseal-archive-lock-verification.md, .json, and .tsv outputs for independent immutable archive lock review, digest proof, retention lock evidence, custody ledger freeze, retrieval instructions, linked asset lock proof, blocker checks, reviewer fields, and residual exception verification after archive lock certificate.
+- [x] Links package post-reseal locked archive closeout certificate parity — added document/active-artboard image-package-post-reseal-locked-archive-closeout-certificate.md, .json, and .tsv outputs for locked archive closeout certificate ID, filed-by/filed-at, final archive location, final custodian, retrieval policy version, custody closeout acknowledgement, linked asset closeout proof, blocker checks, and residual exception tracking after archive lock verification.
+- [x] Links package post-reseal locked archive closeout verification parity — added document/active-artboard image-package-post-reseal-locked-archive-closeout-verification.md, .json, and .tsv outputs for independent locked archive closeout certificate review, final records filing, retrieval policy verification, custody acknowledgement, linked asset closeout evidence, blocker checks, reviewer fields, and residual exception verification.
+- [x] Links package post-reseal locked archive audit certificate parity — added document/active-artboard image-package-post-reseal-locked-archive-audit-certificate.md, .json, and .tsv outputs for final audit certificate ID, audit owner, evidence index version, audit trail reference, retention/retrieval audit acceptance, linked asset audit coverage, blocker checks, auditor fields, and residual exception tracking after locked archive closeout verification.
+- [x] Links package post-reseal locked archive audit verification parity — added document/active-artboard image-package-post-reseal-locked-archive-audit-verification.md, .json, and .tsv outputs for independent locked archive audit certificate review, evidence index verification, audit trail review, residual exception disposition, linked asset audit evidence, blocker checks, reviewer fields, and final audit signoff.
+- [x] Links package post-reseal locked archive audit signoff certificate parity — added document/active-artboard image-package-post-reseal-locked-archive-audit-signoff-certificate.md, .json, and .tsv outputs for final audit signoff ID, signed-by/signed-at, audit owner, final archive closure ID, evidence index freeze, compliance final acceptance, linked asset signoff coverage, blocker checks, approver fields, and residual exception tracking after audit verification.
+- [x] Links package post-reseal locked archive audit signoff verification parity — added document/active-artboard image-package-post-reseal-locked-archive-audit-signoff-verification.md, .json, and .tsv outputs for independent final audit signoff verification, approver signature checks, evidence freeze verification, compliance closure, linked asset signoff evidence, blocker checks, reviewer fields, and residual exception disposition.
+- [x] Links package post-reseal final compliance certificate parity — added document/active-artboard image-package-post-reseal-final-compliance-certificate.md, .json, and .tsv outputs for final compliance acceptance, retention and retrieval obligations, custody/reseal closure, residual exception disposition, linked asset compliance evidence, release restrictions, approver fields, and package blocker checks.
+- [x] Links package post-reseal final archive release receipt parity — added document/active-artboard image-package-post-reseal-final-archive-release-receipt.md, .json, and .tsv outputs for final archive release receipt acceptance, recipient acknowledgement, custody transfer, release restrictions, linked asset receipt coverage, retention handoff, archive location, and release gate/compliance evidence checks.
+- [x] Links package post-reseal final archive release verification parity — added document/active-artboard image-package-post-reseal-final-archive-release-verification.md, .json, and .tsv outputs for independent archive release receipt verification, recipient identity review, custody transfer checks, release restriction verification, linked asset release evidence, retention handoff closure, reviewer fields, and blocker disposition.
+- [x] Links package post-reseal final archive release closeout certificate parity — added document/active-artboard image-package-post-reseal-final-archive-release-closeout-certificate.md, .json, and .tsv outputs for release verification acceptance, closeout authority, final closure IDs, records lock, custody transfer closure, linked asset release closeout, retention handoff, and final blocker disposition.
+- [x] Links package post-reseal final archive release closeout verification parity — added document/active-artboard image-package-post-reseal-final-archive-release-closeout-verification.md, .json, and .tsv outputs for independent final closeout certificate verification, closeout authority review, records lock verification, custody closure checks, linked asset closeout evidence, final reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive completion certificate parity — added document/active-artboard image-package-post-reseal-final-archive-completion-certificate.md, .json, and .tsv outputs for final release closeout verification acceptance, final evidence freeze, archive custody completion, retention handoff, linked asset archive completion, completion authority fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive completion verification parity — added document/active-artboard image-package-post-reseal-final-archive-completion-verification.md, .json, and .tsv outputs for independent final archive completion certificate verification, completion authority review, final evidence freeze verification, archive custody and retention handoff checks, linked asset archive completion evidence, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-certificate.md, .json, and .tsv outputs for final archive seal authority, completion verification acceptance, evidence freeze sealing, retention lock, custody seal evidence, linked asset seal coverage, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-verification.md, .json, and .tsv outputs for independent final archive seal certificate acceptance, seal identity review, evidence freeze verification, retention lock and custody seal checks, linked asset seal coverage, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal closeout certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-closeout-certificate.md, .json, and .tsv outputs for final archive seal verification acceptance, closeout authority, archive closure IDs, sealed evidence and manifest freeze, retention lock and custody freeze closure, linked asset seal closeout coverage, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal closeout verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-closeout-verification.md, .json, and .tsv outputs for independent final archive seal closeout certificate acceptance, archive closure identity review, sealed evidence and manifest freeze verification, retention lock and custody freeze checks, linked asset seal closeout verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release gate certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-gate-certificate.md, .json, and .tsv outputs for final seal closeout verification acceptance, package release gate status, sealed archive gate IDs, release authority/recipient fields, custody and retention release controls, linked asset sealed archive release coverage, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release gate verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-gate-verification.md, .json, and .tsv outputs for independent sealed archive release gate certificate acceptance, package release gate verification, sealed archive gate identity review, custody and retention release control checks, linked asset sealed archive release coverage verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release execution receipt parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-execution-receipt.md, .json, and .tsv outputs for verified sealed archive release gate execution, release executor/recipient acknowledgement fields, custody transfer, retention controls, linked asset sealed release execution evidence, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release execution verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-execution-verification.md, .json, and .tsv outputs for independent sealed archive release execution receipt acceptance, release execution identity review, recipient acknowledgement verification, custody transfer and retention control checks, linked asset sealed release execution verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release closeout certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-closeout-certificate.md, .json, and .tsv outputs for sealed archive release execution verification acceptance, closeout authority/release closure IDs, recipient acceptance, custody transfer and retention closure, linked asset sealed release closeout evidence, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release closeout verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-closeout-verification.md, .json, and .tsv outputs for independent sealed archive release closeout certificate acceptance, release closure ID review, recipient acceptance verification, custody transfer and retention closure checks, linked asset sealed release closeout verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release completion certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-completion-certificate.md, .json, and .tsv outputs for sealed archive release closeout verification acceptance, final completion authority/IDs, recipient acceptance closure, custody and retention completion, linked asset release completion evidence, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release completion verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-completion-verification.md, .json, and .tsv outputs for independent final sealed archive release completion certificate acceptance, completion ID review, recipient acceptance closure verification, custody and retention completion checks, linked asset release completion evidence verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release finalization certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-finalization-certificate.md, .json, and .tsv outputs for sealed archive release completion verification acceptance, immutable finalization IDs, recipient acceptance finalization, custody and retention finalization, linked asset finalization evidence, authority fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release finalization verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-finalization-verification.md, .json, and .tsv outputs for independent final sealed archive release finalization certificate acceptance, immutable finalization ID review, recipient acceptance finalization verification, custody and retention finalization checks, linked asset finalization evidence verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records freeze certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-freeze-certificate.md, .json, and .tsv outputs for finalization verification acceptance, immutable evidence lock, recipient final record acknowledgement, custody and retention ledger freeze, linked asset records freeze evidence, freeze authority fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records freeze verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-freeze-verification.md, .json, and .tsv outputs for independent final records freeze certificate acceptance, immutable evidence lock verification, recipient final record acknowledgement verification, custody and retention ledger freeze checks, linked asset records freeze evidence verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records closure certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-closure-certificate.md, .json, and .tsv outputs for records freeze verification acceptance, immutable ledger closeout IDs, recipient records closure acknowledgement, custody and retention ledger closeout, linked asset records closure evidence, closure authority fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records closure verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-closure-verification.md, .json, and .tsv outputs for independent final records closure certificate acceptance, immutable ledger closeout ID review, recipient records closure acknowledgement verification, custody and retention ledger closeout checks, linked asset records closure evidence verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records completion certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-completion-certificate.md, .json, and .tsv outputs for records closure verification acceptance, immutable records completion IDs, recipient records completion acknowledgement, custody and retention completion, linked asset records completion evidence, completion authority fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records completion verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-completion-verification.md, .json, and .tsv outputs for independent final records completion certificate acceptance, immutable records completion ID review, recipient records completion acknowledgement verification, custody and retention completion checks, linked asset records completion evidence verification, reviewer fields, and blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records signoff certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-signoff-certificate.md, .json, and .tsv outputs for completion verification acceptance, final signoff authority/IDs, immutable archive release signoff lock, recipient/custody/retention final signoff acknowledgement, linked asset final records signoff evidence, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records signoff verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-signoff-verification.md, .json, and .tsv outputs for independent final records signoff certificate acceptance, final signoff authority/ID review, immutable archive release signoff lock verification, recipient/custody/retention final signoff acknowledgement verification, linked asset final records signoff evidence review, reviewer fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records release certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-release-certificate.md, .json, and .tsv outputs for signoff verification acceptance, final records release authority/IDs, immutable final records release lock, recipient/custody/retention release acknowledgement, linked asset final records release evidence, release authority fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records release verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-release-verification.md, .json, and .tsv outputs for independent final records release certificate acceptance, final records release authority/ID review, immutable final records release lock verification, recipient/custody/retention release acknowledgement verification, linked asset final records release evidence review, reviewer fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records handoff certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-handoff-certificate.md, .json, and .tsv outputs for release verification acceptance, final records handoff authority/IDs, immutable final records handoff lock, recipient/custody/retention handoff acknowledgement, linked asset final records handoff evidence, handoff authority fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records handoff verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-handoff-verification.md, .json, and .tsv outputs for independent final records handoff certificate acceptance, final records handoff authority/ID review, immutable final records handoff lock verification, recipient/custody/retention handoff acknowledgement verification, linked asset final records handoff evidence review, reviewer fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records closeout certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-closeout-certificate.md, .json, and .tsv outputs for handoff verification acceptance, final records closeout authority/IDs, immutable final records closeout lock, recipient/custody/retention closeout acknowledgement, linked asset final records closeout evidence, closeout authority fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records closeout verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-closeout-verification.md, .json, and .tsv outputs for independent final records closeout certificate acceptance, final records closeout authority/ID review, immutable final records closeout lock verification, recipient/custody/retention closeout acknowledgement verification, linked asset final records closeout evidence review, reviewer fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records archive certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-archive-certificate.md, .json, and .tsv outputs for final records closeout verification acceptance, final archive authority/ID recording, immutable final records archive lock, recipient/custody/retention archive acknowledgements, linked asset archive evidence, and residual blocker/exception archive disposition.
+- [x] Links package post-reseal final archive seal release final records archive verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-archive-verification.md, .json, and .tsv outputs for independent final records archive certificate acceptance, archive authority/ID review, immutable archive lock verification, recipient/custody/retention archive acknowledgement verification, linked asset archive evidence review, reviewer fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records retention certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-retention-certificate.md, .json, and .tsv outputs for final records archive verification acceptance, retention authority/ID recording, immutable retention lock, recipient/custody/archive retention acknowledgements, linked asset retention evidence, and residual blocker/exception retention disposition.
+- [x] Links package post-reseal final archive seal release final records retention verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-retention-verification.md, .json, and .tsv outputs for independent final records retention certificate acceptance, retention authority/ID review, immutable retention lock verification, recipient/custody/archive retention acknowledgement verification, linked asset retention evidence review, reviewer fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records disposition certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-disposition-certificate.md, .json, and .tsv outputs for final records retention verification acceptance, disposition authority/ID recording, immutable disposition lock, recipient/custody/archive disposition acknowledgements, linked asset disposition evidence, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records disposition verification parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-disposition-verification.md, .json, and .tsv outputs for independent final records disposition certificate acceptance, disposition authority/ID review, immutable disposition lock verification, recipient/custody/archive disposition acknowledgement verification, linked asset disposition evidence review, reviewer fields, and residual blocker/exception disposition.
+- [x] Links package post-reseal final archive seal release final records destruction certificate parity — added document/active-artboard image-package-post-reseal-final-archive-seal-release-final-records-destruction-certificate.md, .json, and .tsv outputs for final records disposition verification acceptance, destruction authority/ID recording, immutable destruction lock, recipient/custody/archive destruction acknowledgements, linked asset destruction evidence, and residual blocker/exception destruction disposition.

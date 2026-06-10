@@ -15,42 +15,54 @@ import { buildOutlineCutPaths } from './contourFromSelection';
 
 const MM_TO_PX = 3.7795; // buildOutlineCutPaths returns mm; convert back to px
 
+type Pt = [number, number];
+
+function toD(points: Pt[], closed: boolean): string {
+  const parts = points.map(([x, y], index) => `${index === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`);
+  if (closed) parts.push('Z');
+  return parts.join(' ');
+}
+
+export function canSimplifyPathObject(object: fabric.FabricObject): boolean {
+  return object.type === 'path';
+}
+
+export function simplifyPathObject(canvas: fabric.Canvas, object: fabric.FabricObject, tolerancePx = 1.5): fabric.Path | null {
+  if (!canSimplifyPathObject(object)) return null;
+  const parts: string[] = [];
+  for (const cutPath of buildOutlineCutPaths([object], 0, 1)) {
+    const points = cutPath.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt);
+    const simplified = douglasPeucker(points, Math.max(0.1, tolerancePx));
+    if (simplified.length >= 2) parts.push(toD(simplified, cutPath.closed));
+  }
+  if (parts.length === 0) return null;
+  const path = new fabric.Path(parts.join(' '), {
+    fill: (object.fill as string) ?? '',
+    stroke: (object.stroke as string) ?? '',
+    strokeWidth: object.strokeWidth ?? 0,
+    opacity: object.opacity ?? 1,
+  });
+  canvas.remove(object);
+  canvas.add(path);
+  return path;
+}
+
 /** True when the selection contains at least one path to simplify. */
 export function canSimplify(): boolean {
   const c = getCanvas();
-  return !!c && c.getActiveObjects().some(o => o.type === 'path');
+  return !!c && c.getActiveObjects().some(canSimplifyPathObject);
 }
 
 /** Simplify every selected path at `tolerancePx`. Returns the count simplified. */
 export function simplifySelection(tolerancePx = 1.5): number {
   const c = getCanvas();
   if (!c) return 0;
-  const objs = c.getActiveObjects().filter(o => o.type === 'path');
+  const objs = c.getActiveObjects().filter(canSimplifyPathObject);
   if (objs.length === 0) return 0;
 
   let count = 0;
   for (const obj of objs) {
-    // Absolute-space polylines (px): mm from buildOutlineCutPaths × MM_TO_PX.
-    const cuts = buildOutlineCutPaths([obj], 0, 1);
-    const parts: string[] = [];
-    for (const cp of cuts) {
-      const px = cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as [number, number]);
-      const simp = douglasPeucker(px, Math.max(0.1, tolerancePx));
-      if (simp.length < 2) continue;
-      simp.forEach(([x, y], i) => parts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`));
-      if (cp.closed) parts.push('Z');
-    }
-    if (parts.length === 0) continue;
-
-    const np = new fabric.Path(parts.join(' '), {
-      fill: (obj.fill as string) ?? '',
-      stroke: (obj.stroke as string) ?? '',
-      strokeWidth: obj.strokeWidth ?? 0,
-      opacity: obj.opacity ?? 1,
-    });
-    c.remove(obj);
-    c.add(np);
-    count++;
+    if (simplifyPathObject(c as fabric.Canvas, obj, tolerancePx)) count++;
   }
 
   if (count > 0) {

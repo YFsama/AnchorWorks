@@ -3,6 +3,10 @@ import { getCanvas } from './canvasEngine';
 
 let isolatedItems: fabric.FabricObject[] | null = null;
 
+export function canEnterIsolationForTarget(target: fabric.FabricObject | null | undefined): target is fabric.Group {
+  return !!target && target.type === 'group' && !isolatedItems;
+}
+
 export function enterIsolationMode(): boolean {
   const canvas = getCanvas();
   if (!canvas || isolatedItems) return false;
@@ -38,3 +42,7 @@ export function exitIsolationMode(): boolean {
 
 export function isIsolationMode(): boolean { return !!isolatedItems; }
 export function toggleIsolationMode(): boolean { return isIsolationMode() ? exitIsolationMode() : enterIsolationMode(); }
+
+export function resetIsolationModeForCanvasDisposal(): void {
+  isolatedItems = null;
+}

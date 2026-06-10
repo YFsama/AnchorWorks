@@ -5,6 +5,7 @@
  * Output is cut-path circles (mm) the user can cut/print on a vinyl banner.
  */
 import { getCanvas } from './canvasEngine';
+import type * as fabric from 'fabric';
 import type { CutPath } from '../store/editor';
 
 const MM_TO_PX = 3.7795;
@@ -29,7 +30,12 @@ export function grommetsFromSelection(insetMm = 20, maxSpacingMm = 500, diameter
   const canvas = getCanvas();
   if (!canvas) return [];
   const objs = canvas.getActiveObjects();
+  return grommetsFromObjects(objs, insetMm, maxSpacingMm, diameterMm);
+}
+
+export function grommetsFromObjects(objs: fabric.FabricObject[], insetMm = 20, maxSpacingMm = 500, diameterMm = 10): CutPath[] {
   if (objs.length === 0) return [];
+  if (!Number.isFinite(insetMm) || !Number.isFinite(maxSpacingMm) || !Number.isFinite(diameterMm) || insetMm < 0 || maxSpacingMm <= 0 || diameterMm <= 0) return [];
 
   const rects = objs.map((o) => o.getBoundingRect());
   const minX = Math.min(...rects.map((r) => r.left)) / MM_TO_PX;

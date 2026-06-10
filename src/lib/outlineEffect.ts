@@ -16,13 +16,14 @@ import { getCanvas, pushHistory } from './canvasEngine';
 
 const MM_TO_PX = 3.7795; // 96dpi
 
-export async function addOutlineEffect(
+export async function addOutlineEffectToCanvas(
+  canvas: fabric.Canvas,
   objects: fabric.FabricObject[],
   colors: string[],
   widthMm: number,
+  commitHistory = true,
 ): Promise<number> {
-  const c = getCanvas();
-  if (!c || objects.length === 0 || colors.length === 0 || widthMm <= 0) return 0;
+  if (objects.length === 0 || colors.length === 0 || widthMm <= 0) return 0;
   const wPx = widthMm * MM_TO_PX;
   let added = 0;
 
@@ -46,19 +47,28 @@ export async function addOutlineEffect(
           evented: true,
         });
         clone.setCoords();
-        c.add(clone);
+        canvas.add(clone);
         added++;
       } catch {
         /* un-clonable object — skip this ring */
       }
     }
     // Keep the original art on top of its own outlines.
-    c.bringObjectToFront(obj);
+    canvas.bringObjectToFront(obj);
   }
 
   if (added > 0) {
-    c.requestRenderAll();
-    pushHistory();
+    canvas.requestRenderAll();
+    if (commitHistory) pushHistory();
   }
   return added;
+}
+
+export async function addOutlineEffect(
+  objects: fabric.FabricObject[],
+  colors: string[],
+  widthMm: number,
+): Promise<number> {
+  const canvas = getCanvas();
+  return canvas ? addOutlineEffectToCanvas(canvas, objects, colors, widthMm) : 0;
 }

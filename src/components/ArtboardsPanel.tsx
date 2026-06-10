@@ -11,9 +11,16 @@ import {
   createArtboardFromSelection,
   deleteArtboard,
   duplicateArtboard,
+  duplicateArtboardFrame,
+  promptRearrangeArtboards,
   renameArtboard,
+  renumberArtboardsByPosition,
+  reorderArtboard,
+  sortArtboardsByPosition,
   moveArtboard,
   resizeArtboard,
+  exportArtboardsByIdAsFiles,
+  exportArtboardsByIdAsPNG,
   exportArtboardPNG,
   exportArtboardSVGAsync,
 } from '../lib/artboards';
@@ -25,6 +32,7 @@ export function ArtboardsPanel() {
   const t = useT();
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState('');
+  const [selectedArtboardIds, setSelectedArtboardIds] = useState<string[]>([]);
   const firstArtboardRef = useRef<HTMLDivElement>(null);
   const artboards = useEditor(s => s.artboards);
   const dpi = useEditor(s => s.doc.dpi);
@@ -43,6 +51,37 @@ export function ArtboardsPanel() {
   const reviewedArtboardIndex = focusedFilteredIndex >= 0 ? focusedFilteredIndex : 0;
   const reviewedArtboard = filteredArtboards[reviewedArtboardIndex];
   const reviewedArtboardSize = reviewedArtboard ? `${Math.round(reviewedArtboard.width)}×${Math.round(reviewedArtboard.height)} px` : '';
+  const validSelectedArtboardIds = selectedArtboardIds.filter((id) => artboards.some((artboard) => artboard.id === id));
+  if (validSelectedArtboardIds.length !== selectedArtboardIds.length) setSelectedArtboardIds(validSelectedArtboardIds);
+  const allFilteredSelected = filteredArtboards.length > 0 && filteredArtboards.every((artboard) => validSelectedArtboardIds.includes(artboard.id));
+  const toggleArtboardSelection = (id: string) => {
+    setSelectedArtboardIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]));
+  };
+  const toggleFilteredArtboards = () => {
+    const filteredIds = filteredArtboards.map((artboard) => artboard.id);
+    setSelectedArtboardIds((ids) => {
+      if (filteredIds.every((id) => ids.includes(id))) return ids.filter((id) => !filteredIds.includes(id));
+      return [...ids, ...filteredIds.filter((id) => !ids.includes(id))];
+    });
+  };
+  const exportSelectedArtboardsAsPNG = () => {
+    const n = exportArtboardsByIdAsPNG(validSelectedArtboardIds);
+    if (n) toast.success(`${n} ${t('artboards exported')}`);
+    else toast.warn(t('Select artboards first.'));
+  };
+  const exportSelectedArtboardsAsSVG = () => {
+    void exportArtboardsByIdAsFiles(validSelectedArtboardIds).then((n) => {
+      if (n) toast.success(`${n} ${t('artboards exported')}`);
+      else toast.warn(t('Select artboards first.'));
+    });
+  };
+  const rearrangeWithOptions = () => {
+    const n = promptRearrangeArtboards({ columns: t('Columns'), spacing: t('Spacing'), moveArtwork: t('Move artwork? yes/no') });
+    if (n == null) return;
+    if (n === -1) toast.warn(t('Invalid artboard rearrange options.'));
+    else if (n) toast.success(t('Artboards rearranged'));
+    else toast.warn(t('Need at least two artboards.'));
+  };
   const handleArtboardListKeys = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
     const target = event.target as HTMLElement | null;
@@ -83,11 +122,11 @@ export function ArtboardsPanel() {
         {t('Artboard row keyboard hint')}
       </div>
 
-      <div className="flex gap-1">
+      <div className="grid grid-cols-2 gap-1">
             <button
               type="button"
               onClick={() => createArtboard()}
-              className="btn flex items-center gap-1 flex-1 justify-center"
+              className="btn flex items-center gap-1 justify-center"
               title={t('Append a new artboard')}
             >
               <Plus size={12} aria-hidden="true" /> {t('Add Artboard')}
@@ -95,10 +134,34 @@ export function ArtboardsPanel() {
             <button
               type="button"
               onClick={() => { const ab = createArtboardFromSelection(); if (ab) { zoomToArtboard({ x: ab.x, y: ab.y, width: ab.width, height: ab.height }); toast.success(t('Artboard created')); } else toast.warn(t('Select something first.')); }}
-              className="btn flex items-center gap-1 flex-1 justify-center"
+              className="btn flex items-center gap-1 justify-center"
               title={t('Create an artboard around the selection')}
             >
               <Frame size={12} aria-hidden="true" /> {t('From Selection')}
+            </button>
+            <button
+              type="button"
+              onClick={rearrangeWithOptions}
+              className="btn flex items-center gap-1 justify-center col-span-2"
+              title={t('Rearrange artboards into a grid with options')}
+            >
+              <RotateCw size={12} aria-hidden="true" /> {t('Rearrange Artboards')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (sortArtboardsByPosition()) toast.success(t('Artboard order updated')); else toast.warn(t('Artboard order already matches position.')); }}
+              className="btn flex items-center gap-1 justify-center"
+              title={t('Sort artboards by visual position')}
+            >
+              {t('Sort by Position')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (renumberArtboardsByPosition(t('Artboard'))) toast.success(t('Artboards renumbered')); else toast.warn(t('Artboards already numbered by position.')); }}
+              className="btn flex items-center gap-1 justify-center"
+              title={t('Renumber artboards by visual position')}
+            >
+              {t('Renumber')}
             </button>
           </div>
 
@@ -111,6 +174,43 @@ export function ArtboardsPanel() {
               onTargetFirst={filteredArtboards.length > 0 ? () => zoomToArtboard(filteredArtboards[0]) : undefined}
               onFocusFirst={filteredArtboards.length > 0 ? () => firstArtboardRef.current?.focus() : undefined}
             />
+          )}
+
+          {artboards.length > 0 && (
+            <div className="rounded border border-border bg-panel2 p-2 space-y-1.5">
+              <div className="flex items-center gap-2 text-[11px] text-muted">
+                <label className="inline-flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleFilteredArtboards}
+                    aria-label={t('Select filtered artboards')}
+                  />
+                  {t('Select filtered')}
+                </label>
+                <span className="ml-auto tabular-nums">{validSelectedArtboardIds.length} {t('selected')}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  className="btn !py-1 !px-1.5 !text-[10px] flex items-center justify-center gap-1"
+                  onClick={exportSelectedArtboardsAsPNG}
+                  disabled={validSelectedArtboardIds.length === 0}
+                  title={t('Export selected artboards as PNG')}
+                >
+                  <FileImage size={11} aria-hidden="true" /> {t('Export Selected PNG')}
+                </button>
+                <button
+                  type="button"
+                  className="btn !py-1 !px-1.5 !text-[10px] flex items-center justify-center gap-1"
+                  onClick={exportSelectedArtboardsAsSVG}
+                  disabled={validSelectedArtboardIds.length === 0}
+                  title={t('Export selected artboards as SVG')}
+                >
+                  <FileCode size={11} aria-hidden="true" /> {t('Export Selected SVG')}
+                </button>
+              </div>
+            </div>
           )}
 
           {artboards.length === 0 ? (
@@ -164,6 +264,8 @@ export function ArtboardsPanel() {
                   dpi={dpi}
                   rowRef={index === 0 ? firstArtboardRef : undefined}
                   selected={a.id === reviewedArtboard?.id}
+                  checked={validSelectedArtboardIds.includes(a.id)}
+                  onToggleChecked={() => toggleArtboardSelection(a.id)}
                   onReview={() => setFocusedArtboardId(a.id)}
                 />
               ))}
@@ -290,7 +392,7 @@ const ARTBOARD_SIZE_PRESETS = [
   { label: '24×12 in', wMm: 609.6, hMm: 304.8 },
 ] as const;
 
-function ArtboardRow({ artboard, dpi, rowRef, selected, onReview }: { artboard: Artboard; dpi: number; rowRef?: React.Ref<HTMLDivElement>; selected: boolean; onReview: () => void }) {
+function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked, onReview }: { artboard: Artboard; dpi: number; rowRef?: React.Ref<HTMLDivElement>; selected: boolean; checked: boolean; onToggleChecked: () => void; onReview: () => void }) {
   const t = useT();
   const [name, setName] = useState(artboard.name);
   const [x, setX] = useState(String(artboard.x));
@@ -352,6 +454,10 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, onReview }: { artboard: 
     if (ok) toast.success(t('Artboard fitted'));
     else toast.warn(scope === 'selection' ? t('Select something first.') : t('Nothing to fit.'));
   };
+  const moveThisArtboardOrder = (direction: 'previous' | 'next' | 'first' | 'last') => {
+    if (reorderArtboard(artboard.id, direction)) toast.success(t('Artboard order updated'));
+    else toast.warn(t('This artboard cannot move further.'));
+  };
   const nextToolbarButton = (event: KeyboardEvent<HTMLDivElement>, selector: string) => {
     const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector));
     if (buttons.length === 0) return null;
@@ -388,6 +494,13 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, onReview }: { artboard: 
         toast.success(t('Artboard duplicated'));
       }
     });
+  };
+  const duplicateThisArtboardFrame = () => {
+    const ab = duplicateArtboardFrame(artboard.id);
+    if (ab) {
+      zoomToArtboard({ x: ab.x, y: ab.y, width: ab.width, height: ab.height });
+      toast.success(t('Artboard duplicated'));
+    }
   };
   const deleteThisArtboard = async () => {
     if (await showConfirm({ message: `${t('Delete artboard')} "${artboard.name}"?`, confirmLabel: t('Delete'), danger: true })) deleteArtboard(artboard.id);
@@ -433,6 +546,15 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, onReview }: { artboard: 
     >
       <div className="flex items-center gap-1">
         <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggleChecked}
+          onClick={(event) => event.stopPropagation()}
+          className="shrink-0"
+          aria-label={`${t('Select artboard')} ${artboard.name}`}
+          title={t('Select artboard')}
+        />
+        <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={commitName}
@@ -465,6 +587,14 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, onReview }: { artboard: 
           <Copy size={12} aria-hidden="true" />
         </button>
         <button
+          onClick={duplicateThisArtboardFrame}
+          className="p-1 text-muted hover:text-ink transition-colors"
+          title={t('Duplicate this artboard frame only')}
+          aria-label={t('Duplicate this artboard frame only')}
+        >
+          <Frame size={12} aria-hidden="true" />
+        </button>
+        <button
           onClick={() => { void deleteThisArtboard(); }}
           className="p-1 text-muted hover:text-danger transition-colors"
           title={t('Delete artboard')}
@@ -479,6 +609,63 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, onReview }: { artboard: 
         <Field label="Y" value={y} onChange={setY} onCommit={commitPos} />
         <Field label="W" value={w} onChange={setW} onCommit={commitSize} />
         <Field label="H" value={h} onChange={setH} onCommit={commitSize} />
+      </div>
+
+      <div>
+        <div className="field-label !mb-1">{t('Artboard order')}</div>
+        <div
+          className="grid grid-cols-4 gap-1"
+          role="toolbar"
+          aria-label={t('Artboard order')}
+          aria-describedby={`artboard-row-action-review-${artboard.id}`}
+          title={t('Use arrow keys to review artboard row actions')}
+          onKeyDown={handleActionGroupKeys}
+        >
+          <button
+            type="button"
+            data-artboard-action
+            data-artboard-action-review={t('Move this artboard to first')}
+            className="btn !py-1 !px-1.5 !text-[10px]"
+            onClick={() => moveThisArtboardOrder('first')}
+            onFocus={() => setReviewedRowAction(t('Move this artboard to first'))}
+            title={t('Move this artboard to first')}
+          >
+            {t('First')}
+          </button>
+          <button
+            type="button"
+            data-artboard-action
+            data-artboard-action-review={t('Move this artboard earlier')}
+            className="btn !py-1 !px-1.5 !text-[10px]"
+            onClick={() => moveThisArtboardOrder('previous')}
+            onFocus={() => setReviewedRowAction(t('Move this artboard earlier'))}
+            title={t('Move this artboard earlier')}
+          >
+            {t('Earlier')}
+          </button>
+          <button
+            type="button"
+            data-artboard-action
+            data-artboard-action-review={t('Move this artboard later')}
+            className="btn !py-1 !px-1.5 !text-[10px]"
+            onClick={() => moveThisArtboardOrder('next')}
+            onFocus={() => setReviewedRowAction(t('Move this artboard later'))}
+            title={t('Move this artboard later')}
+          >
+            {t('Later')}
+          </button>
+          <button
+            type="button"
+            data-artboard-action
+            data-artboard-action-review={t('Move this artboard to last')}
+            className="btn !py-1 !px-1.5 !text-[10px]"
+            onClick={() => moveThisArtboardOrder('last')}
+            onFocus={() => setReviewedRowAction(t('Move this artboard to last'))}
+            title={t('Move this artboard to last')}
+          >
+            {t('Last')}
+          </button>
+        </div>
       </div>
 
       <div>

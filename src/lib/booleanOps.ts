@@ -622,3 +622,67 @@ export function mergeSelection(): number {
   pushHistory();
   return kept.length;
 }
+
+export function groupObjectsBySolidFill<T extends { fill?: unknown }>(objects: T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const object of objects) {
+    const key = typeof object.fill === 'string' && object.fill ? object.fill.trim().toLowerCase() : null;
+    if (!key) continue;
+    const group = groups.get(key) ?? [];
+    group.push(object);
+    groups.set(key, group);
+  }
+  return groups;
+}
+
+/**
+ * Shape Builder-style cleanup: union objects that share the same solid fill,
+ * leaving differently-coloured groups separate. Useful after Divide/Trim or
+ * imports where a logo is fragmented into many same-colour regions.
+ */
+export function mergeSameFillSelection(): number {
+  const canvas = getCanvas();
+  if (!canvas) return 0;
+  const selection = canvas.getActiveObjects();
+  if (selection.length < 2) return 0;
+  const groups = groupObjectsBySolidFill(selection).entries();
+  const created: fabric.Path[] = [];
+  const consumed = new Set<FabricObject>();
+
+  for (const [, objects] of groups) {
+    if (objects.length < 2) continue;
+    const geometries: MultiPolygon[] = [];
+    for (const object of objects as FabricObject[]) {
+      const rings = objectToRings(object);
+      if (rings) geometries.push([rings as Ring[]] as MultiPolygon);
+    }
+    if (geometries.length < 2) continue;
+    let merged: MultiPolygon;
+    try {
+      merged = geometries.slice(1).reduce((acc, geometry) => polygonClipping.union(acc, geometry), geometries[0]);
+    } catch (err) {
+      logger.error('boolean', `merge same fill failed: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    const d = multiPolygonToPathD(merged);
+    if (!d) continue;
+    const styleSource = objects[0] as FabricObject;
+    const path = new fabric.Path(d, {
+      fill: (styleSource.fill as string) ?? '#3d9bff',
+      stroke: (styleSource.stroke as string) ?? '',
+      strokeWidth: styleSource.strokeWidth ?? 0,
+      opacity: styleSource.opacity ?? 1,
+    });
+    created.push(path);
+    objects.forEach(object => consumed.add(object as FabricObject));
+  }
+
+  if (created.length === 0) return 0;
+  consumed.forEach(object => canvas.remove(object));
+  created.forEach(path => canvas.add(path));
+  canvas.discardActiveObject();
+  canvas.setActiveObject(created.length === 1 ? created[0] : new fabric.ActiveSelection(created, { canvas }));
+  canvas.requestRenderAll();
+  pushHistory();
+  return created.length;
+}

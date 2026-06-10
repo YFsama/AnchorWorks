@@ -39,6 +39,28 @@ export function canSplitGrid(): boolean {
   return !!c && c.getActiveObjects().length === 1;
 }
 
+export interface SplitGridObjectOptions {
+  rows: number;
+  cols: number;
+  gutterMm: number;
+}
+
+export function splitObjectIntoGrid(canvas: fabric.Canvas, object: fabric.FabricObject, options: SplitGridObjectOptions): fabric.Rect[] {
+  const bounds = object.getBoundingRect();
+  const cells = gridCells({ left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height }, options.rows, options.cols, options.gutterMm * MM_TO_PX);
+  if (cells.length === 0) return [];
+
+  const style = useEditor.getState().style;
+  const fill = (typeof object.fill === 'string' && object.fill) ? object.fill : (style.fill ?? '');
+  const stroke = (typeof object.stroke === 'string' && object.stroke) ? object.stroke : (style.stroke ?? '#0f0f12');
+  const strokeWidth = object.strokeWidth ?? 1;
+
+  canvas.remove(object);
+  const rects = cells.map((cell) => new fabric.Rect({ left: cell.left, top: cell.top, width: cell.width, height: cell.height, fill, stroke, strokeWidth }));
+  rects.forEach((rect) => canvas.add(rect));
+  return rects;
+}
+
 /** Replace the active object with a rows×cols grid of rectangles. Returns the
  *  number of cells created. */
 export function splitIntoGrid(rows: number, cols: number, gutterMm: number): number {
@@ -47,19 +69,10 @@ export function splitIntoGrid(rows: number, cols: number, gutterMm: number): num
   const obj = canvas.getActiveObject();
   if (!obj || canvas.getActiveObjects().length !== 1) return 0;
 
-  const b = obj.getBoundingRect();
-  const cells = gridCells({ left: b.left, top: b.top, width: b.width, height: b.height }, rows, cols, gutterMm * MM_TO_PX);
-  if (cells.length === 0) return 0;
+  const rects = splitObjectIntoGrid(canvas as fabric.Canvas, obj, { rows, cols, gutterMm });
+  if (rects.length === 0) return 0;
 
-  const style = useEditor.getState().style;
-  const fill = (typeof obj.fill === 'string' && obj.fill) ? obj.fill : (style.fill ?? '');
-  const stroke = (typeof obj.stroke === 'string' && obj.stroke) ? obj.stroke : (style.stroke ?? '#0f0f12');
-  const strokeWidth = obj.strokeWidth ?? 1;
-
-  canvas.remove(obj);
   canvas.discardActiveObject();
-  const rects = cells.map((c) => new fabric.Rect({ left: c.left, top: c.top, width: c.width, height: c.height, fill, stroke, strokeWidth }));
-  rects.forEach((r) => canvas.add(r));
   canvas.setActiveObject(new fabric.ActiveSelection(rects, { canvas }));
   canvas.requestRenderAll();
   pushHistory();

@@ -118,7 +118,8 @@ export function applyTextOnArc(flip = false): boolean {
   }
   if (glyphs.length === 0) return false;
 
-  const group = new fabric.Group(glyphs, { subTargetCheck: false });
+  const group = new fabric.Group(glyphs, { subTargetCheck: false }) as fabric.Group & { __textOnPath?: { kind: 'arc' | 'path'; sourceText: string } };
+  group.__textOnPath = { kind: 'arc', sourceText: str };
   c.add(group);
   c.remove(text);
   c.discardActiveObject();
@@ -237,7 +238,8 @@ export function applyTextOnPath(): boolean {
   }
   if (glyphs.length === 0) return false;
 
-  const group = new fabric.Group(glyphs, { subTargetCheck: false });
+  const group = new fabric.Group(glyphs, { subTargetCheck: false }) as fabric.Group & { __textOnPath?: { kind: 'arc' | 'path'; sourceText: string } };
+  group.__textOnPath = { kind: 'path', sourceText: str };
   c.add(group);
 
   // Remove the source text but keep the path as a visible guide curve.

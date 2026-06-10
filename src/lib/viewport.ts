@@ -130,6 +130,74 @@ export function zoomToArtboard(bbox: { x: number; y: number; width: number; heig
   emitViewport();
 }
 
+export function zoomToAllArtboards(): boolean {
+  const artboards = useEditor.getState().artboards;
+  if (artboards.length === 0) return false;
+  const left = Math.min(...artboards.map((artboard) => artboard.x));
+  const top = Math.min(...artboards.map((artboard) => artboard.y));
+  const right = Math.max(...artboards.map((artboard) => artboard.x + artboard.width));
+  const bottom = Math.max(...artboards.map((artboard) => artboard.y + artboard.height));
+  zoomToArtboard({ x: left, y: top, width: right - left, height: bottom - top });
+  return true;
+}
+
+function overlapsBounds(box: { left: number; top: number; width: number; height: number }, bbox: { x: number; y: number; width: number; height: number }): boolean {
+  return !(box.left + box.width < bbox.x
+    || box.left > bbox.x + bbox.width
+    || box.top + box.height < bbox.y
+    || box.top > bbox.y + bbox.height);
+}
+
+function pointInsideBounds(point: { x: number; y: number }, bbox: { x: number; y: number; width: number; height: number }): boolean {
+  return point.x >= bbox.x && point.x <= bbox.x + bbox.width && point.y >= bbox.y && point.y <= bbox.y + bbox.height;
+}
+
+function activeOrViewportArtboardIndex(): number {
+  const canvas = getCanvas();
+  const artboards = useEditor.getState().artboards;
+  if (!canvas || artboards.length === 0) return -1;
+  const active = canvas.getActiveObject();
+  if (active) {
+    const box = active.getBoundingRect();
+    const activeIndex = artboards.findIndex((candidate) => overlapsBounds(box, candidate));
+    if (activeIndex >= 0) return activeIndex;
+  }
+  const vt = canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0];
+  const zoom = canvas.getZoom?.() || vt[0] || 1;
+  const center = {
+    x: (canvas.getWidth() / 2 - vt[4]) / zoom,
+    y: (canvas.getHeight() / 2 - vt[5]) / zoom,
+  };
+  return artboards.findIndex((candidate) => pointInsideBounds(center, candidate));
+}
+
+/** Frame the artboard containing the active object, matching Illustrator's
+ *  active-artboard navigation pattern. Returns false when there is no active
+ *  object or the object is not on any artboard. */
+export function zoomToActiveArtboard(): boolean {
+  const canvas = getCanvas();
+  const active = canvas?.getActiveObject();
+  if (!canvas || !active) return false;
+  const box = active.getBoundingRect();
+  const artboard = useEditor.getState().artboards.find((candidate) => overlapsBounds(box, candidate));
+  if (!artboard) return false;
+  zoomToArtboard({ x: artboard.x, y: artboard.y, width: artboard.width, height: artboard.height });
+  return true;
+}
+
+export function zoomToAdjacentArtboard(direction: -1 | 1): boolean {
+  const artboards = useEditor.getState().artboards;
+  if (artboards.length === 0) return false;
+  const currentIndex = activeOrViewportArtboardIndex();
+  const fallbackIndex = direction > 0 ? 0 : artboards.length - 1;
+  const nextIndex = currentIndex >= 0
+    ? (currentIndex + direction + artboards.length) % artboards.length
+    : fallbackIndex;
+  const artboard = artboards[nextIndex];
+  zoomToArtboard({ x: artboard.x, y: artboard.y, width: artboard.width, height: artboard.height });
+  return true;
+}
+
 /** Frame the active selection in the viewport (selection-view shortcut). Returns
  *  true if it zoomed to a selection, false if it fell back to Fit (nothing
  *  selected) — callers use the result to pick the right announcement. */

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, Check, X, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, Check, X, Search, MousePointerClick } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import {
   getSymbols,
@@ -7,6 +7,9 @@ import {
   insertSymbol,
   deleteSymbol,
   renameSymbol,
+  redefineSymbolFromSelection,
+  detachSymbolInstancesFromSelection,
+  selectSymbolInstances,
 } from '../lib/symbols';
 import type { SymbolEntry } from '../types';
 import { toast } from '../lib/toast';
@@ -41,6 +44,16 @@ export function SymbolsPanel() {
   }, [namingNew]);
 
   const beginSave = () => setNamingNew('');
+  const redefineActiveSymbol = async () => {
+    const entry = await redefineSymbolFromSelection();
+    if (entry) toast.success(t('Symbol redefined'));
+    else toast.warn(t('Select a symbol instance first.'));
+  };
+  const detachActiveSymbol = () => {
+    const count = detachSymbolInstancesFromSelection();
+    if (count) toast.success(`${count} ${t('symbol instances detached')}`);
+    else toast.warn(t('Select a symbol instance first.'));
+  };
   const cancelSave = () => setNamingNew(null);
 
   const commitSave = async () => {
@@ -121,14 +134,32 @@ export function SymbolsPanel() {
       {open && (
         <div id="symbols-panel-body" className="px-2 pb-3 space-y-2">
           {namingNew == null ? (
-            <button
-              type="button"
-              className="btn flex items-center gap-1 w-full justify-center"
-              onClick={beginSave}
-              title={t('Save the current selection as a reusable symbol')}
-            >
-              <Plus size={12} aria-hidden="true" /> {t('Save Selection as Symbol')}
-            </button>
+            <div className="grid grid-cols-3 gap-1">
+              <button
+                type="button"
+                className="btn flex items-center gap-1 justify-center"
+                onClick={beginSave}
+                title={t('Save the current selection as a reusable symbol')}
+              >
+                <Plus size={12} aria-hidden="true" /> {t('Save Symbol')}
+              </button>
+              <button
+                type="button"
+                className="btn flex items-center gap-1 justify-center"
+                onClick={() => { void redefineActiveSymbol(); }}
+                title={t('Redefine symbol from selected instance')}
+              >
+                <Check size={12} aria-hidden="true" /> {t('Redefine')}
+              </button>
+              <button
+                type="button"
+                className="btn flex items-center gap-1 justify-center"
+                onClick={detachActiveSymbol}
+                title={t('Break link to selected symbol instance')}
+              >
+                <X size={12} aria-hidden="true" /> {t('Break Link')}
+              </button>
+            </div>
           ) : (
             <div
               className="flex items-center gap-1"
@@ -406,6 +437,11 @@ function SymbolTile({
     deleteSymbol(symbol.id);
     toast.success(t('Symbol removed from library'));
   };
+  const selectInstances = () => {
+    const count = selectSymbolInstances(symbol.id);
+    if (count) toast.success(`${count} ${t('selected')}`);
+    else toast.warn(t('No symbol instances found.'));
+  };
   const handleTileKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (renaming) return;
     if (event.key === 'F2') {
@@ -481,15 +517,26 @@ function SymbolTile({
         </div>
       )}
       {!renaming && (
-        <button
-          type="button"
-          className="absolute top-0.5 right-0.5 p-0.5 rounded bg-panel/80 text-muted hover:text-danger opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-          onClick={(e) => { e.stopPropagation(); removeThisSymbol(); }}
-          title={t('Delete symbol')}
-          aria-label={t('Delete symbol')}
-        >
-          <Trash2 size={10} aria-hidden="true" />
-        </button>
+        <>
+          <button
+            type="button"
+            className="absolute top-0.5 left-0.5 p-0.5 rounded bg-panel/80 text-muted hover:text-accent2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+            onClick={(e) => { e.stopPropagation(); selectInstances(); }}
+            title={t('Select symbol instances')}
+            aria-label={t('Select symbol instances')}
+          >
+            <MousePointerClick size={10} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="absolute top-0.5 right-0.5 p-0.5 rounded bg-panel/80 text-muted hover:text-danger opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+            onClick={(e) => { e.stopPropagation(); removeThisSymbol(); }}
+            title={t('Delete symbol')}
+            aria-label={t('Delete symbol')}
+          >
+            <Trash2 size={10} aria-hidden="true" />
+          </button>
+        </>
       )}
     </div>
   );

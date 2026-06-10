@@ -6,6 +6,9 @@ import {
   zoomBy,
   zoomFit,
   zoomToPercent,
+  zoomToAllArtboards,
+  zoomToActiveArtboard,
+  zoomToAdjacentArtboard,
   zoomToSelection,
   zoomToArtboard,
   duplicateSelection,
@@ -23,26 +26,120 @@ import {
   centerOnArtboard,
   flipSelection,
   selectVisibleObjects,
+  selectVisibleActiveArtboardObjects,
   selectUnlockedObjects,
-  selectSame,
-  selectSameType,
+  selectUnlockedActiveArtboardObjects,
+  selectLockedObjects,
+  selectLockedActiveArtboardObjects,
+  selectHiddenObjects,
+  selectHiddenActiveArtboardObjects,
+  selectNamedObjects,
+  selectNamedActiveArtboardObjects,
+  selectUnnamedObjects,
+  selectUnnamedActiveArtboardObjects,
+  selectClippingMaskedObjects,
+  selectClippingMaskedActiveArtboardObjects,
+  selectOpenPathObjects,
+  selectOpenPathActiveArtboardObjects,
+  selectCompoundPathObjects,
+  selectCompoundPathActiveArtboardObjects,
+  selectStrayPointObjects,
+  selectStrayPointActiveArtboardObjects,
+  selectZeroLengthPathObjects,
+  selectZeroLengthPathActiveArtboardObjects,
+  selectUnpaintedObjects,
+  selectUnpaintedActiveArtboardObjects,
+  selectDropShadowObjects,
+  selectDropShadowActiveArtboardObjects,
+  selectTransparencyObjects,
+  selectTransparencyActiveArtboardObjects,
+  selectDashedStrokeObjects,
+  selectDashedStrokeActiveArtboardObjects,
+  selectThinStrokeObjects,
+  selectThinStrokeActiveArtboardObjects,
+  selectOverprintObjects,
+  selectOverprintActiveArtboardObjects,
+  selectPrintMarkObjects,
+  selectPrintMarkActiveArtboardObjects,
+  selectActiveArtboardObjects,
+  selectSameArtboardObjects,
+  selectInsideActiveArtboardObjects,
+  selectOverflowingActiveArtboardObjects,
+  selectOtherArtboardsObjects,
+  selectOutsideArtboardObjects,
+  selectOutsideAnyArtboardObjects,
+  selectInsideArtboardObjects,
+  selectInsideAnyArtboardObjects,
+  selectOverflowingArtboardObjects,
+  selectOverflowingAnyArtboardObjects,
+  selectCustomStrokeObjects,
+  selectCustomStrokeActiveArtboardObjects,
+  selectNonScalingStrokeObjects,
+  selectNonScalingStrokeActiveArtboardObjects,
+  selectPatternFillObjects,
+  selectPatternFillActiveArtboardObjects,
+  selectGradientFillObjects,
+  selectGradientFillActiveArtboardObjects,
+  selectSame, selectSameActiveArtboard,
+  selectSameType, selectSameTypeActiveArtboardObjects,
   selectInverse,
   selectAllText,
-  selectAllImages,
-  selectAllPaths,
-  selectAllShapes,
+  selectAllTextActiveArtboardObjects,
+  selectPointTextObjects,
+  selectPointTextActiveArtboardObjects,
+  selectAreaTextObjects,
+  selectAreaTextActiveArtboardObjects,
+  selectOverflowingTextObjects,
+  selectOverflowingTextActiveArtboardObjects,
+  selectEmptyTextObjects,
+  selectEmptyTextActiveArtboardObjects,
+  selectTextOnPathObjects, selectTextOnPathActiveArtboardObjects,
+  selectMissingFontTextObjects, selectMissingFontTextActiveArtboardObjects,
+  selectCustomTextSpacingObjects, selectCustomTextSpacingActiveArtboardObjects,
+  selectDecoratedTextObjects, selectDecoratedTextActiveArtboardObjects,
+  selectStyledTextObjects, selectStyledTextActiveArtboardObjects,
+  selectTransformedTextObjects, selectTransformedTextActiveArtboardObjects,
+  selectMixedStyleTextObjects, selectMixedStyleTextActiveArtboardObjects,
+  selectNonLeftAlignedTextObjects, selectNonLeftAlignedTextActiveArtboardObjects,
+  selectAllImages, selectAllImagesActiveArtboardObjects,
+  selectFilteredImageObjects, selectFilteredImageActiveArtboardObjects,
+  selectCroppedImageObjects, selectCroppedImageActiveArtboardObjects,
+  selectEmbeddedImageObjects, selectEmbeddedImageActiveArtboardObjects,
+  selectLinkedImageObjects, selectLinkedImageActiveArtboardObjects,
+  selectMissingLinkedImageObjects, selectMissingLinkedImageActiveArtboardObjects,
+  selectTransformedImageObjects, selectTransformedImageActiveArtboardObjects,
+  selectLowResolutionImageObjects, selectLowResolutionImageActiveArtboardObjects,
+  selectHighResolutionImageObjects, selectHighResolutionImageActiveArtboardObjects,
+  selectTransformedObjects,
+  selectTransformedActiveArtboardObjects,
+  selectAllPaths, selectAllPathsActiveArtboardObjects,
+  selectAllShapes, selectAllShapesActiveArtboardObjects,
+  selectAllGroups, selectAllGroupsActiveArtboardObjects,
   selectObjectInStack,
   lockSelection,
+  lockOthers,
+  lockActiveArtboard,
+  lockOtherArtboards,
+  unlockSelection,
+  unlockActiveArtboard,
+  unlockOtherArtboards,
   unlockAll,
   hideSelection,
   hideOthers,
+  hideActiveArtboard,
+  hideOtherArtboards,
+  showSelection,
+  showActiveArtboard,
+  showOtherArtboards,
   showAll,
   deselectAll,
   promptRenameSelection,
   makeGuidesFromSelection,
+  releaseGuides,
   applyStyleToSelection,
   swapFillStroke,
   defaultColors,
+  setKeyObject,
   undo,
   redo,
 } from '../lib/canvasEngine';
@@ -55,16 +152,17 @@ import {
 import { useEditor } from '../store/editor';
 import { buildOutlineCutPaths, weldOutline, outlineStrokeToCutPaths } from '../lib/contourFromSelection';
 import { joinSelection } from '../lib/pathJoin';
-import { repeatTransform, rotateSelection } from '../lib/transformOps';
+import { reflectSelection, repeatTransform, rotateSelection } from '../lib/transformOps';
 import { toggleIsolationMode } from '../lib/isolationMode';
 import { booleanOp, divideSelection, trimSelection, mergeSelection, cropSelection } from '../lib/booleanOps';
 import { addAnchorsToSelection } from '../lib/addAnchors';
+import { smoothPathSelection } from '../lib/pathSmooth';
 import { averageSelectedAnchors } from '../lib/pathEdit';
 import { reversePathSelection } from '../lib/pathReverse';
 import { pasteFromSystemClipboard, traceSelectedImage } from '../lib/io3';
 import { rasterizeSelection } from '../lib/rasterize';
-import { fitArtboardToContent } from '../lib/fitArtboard';
-import { createArtboardFromSelection, exportAllArtboardsAsFiles, exportAllArtboardsAsPNG } from '../lib/artboards';
+import { fitActiveArtboardToContent, fitArtboardToContent } from '../lib/fitArtboard';
+import { createArtboardFromSelection, deleteActiveArtboard, duplicateActiveArtboard, duplicateActiveArtboardFrame, exportActiveArtboardAsPNG, exportActiveArtboardAsSVG, exportAllArtboardsAsFiles, exportAllArtboardsAsPNG, promptExportArtboardRangeAsPNG, promptExportArtboardRangeAsSVG, promptRearrangeArtboards, promptRenameActiveArtboard, renumberArtboardsByPosition, reorderActiveArtboard, sortArtboardsByPosition } from '../lib/artboards';
 import { outlineStrokeToFillSelection } from '../lib/outlineStrokeFill';
 import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
@@ -75,20 +173,25 @@ import { smartPunctuationSelection } from '../lib/smartPunctuation';
 import { applyTextOnArc } from '../lib/textPath';
 import { exportSelectionSVG, exportSelectionPNG, copySelectionSVG } from '../lib/exportSelection';
 import { toast } from '../lib/toast';
+import { showConfirm } from '../lib/confirm';
 import { useT } from '../lib/i18n';
 import { getBinding } from '../lib/keymap';
 import { isMac, ariaKeyshortcuts } from '../lib/runtime';
 import { setOutlineMode, isOutlineMode } from '../lib/outlineView';
 import { applyBlur, applySepia, applyGrayscale as applyImageGrayscale, applyBrightness as applyImageBrightness, applyContrast, applyHueRotate, clearFilters } from '../lib/filters';
-import { cleanUpDocument } from '../lib/cleanUp';
-import { saveSelectionAsSymbol } from '../lib/symbols';
+import { cleanUpDocument, selectCleanupObjects } from '../lib/cleanUp';
+import { getSymbols, saveSelectionAsSymbol, selectAllSymbolInstances, selectSymbolInstances } from '../lib/symbols';
 import { addArrowheads } from '../lib/arrowheads';
 import { applyStrokeAlign } from '../lib/strokeAlign';
-import { applyBlendModeToSelection, applyPatternFill, applyShadowToSelection, applyStrokeStyleToSelection, toggleUniformStroke } from '../lib/effects';
+import { applyBlendModeToSelection, applyOverprintToSelection, applyPatternFill, applyShadowToSelection, applyStrokeStyleToSelection, clearGradientFillSelection, clearPatternFillSelection, expandAppearanceSelection, expandDropShadowSelection, expandPatternFillSelection, flattenTransparencySelection, toggleUniformStroke } from '../lib/effects';
+import { applyGraphicStyleToSelection, loadGraphicStyles, saveGraphicStyleFromSelection, selectObjectsUsingGraphicStyle, clearAppearanceFromSelection } from '../lib/graphicStyles';
+import { addSavedSwatchColor, applySwatchToSelection, collectSelectionColorsIntoSwatches, loadSwatches, replaceSavedSwatchWithColor, selectObjectsUsingSwatch } from '../lib/globalSwatches';
 import { getFormat } from '../lib/formats';
 import { openProjectFromFile, openRecentFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
 import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, savePlotterTestCut } from '../lib/cutPrepActions';
+import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
+import { expandBlendSteps, releaseBlendSteps, removeOrphanBlendSteps, relinkBlendEndpointFromSelection, reverseBlendSteps, selectAllBlendEndpoints, selectAllBlendGroups, selectBlendEndpointsFromSelection, selectBlendGroupFromSelection, selectBlendSteps, selectBlendStepsFromSelection, selectOrphanBlendSteps, updateBlendSteps } from '../lib/blend';
 
 // ---------------------------------------------------------------------------
 // The context menu host. Listens for the `vector:context-menu` CustomEvent
@@ -481,8 +584,12 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Export DXF (paths)')} onClick={() => run(() => { void getFormat('dxf')?.export?.(); }, true)} />
         <Item label={t('Export JSON')} onClick={() => run(() => { void getFormat('json')?.export?.(); }, true)} />
         <Separator />
+        <Item label={t('Export Active Artboard (SVG)')} disabled={!hasSelection} onClick={() => run(() => { void exportActiveArtboardAsSVG().then(ok => { if (ok) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); }); }, hasSelection)} />
+        <Item label={t('Export Active Artboard (PNG)')} disabled={!hasSelection} onClick={() => run(() => { if (exportActiveArtboardAsPNG()) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Export All Artboards (SVG)')} onClick={() => run(() => { void exportAllArtboardsAsFiles().then(n => { if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }); }, true)} />
         <Item label={t('Export All Artboards (PNG)')} onClick={() => run(() => { const n = exportAllArtboardsAsPNG(); if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }, true)} />
+        <Item label={t('Export Artboard Range (SVG)…')} onClick={() => run(() => { void promptExportArtboardRangeAsSVG(t('Artboard range'), '1').then(n => { if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }); }, true)} />
+        <Item label={t('Export Artboard Range (PNG)…')} onClick={() => run(() => { const n = promptExportArtboardRangeAsPNG(t('Artboard range'), '1'); if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }, true)} />
         <Separator />
         <Item label={t('Export Selection as SVG')} disabled={!hasSelection} onClick={() => run(() => exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }), hasSelection)} />
         <Item label={t('Export Selection as PNG')} disabled={!hasSelection} onClick={() => run(() => exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }), hasSelection)} />
@@ -571,8 +678,48 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Align center vertically')} kbd={getBinding('align.centerV')} disabled={!canAlign} onClick={() => run(() => alignSelection('centerV'), canAlign)} />
         <Item label={t('Align bottom')} kbd={getBinding('align.bottom')} disabled={!canAlign} onClick={() => run(() => alignSelection('bottom'), canAlign)} />
         <Separator />
+        <Item label={t('Set Key Object')} disabled={active.length !== 1} onClick={() => run(() => { if (setKeyObject()) toast.success(t('Key object set')); else toast.warn(t('Select a single object first.')); }, active.length === 1)} />
+        <SubMenu label={t('Align to Key Object')} openLeft={openLeft} disabled={!canAlign}>
+          <Item label={t('Align left')} disabled={!canAlign} onClick={() => run(() => alignSelection('left', 'key'), canAlign)} />
+          <Item label={t('Align center horizontally')} disabled={!canAlign} onClick={() => run(() => alignSelection('centerH', 'key'), canAlign)} />
+          <Item label={t('Align right')} disabled={!canAlign} onClick={() => run(() => alignSelection('right', 'key'), canAlign)} />
+          <Separator />
+          <Item label={t('Align top')} disabled={!canAlign} onClick={() => run(() => alignSelection('top', 'key'), canAlign)} />
+          <Item label={t('Align center vertically')} disabled={!canAlign} onClick={() => run(() => alignSelection('centerV', 'key'), canAlign)} />
+          <Item label={t('Align bottom')} disabled={!canAlign} onClick={() => run(() => alignSelection('bottom', 'key'), canAlign)} />
+        </SubMenu>
+        <Separator />
         <Item label={t('Distribute horizontally (equal spacing)')} kbd={getBinding('distribute.horizontal')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal'), canDistribute)} />
         <Item label={t('Distribute vertically (equal spacing)')} kbd={getBinding('distribute.vertical')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical'), canDistribute)} />
+        <SubMenu label={t('Distribute by edge/center')} openLeft={openLeft} disabled={!canDistribute}>
+          <Item label={t('Distribute horizontal centers')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal', 'center'), canDistribute)} />
+          <Item label={t('Distribute vertical centers')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical', 'center'), canDistribute)} />
+          <Separator />
+          <Item label={t('Distribute left edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal', 'start'), canDistribute)} />
+          <Item label={t('Distribute right edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal', 'end'), canDistribute)} />
+          <Item label={t('Distribute top edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical', 'start'), canDistribute)} />
+          <Item label={t('Distribute bottom edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical', 'end'), canDistribute)} />
+          <Separator />
+          <SubMenu label={t('Distribute to Key Object')} openLeft={openLeft} disabled={!canDistribute}>
+            <Item label={t('Distribute horizontal centers')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal', 'center', 'key'), canDistribute)} />
+            <Item label={t('Distribute vertical centers')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical', 'center', 'key'), canDistribute)} />
+            <Separator />
+            <Item label={t('Distribute left edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal', 'start', 'key'), canDistribute)} />
+            <Item label={t('Distribute right edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal', 'end', 'key'), canDistribute)} />
+            <Item label={t('Distribute top edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical', 'start', 'key'), canDistribute)} />
+            <Item label={t('Distribute bottom edges')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical', 'end', 'key'), canDistribute)} />
+          </SubMenu>
+        </SubMenu>
+        <Separator />
+        <SubMenu label={t('Align to Artboard')} openLeft={openLeft} disabled={!canDistributeArtboard}>
+          <Item label={t('Align left')} disabled={!canDistributeArtboard} onClick={() => run(() => alignSelection('left', 'artboard'), canDistributeArtboard)} />
+          <Item label={t('Align center horizontally')} disabled={!canDistributeArtboard} onClick={() => run(() => alignSelection('centerH', 'artboard'), canDistributeArtboard)} />
+          <Item label={t('Align right')} disabled={!canDistributeArtboard} onClick={() => run(() => alignSelection('right', 'artboard'), canDistributeArtboard)} />
+          <Separator />
+          <Item label={t('Align top')} disabled={!canDistributeArtboard} onClick={() => run(() => alignSelection('top', 'artboard'), canDistributeArtboard)} />
+          <Item label={t('Align center vertically')} disabled={!canDistributeArtboard} onClick={() => run(() => alignSelection('centerV', 'artboard'), canDistributeArtboard)} />
+          <Item label={t('Align bottom')} disabled={!canDistributeArtboard} onClick={() => run(() => alignSelection('bottom', 'artboard'), canDistributeArtboard)} />
+        </SubMenu>
         <Item label={t('Distribute horizontally in Artboard')} disabled={!canDistributeArtboard} onClick={() => run(() => distributeInArtboard('horizontal'), canDistributeArtboard)} />
         <Item label={t('Distribute vertically in Artboard')} disabled={!canDistributeArtboard} onClick={() => run(() => distributeInArtboard('vertical'), canDistributeArtboard)} />
         <Item label={t('Center on Artboard')} disabled={!canDistributeArtboard} onClick={() => run(() => { if (!centerOnArtboard()) toast.warn(t('Select something first.')); }, canDistributeArtboard)} />
@@ -586,6 +733,8 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Separator />
         <Item label={t('Flip Horizontal')} kbd={getBinding('edit.flipH')} disabled={!hasSelection} onClick={() => run(() => flip('x'), hasSelection)} />
         <Item label={t('Flip Vertical')} kbd={getBinding('edit.flipV')} disabled={!hasSelection} onClick={() => run(() => flip('y'), hasSelection)} />
+        <Item label={t('Reflect 45°')} disabled={!hasSelection} onClick={() => run(() => { reflectSelection(45); }, hasSelection)} />
+        <Item label={t('Reflect 135°')} disabled={!hasSelection} onClick={() => run(() => { reflectSelection(135); }, hasSelection)} />
         <Item label={t('Rotate 90° CW')} disabled={!hasSelection} onClick={() => run(() => { void rotateSelection(90); }, hasSelection)} />
         <Item label={t('Rotate 90° CCW')} disabled={!hasSelection} onClick={() => run(() => { void rotateSelection(-90); }, hasSelection)} />
         <Item label={t('Rotate 180°')} disabled={!hasSelection} onClick={() => run(() => { void rotateSelection(180); }, hasSelection)} />
@@ -623,6 +772,36 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         onClick={() => run(() => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); }, hasSelection)}
       />
       <Item
+        label={t('Lock Others')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = lockOthers(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('No other unlocked objects.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Lock Active Artboard')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = lockActiveArtboard(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Lock Other Artboards')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = lockOtherArtboards(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Unlock Selection')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = unlockSelection(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked selection.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Unlock Active Artboard')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = unlockActiveArtboard(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Unlock Other Artboards')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = unlockOtherArtboards(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
+      />
+      <Item
         label={t('Unlock All')}
         kbd={getBinding('edit.unlockAll')}
         onClick={() => run(() => { const n = unlockAll(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked objects.')); }, true)}
@@ -637,6 +816,31 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         label={t('Hide Others')}
         disabled={!hasSelection}
         onClick={() => run(() => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Hide Active Artboard')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = hideActiveArtboard(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Hide Other Artboards')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = hideOtherArtboards(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Show Selection')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = showSelection(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden selection.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Show Active Artboard')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = showActiveArtboard(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
+      />
+      <Item
+        label={t('Show Other Artboards')}
+        disabled={!hasSelection}
+        onClick={() => run(() => { const n = showOtherArtboards(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)}
       />
       <Item
         label={t('Show All')}
@@ -754,11 +958,50 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Lighten')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('lighten'), hasSelection)} />
         <Item label={t('Difference')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('difference'), hasSelection)} />
       </SubMenu>
+      <SubMenu label={t('Appearance')} openLeft={openLeft} disabled={!hasSelection}>
+        <Item label={t('Clear Appearance')} disabled={!hasSelection} onClick={() => run(() => { const n = clearAppearanceFromSelection(); if (n) toast.success(`${n} ${t('appearances cleared')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
+        <Item label={t('Flatten Transparency')} disabled={!hasSelection} onClick={() => run(() => { const n = flattenTransparencySelection(); if (n) toast.success(`${n} ${t('objects flattened')}`); else toast.warn(t('Select transparent or blended objects first.')); }, hasSelection)} />
+        <Item label={t('Expand Appearance')} disabled={!hasSelection} onClick={() => run(() => { void expandAppearanceSelection().then((n) => { if (n) toast.success(`${n} ${t('appearances expanded')}`); else toast.warn(t('Select objects with expandable appearance first.')); }); }, hasSelection)} />
+        <Item label={t('Clear Gradient Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = clearGradientFillSelection(); if (n) toast.success(`${n} ${t('gradient fills cleared')}`); else toast.warn(t('Select objects with gradient fills first.')); }, hasSelection)} />
+        <SubMenu label={t('Overprint')} openLeft={openLeft} disabled={!hasSelection}>
+          <Item label={t('Overprint Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = applyOverprintToSelection('fill', true); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); }, hasSelection)} />
+          <Item label={t('Overprint Stroke')} disabled={!hasSelection} onClick={() => run(() => { const n = applyOverprintToSelection('stroke', true); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); }, hasSelection)} />
+          <Item label={t('Overprint Fill and Stroke')} disabled={!hasSelection} onClick={() => run(() => { const n = applyOverprintToSelection('both', true); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); }, hasSelection)} />
+          <Separator />
+          <Item label={t('Clear Overprint')} disabled={!hasSelection} onClick={() => run(() => { const n = applyOverprintToSelection('both', false); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); }, hasSelection)} />
+        </SubMenu>
+        <Separator />
+        <Item label={t('Save selection as graphic style')} disabled={!hasSelection} onClick={() => run(() => { const style = saveGraphicStyleFromSelection(); if (style) toast.success(`${t('Graphic style saved')}: ${style.name}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
+        <SubMenu label={t('Graphic Styles')} openLeft={openLeft} disabled={!hasSelection}>
+          {loadGraphicStyles().map((style) => (
+            <Item key={style.id} label={style.name} disabled={!hasSelection} onClick={() => run(() => { const n = applyGraphicStyleToSelection(style); if (n) toast.success(`${n} ${t('graphic styles applied')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
+          ))}
+        </SubMenu>
+        <SubMenu label={t('Select art using graphic style')} openLeft={openLeft}>
+          {loadGraphicStyles().map((style) => (
+            <Item key={style.id} label={style.name} onClick={() => run(() => { const n = selectObjectsUsingGraphicStyle(style); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No objects use this graphic style.')); }, true)} />
+          ))}
+        </SubMenu>
+        <SubMenu label={t('Swatches')} openLeft={openLeft}>
+          <Item label={t('Add current fill')} onClick={() => run(() => { const fill = useEditor.getState().style.fill; if (typeof fill !== 'string' || !fill) { toast.warn(t('Select an object with a solid colour first.')); return; } const before = loadSwatches().length; const next = addSavedSwatchColor(fill); if (next.length > before) toast.success(t('Swatch added')); else toast.warn(t('Swatch already exists.')); }, true)} />
+          <Item label={t('Collect colours from selection')} onClick={() => run(() => { const result = collectSelectionColorsIntoSwatches(); if (result.added) toast.success(`${result.added} ${t('swatches added')}`); else toast.warn(t('Select an object with a solid colour first.')); }, true)} />
+          <Separator />
+          {loadSwatches().flatMap((color) => [
+            <Item key={`${color}-apply-fill`} label={`${t('Apply swatch fill')}: ${color}`} disabled={!hasSelection} onClick={() => run(() => { const n = applySwatchToSelection(color, 'fill'); if (n) toast.success(`${n} ${t('Appearance applied')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />,
+            <Item key={`${color}-apply-stroke`} label={`${t('Apply swatch stroke')}: ${color}`} disabled={!hasSelection} onClick={() => run(() => { const n = applySwatchToSelection(color, 'stroke'); if (n) toast.success(`${n} ${t('Appearance applied')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />,
+            <Item key={`${color}-select`} label={`${t('Select art using swatch')}: ${color}`} onClick={() => run(() => { const n = selectObjectsUsingSwatch(color); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No objects use this swatch.')); }, true)} />,
+            <Item key={`${color}-replace`} label={`${t('Replace swatch with current fill')}: ${color}`} onClick={() => run(() => { const fill = useEditor.getState().style.fill; if (typeof fill !== 'string' || !fill) { toast.warn(t('Select an object with a solid colour first.')); return; } const result = replaceSavedSwatchWithColor(color, fill); if (result.changed) toast.success(`${result.changed} ${t('colours changed')}`); else toast.warn(t('No objects use this swatch.')); }, true)} />,
+          ])}
+        </SubMenu>
+      </SubMenu>
       <SubMenu label={t('Pattern Fill')} openLeft={openLeft} disabled={!hasSelection}>
         <Item label={t('Checker')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('checker', 16, '#ffffff', '#111827'), hasSelection)} />
         <Item label={t('Stripes')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('stripes', 16, '#ffffff', '#111827'), hasSelection)} />
         <Item label={t('Dots')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('dots', 16, '#ffffff', '#111827'), hasSelection)} />
         <Item label={t('Crosshatch')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('crosshatch', 16, '#ffffff', '#111827'), hasSelection)} />
+        <Separator />
+        <Item label={t('Clear Pattern Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = clearPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills cleared')}`); else toast.warn(t('Select objects with pattern fills first.')); }, hasSelection)} />
+        <Item label={t('Expand Pattern Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = expandPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills expanded')}`); else toast.warn(t('Select objects with pattern fills first.')); }, hasSelection)} />
       </SubMenu>
       <SubMenu label={t('Drop shadow')} openLeft={openLeft} disabled={!hasSelection}>
         <Item label={t('Soft Shadow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.35)', blur: 12, offsetX: 4, offsetY: 6 }), hasSelection)} />
@@ -766,6 +1009,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Glow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 }), hasSelection)} />
         <Separator />
         <Item label={t('Clear Shadow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection(null), hasSelection)} />
+        <Item label={t('Expand Drop Shadow')} disabled={!hasSelection} onClick={() => run(() => { void expandDropShadowSelection().then((n) => { if (n) toast.success(`${n} ${t('drop shadows expanded')}`); else toast.warn(t('Select objects with drop shadows first.')); }); }, hasSelection)} />
       </SubMenu>
       <SubMenu label={t('Opacity')} openLeft={openLeft} disabled={!hasSelection}>
         <Item label="100%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 1 }), hasSelection)} />
@@ -802,6 +1046,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         onClick={() => run(() => { joinSelection(); }, pathCount === 1 || pathCount === 2)}
       />
       <SubMenu label={t('Path Effects')} openLeft={openLeft}>
+        <Item label={t('Select Cleanup Objects')} onClick={() => run(() => { const n = selectCleanupObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.success(t('Nothing to clean up.')); }, true)} />
         <Item label={t('Clean Up')} onClick={() => run(() => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); }, true)} />
         <Separator />
         <Item label={t('Add Anchor Points')} disabled={!hasSelection} onClick={() => run(() => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
@@ -812,6 +1057,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Add Arrowhead (End)')} disabled={!hasSelection} onClick={() => run(() => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); }, hasSelection)} />
         <Item label={t('Add Arrowheads (Both)')} disabled={!hasSelection} onClick={() => run(() => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); }, hasSelection)} />
         <Item label={t('Simplify Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showSimplify'), hasSelection)} />
+        <Item label={t('Smooth Path')} disabled={!hasSelection} onClick={() => run(() => { const n = smoothPathSelection(); if (n) toast.success(`${n} ${t('paths smoothed')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
         <Item label={t('Round Corners…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoundCorners'), hasSelection)} />
         <Item label={t('Offset Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOffsetPath'), hasSelection)} />
         <Item label={t('Roughen…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoughen'), hasSelection)} />
@@ -821,6 +1067,23 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Free Distort…')} disabled={!hasSelection} onClick={() => run(() => openModal('showFreeDistort'), hasSelection)} />
         <Item label={t('Arc Warp…')} disabled={!hasSelection} onClick={() => run(() => openModal('showWarp'), hasSelection)} />
         <Item label={t('Blend…')} disabled={active.length < 2} onClick={() => run(() => openModal('showBlend'), active.length >= 2)} />
+        <Item label={t('Select Blend Steps')} onClick={() => run(() => { const n = selectBlendSteps(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('No generated blend steps found.')); }, true)} />
+        <Item label={t('Select Related Blend Steps')} disabled={!hasSelection} onClick={() => run(() => { const n = selectBlendStepsFromSelection(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); }, hasSelection)} />
+        <Item label={t('Select Blend Endpoints')} disabled={!hasSelection} onClick={() => run(() => { const n = selectBlendEndpointsFromSelection(); if (n) toast.success(`${n} ${t('blend endpoints selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); }, hasSelection)} />
+        <Item label={t('Select All Blend Endpoints')} onClick={() => run(() => { const n = selectAllBlendEndpoints(); if (n) toast.success(`${n} ${t('blend endpoints selected')}`); else toast.warn(t('No generated blend steps found.')); }, true)} />
+        <Item label={t('Select Blend Group')} disabled={!hasSelection} onClick={() => run(() => { const n = selectBlendGroupFromSelection(); if (n) toast.success(`${n} ${t('blend objects selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); }, hasSelection)} />
+        <Item label={t('Select All Blend Groups')} onClick={() => run(() => { const n = selectAllBlendGroups(); if (n) toast.success(`${n} ${t('blend objects selected')}`); else toast.warn(t('No generated blend steps found.')); }, true)} />
+        <Item label={t('Select Orphan Blend Steps')} onClick={() => run(() => { const n = selectOrphanBlendSteps('document'); if (n) toast.success(`${n} ${t('orphan blend steps selected')}`); else toast.success(t('No orphan blend steps found.')); }, true)} />
+        <Item label={t('Update Blend Steps')} disabled={!hasSelection} onClick={() => run(() => { const n = updateBlendSteps(); if (n) toast.success(`${n} ${t('blend steps updated')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); }, hasSelection)} />
+        <Item label={t('Relink Blend Endpoint')} disabled={!hasSelection} onClick={() => run(() => { const n = relinkBlendEndpointFromSelection(); if (n) toast.success(`${n} ${t('blend steps relinked')}`); else toast.warn(t('Select one blend endpoint and one replacement object.')); }, hasSelection)} />
+        <Item label={t('Update All Blend Steps')} onClick={() => run(() => { const n = updateBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps updated')}`); else toast.warn(t('No generated blend steps found.')); }, true)} />
+        <Item label={t('Reverse Blend Steps')} disabled={!hasSelection} onClick={() => run(() => { const n = reverseBlendSteps(); if (n) toast.success(`${n} ${t('blend steps reversed')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); }, hasSelection)} />
+        <Item label={t('Reverse All Blend Steps')} onClick={() => run(() => { const n = reverseBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps reversed')}`); else toast.warn(t('No generated blend steps found.')); }, true)} />
+        <Item label={t('Expand Blend Steps')} disabled={!hasSelection} onClick={() => run(() => { const n = expandBlendSteps(); if (n) toast.success(`${n} ${t('blend steps expanded')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); }, hasSelection)} />
+        <Item label={t('Expand All Blend Steps')} onClick={() => run(() => { const n = expandBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps expanded')}`); else toast.warn(t('No generated blend steps found.')); }, true)} />
+        <Item label={t('Release Blend Steps')} disabled={!hasSelection} onClick={() => run(() => { const n = releaseBlendSteps(); if (n) toast.success(`${n} ${t('blend steps released')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); }, hasSelection)} />
+        <Item label={t('Release All Blend Steps')} onClick={() => run(() => { const n = releaseBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps released')}`); else toast.warn(t('No generated blend steps found.')); }, true)} />
+        <Item label={t('Remove Orphan Blend Steps')} onClick={() => run(() => { const n = removeOrphanBlendSteps('document'); if (n) toast.success(`${n} ${t('orphan blend steps removed')}`); else toast.success(t('No orphan blend steps found.')); }, true)} />
       </SubMenu>
       <SubMenu label={t('Cut prep')} openLeft={openLeft}>
         <Item label={t('Generate 2 mm contour')} disabled={!hasSelection} onClick={() => run(() => oneClickContour(), hasSelection)} />
@@ -861,6 +1124,8 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
       <SubMenu label={t('Print / Output')} openLeft={openLeft}>
         <Item label={t('Print…')} kbd={getBinding('file.print')} onClick={() => run(() => openModal('showPrint'), true)} />
         <Item label={t('Print Prep…')} onClick={() => run(() => openPrintPrep(), true)} />
+        <Item label={t('Add Print Marks')} onClick={() => run(() => { const n = addPrintMarksToArtboard(); if (n) toast.success(`${n} ${t('print marks added')}`); else toast.warn(t('No artboard for print marks.')); }, true)} />
+        <Item label={t('Clear Print Marks')} onClick={() => run(() => { const n = clearPrintMarks(); if (n) toast.success(`${n} ${t('print marks cleared')}`); else toast.warn(t('No print marks.')); }, true)} />
         <Item label={t('Tile Print…')} kbd={getBinding('file.tilePrint')} onClick={() => run(() => openModal('showTilePrint'), true)} />
         <Item label={t('Auto-arrange (Nest)')} disabled={active.length < 2} onClick={() => run(() => nest(), active.length >= 2)} />
         <Item label={t('Add positioning marks')} onClick={() => run(() => addPlotterRegistrationMarks(t), true)} />
@@ -891,6 +1156,12 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
       </SubMenu>
       <SubMenu label={t('Insert / Layout')} openLeft={openLeft}>
         <Item label={t('Save Selection as Symbol')} disabled={!hasSelection} onClick={() => run(() => saveSymbolFromSelection(), hasSelection)} />
+        <Item label={t('Select All Symbol Instances')} onClick={() => run(() => { const count = selectAllSymbolInstances(); if (count) toast.success(`${count} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); }, true)} />
+        <SubMenu label={t('Select symbol instances')} openLeft={openLeft}>
+          {getSymbols().map((symbol) => (
+            <Item key={symbol.id} label={symbol.name} onClick={() => run(() => { const count = selectSymbolInstances(symbol.id); if (count) toast.success(`${count} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); }, true)} />
+          ))}
+        </SubMenu>
         <Separator />
         <Item label={t('Star / Polygon…')} onClick={() => run(() => openModal('showStar'), true)} />
         <Item label={t('Split Into Grid…')} onClick={() => run(() => openModal('showSplitGrid'), true)} />
@@ -900,14 +1171,31 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('New from Template…')} onClick={() => run(() => openModal('showTemplates'), true)} />
         <Separator />
         <Item label={t('Create Artboard from Selection')} disabled={!hasSelection} onClick={() => run(() => makeArtboardFromSelection(), hasSelection)} />
+        <Item label={t('Duplicate Active Artboard')} disabled={!hasSelection} onClick={() => run(() => { void duplicateActiveArtboard().then((ab) => { if (ab) toast.success(t('Artboard duplicated')); else toast.warn(t('Select an object on or near an artboard first.')); }); }, hasSelection)} />
+        <Item label={t('Duplicate Active Artboard Frame')} disabled={!hasSelection} onClick={() => run(() => { if (duplicateActiveArtboardFrame()) toast.success(t('Artboard duplicated')); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Rename Active Artboard…')} disabled={!hasSelection} onClick={() => run(() => { if (promptRenameActiveArtboard(t('Artboard name'))) toast.success(t('Artboard renamed')); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Move Active Artboard Earlier')} disabled={!hasSelection} onClick={() => run(() => { if (reorderActiveArtboard('previous')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); }, hasSelection)} />
+        <Item label={t('Move Active Artboard Later')} disabled={!hasSelection} onClick={() => run(() => { if (reorderActiveArtboard('next')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); }, hasSelection)} />
+        <Item label={t('Move Active Artboard to First')} disabled={!hasSelection} onClick={() => run(() => { if (reorderActiveArtboard('first')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); }, hasSelection)} />
+        <Item label={t('Move Active Artboard to Last')} disabled={!hasSelection} onClick={() => run(() => { if (reorderActiveArtboard('last')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); }, hasSelection)} />
+        <Item label={t('Sort Artboards by Position')} onClick={() => run(() => { if (sortArtboardsByPosition()) toast.success(t('Artboard order updated')); else toast.warn(t('Artboard order already matches position.')); }, true)} />
+        <Item label={t('Renumber Artboards by Position')} onClick={() => run(() => { if (renumberArtboardsByPosition(t('Artboard'))) toast.success(t('Artboards renumbered')); else toast.warn(t('Artboards already numbered by position.')); }, true)} />
+        <Item label={t('Delete Active Artboard')} disabled={!hasSelection} onClick={() => run(() => { void showConfirm({ message: t('Delete active artboard?'), confirmLabel: t('Delete'), danger: true }).then((ok) => { if (!ok) return; if (deleteActiveArtboard()) toast.success(t('Artboard deleted')); else toast.warn(t('Select an object on or near an artboard first.')); }); }, hasSelection)} />
+        <Item label={t('Rearrange Artboards')} onClick={() => run(() => { const n = promptRearrangeArtboards({ columns: t('Columns'), spacing: t('Spacing'), moveArtwork: t('Move artwork? yes/no') }); if (n == null) return; if (n === -1) toast.warn(t('Invalid artboard rearrange options.')); else if (n) toast.success(t('Artboards rearranged')); else toast.warn(t('Need at least two artboards.')); }, true)} />
         <Item label={t('Fit Artboard to Selection')} disabled={!hasSelection} onClick={() => run(() => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); }, hasSelection)} />
         <Item label={t('Fit Artboard to Artwork')} onClick={() => run(() => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); }, true)} />
+        <Item label={t('Fit Active Artboard to Selection')} disabled={!hasSelection} onClick={() => run(() => { if (!fitActiveArtboardToContent('selection')) toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Fit Active Artboard to Artwork')} disabled={!hasSelection} onClick={() => run(() => { if (!fitActiveArtboardToContent('all')) toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
       </SubMenu>
       <SubMenu label={t('View / Guides')} openLeft={openLeft}>
         <Item label={t('Zoom In')} kbd={getBinding('view.zoomIn')} onClick={() => run(() => zoomBy(1.25), true)} />
         <Item label={t('Zoom Out')} kbd={getBinding('view.zoomOut')} onClick={() => run(() => zoomBy(1 / 1.25), true)} />
         <Item label={t('Actual Size')} kbd={getBinding('view.actualSize')} onClick={() => run(() => zoomToPercent(100), true)} />
         <Item label={t('Fit to Page')} kbd={getBinding('view.zoomFit')} onClick={() => run(() => zoomFit(), true)} />
+        <Item label={t('Fit All Artboards in Window')} onClick={() => run(() => { if (!zoomToAllArtboards()) toast.warn(t('No artboards to navigate.')); }, true)} />
+        <Item label={t('Zoom to Active Artboard')} disabled={!hasSelection} onClick={() => run(() => { if (!zoomToActiveArtboard()) toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Previous Artboard')} onClick={() => run(() => { if (!zoomToAdjacentArtboard(-1)) toast.warn(t('No artboards to navigate.')); }, true)} />
+        <Item label={t('Next Artboard')} onClick={() => run(() => { if (!zoomToAdjacentArtboard(1)) toast.warn(t('No artboards to navigate.')); }, true)} />
         <Item label={t('Zoom to Selection')} kbd={getBinding('view.zoomSelection')} disabled={!hasSelection} onClick={() => run(() => { if (!zoomToSelection()) toast.warn(t('Select something first.')); }, hasSelection)} />
         <Separator />
         <Item label={isOutlineMode() ? t('Hide Outline View') : t('Outline View')} kbd={getBinding('view.outline')} onClick={() => run(() => setOutlineMode(!isOutlineMode()), true)} />
@@ -921,6 +1209,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={guidesLocked ? t('Unlock Guides') : t('Lock Guides')} onClick={() => run(() => toggleStoreFlag('guidesLocked'), true)} />
         <Item label={t('Make Guides from Selection')} disabled={!hasSelection} onClick={() => run(() => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
         <Item label={t('Margin Guides…')} onClick={() => run(() => openModal('showMarginGuides'), true)} />
+        <Item label={t('Release Guides')} onClick={() => run(() => { const n = releaseGuides(); if (n) toast.success(`${n} ${t('guides released')}`); else toast.warn(t('No guides to release.')); }, true)} />
         <Item label={t('Clear Guides')} onClick={() => run(() => useEditor.getState().clearUserGuides(), true)} />
       </SubMenu>
       <SubMenu label={t('Help / Settings')} openLeft={openLeft}>
@@ -958,28 +1247,222 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         onClick={() => run(() => { const n = selectVisibleObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No visible unlocked objects.')); }, true)}
       />
       <Item
+        label={t('Select Visible Active Artboard Objects')}
+        onClick={() => run(() => { const n = selectVisibleActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)}
+      />
+      <Item
         label={t('Select Unlocked Objects')}
         onClick={() => run(() => { const n = selectUnlockedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unlocked objects.')); }, true)}
       />
+      <Item
+        label={t('Select Unlocked Active Artboard Objects')}
+        onClick={() => run(() => { const n = selectUnlockedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)}
+      />
+      <Item
+        label={t('Select Locked Objects')}
+        onClick={() => run(() => { const n = selectLockedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No locked objects.')); }, true)}
+      />
+      <Item
+        label={t('Select Locked Active Artboard Objects')}
+        onClick={() => run(() => { const n = selectLockedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)}
+      />
+      <Item
+        label={t('Select Hidden Objects')}
+        onClick={() => run(() => { const n = selectHiddenObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No hidden objects.')); }, true)}
+      />
+      <Item
+        label={t('Select Hidden Active Artboard Objects')}
+        onClick={() => run(() => { const n = selectHiddenActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)}
+      />
       <SubMenu label={t('Select Object')} openLeft={openLeft}>
         <Item label={t('Select All Text Objects')} onClick={() => run(() => { const n = selectAllText(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text objects.')); }, true)} />
+        <Item label={t('Select All Text Active Artboard Objects')} onClick={() => run(() => { const n = selectAllTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Point Text Objects')} onClick={() => run(() => { const n = selectPointTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No point text objects.')); }, true)} />
+        <Item label={t('Select Point Text Active Artboard Objects')} onClick={() => run(() => { const n = selectPointTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Area Text Objects')} onClick={() => run(() => { const n = selectAreaTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No area text objects.')); }, true)} />
+        <Item label={t('Select Area Text Active Artboard Objects')} onClick={() => run(() => { const n = selectAreaTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Overflowing Text Objects')} onClick={() => run(() => { const n = selectOverflowingTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overflowing text objects.')); }, true)} />
+        <Item label={t('Select Overflowing Text Active Artboard Objects')} onClick={() => run(() => { const n = selectOverflowingTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Empty Text Objects')} onClick={() => run(() => { const n = selectEmptyTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No empty text objects.')); }, true)} />
+        <Item label={t('Select Empty Text Active Artboard Objects')} onClick={() => run(() => { const n = selectEmptyTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Text on Path Objects')} onClick={() => run(() => { const n = selectTextOnPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text on path objects.')); }, true)} />
+        <Item label={t('Select Text on Path Active Artboard Objects')} onClick={() => run(() => { const n = selectTextOnPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Missing Font Text Objects')} onClick={() => run(() => { const n = selectMissingFontTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No missing font text objects.')); }, true)} />
+        <Item label={t('Select Missing Font Text Active Artboard Objects')} onClick={() => run(() => { const n = selectMissingFontTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Custom Text Spacing Objects')} onClick={() => run(() => { const n = selectCustomTextSpacingObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No custom text spacing objects.')); }, true)} />
+        <Item label={t('Select Custom Text Spacing Active Artboard Objects')} onClick={() => run(() => { const n = selectCustomTextSpacingActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Decorated Text Objects')} onClick={() => run(() => { const n = selectDecoratedTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No decorated text objects.')); }, true)} />
+        <Item label={t('Select Decorated Text Active Artboard Objects')} onClick={() => run(() => { const n = selectDecoratedTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Non-Left Aligned Text Objects')} onClick={() => run(() => { const n = selectNonLeftAlignedTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No non-left aligned text objects.')); }, true)} />
+        <Item label={t('Select Non-Left Aligned Text Active Artboard Objects')} onClick={() => run(() => { const n = selectNonLeftAlignedTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Styled Text Objects')} onClick={() => run(() => { const n = selectStyledTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No styled text objects.')); }, true)} />
+        <Item label={t('Select Styled Text Active Artboard Objects')} onClick={() => run(() => { const n = selectStyledTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Transformed Text Objects')} onClick={() => run(() => { const n = selectTransformedTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transformed text objects.')); }, true)} />
+        <Item label={t('Select Transformed Text Active Artboard Objects')} onClick={() => run(() => { const n = selectTransformedTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Mixed Style Text Objects')} onClick={() => run(() => { const n = selectMixedStyleTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No mixed style text objects.')); }, true)} />
+        <Item label={t('Select Mixed Style Text Active Artboard Objects')} onClick={() => run(() => { const n = selectMixedStyleTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
         <Item label={t('Select All Image Objects')} onClick={() => run(() => { const n = selectAllImages(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No image objects.')); }, true)} />
+        <Item label={t('Select All Image Active Artboard Objects')} onClick={() => run(() => { const n = selectAllImagesActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Filtered Image Objects')} onClick={() => run(() => { const n = selectFilteredImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No filtered image objects.')); }, true)} />
+        <Item label={t('Select Filtered Image Active Artboard Objects')} onClick={() => run(() => { const n = selectFilteredImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Cropped Image Objects')} onClick={() => run(() => { const n = selectCroppedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No cropped image objects.')); }, true)} />
+        <Item label={t('Select Cropped Image Active Artboard Objects')} onClick={() => run(() => { const n = selectCroppedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Embedded Image Objects')} onClick={() => run(() => { const n = selectEmbeddedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No embedded image objects.')); }, true)} />
+        <Item label={t('Select Embedded Image Active Artboard Objects')} onClick={() => run(() => { const n = selectEmbeddedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Linked Image Objects')} onClick={() => run(() => { const n = selectLinkedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No linked image objects.')); }, true)} />
+        <Item label={t('Select Linked Image Active Artboard Objects')} onClick={() => run(() => { const n = selectLinkedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Missing Linked Image Objects')} onClick={() => run(() => { const n = selectMissingLinkedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No missing linked image objects.')); }, true)} />
+        <Item label={t('Select Missing Linked Image Active Artboard Objects')} onClick={() => run(() => { const n = selectMissingLinkedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Transformed Image Objects')} onClick={() => run(() => { const n = selectTransformedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transformed image objects.')); }, true)} />
+        <Item label={t('Select Transformed Image Active Artboard Objects')} onClick={() => run(() => { const n = selectTransformedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Low Resolution Image Objects')} onClick={() => run(() => { const n = selectLowResolutionImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No low resolution image objects.')); }, true)} />
+        <Item label={t('Select Low Resolution Image Active Artboard Objects')} onClick={() => run(() => { const n = selectLowResolutionImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select High Resolution Image Objects')} onClick={() => run(() => { const n = selectHighResolutionImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No high resolution image objects.')); }, true)} />
+        <Item label={t('Select High Resolution Image Active Artboard Objects')} onClick={() => run(() => { const n = selectHighResolutionImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Transformed Objects')} onClick={() => run(() => { const n = selectTransformedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transformed objects.')); }, true)} />
+        <Item label={t('Select Transformed Active Artboard Objects')} onClick={() => run(() => { const n = selectTransformedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
         <Item label={t('Select All Path Objects')} onClick={() => run(() => { const n = selectAllPaths(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No path objects.')); }, true)} />
+        <Item label={t('Select All Path Active Artboard Objects')} onClick={() => run(() => { const n = selectAllPathsActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
         <Item label={t('Select All Shape Objects')} onClick={() => run(() => { const n = selectAllShapes(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No shape objects.')); }, true)} />
+        <Item label={t('Select All Shape Active Artboard Objects')} onClick={() => run(() => { const n = selectAllShapesActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select All Group Objects')} onClick={() => run(() => { const n = selectAllGroups(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No group objects.')); }, true)} />
+        <Item label={t('Select All Group Active Artboard Objects')} onClick={() => run(() => { const n = selectAllGroupsActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Named Objects')} onClick={() => run(() => { const n = selectNamedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No named objects.')); }, true)} />
+        <Item label={t('Select Named Active Artboard Objects')} onClick={() => run(() => { const n = selectNamedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Unnamed Objects')} onClick={() => run(() => { const n = selectUnnamedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unnamed objects.')); }, true)} />
+        <Item label={t('Select Unnamed Active Artboard Objects')} onClick={() => run(() => { const n = selectUnnamedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Clipping Masked Objects')} onClick={() => run(() => { const n = selectClippingMaskedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No clipping masked objects.')); }, true)} />
+        <Item label={t('Select Clipping Masked Active Artboard Objects')} onClick={() => run(() => { const n = selectClippingMaskedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Open Path Objects')} onClick={() => run(() => { const n = selectOpenPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No open path objects.')); }, true)} />
+        <Item label={t('Select Open Path Active Artboard Objects')} onClick={() => run(() => { const n = selectOpenPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Compound Path Objects')} onClick={() => run(() => { const n = selectCompoundPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No compound path objects.')); }, true)} />
+        <Item label={t('Select Compound Path Active Artboard Objects')} onClick={() => run(() => { const n = selectCompoundPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Stray Point Objects')} onClick={() => run(() => { const n = selectStrayPointObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No stray point objects.')); }, true)} />
+        <Item label={t('Select Stray Point Active Artboard Objects')} onClick={() => run(() => { const n = selectStrayPointActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Zero-Length Path Objects')} onClick={() => run(() => { const n = selectZeroLengthPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No zero-length path objects.')); }, true)} />
+        <Item label={t('Select Zero-Length Path Active Artboard Objects')} onClick={() => run(() => { const n = selectZeroLengthPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Unpainted Objects')} onClick={() => run(() => { const n = selectUnpaintedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unpainted objects.')); }, true)} />
+        <Item label={t('Select Unpainted Active Artboard Objects')} onClick={() => run(() => { const n = selectUnpaintedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Drop Shadow Objects')} onClick={() => run(() => { const n = selectDropShadowObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No drop shadow objects.')); }, true)} />
+        <Item label={t('Select Drop Shadow Active Artboard Objects')} onClick={() => run(() => { const n = selectDropShadowActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Transparency Objects')} onClick={() => run(() => { const n = selectTransparencyObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transparency objects.')); }, true)} />
+        <Item label={t('Select Transparency Active Artboard Objects')} onClick={() => run(() => { const n = selectTransparencyActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Dashed Stroke Objects')} onClick={() => run(() => { const n = selectDashedStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No dashed stroke objects.')); }, true)} />
+        <Item label={t('Select Dashed Stroke Active Artboard Objects')} onClick={() => run(() => { const n = selectDashedStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Thin Stroke Objects')} onClick={() => run(() => { const n = selectThinStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No thin stroke objects.')); }, true)} />
+        <Item label={t('Select Thin Stroke Active Artboard Objects')} onClick={() => run(() => { const n = selectThinStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Overprint Objects')} onClick={() => run(() => { const n = selectOverprintObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overprint objects.')); }, true)} />
+        <Item label={t('Select Overprint Active Artboard Objects')} onClick={() => run(() => { const n = selectOverprintActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Print Mark Objects')} onClick={() => run(() => { const n = selectPrintMarkObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No print mark objects.')); }, true)} />
+        <Item label={t('Select Print Mark Active Artboard Objects')} onClick={() => run(() => { const n = selectPrintMarkActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Active Artboard Objects')} onClick={() => run(() => { const n = selectActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Same Artboard Objects')} onClick={() => run(() => { const n = selectSameArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Inside Active Artboard Objects')} onClick={() => run(() => { const n = selectInsideActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Overflowing Active Artboard Objects')} onClick={() => run(() => { const n = selectOverflowingActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Other Artboards Objects')} onClick={() => run(() => { const n = selectOtherArtboardsObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Outside Artboard Objects')} onClick={() => run(() => { const n = selectOutsideArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No outside artboard objects.')); }, true)} />
+        <Item label={t('Select Outside Any Artboard Objects')} onClick={() => run(() => { const n = selectOutsideAnyArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No outside any artboard objects.')); }, true)} />
+        <Item label={t('Select Inside Artboard Objects')} onClick={() => run(() => { const n = selectInsideArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No inside artboard objects.')); }, true)} />
+        <Item label={t('Select Inside Any Artboard Objects')} onClick={() => run(() => { const n = selectInsideAnyArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No inside any artboard objects.')); }, true)} />
+        <Item label={t('Select Overflowing Artboard Objects')} onClick={() => run(() => { const n = selectOverflowingArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overflowing artboard objects.')); }, true)} />
+        <Item label={t('Select Overflowing Any Artboard Objects')} onClick={() => run(() => { const n = selectOverflowingAnyArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overflowing any artboard objects.')); }, true)} />
+        <Item label={t('Select Custom Stroke Objects')} onClick={() => run(() => { const n = selectCustomStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No custom stroke objects.')); }, true)} />
+        <Item label={t('Select Custom Stroke Active Artboard Objects')} onClick={() => run(() => { const n = selectCustomStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Non-Scaling Stroke Objects')} onClick={() => run(() => { const n = selectNonScalingStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No non-scaling stroke objects.')); }, true)} />
+        <Item label={t('Select Non-Scaling Stroke Active Artboard Objects')} onClick={() => run(() => { const n = selectNonScalingStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Pattern Fill Objects')} onClick={() => run(() => { const n = selectPatternFillObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No pattern fill objects.')); }, true)} />
+        <Item label={t('Select Pattern Fill Active Artboard Objects')} onClick={() => run(() => { const n = selectPatternFillActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select Gradient Fill Objects')} onClick={() => run(() => { const n = selectGradientFillObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No gradient fill objects.')); }, true)} />
+        <Item label={t('Select Gradient Fill Active Artboard Objects')} onClick={() => run(() => { const n = selectGradientFillActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, true)} />
+        <Item label={t('Select All Symbol Instances')} onClick={() => run(() => { const n = selectAllSymbolInstances(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); }, true)} />
       </SubMenu>
       <SubMenu label={t('Select Same')} openLeft={openLeft} disabled={!hasSelection}>
         <Item label={t('Select Same Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('fill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
+        <Item label={t('Select Same Fill Appearance')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('fillAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a fill first.')); }, hasSelection)} />
+        <Item label={t('Select Same Fill Appearance Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('fillAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Stroke')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
+        <Item label={t('Select Same Fill & Stroke')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('fillStroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
+        <Item label={t('Select Same Fill & Stroke Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('fillStroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Stroke Appearance')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('strokeAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a stroke first.')); }, hasSelection)} />
+        <Item label={t('Select Same Stroke Appearance Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('strokeAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Stroke Weight')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Stroke Weight Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Opacity')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Opacity Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Font Family')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('fontFamily'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Font Family Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('fontFamily'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Font Size')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('fontSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Font Size Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('fontSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Text Appearance')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('textAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Text Appearance Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('textAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Blend Mode')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('globalCompositeOperation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Blend Mode Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('globalCompositeOperation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Dash')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('strokeDashArray'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Dash Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('strokeDashArray'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Line Cap')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('strokeLineCap'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Line Cap Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('strokeLineCap'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Line Join')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('strokeLineJoin'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Line Join Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('strokeLineJoin'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Type')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameType(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Type Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameTypeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same X Position')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same X Position Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Y Position')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Y Position Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Position')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectPosition'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Position Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectPosition'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Right Edge')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectRight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Right Edge Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectRight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Bottom Edge')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectBottom'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Bottom Edge Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectBottom'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Bounds')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectBounds'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Bounds Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectBounds'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Center X')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectCenterX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Center X Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectCenterX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Center Y')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectCenterY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Center Y Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectCenterY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Center')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectCenter'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Center Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectCenter'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Width')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Width Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Height')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectHeight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Height Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectHeight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Object Size')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Object Size Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Area')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectArea'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Area Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectArea'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Aspect Ratio')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectAspectRatio'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Aspect Ratio Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectAspectRatio'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Scale')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectScale'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Scale Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectScale'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Skew')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectSkew'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Skew Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectSkew'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Rotation')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectRotation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Rotation Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectRotation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Transform')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('objectTransform'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Transform Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('objectTransform'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Artboard Placement')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('artboardPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Artboard Placement Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('artboardPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Any-Artboard Placement')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('artboardAnyPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Any-Artboard Placement Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('artboardAnyPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
         <Item label={t('Select Same Name')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('name'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a named object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Name Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('name'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Appearance')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('appearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Appearance Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('appearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Shadow')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('shadow'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a drop shadow first.')); }, hasSelection)} />
+        <Item label={t('Select Same Shadow Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('shadow'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Pattern Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('patternSpec'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a pattern fill first.')); }, hasSelection)} />
+        <Item label={t('Select Same Pattern Fill Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('patternSpec'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Gradient Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('gradientFill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a gradient fill first.')); }, hasSelection)} />
+        <Item label={t('Select Same Gradient Fill Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('gradientFill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Overprint')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('overprint'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an overprint object first.')); }, hasSelection)} />
+        <Item label={t('Select Same Overprint Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('overprint'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Print Mark Type')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('printMarkKind'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a print mark first.')); }, hasSelection)} />
+        <Item label={t('Select Same Print Mark Type Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('printMarkKind'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Symbol')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('symbolId'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a symbol instance first.')); }, hasSelection)} />
+        <Item label={t('Select Same Symbol Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('symbolId'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
+        <Item label={t('Select Same Clipping Mask')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSame('clipPath'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a clipping group first.')); }, hasSelection)} />
+        <Item label={t('Select Same Clipping Mask Active Artboard Objects')} disabled={!hasSelection} onClick={() => run(() => { const n = selectSameActiveArtboard('clipPath'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); }, hasSelection)} />
       </SubMenu>
       <Item
         label={t('Select Inverse')}

@@ -32,6 +32,7 @@ export function TransformDialog() {
   const setSY = (v: number) => { const n = Math.max(1, v || 100); setScaleY(n); if (linkScale) setScaleX(n); };
   const [copy, setCopy] = useState(false);
   const [each, setEach] = useState(false);
+  const [scaleStrokesEffects, setScaleStrokesEffects] = useState(false);
   // Move can be entered as X/Y or polar distance+angle (Illustrator's Move
   // dialog). Angle is Illustrator-style: 0° = right, 90° = up.
   const [moveMode, setMoveMode] = useState<'xy' | 'polar'>('xy');
@@ -60,7 +61,7 @@ export function TransformDialog() {
     const rad = (angle * Math.PI) / 180;
     const mdx = moveMode === 'polar' ? dist * Math.cos(rad) : dx;
     const mdy = moveMode === 'polar' ? -dist * Math.sin(rad) : dy;
-    const ok = await applyTransform({ dx: mdx * k, dy: mdy * k, scale: scaleX / 100, scaleY: scaleY / 100, rotate, copy, each });
+    const ok = await applyTransform({ dx: mdx * k, dy: mdy * k, scale: scaleX / 100, scaleY: scaleY / 100, rotate, copy, each, scaleStrokesEffects });
     if (ok) toast.success(copy ? t('Transformed copy') : t('Transformed'), { title: t('Transform') });
     close();
   };
@@ -85,6 +86,7 @@ export function TransformDialog() {
     setRotate(0);
     setCopy(false);
     setEach(false);
+    setScaleStrokesEffects(false);
     setReviewedMoveMode(`${t('Move mode')} · ${t('XY')}`);
     setReviewedMovePreset(`${t('Move')} X 0 ${unit} · Y 0 ${unit}`);
     setReviewedScalePreset(`${t('Scale')} X 100% · Y 100%`);
@@ -404,6 +406,10 @@ export function TransformDialog() {
         <label className="flex items-center gap-2 mt-1 text-xs cursor-pointer" title={t('Pivot each object on its own centre instead of the selection centre.')}>
           <input type="checkbox" checked={each} onChange={(e) => setEach(e.target.checked)} />
           {t('Transform each')}
+        </label>
+        <label className="flex items-center gap-2 mt-1 text-xs cursor-pointer" title={t('Scale stroke widths and drop shadows with the object.')}>
+          <input type="checkbox" checked={scaleStrokesEffects} onChange={(e) => setScaleStrokesEffects(e.target.checked)} />
+          {t('Scale Strokes & Effects')}
         </label>
 
         <div

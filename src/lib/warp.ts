@@ -60,23 +60,16 @@ function densify(pts: Pt[]): Pt[] {
 
 const SHAPES = new Set(['path', 'rect', 'polygon', 'ellipse']);
 
-/** True when the selection has a path/shape to warp. */
-export function canWarp(): boolean {
-  const c = getCanvas();
-  return !!c && c.getActiveObjects().some(o => SHAPES.has(o.type ?? ''));
+type WarpGatheredObject = { obj: fabric.FabricObject; loops: { pts: Pt[]; closed: boolean }[] };
+
+export function canWarpObject(object: fabric.FabricObject): boolean {
+  return SHAPES.has(object.type ?? '');
 }
 
-/** Warp every selected path/shape by `bendPct` in [-100, 100] using `style`. */
-export function warpSelection(bendPct: number, style: WarpStyle = 'arc'): number {
-  const canvas = getCanvas();
-  if (!canvas || bendPct === 0) return 0;
-  const objs = canvas.getActiveObjects().filter(o => SHAPES.has(o.type ?? ''));
-  if (objs.length === 0) return 0;
-
-  // First pass: gather dense polylines (px) + the selection's shared x-frame.
-  const gathered: { obj: fabric.FabricObject; loops: { pts: Pt[]; closed: boolean }[] }[] = [];
+function gatherWarpObjects(objects: fabric.FabricObject[]): { gathered: WarpGatheredObject[]; minX: number; width: number } | null {
+  const gathered: WarpGatheredObject[] = [];
   let minX = Infinity, maxX = -Infinity;
-  for (const obj of objs) {
+  for (const obj of objects.filter(canWarpObject)) {
     const loops: { pts: Pt[]; closed: boolean }[] = [];
     for (const cp of buildOutlineCutPaths([obj], 0, 1)) {
       const px = densify(cp.points.map(([x, y]) => [x * MM_TO_PX, y * MM_TO_PX] as Pt));
@@ -86,31 +79,50 @@ export function warpSelection(bendPct: number, style: WarpStyle = 'arc'): number
     if (loops.length) gathered.push({ obj, loops });
   }
   const width = maxX - minX;
-  if (!isFinite(width) || width <= 0) return 0;
-  const bend = bendPct / 100;
+  return gathered.length && isFinite(width) && width > 0 ? { gathered, minX, width } : null;
+}
 
-  let count = 0;
-  for (const { obj, loops } of gathered) {
+export function warpObjects(canvas: fabric.Canvas, objects: fabric.FabricObject[], bendPct: number, style: WarpStyle = 'arc'): fabric.Path[] {
+  if (bendPct === 0) return [];
+  const frame = gatherWarpObjects(objects);
+  if (!frame) return [];
+  const bend = bendPct / 100;
+  const created: fabric.Path[] = [];
+  for (const { obj, loops } of frame.gathered) {
     const parts: string[] = [];
     for (const { pts, closed } of loops) {
-      const warped = warpPoints(pts, minX, width, bend, style);
+      const warped = warpPoints(pts, frame.minX, frame.width, bend, style);
       if (warped.length >= 2) parts.push(toD(warped, closed));
     }
     if (parts.length === 0) continue;
-    const np = new fabric.Path(parts.join(' '), {
+    const path = new fabric.Path(parts.join(' '), {
       fill: (obj.fill as string) ?? '',
       stroke: (obj.stroke as string) ?? '',
       strokeWidth: obj.strokeWidth ?? 0,
       opacity: obj.opacity ?? 1,
     });
     canvas.remove(obj);
-    canvas.add(np);
-    count++;
+    canvas.add(path);
+    created.push(path);
   }
-  if (count > 0) {
+  return created;
+}
+
+/** True when the selection has a path/shape to warp. */
+export function canWarp(): boolean {
+  const c = getCanvas();
+  return !!c && c.getActiveObjects().some(canWarpObject);
+}
+
+/** Warp every selected path/shape by `bendPct` in [-100, 100] using `style`. */
+export function warpSelection(bendPct: number, style: WarpStyle = 'arc'): number {
+  const canvas = getCanvas();
+  if (!canvas || bendPct === 0) return 0;
+  const created = warpObjects(canvas, canvas.getActiveObjects(), bendPct, style);
+  if (created.length > 0) {
     canvas.discardActiveObject();
     canvas.requestRenderAll();
     pushHistory();
   }
-  return count;
+  return created.length;
 }

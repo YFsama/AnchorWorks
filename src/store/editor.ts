@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { DocSettings, FillStroke, LayerInfo, ToolId, ShadowSettings, Artboard } from '../types';
+import { DEFAULT_BRUSH_PRESET, type BrushPresetId } from '../lib/brushPresets';
 
 /**
  * Vinyl-cutter geometry. Lives parallel to the canvas content, NOT as a
@@ -104,6 +105,15 @@ function readInitialDimUnit(): 'mm' | 'px' {
   try {
     return window.localStorage.getItem('vector.xfUnit') === 'px' ? 'px' : 'mm';
   } catch { return 'mm'; }
+}
+
+function readInitialBrushPreset(): BrushPresetId {
+  if (typeof window === 'undefined') return DEFAULT_BRUSH_PRESET;
+  try {
+    const stored = window.localStorage.getItem('vector.brushPreset');
+    if (stored === 'basic' || stored === 'calligraphy' || stored === 'marker' || stored === 'inking') return stored;
+  } catch { /* localStorage blocked */ }
+  return DEFAULT_BRUSH_PRESET;
 }
 
 interface EditorState {
@@ -272,6 +282,11 @@ interface EditorState {
   artboards: Artboard[];
   setArtboards: (a: Artboard[]) => void;
 
+  // Pencil/brush preset for freehand drawing. Persisted so the drawing feel
+  // survives reloads, closer to Illustrator's brush libraries.
+  brushPreset: BrushPresetId;
+  setBrushPreset: (preset: BrushPresetId) => void;
+
   // Eraser tool brush size (document pixels). Adjustable via `+`/`-` while
   // the eraser is active, or programmatically via the `set_eraser_size` skill.
   eraserSize: number;
@@ -408,6 +423,12 @@ export const useEditor = create<EditorState>((set) => ({
   setDimUnit: (u) => {
     try { window.localStorage.setItem('vector.xfUnit', u); } catch { /* quota/blocked */ }
     set({ dimUnit: u });
+  },
+
+  brushPreset: readInitialBrushPreset(),
+  setBrushPreset: (preset) => {
+    try { window.localStorage.setItem('vector.brushPreset', preset); } catch { /* quota/blocked */ }
+    set({ brushPreset: preset });
   },
 
   cursorX: 0,

@@ -6,6 +6,7 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { buildSortedRecolorTargets } from '../lib/recolorSort';
 
 const RECOLOR_PALETTE_PRESETS: Array<{ label: string; colors: string[]; title: string }> = [
   { label: 'Vinyl primary', colors: ['#ff2b2b', '#ffd600', '#0057ff', '#111111', '#ffffff'], title: 'Map artwork to common red, yellow, blue, black, and white vinyl colors.' },
@@ -57,6 +58,12 @@ export function RecolorDialog() {
   };
   const grayscaleTargets = () => {
     setTargets(Object.fromEntries(sources.map((src) => [src, toGrayscaleHex(src)])));
+  };
+  const sortByHueTargets = () => {
+    setTargets(buildSortedRecolorTargets(sources, 'hue'));
+  };
+  const sortByLuminanceTargets = () => {
+    setTargets(buildSortedRecolorTargets(sources, 'luminance'));
   };
 
   const applyPalettePreset = (colors: string[]) => {
@@ -129,7 +136,7 @@ export function RecolorDialog() {
         ) : (
           <>
             <div
-              className="grid grid-cols-3 gap-1 mb-3"
+              className="grid grid-cols-5 gap-1 mb-3"
               role="toolbar"
               aria-label={t('Recolor mapping actions')}
               aria-describedby="recolor-action-review-status"
@@ -167,6 +174,28 @@ export function RecolorDialog() {
                 onFocus={() => setReviewedFooterAction(t('Map to gray'))}
               >
                 {t('Map to gray')}
+              </button>
+              <button
+                type="button"
+                data-recolor-action
+                data-recolor-action-review={t('Sort by hue')}
+                className="btn"
+                onClick={sortByHueTargets}
+                onFocus={() => setReviewedFooterAction(t('Sort by hue'))}
+                disabled={sources.length < 2}
+              >
+                {t('Sort hue')}
+              </button>
+              <button
+                type="button"
+                data-recolor-action
+                data-recolor-action-review={t('Sort by luminance')}
+                className="btn"
+                onClick={sortByLuminanceTargets}
+                onFocus={() => setReviewedFooterAction(t('Sort by luminance'))}
+                disabled={sources.length < 2}
+              >
+                {t('Sort light')}
               </button>
             </div>
             <div className="mb-3">

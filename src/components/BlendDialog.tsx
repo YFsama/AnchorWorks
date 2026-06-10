@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { X, Blend as BlendIcon } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { getCanvas } from '../lib/canvasEngine';
-import { blendSelection } from '../lib/blend';
+import { applyBlendOptionsToSelection, blendSelection, estimateBlendStepCount, type BlendEndpoint, type BlendOrientation, type BlendSpacingMode } from '../lib/blend';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
@@ -19,22 +19,40 @@ export function BlendDialog() {
   const open = useEditor(s => s.showBlend);
   const close = useCallback(() => useEditor.getState().setModal('showBlend', false), []);
   const [steps, setSteps] = useState(5);
+  const [spacingMode, setSpacingMode] = useState<BlendSpacingMode>('specifiedSteps');
+  const [distancePx, setDistancePx] = useState(24);
+  const [orientation, setOrientation] = useState<BlendOrientation>('page');
+  const [reverse, setReverse] = useState(false);
   const [reviewedPreset, setReviewedPreset] = useState('');
   const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+
+  const selectedEndpoints = useMemo(() => (open ? (getCanvas()?.getActiveObjects() ?? []).map(object => object as unknown as BlendEndpoint) : []), [open]);
+  const estimatedSteps = useMemo(() => estimateBlendStepCount(selectedEndpoints, steps, { reverse, spacingMode, distancePx, orientation }), [distancePx, orientation, reverse, selectedEndpoints, spacingMode, steps]);
 
   useEscapeClose(open, close);
   useFocusRestore(open);
   if (!open) return null;
 
   const apply = async () => {
-    if ((getCanvas()?.getActiveObjects().length ?? 0) < 2) { toast.warn(t('Select two objects to blend.'), { title: t('Blend') }); return; }
-    const n = await blendSelection(steps);
+    if ((getCanvas()?.getActiveObjects().length ?? 0) < 2) { toast.warn(t('Select 2 or more objects first.'), { title: t('Blend') }); return; }
+    const n = await blendSelection(steps, { reverse, spacingMode, distancePx, orientation });
     if (n > 0) toast.success(`${n} ${t('blend steps added')}`, { title: t('Blend') });
+    close();
+  };
+
+  const applyOptions = async () => {
+    const n = await applyBlendOptionsToSelection(steps, { reverse, spacingMode, distancePx, orientation });
+    if (n > 0) toast.success(`${n} ${t('blend steps updated')}`, { title: t('Blend Options') });
+    else toast.warn(t('Select generated blend steps or endpoints first.'), { title: t('Blend Options') });
     close();
   };
 
   const resetSettings = () => {
     setSteps(5);
+    setSpacingMode('specifiedSteps');
+    setDistancePx(24);
+    setOrientation('page');
+    setReverse(false);
     setReviewedPreset('');
     setReviewedFooterAction(t('Reset'));
   };
@@ -93,6 +111,20 @@ export function BlendDialog() {
         </div>
 
         <label className="block mb-2">
+          <div className="field-label">{t('Blend spacing')}</div>
+          <select
+            value={spacingMode}
+            onChange={(event) => setSpacingMode(event.target.value as BlendSpacingMode)}
+            className="input w-full"
+            aria-label={t('Blend spacing')}
+          >
+            <option value="specifiedSteps">{t('Specified Steps')}</option>
+            <option value="specifiedDistance">{t('Specified Distance')}</option>
+            <option value="smoothColor">{t('Smooth Color')}</option>
+          </select>
+        </label>
+
+        <label className="block mb-2">
           <div className="field-label flex items-center justify-between">
             <span>{t('Steps')}</span>
             <span className="text-ink tabular-nums">{steps}</span>
@@ -103,6 +135,22 @@ export function BlendDialog() {
             onChange={(e) => setSteps(parseInt(e.target.value, 10))}
             className="w-full"
             aria-label={t('Steps')}
+            disabled={spacingMode !== 'specifiedSteps'}
+          />
+        </label>
+
+        <label className="block mb-2">
+          <div className="field-label flex items-center justify-between">
+            <span>{t('Distance')}</span>
+            <span className="text-ink tabular-nums">{distancePx}px</span>
+          </div>
+          <input
+            type="number" min={1} max={500} step={1}
+            value={distancePx}
+            onChange={(event) => setDistancePx(Math.max(1, Math.min(500, Number(event.target.value) || 1)))}
+            className="input w-full"
+            aria-label={t('Distance')}
+            disabled={spacingMode !== 'specifiedDistance'}
           />
         </label>
 
@@ -130,6 +178,7 @@ export function BlendDialog() {
                   data-review={review}
                   data-value={preset}
                   className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
+                  disabled={spacingMode !== 'specifiedSteps'}
                   onClick={() => setSteps(preset)}
                   onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
                   aria-pressed={active}
@@ -141,6 +190,37 @@ export function BlendDialog() {
             })}
           </div>
         </div>
+
+        <div className="rounded border border-border bg-surface/50 px-3 py-2 text-xs text-muted" aria-live="polite">
+          <span className="font-medium text-ink">{estimatedSteps}</span> {t('estimated blend steps')}
+        </div>
+
+        <label className="block mb-2">
+          <div className="field-label">{t('Orientation')}</div>
+          <select
+            value={orientation}
+            onChange={(event) => setOrientation(event.target.value as BlendOrientation)}
+            className="input w-full"
+            aria-label={t('Orientation')}
+          >
+            <option value="page">{t('Align to Page')}</option>
+            <option value="path">{t('Align to Path')}</option>
+          </select>
+        </label>
+
+        <label className="mt-3 flex items-start gap-2 text-xs text-ink">
+          <input
+            type="checkbox"
+            checked={reverse}
+            onChange={(event) => setReverse(event.target.checked)}
+            className="mt-0.5"
+            aria-label={t('Reverse blend spine')}
+          />
+          <span>
+            <span className="font-medium">{t('Reverse blend spine')}</span>
+            <span className="block text-muted">{t('Blend from the last selected object back to the first.')}</span>
+          </span>
+        </label>
 
         <div
           className="flex justify-end gap-2 mt-3"
@@ -172,6 +252,16 @@ export function BlendDialog() {
             onFocus={() => setReviewedFooterAction(t('Reset'))}
           >
             {t('Reset')}
+          </button>
+          <button
+            type="button"
+            data-blend-action
+            data-blend-action-review={t('Apply Blend Options')}
+            className="btn"
+            onClick={() => { void applyOptions(); }}
+            onFocus={() => setReviewedFooterAction(t('Apply Blend Options'))}
+          >
+            {t('Apply Options')}
           </button>
           <button
             type="button"

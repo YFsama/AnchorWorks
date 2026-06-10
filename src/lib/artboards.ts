@@ -114,6 +114,14 @@ export function deleteArtboard(id: string): void {
   commit(list);
 }
 
+/** Delete the artboard containing the active object. Returns true when removed. */
+export function deleteActiveArtboard(): boolean {
+  const id = activeArtboardId();
+  if (!id) return false;
+  deleteArtboard(id);
+  return true;
+}
+
 /**
  * Create a new artboard that frames the current selection's bounding box
  * (Illustrator "Artboard from selection"), optionally inset by a margin. Placed
@@ -145,14 +153,49 @@ export function createArtboardFromSelection(marginPx = 0): Artboard | null {
  * the source frame is cloned and shifted by the same delta. Async because
  * Fabric v6's clone() is Promise-based. Returns the new artboard, or null.
  */
+function overlapsArtboard(box: { left: number; top: number; width: number; height: number }, artboard: Artboard): boolean {
+  return !(box.left + box.width < artboard.x
+    || box.left > artboard.x + artboard.width
+    || box.top + box.height < artboard.y
+    || box.top > artboard.y + artboard.height);
+}
+
+function activeArtboardId(): string | null {
+  const canvas = getCanvas();
+  const active = canvas?.getActiveObject();
+  if (!active) return null;
+  const box = active.getBoundingRect();
+  return getArtboards().find((artboard) => overlapsArtboard(box, artboard))?.id ?? null;
+}
+
+function duplicatedArtboardFrame(src: Artboard, list: Artboard[]): Artboard {
+  const rightmost = list.reduce((acc, a) => (a.x + a.width > acc.x + acc.width ? a : acc), list[0]);
+  return {
+    id: nextId(),
+    name: `${src.name} copy`,
+    x: rightmost.x + rightmost.width + 30,
+    y: src.y,
+    width: src.width,
+    height: src.height,
+  };
+}
+
+export function duplicateArtboardFrame(id: string): Artboard | null {
+  const src = findArtboard(id);
+  if (!src) return null;
+  const list = getArtboards();
+  const ab = duplicatedArtboardFrame(src, list);
+  commit([...list, ab]);
+  return ab;
+}
+
 export async function duplicateArtboard(id: string): Promise<Artboard | null> {
   const src = findArtboard(id);
   if (!src) return null;
   const list = getArtboards();
-  const rightmost = list.reduce((acc, a) => (a.x + a.width > acc.x + acc.width ? a : acc), list[0]);
-  const nx = rightmost.x + rightmost.width + 30;
-  const ny = src.y;
-  const ab: Artboard = { id: nextId(), name: `${src.name} copy`, x: nx, y: ny, width: src.width, height: src.height };
+  const ab = duplicatedArtboardFrame(src, list);
+  const nx = ab.x;
+  const ny = ab.y;
   commit([...list, ab]);
 
   const canvas = getCanvas();
@@ -177,9 +220,110 @@ export async function duplicateArtboard(id: string): Promise<Artboard | null> {
   return ab;
 }
 
+
+/** Duplicate the artboard containing the active object, including artwork on that page. */
+export async function duplicateActiveArtboard(): Promise<Artboard | null> {
+  const id = activeArtboardId();
+  return id ? duplicateArtboard(id) : null;
+}
+
+/** Duplicate only the active artboard frame, leaving artwork in place. */
+export function duplicateActiveArtboardFrame(): Artboard | null {
+  const id = activeArtboardId();
+  return id ? duplicateArtboardFrame(id) : null;
+}
+
+export type ArtboardOrderDirection = 'previous' | 'next' | 'first' | 'last';
+
+export function reorderArtboard(id: string, direction: ArtboardOrderDirection): boolean {
+  const list = getArtboards();
+  const index = list.findIndex((artboard) => artboard.id === id);
+  if (index < 0) return false;
+  const target = direction === 'first'
+    ? 0
+    : direction === 'last'
+      ? list.length - 1
+      : index + (direction === 'previous' ? -1 : 1);
+  if (target < 0 || target >= list.length || target === index) return false;
+  const next = [...list];
+  const [artboard] = next.splice(index, 1);
+  next.splice(target, 0, artboard);
+  commit(next);
+  return true;
+}
+
+export function reorderActiveArtboard(direction: ArtboardOrderDirection): boolean {
+  const id = activeArtboardId();
+  return id ? reorderArtboard(id, direction) : false;
+}
+
+function artboardOrderKey(artboard: Artboard): string {
+  return `${artboard.id}:${artboard.x}:${artboard.y}:${artboard.width}:${artboard.height}`;
+}
+
+function artboardPositionSorted(list: Artboard[]): Artboard[] {
+  return [...list].sort((a, b) => {
+    const verticalTolerance = Math.max(1, Math.min(a.height, b.height) * 0.5);
+    if (Math.abs(a.y - b.y) > verticalTolerance) return a.y - b.y;
+    if (a.x !== b.x) return a.x - b.x;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+export function sortArtboardsByPosition(): boolean {
+  const list = getArtboards();
+  if (list.length < 2) return false;
+  const sorted = artboardPositionSorted(list);
+  if (sorted.map(artboardOrderKey).join('|') === list.map(artboardOrderKey).join('|')) return false;
+  commit(sorted);
+  return true;
+}
+
+export function renumberArtboardsByPosition(prefix = 'Artboard'): boolean {
+  const list = getArtboards();
+  if (list.length === 0) return false;
+  const sorted = artboardPositionSorted(list).map((artboard, index) => ({
+    ...artboard,
+    name: `${prefix} ${index + 1}`,
+  }));
+  const sameOrder = sorted.map((artboard) => artboard.id).join('|') === list.map((artboard) => artboard.id).join('|');
+  const sameNames = sorted.every((artboard, index) => artboard.name === list[index]?.name);
+  if (sameOrder && sameNames) return false;
+  commit(sorted);
+  return true;
+}
+
 export function renameArtboard(id: string, name: string): void {
   const list = getArtboards().map((a) => (a.id === id ? { ...a, name } : a));
   commit(list);
+}
+
+/** Rename the artboard containing the active object. Returns true when changed. */
+export function renameActiveArtboard(name: string): boolean {
+  const id = activeArtboardId();
+  const nextName = name.trim();
+  if (!id || !nextName) return false;
+  const current = getArtboards().find((artboard) => artboard.id === id);
+  if (!current || current.name === nextName) return false;
+  renameArtboard(id, nextName);
+  return true;
+}
+
+export function getActiveArtboard(): Artboard | null {
+  const id = activeArtboardId();
+  return id ? getArtboards().find((artboard) => artboard.id === id) ?? null : null;
+}
+
+export function getActiveArtboardName(): string | null {
+  return getActiveArtboard()?.name ?? null;
+}
+
+export function promptRenameActiveArtboard(label = 'Artboard name'): boolean {
+  const current = getActiveArtboardName();
+  if (!current) return false;
+  const next = window.prompt(label, current);
+  if (next == null) return false;
+  return renameActiveArtboard(next);
 }
 
 export function moveArtboard(id: string, x: number, y: number): void {
@@ -192,6 +336,118 @@ export function resizeArtboard(id: string, w: number, h: number): void {
   const height = Math.max(1, h);
   const list = getArtboards().map((a) => (a.id === id ? { ...a, width, height } : a));
   commit(list);
+}
+
+export interface RearrangeArtboardsOptions {
+  columns?: number;
+  spacing?: number;
+  moveArtwork?: boolean;
+  startX?: number;
+  startY?: number;
+}
+
+export interface PromptRearrangeArtboardsLabels {
+  columns?: string;
+  spacing?: string;
+  moveArtwork?: string;
+}
+
+function parsePositiveInteger(value: string): number | null {
+  const parsed = Number(value.trim());
+  if (!Number.isFinite(parsed)) return null;
+  const rounded = Math.floor(parsed);
+  return rounded >= 1 ? rounded : null;
+}
+
+function parseNonNegativeNumber(value: string): number | null {
+  const parsed = Number(value.trim());
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function parsePromptBoolean(value: string): boolean | null {
+  const normalized = value.trim().toLowerCase();
+  if (['y', 'yes', 'true', '1'].includes(normalized)) return true;
+  if (['n', 'no', 'false', '0'].includes(normalized)) return false;
+  return null;
+}
+
+/** Prompt for Illustrator-style Rearrange Artboards options. Returns null on cancel, -1 on invalid input. */
+export function promptRearrangeArtboards(labels: PromptRearrangeArtboardsLabels = {}): number | null {
+  const artboardCount = getArtboards().length;
+  if (artboardCount < 2) return 0;
+  const defaultColumns = String(Math.ceil(Math.sqrt(artboardCount)));
+  const columnsRaw = window.prompt(labels.columns ?? 'Columns', defaultColumns);
+  if (columnsRaw == null) return null;
+  const columns = parsePositiveInteger(columnsRaw);
+  if (columns == null) return -1;
+
+  const spacingRaw = window.prompt(labels.spacing ?? 'Spacing', '30');
+  if (spacingRaw == null) return null;
+  const spacing = parseNonNegativeNumber(spacingRaw);
+  if (spacing == null) return -1;
+
+  const moveArtworkRaw = window.prompt(labels.moveArtwork ?? 'Move artwork? yes/no', 'yes');
+  if (moveArtworkRaw == null) return null;
+  const moveArtwork = parsePromptBoolean(moveArtworkRaw);
+  if (moveArtwork == null) return -1;
+
+  return rearrangeArtboards({ columns, spacing, moveArtwork });
+}
+
+function centerInsideArtboard(object: fabric.FabricObject, artboard: Artboard): boolean {
+  const bounds = object.getBoundingRect();
+  const cx = bounds.left + bounds.width / 2;
+  const cy = bounds.top + bounds.height / 2;
+  return cx >= artboard.x && cx <= artboard.x + artboard.width && cy >= artboard.y && cy <= artboard.y + artboard.height;
+}
+
+export function rearrangeArtboards(options: RearrangeArtboardsOptions = {}): number {
+  const artboards = getArtboards();
+  if (artboards.length < 2) return 0;
+  const columns = Math.max(1, Math.floor(options.columns ?? Math.ceil(Math.sqrt(artboards.length))));
+  const spacing = Math.max(0, options.spacing ?? 30);
+  const startX = options.startX ?? Math.min(...artboards.map((artboard) => artboard.x));
+  const startY = options.startY ?? Math.min(...artboards.map((artboard) => artboard.y));
+  let x = startX;
+  let y = startY;
+  let rowHeight = 0;
+  const arranged = artboards.map((artboard, index) => {
+    if (index > 0 && index % columns === 0) {
+      x = startX;
+      y += rowHeight + spacing;
+      rowHeight = 0;
+    }
+    const next = { ...artboard, x: Math.round(x), y: Math.round(y) };
+    x += artboard.width + spacing;
+    rowHeight = Math.max(rowHeight, artboard.height);
+    return next;
+  });
+  commit(arranged);
+
+  if (options.moveArtwork !== false) {
+    const canvas = getCanvas();
+    if (canvas) {
+      let movedObjects = 0;
+      for (const object of canvas.getObjects()) {
+        if ((object as { excludeFromExport?: boolean }).excludeFromExport) continue;
+        const sourceIndex = artboards.findIndex((artboard) => centerInsideArtboard(object, artboard));
+        if (sourceIndex < 0) continue;
+        const source = artboards[sourceIndex];
+        const target = arranged[sourceIndex];
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        if (!dx && !dy) continue;
+        object.set({ left: (object.left ?? 0) + dx, top: (object.top ?? 0) + dy });
+        object.setCoords();
+        movedObjects++;
+      }
+      if (movedObjects) {
+        canvas.requestRenderAll();
+        pushHistory();
+      }
+    }
+  }
+  return arranged.length;
 }
 
 /** Reposition + resize an artboard to tightly fit `bbox` plus a px margin, in
@@ -329,17 +585,104 @@ export function exportAllArtboardsSVG(): string[] {
  * Download every artboard as a separate SVG file (one per artboard), using the
  * async full-fidelity render. Returns the number exported.
  */
+function safeArtboardName(artboard: Artboard, fallback: string): string {
+  return (artboard.name || fallback).replace(/[^\w.-]+/g, '_');
+}
+
+export function parseArtboardRange(range: string, artboardCount: number): number[] | null {
+  if (artboardCount <= 0) return [];
+  const seen = new Set<number>();
+  const indexes: number[] = [];
+  const parts = range.split(',').map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  for (const part of parts) {
+    const match = part.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+    if (!match) return null;
+    const start = Number(match[1]);
+    const end = Number(match[2] ?? match[1]);
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < 1 || start > artboardCount || end > artboardCount || start > end) return null;
+    for (let page = start; page <= end; page++) {
+      const index = page - 1;
+      if (!seen.has(index)) {
+        seen.add(index);
+        indexes.push(index);
+      }
+    }
+  }
+  return indexes;
+}
+
+function artboardsFromRange(range: string): Artboard[] | null {
+  const artboards = getArtboards();
+  const indexes = parseArtboardRange(range, artboards.length);
+  if (!indexes) return null;
+  return indexes.map((index) => artboards[index]).filter(Boolean);
+}
+
+function artboardsFromIds(ids: string[]): Artboard[] {
+  const artboards = getArtboards();
+  const byId = new Map(artboards.map((artboard) => [artboard.id, artboard]));
+  const seen = new Set<string>();
+  const selected: Artboard[] = [];
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    const artboard = byId.get(id);
+    if (!artboard) continue;
+    seen.add(id);
+    selected.push(artboard);
+  }
+  return selected;
+}
+
+export async function exportActiveArtboardAsSVG(): Promise<boolean> {
+  const artboard = getActiveArtboard();
+  if (!artboard) return false;
+  const svg = await exportArtboardSVGAsync(artboard.id);
+  if (!svg) return false;
+  download(`${safeArtboardName(artboard, 'active-artboard')}.svg`, svg);
+  return true;
+}
+
+export function exportActiveArtboardAsPNG(multiplier = 2): boolean {
+  const artboard = getActiveArtboard();
+  if (!artboard) return false;
+  const url = exportArtboardPNG(artboard.id, multiplier);
+  if (!url) return false;
+  downloadDataURL(`${safeArtboardName(artboard, 'active-artboard')}.png`, url);
+  return true;
+}
+
 export async function exportAllArtboardsAsFiles(): Promise<number> {
   const abs = getArtboards();
   let n = 0;
   for (const a of abs) {
     const svg = await exportArtboardSVGAsync(a.id);
     if (!svg) continue;
-    const safe = (a.name || `artboard-${n + 1}`).replace(/[^\w.-]+/g, '_');
-    download(`${safe}.svg`, svg);
+    download(`${safeArtboardName(a, `artboard-${n + 1}`)}.svg`, svg);
     n++;
   }
   return n;
+}
+
+export async function exportArtboardRangeAsFiles(range: string): Promise<number | null> {
+  const artboards = artboardsFromRange(range);
+  if (!artboards) return null;
+  return exportArtboardsAsFilesByList(artboards);
+}
+
+async function exportArtboardsAsFilesByList(artboards: Artboard[]): Promise<number> {
+  let n = 0;
+  for (const artboard of artboards) {
+    const svg = await exportArtboardSVGAsync(artboard.id);
+    if (!svg) continue;
+    download(`${safeArtboardName(artboard, `artboard-${n + 1}`)}.svg`, svg);
+    n++;
+  }
+  return n;
+}
+
+export async function exportArtboardsByIdAsFiles(ids: string[]): Promise<number> {
+  return exportArtboardsAsFilesByList(artboardsFromIds(ids));
 }
 
 /** Download every artboard as its own PNG (`multiplier`× resolution). Returns
@@ -350,11 +693,43 @@ export function exportAllArtboardsAsPNG(multiplier = 2): number {
   for (const a of abs) {
     const url = exportArtboardPNG(a.id, multiplier);
     if (!url) continue;
-    const safe = (a.name || `artboard-${n + 1}`).replace(/[^\w.-]+/g, '_');
-    downloadDataURL(`${safe}.png`, url);
+    downloadDataURL(`${safeArtboardName(a, `artboard-${n + 1}`)}.png`, url);
     n++;
   }
   return n;
+}
+
+export function exportArtboardRangeAsPNG(range: string, multiplier = 2): number | null {
+  const artboards = artboardsFromRange(range);
+  if (!artboards) return null;
+  return exportArtboardsAsPNGByList(artboards, multiplier);
+}
+
+function exportArtboardsAsPNGByList(artboards: Artboard[], multiplier = 2): number {
+  let n = 0;
+  for (const artboard of artboards) {
+    const url = exportArtboardPNG(artboard.id, multiplier);
+    if (!url) continue;
+    downloadDataURL(`${safeArtboardName(artboard, `artboard-${n + 1}`)}.png`, url);
+    n++;
+  }
+  return n;
+}
+
+export function exportArtboardsByIdAsPNG(ids: string[], multiplier = 2): number {
+  return exportArtboardsAsPNGByList(artboardsFromIds(ids), multiplier);
+}
+
+export async function promptExportArtboardRangeAsSVG(label = 'Artboard range', defaultRange = '1'): Promise<number | null> {
+  const range = window.prompt(label, defaultRange);
+  if (range == null) return null;
+  return exportArtboardRangeAsFiles(range);
+}
+
+export function promptExportArtboardRangeAsPNG(label = 'Artboard range', defaultRange = '1'): number | null {
+  const range = window.prompt(label, defaultRange);
+  if (range == null) return null;
+  return exportArtboardRangeAsPNG(range);
 }
 
 /**
