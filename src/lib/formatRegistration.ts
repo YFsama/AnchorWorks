@@ -19,6 +19,7 @@ import { registerFormat } from './formats';
 import { download, downloadDataURL, exportPNG, importSVGString } from './io';
 import { exportDXF, exportJPG, exportJSON, exportPDF, exportPDFReal, importJSON } from './io2';
 import { exportSVGOptimized } from './io3';
+import { importPdfFile } from './pdfImporter';
 import { importSVGSmartFile } from './svgImport';
 import { buildPlotterOutput, defaultPlotterOptions } from './plotter';
 import { parsePlt, polylinesToSvg } from './pltImporter';
@@ -106,15 +107,24 @@ export function registerBuiltInFormats(): void {
     },
   });
 
+  // PDF — export via the browser print dialog, import via the vector
+  // operator-list walker in pdfImporter.ts (paths + colours come through as
+  // editable SVG geometry; text is skipped with a warning). 'pdf' is the
+  // first ext-match for drag-drop because it registers before 'pdf-vector'.
   registerFormat({
     id: 'pdf',
     label: 'PDF',
     ext: 'pdf',
     mime: 'application/pdf',
-    mode: 'export',
+    mode: 'both',
     category: 'Document',
-    description: t('PDF via the browser print dialog (use Print Prep dialog for crop / bleed / registration marks).'),
+    keywords: 'import vector acrobat reader',
+    description: t('PDF via the browser print dialog (use Print Prep dialog for crop / bleed / registration marks). Imports vector artwork as editable paths.'),
     export: () => exportPDF(),
+    import: async (input) => {
+      if (typeof input === 'string') return; // PDFs are binary-only — needs a File
+      await importPdfFile(input);
+    },
   });
 
   // Vector PDF uses jsPDF + svg2pdf.js (no print-dialog round-trip). The
