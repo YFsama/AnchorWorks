@@ -16,7 +16,7 @@ import { Onboarding } from './components/Onboarding';
 import { hasOnboarded } from './lib/onboarding';
 import { Loading } from './components/Loading';
 import { useEditor } from './store/editor';
-import { useT, useI18n } from './lib/i18n';
+import { useT, useI18n, useI18nReady } from './lib/i18n';
 import { announce, setLiveRegion } from './lib/a11y';
 import { getFormat } from './lib/formats';
 import { openProjectFromFile, saveProjectQuick, saveProjectToFile, applyProject, subscribeCurrentProjectName } from './lib/projectFile';
@@ -698,6 +698,10 @@ registerSkill({
 export default function App() {
   const t = useT();
   const lang = useI18n((s) => s.lang);
+  // Cold-boot flash guard: a persisted-zh user must not see one English
+  // frame while the lazy zh dictionary chunk loads. English is always
+  // ready; the gate only ever holds for the dictionary's fetch window.
+  const i18nReady = useI18nReady();
 
   // Keep <html lang> in sync with the active locale — screen readers, browser
   // spell-check, and Google's "Translate this page" prompt all consult it.
@@ -1295,6 +1299,11 @@ export default function App() {
   // Under Tauri, hook up the native menu listener so File / Edit / View
   // picks dispatch to the same handlers as the DOM MenuBar. No-op in PWA.
   useEffect(() => { void installNativeMenuListener(); }, []);
+
+  // Hold first paint (after all hooks) until the locale is renderable.
+  if (!i18nReady) {
+    return <Loading overlay label="…" />;
+  }
 
   return (
     <div className="h-full w-full flex flex-col bg-[rgb(var(--color-app-bg))] relative">
