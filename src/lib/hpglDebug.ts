@@ -220,7 +220,23 @@ const HPGL_KNOWN = new Set([
   'OA', 'OB', 'OC', 'OD', 'OE', 'OF', 'OH', 'OI', 'OK', 'OL',
   'OP', 'OS', 'OT', 'OW', 'TL', 'LT', 'AC', 'CT', 'TB', 'PG',
   'NP', 'FR', 'DW', 'MC', 'IM', 'CB', 'PT', 'SM', 'EA', 'RA',
+  'AA', 'AR', 'CI', 'PW',
 ]);
+
+/** Flatten an HP-GL arc into polyline points (EXCLUDING the start point).
+ *  `cx/cy` = center, `r` = radius, `a0` = start angle (radians), `sweepDeg`
+ *  = sweep in degrees (CCW positive). Step density is capped so huge
+ *  sweeps stay cheap. Shared by the linter and the run parser so imported
+ *  PLT files with arcs plot honestly in both. */
+export function flattenArcPoints(cx: number, cy: number, r: number, a0: number, sweepDeg: number): Array<[number, number]> {
+  const steps = Math.max(6, Math.min(96, Math.ceil(Math.abs(sweepDeg) / 5)));
+  const out: Array<[number, number]> = [];
+  for (let i = 1; i <= steps; i++) {
+    const a = a0 + (sweepDeg * Math.PI / 180) * (i / steps);
+    out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return out;
+}
 
 function lintHpgl(code: string, ctx: LintOptions, issues: JobIssue[], stats: LintStats): void {
   const per = ctx.unit === 'in' ? 1016 : 40;
@@ -269,6 +285,39 @@ function lintHpgl(code: string, ctx: LintOptions, issues: JobIssue[], stats: Lin
         if (relative) { x += args[k]; y += args[k + 1]; }
         else { x = args[k]; y = args[k + 1]; }
         stats.penDownMoves += penDown ? 1 : 0;
+        if (penDown) {
+          minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        }
+      }
+    } else if (mnemonic === 'AA' || mnemonic === 'AR' || mnemonic === 'CI') {
+      // Arcs (AA/AR) and circles (CI) — flattened so extents stay honest
+      // on imported PLT files. Coordinates stay in plotter units.
+      let cx: number, cy: number, r: number, a0: number;
+      let sweep: number;
+      let returnsToCenter = false;
+      if (mnemonic === 'CI') {
+        r = args[0] ?? 0;
+        sweep = args[1] ?? 360;
+        cx = x; cy = y; a0 = 0;
+        returnsToCenter = true;
+      } else {
+        cx = mnemonic === 'AR' ? x + (args[0] ?? 0) : (args[0] ?? 0);
+        cy = mnemonic === 'AR' ? y + (args[1] ?? 0) : (args[1] ?? 0);
+        sweep = args[2] ?? 360;
+        r = Math.hypot(cx - x, cy - y);
+        a0 = Math.atan2(y - cy, x - cx);
+      }
+      for (const [ax, ay] of flattenArcPoints(cx, cy, r, a0, sweep)) {
+        x = ax; y = ay;
+        stats.penDownMoves += penDown ? 1 : 0;
+        if (penDown) {
+          minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+        }
+      }
+      if (returnsToCenter) {
+        x = cx; y = cy;
         if (penDown) {
           minX = Math.min(minX, x); maxX = Math.max(maxX, x);
           minY = Math.min(minY, y); maxY = Math.max(maxY, y);
@@ -464,7 +513,7 @@ const HPGL_QUERY_INFO: Record<string, string> = {
 
 const HPGL_SETUP_MNEMONICS = new Set([
   'IN', 'SP', 'FS', 'VS', 'IP', 'SC', 'TB', 'CT', 'NP', 'FR', 'LT', 'PT',
-  'AC', 'IM', 'CB', 'MC', 'SM', 'EA', 'RA', 'PW', 'AA', 'CI',
+  'AC', 'IM', 'CB', 'MC', 'SM', 'EA', 'RA', 'PW',
 ]);
 
 function runHpgl(code: string, per: number): MachineRun {
@@ -542,6 +591,29 @@ function runHpgl(code: string, per: number): MachineRun {
         distance += movePoint(nx, ny);
         moved = true;
       }
+    } else if (mnemonic === 'AA' || mnemonic === 'AR' || mnemonic === 'CI') {
+      // Arcs and circles, flattened into the same polyline runs.
+      kind = penDown ? 'cut' : 'travel';
+      let cx: number, cy: number, r: number, a0: number, sweep: number;
+      let returnsToCenter = false;
+      if (mnemonic === 'CI') {
+        r = args[0] ?? 0;
+        sweep = args[1] ?? 360;
+        cx = x; cy = y; a0 = 0;
+        returnsToCenter = true;
+      } else {
+        cx = mnemonic === 'AR' ? x + (args[0] ?? 0) : (args[0] ?? 0);
+        cy = mnemonic === 'AR' ? y + (args[1] ?? 0) : (args[1] ?? 0);
+        sweep = args[2] ?? 360;
+        r = Math.hypot(cx - x, cy - y);
+        a0 = Math.atan2(y - cy, x - cx);
+      }
+      for (const [ax, ay] of flattenArcPoints(cx, cy, r, a0, sweep)) {
+        distance += movePoint(ax, ay);
+      }
+      // CI: the pen ends back at the circle's center.
+      if (returnsToCenter) distance += movePoint(cx, cy);
+      moved = true;
     } else if (mnemonic === 'PG') kind = 'end';
     else if (HPGL_SETUP_MNEMONICS.has(mnemonic)) kind = 'setup';
 
@@ -734,10 +806,16 @@ export function explainStep(step: RunStep, unit: 'mm' | 'in' = 'mm'): string {
       return `Ask the machine for its ${what} (${step.mnemonic};) — expects a reply.`;
     }
     case 'travel':
+      if (step.moved && (step.mnemonic === 'AA' || step.mnemonic === 'AR' || step.mnemonic === 'CI')) {
+        return `Trace arc (${step.mnemonic}) · ${n(step.distance)} ${unit} with the pen up.`;
+      }
       return step.moved
         ? `Pen up → ${pos(step.to)} · ${n(step.distance)} ${unit} of travel.`
         : 'Raise the pen / blade.';
     case 'cut':
+      if (step.moved && (step.mnemonic === 'AA' || step.mnemonic === 'AR' || step.mnemonic === 'CI')) {
+        return `Cut arc (${step.mnemonic}) · ${n(step.distance)} ${unit} of blade-down.`;
+      }
       return step.moved
         ? `Cut to ${pos(step.to)} · ${n(step.distance)} ${unit} of blade-down.`
         : 'Lower the pen / blade here.';
@@ -796,4 +874,13 @@ export function parsePageReply(reply: string, unit: 'mm' | 'in' = 'mm'): { x0: n
   if (nums.length < 4 || !nums.slice(0, 4).every(Number.isFinite)) return null;
   const per = unit === 'in' ? 1016 : 40;
   return { x0: nums[0] / per, y0: nums[1] / per, x1: nums[2] / per, y1: nums[3] / per };
+}
+
+/** Best-effort format sniff for loaded machine-code files: HP-GL vs grbl
+ *  G-code. HP-GL is the fallback — most .plt content has no header. */
+export function sniffFormat(text: string): OutputFormat {
+  const head = text.slice(0, 4000).toUpperCase();
+  if (/;(PU|PD|IN|SP|VS|FS)/.test(head) || /^(PU|PD|IN|SP|VS|FS)/m.test(head)) return 'hpgl';
+  if (/(^|\n)\s*(G0|G1|G2|G3|G20|G21|G90|G91|M3|M5|M30|\$)/.test(head)) return 'gcode';
+  return 'hpgl';
 }

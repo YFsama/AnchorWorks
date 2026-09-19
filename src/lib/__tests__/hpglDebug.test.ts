@@ -11,6 +11,7 @@ import {
   explainStep,
   parsePositionReply,
   parsePageReply,
+  sniffFormat,
   QUICK_COMMANDS,
 } from '../hpglDebug';
 
@@ -377,5 +378,61 @@ describe('MachineRun.segs — statement tagging', () => {
     const run = simulateMachineCode('hpgl', code, 'mm');
     expect(run.segs.filter(s => s.penDown).map(s => s.pts)).toEqual(run.cuts);
     expect(run.segs.filter(s => !s.penDown).map(s => s.pts)).toEqual(run.travels);
+  });
+});
+
+describe('HP-GL arcs — AA / AR / CI', () => {
+  it('flattens CI into a full circle with the right length and extents', () => {
+    // Center (10,10) mm, r = 10 mm → circle 2π·10 ≈ 62.83 mm plus the
+    // drop-to-circle and return-to-center radii (10 + 10 mm).
+    const run = simulateMachineCode('hpgl', 'IN;PU400,400;PD;CI400;', 'mm');
+    expect(run.cutLen).toBeGreaterThan(80);
+    expect(run.cutLen).toBeLessThan(85);
+    expect(run.bbox?.minX).toBeCloseTo(0, 1);
+    expect(run.bbox?.maxX).toBeCloseTo(20, 1);
+    expect(run.bbox?.minY).toBeCloseTo(0, 1);
+    // CI ends back at the circle center.
+    const last = run.steps[run.steps.length - 1];
+    expect(last.to).toEqual([10, 10]);
+  });
+
+  it('flattens AA quarter arcs with honest extents', () => {
+    // Start (0,0), center (10,0) mm, sweep +90° CCW → arc ends at (10,-10).
+    const run = simulateMachineCode('hpgl', 'IN;PU0,0;PD;AA400,0,90;', 'mm');
+    expect(run.cutLen).toBeGreaterThan(14);   // π·10/2 ≈ 15.7
+    expect(run.cutLen).toBeLessThan(17);
+    expect(run.bbox?.minY).toBeCloseTo(-10, 1);
+    expect(run.bbox?.maxX).toBeCloseTo(10, 1);
+  });
+
+  it('classifies arcs as cut/travel statements, not setup', () => {
+    const run = simulateMachineCode('hpgl', 'IN;PD;CI400;', 'mm');
+    const ci = run.steps.find(s => s.stmt.startsWith('CI'));
+    expect(ci?.kind).toBe('cut');
+    expect(ci?.moved).toBe(true);
+  });
+
+  it('lint accepts AA/AR/CI without unknown warnings and tracks extents', () => {
+    const res = lintJob('hpgl', 'IN;PD;CI400;', { unit: 'mm' });
+    expect(res.issues.some(i => i.message.includes('Unknown'))).toBe(false);
+    expect(res.stats.plot?.h).toBeCloseTo(20, 1);
+    const ar = lintJob('hpgl', 'IN;PD0,0;AR400,0,90;', { unit: 'mm' });
+    expect(ar.issues.some(i => i.message.includes('Unknown'))).toBe(false);
+  });
+});
+
+describe('sniffFormat', () => {
+  it('recognises HP-GL by its statement verbs', () => {
+    expect(sniffFormat('IN;SP1;PU100,100;PD200,200;')).toBe('hpgl');
+    expect(sniffFormat('PU 10 20;PD 30 40;')).toBe('hpgl');
+  });
+
+  it('recognises grbl G-code by motion codes and $ commands', () => {
+    expect(sniffFormat('; job\nG21\nG90\nG0 Z5\nG1 X10 F1500\nM30')).toBe('gcode');
+    expect(sniffFormat('$X\n$H\n?')).toBe('gcode');
+  });
+
+  it('falls back to HP-GL for headerless .plt-style content', () => {
+    expect(sniffFormat('100,200,300,400\n')).toBe('hpgl');
   });
 });

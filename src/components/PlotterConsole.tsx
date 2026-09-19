@@ -107,6 +107,9 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   const [lastTransfer, setLastTransfer] = useState<{ bps: number; pct: number | null } | null>(null);
   // Traffic-log direction filter (chips above the log).
   const [dirFilter, setDirFilter] = useState<'all' | 'tx' | 'rx' | 'notice'>('all');
+  // Raw-command history for terminal-style ↑/↓ recall.
+  const [history, setHistory] = useState<string[]>([]);
+  const [histIdx, setHistIdx] = useState(-1);
   // Saved machine configs + job history (plotterRecords).
   const [machines, setMachines] = useState<MachineRecord[]>(() => listMachines());
   const [selectedMachineId, setSelectedMachineId] = useState('');
@@ -445,14 +448,37 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   };
 
   const jog = (dx: number, dy: number) => {
+    warnIfJogExitsPage(dx, dy);
     void exec(buildJog(format, dx * jogStep, dy * jogStep, unit, feedRate));
+  };
+
+  /** Soft guard: when the live position and page limits are known (auto
+   *  status + OH; on connect), warn before jogging off the material. */
+  const warnIfJogExitsPage = (dx: number, dy: number) => {
+    if (!position || !page) return;
+    const nx = position.x + dx * jogStep;
+    const ny = position.y + dy * jogStep;
+    if (nx < page.x0 || nx > page.x1 || ny < page.y0 || ny > page.y1) {
+      toast.warn(t('Jog would leave the page area.'), { title: t('Jog') });
+    }
   };
 
   const submitInput = () => {
     const text = input.trim();
     if (!text) return;
     setInput('');
+    setHistory(h => (h[h.length - 1] === text ? h : [...h, text].slice(-50)));
+    setHistIdx(-1);
     void exec(text);
+  };
+
+  /** Terminal-style ↑/↓ recall of previously sent raw commands. */
+  const recallHistory = (dir: 1 | -1, current: string) => {
+    if (history.length === 0) return null;
+    let idx = histIdx === -1 && dir === -1 ? history.length - 1 : histIdx + dir;
+    idx = Math.max(0, Math.min(history.length - 1, idx));
+    setHistIdx(idx);
+    return history[idx] ?? current;
   };
 
   const plainLog = () => entries.map(e => {
@@ -907,6 +933,13 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); submitInput(); }
+                else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.nativeEvent.isComposing && history.length > 0) {
+                  e.preventDefault();
+                  const recalled = recallHistory(e.key === 'ArrowUp' ? -1 : 1, input);
+                  if (recalled !== null) setInput(recalled);
+                  // Returning past the newest entry drops back to free typing.
+                  if (e.key === 'ArrowDown' && histIdx === history.length - 1) setHistIdx(-1);
+                }
               }}
               placeholder={format === 'hpgl' ? 'IN; SP1; VS10; OE;' : '$I ? $X G0 X10'}
               aria-label={t('Raw command')}

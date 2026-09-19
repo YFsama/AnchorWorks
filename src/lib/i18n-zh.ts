@@ -4032,4 +4032,11 @@ export const zhDict: Record<string, string> = {
   "Filter the traffic log by direction.": "按方向过滤流量日志。",
   "No entries match this filter.": "没有符合条件的记录。",
   "Hold the stream between chunks — the machine drains its buffer and stops. grbl also gets a feed hold.": "在数据块之间暂停发送——机器排空缓冲后停下；grbl 机型还会同时发送进给保持。",
+  "Discard the loaded file and go back to generated code.": "丢弃已加载的文件，回到生成的代码。",
+  "Jog would leave the page area.": "点动将超出页面范围。",
+  "Load an existing .plt / .hpgl / .gcode file to preflight, explain and replay it here — debug a third-party file before it touches the machine.": "打开已有的 .plt / .hpgl / .gcode 文件，在此预检、逐句解释并回放——在文件上机前调试第三方文件。",
+  "Load file…": "打开文件…",
+  "Loaded file": "已加载文件",
+  "Send anyway?": "仍要发送？",
+  "The file is empty.": "文件为空。",
 };

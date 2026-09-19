@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play } from 'lucide-react';
+import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
-import { buildAbortSnippet, lintJob, simulateMachineCode, type LintResult, type MachineRun } from '../lib/hpglDebug';
+import { buildAbortSnippet, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
 import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSpeed } from '../lib/machineProfiles';
 import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
 import { estimateTransferSeconds } from '../lib/plotterDiag';
@@ -85,6 +85,8 @@ export function PlotterDialog() {
   const [opts, setOpts] = useState<PlotterOptions>(savedPrefs.opts ?? defaultPlotterOptions);
   const [format, setFormat] = useState<'gcode' | 'hpgl'>(savedPrefs.format ?? 'hpgl');
   const [code, setCode] = useState('');
+  // Filename when the code tab shows a loaded third-party file ('' = generated).
+  const [codeSource, setCodeSource] = useState('');
   // Preflight dry-run result for the Code tab (see lintJob in hpglDebug).
   const [lint, setLint] = useState<LintResult | null>(null);
   // Code-tab sub-view: raw text / annotated statements / animated replay.
@@ -347,7 +349,34 @@ export function PlotterDialog() {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
     const out = buildOut();
     setCode(out);
+    setCodeSource('');
     setLint(lintJob(format, out, lintContext));
+  };
+  /** Load a third-party .plt / .hpgl / .gcode file into the code tab for
+   *  preflight / annotated / replay analysis — nothing is sent. The
+   *  format tab auto-switches to the sniffed format so the parsers match. */
+  const loadCodeFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.plt,.hpgl,.gcode,.nc,.ngc,.gcode.txt,.txt';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        if (!text.trim()) { toast.warn(t('The file is empty.')); return; }
+        const sniffed = sniffFormat(text);
+        if (sniffed !== format) setFormat(sniffed);
+        setCode(text);
+        setCodeSource(file.name);
+        setLint(lintJob(sniffed, text, lintContext));
+        setPreviewMode('code');
+        toast.success(`${t('Loaded file')}: ${file.name}${sniffed !== format ? ` (${sniffed === 'gcode' ? 'G-code' : 'HP-GL'})` : ''}`);
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    };
+    input.click();
   };
   const setPreview = (mode: PreviewMode) => {
     setPreviewMode(mode);
@@ -592,9 +621,22 @@ export function PlotterDialog() {
 
   const send = async () => {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
+    // Last-chance preflight gate: lintJob is pure and fast, so run it on
+    // the exact bytes about to ship and confirm on ERROR-level problems.
+    const payload = code || buildOut();
+    const check = lintJob(format, payload, lintContext);
+    if (check.issues.some(i => i.severity === 'error')) {
+      const first = check.issues.find(i => i.severity === 'error');
+      const ok = window.confirm(`${t('Preflight found problems')}:\n${first?.message ?? ''}\n\n${t('Send anyway?')}`);
+      if (!ok) {
+        setLint(check);
+        setPreviewMode('code');
+        return;
+      }
+    }
     setBusy(true);
     try {
-      await streamJob(code || buildOut(), t('✅ Sent to plotter'));
+      await streamJob(payload, t('✅ Sent to plotter'));
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -1511,6 +1553,28 @@ export function PlotterDialog() {
                   >
                     {t('Preflight')}
                   </button>
+                  <button
+                    type="button"
+                    className="btn !py-1 !text-[10px]"
+                    onClick={() => { void loadCodeFile(); }}
+                    title={t('Load an existing .plt / .hpgl / .gcode file to preflight, explain and replay it here — debug a third-party file before it touches the machine.')}
+                  >
+                    <FolderOpen size={11} aria-hidden="true" />{t('Load file…')}
+                  </button>
+                  {codeSource && (
+                    <span className="flex items-center gap-1 rounded border border-accent2/40 bg-accent2/10 px-1.5 py-0.5 text-[10px] text-accent2">
+                      {codeSource}
+                      <button
+                        type="button"
+                        className="text-accent2/70 hover:text-accent2"
+                        onClick={() => { setCode(''); setCodeSource(''); setLint(null); }}
+                        title={t('Discard the loaded file and go back to generated code.')}
+                        aria-label={t('Discard the loaded file and go back to generated code.')}
+                      >
+                        <X size={10} aria-hidden="true" />
+                      </button>
+                    </span>
+                  )}
                 </>
               )}
               <div className="flex-1" />
