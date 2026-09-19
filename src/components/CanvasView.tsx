@@ -12,6 +12,7 @@ import { CutPathLayer } from './CutPathLayer';
 import { GuidesLayer } from './GuidesLayer';
 import { MeasureLayer } from './MeasureLayer';
 import { EraserHUD } from './EraserHUD';
+import { TransformHUD } from './TransformHUD';
 import { EmptyCanvasHint } from './EmptyCanvasHint';
 import { enhanceTouchSupport } from '../lib/touch';
 
@@ -146,6 +147,7 @@ export function CanvasView() {
           forward it as a prop is safe and intentional — the alternative
           (callback ref) loses the ergonomic prop shape. */}
       {ready && <EraserHUD host={wrapRef.current} />}
+      {ready && <TransformHUD />}
       {ready && <EmptyCanvasHint />}
     </div>
   );

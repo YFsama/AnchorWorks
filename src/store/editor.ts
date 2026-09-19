@@ -264,6 +264,12 @@ interface EditorState {
   cursorY: number;
   setCursor: (x: number, y: number) => void;
 
+  // Live transform readout (Illustrator-style W×H / angle HUD). Written by
+  // canvasEngine during object:scaling / object:rotating, cleared shortly
+  // after mouse:up so the final value lingers for the user.
+  transformHud: null | { kind: 'scale'; w: number; h: number } | { kind: 'rotate'; angle: number };
+  setTransformHud: (h: EditorState['transformHud']) => void;
+
   // Object count for status bar
   objectCount: number;
   setObjectCount: (n: number) => void;
@@ -434,6 +440,9 @@ export const useEditor = create<EditorState>((set) => ({
   cursorX: 0,
   cursorY: 0,
   setCursor: (x, y) => set({ cursorX: x, cursorY: y }),
+
+  transformHud: null,
+  setTransformHud: (h) => set({ transformHud: h }),
 
   objectCount: 0,
   setObjectCount: (n) => set({ objectCount: n }),

@@ -622,6 +622,30 @@ function GeneralTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
           onChange={(e) => { const v = Math.max(2, Math.min(500, Math.round(+e.target.value || 20))); patch.prefs({ gridSizePx: v }); useEditor.getState().setGridSize(v); }}
         />
       </Field>
+
+      {/* Wheel behaviour — 'pan' keeps the Figma-style default (wheel scrolls,
+          Ctrl/Cmd+wheel zooms); 'zoom' flips it for Inkscape/Illustrator muscle
+          memory. Read live per wheel event, so Apply makes it effective
+          immediately. Shift+wheel pans horizontally in either mode. */}
+      <Field label={t('Mouse wheel')}>
+        <div className="flex items-center gap-1.5" role="group" aria-label={t('Mouse wheel')}>
+          {(['pan', 'zoom'] as const).map((mode) => {
+            const active = draft.prefs.wheelMode === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                aria-pressed={active}
+                title={mode === 'pan' ? t('Wheel scrolls, Ctrl/Cmd+wheel zooms (Figma-style)') : t('Wheel zooms at the cursor, Ctrl/Cmd+wheel scrolls (Illustrator-style)')}
+                onClick={() => patch.prefs({ wheelMode: mode })}
+              >
+                {mode === 'pan' ? t('Scroll (Ctrl+wheel zooms)') : t('Zoom (Ctrl+wheel scrolls)')}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
     </div>
   );
 }

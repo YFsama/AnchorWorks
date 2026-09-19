@@ -28,6 +28,10 @@ export interface AppPreferences {
   keyboardIncrementPx: number;
   /** Grid spacing in px (snap-to-grid + grid overlay). */
   gridSizePx: number;
+  /** Mouse-wheel behaviour on the canvas: 'pan' (Figma-style — wheel scrolls,
+   *  Ctrl/Cmd+wheel zooms, the default) or 'zoom' (Inkscape/Illustrator-style
+   *  — wheel zooms at the cursor, Ctrl/Cmd+wheel scrolls). */
+  wheelMode: 'pan' | 'zoom';
 }
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -37,6 +41,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   autosaveIntervalMs: 30000,
   keyboardIncrementPx: 1,
   gridSizePx: 20,
+  wheelMode: 'pan',
 };
 
 /**
@@ -87,6 +92,12 @@ export function getGridSize(): number {
   return typeof v === 'number' && v >= 2 ? v : DEFAULT_PREFERENCES.gridSizePx;
 }
 
+/** Canvas wheel behaviour: 'pan' (default) or 'zoom'. */
+export function getWheelMode(): 'pan' | 'zoom' {
+  const v = loadPreferences().wheelMode;
+  return v === 'zoom' ? 'zoom' : 'pan';
+}
+
 /** Coerce numeric / string fields back into sensible ranges. */
 function sanitize(p: Partial<AppPreferences>): Partial<AppPreferences> {
   const out: Partial<AppPreferences> = {};
@@ -107,6 +118,9 @@ function sanitize(p: Partial<AppPreferences>): Partial<AppPreferences> {
   }
   if (typeof p.gridSizePx === 'number' && isFinite(p.gridSizePx) && p.gridSizePx >= 2) {
     out.gridSizePx = Math.round(Math.min(500, p.gridSizePx));
+  }
+  if (p.wheelMode === 'zoom' || p.wheelMode === 'pan') {
+    out.wheelMode = p.wheelMode;
   }
   return out;
 }

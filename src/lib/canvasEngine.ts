@@ -72,6 +72,17 @@ export function initCanvas(el: HTMLCanvasElement) {
   canvas.on('object:moving', (e) => {
     // Fire a pending Alt-drag duplicate on the first move of the dragged object.
     if (altPending && e.target === altPending.obj) { const p = altPending; altPending = null; void altCloneInPlace(canvas!, p); }
+    const ev = e.e as { shiftKey?: boolean } | undefined;
+    // Shift while dragging locks the move to the dominant axis from the
+    // gesture origin (Illustrator/Figma behaviour). The hard constraint
+    // wins over smart snap — the user asked for a lock, not a hint.
+    if (ev?.shiftKey && e.target && dragOrigin) {
+      const dx = (e.target.left ?? 0) - dragOrigin.left;
+      const dy = (e.target.top ?? 0) - dragOrigin.top;
+      if (Math.abs(dx) >= Math.abs(dy)) e.target.set({ top: dragOrigin.top });
+      else e.target.set({ left: dragOrigin.left });
+      return;
+    }
     if (e.target) applySmartSnap(canvas!, e.target);
   });
   // Shift while rotating snaps to 15° increments (Illustrator behaviour).
@@ -81,7 +92,21 @@ export function initCanvas(el: HTMLCanvasElement) {
       const snapped = Math.round((e.target.angle ?? 0) / 15) * 15;
       e.target.set({ angle: ((snapped % 360) + 360) % 360 });
     }
+    if (e.target) showTransformHud({ kind: 'rotate', angle: e.target.angle ?? 0 });
   });
+  // Live W×H readout while scaling — Illustrator's transform tooltip, fed
+  // to the TransformHUD overlay through the editor store.
+  canvas.on('object:scaling', (e) => {
+    if (!e.target) return;
+    showTransformHud({ kind: 'scale', w: e.target.getScaledWidth(), h: e.target.getScaledHeight() });
+  });
+  // Drag origin for the Shift axis-lock above — captured when the gesture
+  // starts on a target, cleared when it starts on empty canvas.
+  canvas.on('mouse:down', (e) => {
+    dragOrigin = e.target ? { left: e.target.left ?? 0, top: e.target.top ?? 0 } : null;
+  });
+  // Let the final transform readout linger briefly after the gesture ends.
+  canvas.on('mouse:up', () => scheduleTransformHudHide());
 
   // Double-click a group → Isolation Mode; double-click a path → Direct Select
   // path-edit. Text objects enter editing via Fabric's own native dblclick, so
@@ -148,6 +173,8 @@ export function initCanvas(el: HTMLCanvasElement) {
 
 export function disposeCanvas() {
   resetIsolationModeForCanvasDisposal();
+  if (hudHideTimer) { clearTimeout(hudHideTimer); hudHideTimer = null; }
+  dragOrigin = null;
   canvas?.dispose();
   canvas = null;
   history = null;
@@ -225,6 +252,27 @@ function onMouseDown(e: fabric.TPointerEventInfo<fabric.TPointerEvent>) {
 
 /** Pending Alt-drag duplicate, armed on mouse:down, fired on first move. */
 let altPending: { obj: fabric.FabricObject; left: number; top: number } | null = null;
+
+/** Drag origin of the current object gesture, for the Shift axis-lock. */
+let dragOrigin: { left: number; top: number } | null = null;
+
+/** Auto-hide timer for the live transform HUD (set on mouse:up). */
+let hudHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Publish the live transform readout and cancel any pending auto-hide. */
+function showTransformHud(hud: { kind: 'scale'; w: number; h: number } | { kind: 'rotate'; angle: number }): void {
+  if (hudHideTimer) { clearTimeout(hudHideTimer); hudHideTimer = null; }
+  useEditor.getState().setTransformHud(hud);
+}
+
+/** Keep the final transform value on screen briefly after the gesture ends. */
+function scheduleTransformHudHide(): void {
+  if (hudHideTimer) clearTimeout(hudHideTimer);
+  hudHideTimer = setTimeout(() => {
+    useEditor.getState().setTransformHud(null);
+    hudHideTimer = null;
+  }, 650);
+}
 
 /** Drop a copy of the armed object at its drag-start position. */
 async function altCloneInPlace(c: fabric.Canvas, pending: { obj: fabric.FabricObject; left: number; top: number }) {

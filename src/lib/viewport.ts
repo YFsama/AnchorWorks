@@ -23,6 +23,7 @@ import * as fabric from 'fabric';
 import { getCanvas } from './canvasEngine';
 import { useEditor } from '../store/editor';
 import { emitViewport } from './canvasEvents';
+import { getWheelMode } from './preferences';
 
 /**
  * Fabric `mouse:wheel` handler. Two modes off the same event:
@@ -43,13 +44,26 @@ export function handleWheel(e: fabric.TPointerEventInfo<WheelEvent>): void {
   if (!canvas) return;
   const delta = e.e.deltaY;
   const vp = canvas.getViewportPoint(e.e);
-  if (e.e.ctrlKey || e.e.metaKey) {
+  // Wheel behaviour is user-configurable (Preferences): 'pan' is the
+  // Figma-style default (wheel scrolls, Ctrl/Cmd zooms); 'zoom' flips it
+  // for Inkscape/Illustrator muscle memory. Shift+wheel always pans
+  // horizontally in either mode.
+  const modifier = e.e.ctrlKey || e.e.metaKey;
+  const wantsZoom = getWheelMode() === 'zoom' ? !modifier : modifier;
+  if (wantsZoom) {
     const factor = Math.pow(0.999, delta);
     zoomToPoint(vp.x, vp.y, canvas.getZoom() * factor);
   } else {
     const vt = canvas.viewportTransform!;
-    vt[4] -= e.e.deltaX;
-    vt[5] -= delta;
+    // Shift+wheel pans sideways: browsers report the horizontal intent as
+    // deltaY with shiftKey (deltaX stays 0), so remap it — matching the
+    // Figma/Illustrator muscle memory for horizontal scroll.
+    if (e.e.shiftKey && Math.abs(e.e.deltaX) < 1) {
+      vt[4] -= delta;
+    } else {
+      vt[4] -= e.e.deltaX;
+      vt[5] -= delta;
+    }
     canvas.setViewportTransform(vt);
     emitViewport();
   }
