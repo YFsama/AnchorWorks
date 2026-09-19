@@ -30,6 +30,7 @@ export type LinkEvent =
   | { type: 'tx'; text: string; bytes: number; ts: number; raw: Uint8Array }
   | { type: 'rx'; text: string; bytes: number; ts: number; raw: Uint8Array }
   | { type: 'progress'; sent: number; total: number }
+  | { type: 'flow'; paused: boolean }
   | { type: 'done'; sent: number; total: number; aborted: boolean; error?: string; ms?: number };
 
 export interface LinkOpenOptions {
@@ -42,6 +43,9 @@ export interface LinkOpenOptions {
 export interface SendOptions {
   onProgress?: (sent: number, total: number) => void;
   signal?: AbortSignal;
+  /** Skip the pause gate — used by control snippets (blade lift, feed
+   *  hold, cycle resume) that must go out WHILE a job send is paused. */
+  pauseImmune?: boolean;
 }
 
 export interface NativeLinkPortInfo {
@@ -148,6 +152,10 @@ export class PlotterLink {
   /** Lifetime traffic counters for the console's status line. */
   txBytes = 0;
   rxBytes = 0;
+  /** True while the operator has paused the active job stream. */
+  paused = false;
+  /** Resolvers for senders parked at the pause gate. */
+  private pausedWaiters: Array<() => void> = [];
   /** Consecutive failed rx polls — a streak means the device is gone. */
   private rxErrorStreak = 0;
 
@@ -246,6 +254,7 @@ export class PlotterLink {
     try {
       for (let off = 0; off < total; off += LINK_CHUNK_BYTES) {
         if (sendOpts.signal?.aborted) throw new AbortedError();
+        await this.waitWhilePaused(sendOpts.signal, sendOpts.pauseImmune);
         const chunk = payload.subarray(off, Math.min(off + LINK_CHUNK_BYTES, total));
         await this.writeChunk(chunk);
         sent += chunk.length;
@@ -263,6 +272,42 @@ export class PlotterLink {
       if (!aborted) await this.fatalError((e as Error).message).catch(() => undefined);
       this.emit({ type: 'done', sent, total, aborted, error: aborted ? undefined : (e as Error).message, ms: Date.now() - t0 });
       throw e;
+    }
+  }
+
+  /** Pause the active job stream between chunks — the machine drains its
+   *  input buffer and stops. Safe any time; affects the running `send()`. */
+  pause(): void {
+    if (this.paused) return;
+    this.paused = true;
+    this.emit({ type: 'flow', paused: true });
+  }
+
+  /** Resume a paused sender and notify listeners. */
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    for (const r of this.pausedWaiters.splice(0)) r();
+    this.emit({ type: 'flow', paused: false });
+  }
+
+  /** Park the sender while `paused` is set. Abort (and close) break
+   *  through immediately so a paused job can always be cancelled. */
+  private async waitWhilePaused(signal: AbortSignal | undefined, immune?: boolean): Promise<void> {
+    if (immune || !this.paused) return;
+    while (this.paused) {
+      if (signal?.aborted) throw new AbortedError();
+      await new Promise<void>(resolve => {
+        const wake = () => {
+          const i = this.pausedWaiters.indexOf(wake);
+          if (i >= 0) this.pausedWaiters.splice(i, 1);
+          signal?.removeEventListener('abort', wake);
+          resolve();
+        };
+        this.pausedWaiters.push(wake);
+        signal?.addEventListener('abort', wake, { once: true });
+      });
+      if (signal?.aborted && this.paused) throw new AbortedError();
     }
   }
 
@@ -415,6 +460,11 @@ export class PlotterLink {
     this.webPort = null;
     this.webWriter = null;
     this.stopRxPoll();
+    // Release a paused sender so close() never leaves it parked forever.
+    if (this.paused) {
+      this.paused = false;
+      for (const r of this.pausedWaiters.splice(0)) r();
+    }
     // Unblock any pending query with what we have.
     const waiters = this.rxWaiters;
     this.rxWaiters = [];

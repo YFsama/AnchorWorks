@@ -63,6 +63,7 @@ interface SimSeg {
   penDown: boolean;
   start: number;
   end: number;
+  stepIndex: number;
 }
 
 const SIM_W = 400;
@@ -76,17 +77,15 @@ export function MachineSim({ run, unit }: { run: MachineRun; unit: 'mm' | 'in' }
   const segs = useMemo<SimSeg[]>(() => {
     const out: SimSeg[] = [];
     let acc = 0;
-    for (const penDown of [true, false]) {
-      for (const pts of penDown ? run.cuts : run.travels) {
-        let len = 0;
-        for (let i = 1; i < pts.length; i++) {
-          len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-        }
-        out.push({ pts, penDown, start: acc, end: acc + len });
-        acc += len;
+    for (const seg of run.segs) {
+      const pts = seg.pts;
+      let len = 0;
+      for (let i = 1; i < pts.length; i++) {
+        len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
       }
+      out.push({ pts, penDown: seg.penDown, start: acc, end: acc + len, stepIndex: seg.stepIndex });
+      acc += len;
     }
-    out.sort((a, b) => a.start - b.start);
     return out;
   }, [run]);
 
@@ -163,6 +162,17 @@ export function MachineSim({ run, unit }: { run: MachineRun; unit: 'mm' | 'in' }
   const pen: [number, number] | null = lastVisible ? lastVisible.pts[lastVisible.pts.length - 1] : null;
 
   const pct = total > 0 ? played / total : 0;
+
+  // The statement the playhead is executing — drives the synced list.
+  const activeSeg = [...segs].reverse().find(s => played >= s.start && played < s.end)
+    ?? (played >= total && segs.length > 0 ? segs[segs.length - 1] : undefined);
+  const activeStepIndex = activeSeg?.stepIndex ?? -1;
+  const stepListRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    stepListRef.current
+      ?.querySelector(`[data-step="${activeStepIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [activeStepIndex]);
 
   return (
     <div className="rounded border border-border bg-panel2 p-2 text-[10px]">
@@ -255,6 +265,39 @@ export function MachineSim({ run, unit }: { run: MachineRun; unit: 'mm' | 'in' }
           <span className="text-[#ff2e9a]">▬</span> {t('Cut')} · <span className="text-[#5b9cff]">┄</span> {t('Travel')}
         </span>
       </div>
+
+      {/* Synced statement list — click a row to jump the playhead there. */}
+      {run.steps.length > 0 && (
+        <div
+          ref={stepListRef}
+          className="mt-1.5 max-h-24 overflow-y-auto rounded border border-border bg-panel divide-y divide-border/40"
+          role="listbox"
+          aria-label={t('Statements (click to seek)')}
+        >
+          {run.steps.map(step => {
+            const active = step.index === activeStepIndex;
+            return (
+              <button
+                key={step.index}
+                type="button"
+                data-step={step.index}
+                role="option"
+                aria-selected={active}
+                className={`flex w-full items-center gap-1.5 px-1.5 py-0.5 text-left transition-colors ${active ? 'bg-accent2/15' : 'hover:bg-panel2'}`}
+                onClick={() => {
+                  const target = segs.find(s => s.stepIndex === step.index);
+                  if (target) { setPlaying(false); seek(target.start); }
+                }}
+                title={explainStep(step, unit)}
+              >
+                <span className={`h-2 w-2 shrink-0 rounded-sm ${KIND_COLORS[step.kind]}`} aria-hidden="true" />
+                <span className={`w-6 shrink-0 text-right tabular-nums ${active ? 'text-accent2 font-semibold' : 'text-muted/70'}`}>{step.index + 1}</span>
+                <span className={`truncate font-mono ${active ? 'text-ink' : 'text-muted'}`}>{step.stmt}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -195,4 +195,53 @@ describe('PlotterLink (web serial fake)', () => {
     await expect(link.send('JOBJOB')).rejects.toThrow('port unplugged');
     expect(link.status).toBe('error');
   });
+describe('pause / resume gate', () => {
+  it('parks the sender between chunks and completes after resume()', async () => {
+    await link.open({ baud: 9600, flowControl: 'hardware' }); // no pacing delays
+    link.pause();
+    expect(link.paused).toBe(true);
+    let settled = false;
+    const p = link.send('A'.repeat(LINK_CHUNK_BYTES + 10)).then(() => { settled = true; });
+    await new Promise(r => { setTimeout(r, 30); });
+    expect(settled).toBe(false);          // parked before the first chunk
+    expect(fake.written.length).toBe(0);
+    link.resume();
+    await p;
+    expect(settled).toBe(true);
+    expect(fake.written.length).toBe(LINK_CHUNK_BYTES + 10);
+    expect(link.paused).toBe(false);
+  });
+
+  it('control snippets with pauseImmune bypass the gate', async () => {
+    await link.open({ baud: 9600, flowControl: 'hardware' });
+    link.pause();
+    const job = link.send('B'.repeat(LINK_CHUNK_BYTES * 3));
+    await new Promise(r => { setTimeout(r, 20); });
+    await link.send('!', { pauseImmune: true });
+    expect(fake.written).toContain('!'.charCodeAt(0));
+    link.resume();
+    await job;
+  });
+
+  it('abort breaks through a paused send', async () => {
+    await link.open({ baud: 9600, flowControl: 'hardware' });
+    link.pause();
+    const controller = new AbortController();
+    const p = link.send('C'.repeat(1024), { signal: controller.signal });
+    await new Promise(r => { setTimeout(r, 20); });
+    controller.abort();
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' });
+    link.resume();
+  });
+
+  it('close() releases a paused sender', async () => {
+    await link.open({ baud: 9600, flowControl: 'hardware' });
+    link.pause();
+    const p = link.send('D'.repeat(512));
+    await new Promise(r => { setTimeout(r, 20); });
+    await link.close();
+    await expect(p).rejects.toThrow();
+    expect(link.paused).toBe(false);
+  });
+});
 });

@@ -9,7 +9,7 @@ import { download } from '../lib/io';
 import type { FlowControl, PlotterLink } from '../lib/plotterLink';
 import { lineRateBytesPerSec, toHex } from '../lib/plotterLink';
 import type { NativeSerialPort } from '../lib/plotter';
-import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildSetOrigin, decodeReply, isQueryCommand, type QuickCommand } from '../lib/hpglDebug';
+import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildSetOrigin, decodeReply, isQueryCommand, parsePageReply, parsePositionReply, type MachinePosition, type QuickCommand } from '../lib/hpglDebug';
 import { buildDiagnosticsReport, probeBaud, runConnectionSelfTest } from '../lib/plotterDiag';
 import { autoDetectCutter, chipForPort, identifyMachine } from '../lib/plotterIdentify';
 import { clearJobLog, deleteMachine, listJobLog, listMachines, saveMachine, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
@@ -99,9 +99,14 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   const [signals, setSignals] = useState({ dtr: false, rts: false });
   const [autoPoll, setAutoPoll] = useState(false);
   const [lastPoll, setLastPoll] = useState('');
+  // Structured live position (from auto-poll) + page limits (from OH;).
+  const [position, setPosition] = useState<MachinePosition | null>(null);
+  const [page, setPage] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   // Command-reference panel + last-transfer throughput analysis.
   const [refOpen, setRefOpen] = useState(false);
   const [lastTransfer, setLastTransfer] = useState<{ bps: number; pct: number | null } | null>(null);
+  // Traffic-log direction filter (chips above the log).
+  const [dirFilter, setDirFilter] = useState<'all' | 'tx' | 'rx' | 'notice'>('all');
   // Saved machine configs + job history (plotterRecords).
   const [machines, setMachines] = useState<MachineRecord[]>(() => listMachines());
   const [selectedMachineId, setSelectedMachineId] = useState('');
@@ -146,9 +151,13 @@ export function PlotterConsole(props: PlotterConsoleProps) {
         else if (ev.status === 'connected') {
           setSignals({ dtr: false, rts: false });
           setLastPoll('');
+          setPosition(null);
           push({ ts: nowMs(), dir: 'info', text: `${t('Connected')} — ${link.describe()} ${flow.toUpperCase() === 'NONE' ? '' : flow}` });
         }
-        else if (ev.status === 'idle') push({ ts: nowMs(), dir: 'info', text: t('Disconnected') });
+        else if (ev.status === 'idle') {
+          setPosition(null);
+          push({ ts: nowMs(), dir: 'info', text: t('Disconnected') });
+        }
       } else if (ev.type === 'done') {
         forceTick();
         // Effective throughput vs theoretical line rate — tells the
@@ -180,7 +189,11 @@ export function PlotterConsole(props: PlotterConsoleProps) {
       if (stopped || link.status !== 'connected') return;
       try {
         const reply = await link.query(cmd, 1500);
-        if (!stopped) setLastPoll(decodeReply(format, cmd, reply, unit));
+        if (!stopped) {
+          setLastPoll(decodeReply(format, cmd, reply, unit));
+          const pos = parsePositionReply(format, reply, unit);
+          if (pos) setPosition(pos);
+        }
       } catch { /* the query attempt is already visible in the log */ }
     };
     void tick();
@@ -213,6 +226,17 @@ export function PlotterConsole(props: PlotterConsoleProps) {
       if (connectInit && link.status === 'connected') {
         await link.send(connectInit);
         push({ ts: nowMs(), dir: 'info', text: `${t('Profile init sent')}: ${connectInit}` });
+      }
+      // Ask an HP-GL machine for its loaded page limits (OH;) — powers
+      // the page-size readout next to the position chip. Many cutters
+      // ignore it; that's fine, the readout just stays hidden.
+      if (format === 'hpgl' && link.status === 'connected') {
+        const reply = await link.query('OH;', 1000).catch(() => '');
+        const parsed = parsePageReply(reply, unit);
+        if (parsed) {
+          setPage(parsed);
+          push({ ts: nowMs(), dir: 'info', text: `${t('Loaded page')}: ${Math.round(parsed.x1 - parsed.x0)} × ${Math.round(parsed.y1 - parsed.y0)} ${unit}` });
+        }
       }
     } catch {
       /* status event already logged the message */
@@ -447,6 +471,10 @@ export function PlotterConsole(props: PlotterConsoleProps) {
 
   const statusColor = connected ? 'bg-success' : link.status === 'connecting' ? 'bg-warning' : link.status === 'error' ? 'bg-danger' : 'bg-muted';
   const quickCommands = QUICK_COMMANDS.filter(cmd => !cmd.formats || cmd.formats.includes(format));
+  // Direction-filtered view of the log (the copy/download exports stay full).
+  const filteredEntries = dirFilter === 'all'
+    ? entries
+    : entries.filter(e => (dirFilter === 'tx' && e.dir === 'tx') || (dirFilter === 'rx' && e.dir === 'rx') || (dirFilter === 'notice' && e.dir !== 'tx' && e.dir !== 'rx'));
 
   const fmtEntry = (e: Entry) => {
     if (hexView && e.raw) return toHex(e.raw);
@@ -472,6 +500,26 @@ export function PlotterConsole(props: PlotterConsoleProps) {
           <span className={`inline-block h-2 w-2 rounded-full ${statusColor}`} aria-hidden="true" />
           {connected ? link.describe() : t(link.status === 'connecting' ? 'Connecting…' : link.status === 'error' ? 'Connection error' : 'Not connected')}
         </span>
+        {connected && position && (
+          <span
+            className="flex items-center gap-1 rounded border border-border bg-panel px-1.5 py-0.5 text-[10px] tabular-nums"
+            title={t('Live carriage position from the status poll (enable Auto status).')}
+          >
+            <Crosshair size={10} aria-hidden="true" className="text-accent2" />
+            X {position.x.toFixed(1)} · Y {position.y.toFixed(1)} {unit}
+            {position.penDown !== undefined && (
+              <span className={position.penDown ? 'font-semibold text-[#ff2e9a]' : 'text-muted'} aria-hidden="true">
+                {position.penDown ? '▼' : '△'}
+              </span>
+            )}
+            {position.state && <span className="text-muted">{position.state}</span>}
+            {page && (
+              <span className="text-muted/70" title={t('Loaded page size (OH;)')}>
+                · {Math.round(page.x1 - page.x0)}×{Math.round(page.y1 - page.y0)}
+              </span>
+            )}
+          </span>
+        )}
         <div className="flex-1" />
         {canConnect && (
           connected ? (
@@ -775,12 +823,53 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               </span>
             )}
             <div className="flex-1" />
+            {(['all', 'tx', 'rx', 'notice'] as const).map(f => (
+              <button
+                key={f}
+                type="button"
+                className={`btn !py-0.5 !px-1 !text-[10px] ${dirFilter === f ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                onClick={() => setDirFilter(f)}
+                aria-pressed={dirFilter === f}
+                title={t('Filter the traffic log by direction.')}
+              >
+                {t(f === 'all' ? 'All' : f === 'tx' ? 'TX' : f === 'rx' ? 'RX' : 'Notices')}
+              </button>
+            ))}
             <button type="button" className={`btn !py-0.5 !px-1.5 !text-[10px] ${hexView ? 'border-accent2 text-accent2' : ''}`} onClick={() => setHexView(!hexView)} aria-pressed={hexView} title={t('Toggle HEX / ASCII view')}>HEX</button>
             <button type="button" className={`btn !py-0.5 !px-1.5 !text-[10px] ${autoScroll ? 'border-accent2 text-accent2' : ''}`} onClick={() => setAutoScroll(!autoScroll)} aria-pressed={autoScroll} title={t('Follow new traffic automatically')}>{t('Auto')}</button>
             <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={() => { void copyLog(); }} title={t('Copy console log')}><Copy size={11} aria-hidden="true" /></button>
             <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={() => download('plotter-console.log', plainLog(), 'text/plain')} title={t('Download console log')}><Download size={11} aria-hidden="true" /></button>
             <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={() => setEntries([])} title={t('Clear console')}><Trash2 size={11} aria-hidden="true" /></button>
           </div>
+          {/* Timeline strip — TX above / RX below the axis, errors full
+              height; a glance at reply latency and burst patterns. */}
+          {(() => {
+            const recent = entries.slice(-160);
+            if (recent.length < 2) return null;
+            const t1 = recent[recent.length - 1].ts;
+            const t0 = Math.min(recent[0].ts, t1 - 1000);
+            const span = Math.max(1, t1 - t0);
+            const X = (ts: number) => ((ts - t0) / span) * 100;
+            const FILLS: Record<Entry['dir'], string> = { tx: '#5b9cff', rx: '#22c55e', err: '#ef4444', warn: '#f59e0b', info: '#6b7280' };
+            return (
+              <svg
+                viewBox="0 0 100 24"
+                preserveAspectRatio="none"
+                className="mt-1 h-6 w-full rounded border border-border bg-panel"
+                role="img"
+                aria-label={t('Traffic timeline')}
+              >
+                <line x1="0" y1="12" x2="100" y2="12" strokeWidth="0.3" stroke="#4b5563" />
+                {recent.map(e => {
+                  const x = X(e.ts);
+                  if (e.dir === 'tx') return <rect key={e.id} x={x} y="2" width="0.7" height="8" fill={FILLS.tx} />;
+                  if (e.dir === 'rx') return <rect key={e.id} x={x} y="14" width="0.7" height="8" fill={FILLS.rx} />;
+                  if (e.dir === 'err') return <rect key={e.id} x={x} y="1" width="0.7" height="22" fill={FILLS.err} />;
+                  return <rect key={e.id} x={x} y="10" width="0.7" height="4" fill={FILLS[e.dir]} opacity="0.7" />;
+                })}
+              </svg>
+            );
+          })()}
           <div
             ref={scrollRef}
             className="mt-1 h-40 overflow-y-auto rounded border border-border bg-panel px-2 py-1 font-mono text-[10px] leading-relaxed"
@@ -788,9 +877,9 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             aria-label={t('Serial traffic')}
             aria-live="polite"
           >
-            {entries.length === 0 ? (
-              <div className="text-muted">{t('No serial traffic yet — connect the cutter, then use the quick commands or jog pad.')}</div>
-            ) : entries.map((e) => (
+            {filteredEntries.length === 0 ? (
+              <div className="text-muted">{entries.length === 0 ? t('No serial traffic yet — connect the cutter, then use the quick commands or jog pad.') : t('No entries match this filter.')}</div>
+            ) : filteredEntries.map((e) => (
               <div key={e.id} className="flex gap-1.5">
                 <span className="text-muted/70 tabular-nums shrink-0">
                   {new Date(e.ts).toLocaleTimeString([], { hour12: false })}.{String(e.ts % 1000).padStart(3, '0')}

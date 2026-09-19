@@ -431,12 +431,23 @@ export interface RunStep {
   distance: number;
 }
 
+/** One carriage polyline (cut or travel) tagged with the statement that
+ *  produced it — lets the replay view highlight the active statement. */
+export interface RunSeg {
+  pts: Array<[number, number]>;
+  penDown: boolean;
+  /** Index into MachineRun.steps, or −1 when unknown. */
+  stepIndex: number;
+}
+
 export interface MachineRun {
   steps: RunStep[];
   /** Pen-down polylines in operator units — what the blade marks. */
   cuts: Array<Array<[number, number]>>;
   /** Pen-up repositioning polylines in operator units. */
   travels: Array<Array<[number, number]>>;
+  /** All polylines in job order, tagged with their source statement. */
+  segs: RunSeg[];
   bbox: { minX: number; minY: number; maxX: number; maxY: number } | null;
   cutLen: number;
   travelLen: number;
@@ -460,12 +471,14 @@ function runHpgl(code: string, per: number): MachineRun {
   const steps: RunStep[] = [];
   const cuts: Array<Array<[number, number]>> = [];
   const travels: Array<Array<[number, number]>> = [];
+  const segs: RunSeg[] = [];
   let penDown = false;
   let x = 0, y = 0; // tracked position in plotter units
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   let cutLen = 0, travelLen = 0, penDownMoves = 0;
   let cut: Array<[number, number]> | null = null;
   let travel: Array<[number, number]> | null = null;
+  let curStep = 0; // statement currently being walked (for seg tagging)
 
   const u = (v: number) => v / per;
   const touch = (px: number, py: number) => {
@@ -478,12 +491,12 @@ function runHpgl(code: string, per: number): MachineRun {
     const d = Math.hypot(nx - x, ny - y) / per;
     if (penDown) {
       cutLen += d; penDownMoves++;
-      if (!cut) { cut = [[u(x), u(y)]]; cuts.push(cut); }
+      if (!cut) { cut = [[u(x), u(y)]]; cuts.push(cut); segs.push({ pts: cut, penDown: true, stepIndex: curStep }); }
       cut.push([u(nx), u(ny)]);
       travel = null;
     } else {
       travelLen += d;
-      if (!travel) { travel = [[u(x), u(y)]]; travels.push(travel); }
+      if (!travel) { travel = [[u(x), u(y)]]; travels.push(travel); segs.push({ pts: travel, penDown: false, stepIndex: curStep }); }
       travel.push([u(nx), u(ny)]);
       cut = null;
     }
@@ -493,6 +506,7 @@ function runHpgl(code: string, per: number): MachineRun {
 
   const stmts = code.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
   stmts.forEach((stmt, i) => {
+    curStep = i;
     const from: [number, number] = [u(x), u(y)];
     const isVendor = stmt.startsWith('!');
     const m = isVendor ? null : stmt.match(/^([A-Za-z]{2})\s*(.*)$/);
@@ -510,6 +524,7 @@ function runHpgl(code: string, per: number): MachineRun {
       if (mnemonic === 'PD' && !penDown) {
         // Pen drops at the CURRENT position — the cut run starts there.
         cut = [[u(x), u(y)]]; cuts.push(cut); travel = null;
+        segs.push({ pts: cut, penDown: true, stepIndex: curStep });
       } else if (mnemonic === 'PU' && penDown) {
         cut = null; travel = null;
       }
@@ -538,7 +553,7 @@ function runHpgl(code: string, per: number): MachineRun {
   });
 
   return {
-    steps, cuts, travels,
+    steps, cuts, travels, segs,
     bbox: Number.isFinite(minX) ? { minX: u(minX), minY: u(minY), maxX: u(maxX), maxY: u(maxY) } : null,
     cutLen, travelLen, penDownMoves,
   };
@@ -549,6 +564,7 @@ function runGcode(code: string): MachineRun {
   const steps: RunStep[] = [];
   const cuts: Array<Array<[number, number]>> = [];
   const travels: Array<Array<[number, number]>> = [];
+  const segs: RunSeg[] = [];
   let penDown = false;
   let absolute = true;
   let x = 0, y = 0;
@@ -556,6 +572,7 @@ function runGcode(code: string): MachineRun {
   let cutLen = 0, travelLen = 0, penDownMoves = 0;
   let cut: Array<[number, number]> | null = null;
   let travel: Array<[number, number]> | null = null;
+  let curStep = 0; // line currently being walked (for seg tagging)
 
   const touch = (px: number, py: number) => {
     minX = Math.min(minX, px); maxX = Math.max(maxX, px);
@@ -566,12 +583,12 @@ function runGcode(code: string): MachineRun {
     const d = Math.hypot(nx - x, ny - y);
     if (penDown) {
       cutLen += d; penDownMoves++;
-      if (!cut) { cut = [[x, y]]; cuts.push(cut); }
+      if (!cut) { cut = [[x, y]]; cuts.push(cut); segs.push({ pts: cut, penDown: true, stepIndex: curStep }); }
       cut.push([nx, ny]);
       travel = null;
     } else {
       travelLen += d;
-      if (!travel) { travel = [[x, y]]; travels.push(travel); }
+      if (!travel) { travel = [[x, y]]; travels.push(travel); segs.push({ pts: travel, penDown: false, stepIndex: curStep }); }
       travel.push([nx, ny]);
       cut = null;
     }
@@ -584,6 +601,7 @@ function runGcode(code: string): MachineRun {
     const line = rawLine.trim();
     const bare = line.replace(/;.*$/, '').replace(/\([^)]*\)/g, '').trim();
     if (!bare) continue;
+    curStep = index;
     const from: [number, number] = [x, y];
 
     if (bare.startsWith('$')) {
@@ -632,6 +650,7 @@ function runGcode(code: string): MachineRun {
       const down = zValue < 0;
       if (down && !penDown) {
         cut = [[x, y]]; cuts.push(cut); travel = null;
+        segs.push({ pts: cut, penDown: true, stepIndex: curStep });
       } else if (!down && penDown) {
         cut = null; travel = null;
       }
@@ -664,7 +683,7 @@ function runGcode(code: string): MachineRun {
   }
 
   return {
-    steps, cuts, travels,
+    steps, cuts, travels, segs,
     bbox: Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null,
     cutLen, travelLen, penDownMoves,
   };
@@ -674,7 +693,7 @@ function runGcode(code: string): MachineRun {
  *  on every preview refresh. Throws nothing, even on garbage input. */
 export function simulateMachineCode(format: OutputFormat, code: string, unit: 'mm' | 'in' = 'mm'): MachineRun {
   if (!code.trim()) {
-    return { steps: [], cuts: [], travels: [], bbox: null, cutLen: 0, travelLen: 0, penDownMoves: 0 };
+    return { steps: [], cuts: [], travels: [], segs: [], bbox: null, cutLen: 0, travelLen: 0, penDownMoves: 0 };
   }
   if (format === 'hpgl') return runHpgl(code, unit === 'in' ? 1016 : 40);
   return runGcode(code);
@@ -729,4 +748,52 @@ export function explainStep(step: RunStep, unit: 'mm' | 'in' = 'mm'): string {
     default:
       return `Unrecognised statement: ${step.stmt.slice(0, 40)}`;
   }
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Live position parsing — turns status-query replies into structured
+ * numbers for the console's position readout.
+ */
+
+export interface MachinePosition {
+  x: number;
+  y: number;
+  penDown?: boolean;
+  /** grbl state word (Idle / Run / Hold:0 / Alarm …). */
+  state?: string;
+}
+
+/** Parse an OA;/OB;/OC; (HP-GL) or ? (grbl status report) reply into a
+ *  machine position in the operator's unit. Null when unparseable. */
+export function parsePositionReply(format: OutputFormat, reply: string, unit: 'mm' | 'in' = 'mm'): MachinePosition | null {
+  const raw = reply.replace(/[\r\n;]+$/g, '').replaceAll(ETX, '').trim();
+  if (!raw) return null;
+  if (format === 'gcode') {
+    // <Idle|MPos:10.500,20.000,5.000|FS:400,0> / <Run|WPos:…>
+    const m = raw.match(/^<(\w+)(?::\d+)?\|(?:[A-Za-z]+:)?(M|W)Pos:(-?[\d.]+),(-?[\d.]+)/);
+    if (!m) return null;
+    return { x: Number(m[3]), y: Number(m[4]), state: m[1] };
+  }
+  const nums = raw.split(',').map(Number);
+  if (nums.length >= 2 && Number.isFinite(nums[0]) && Number.isFinite(nums[1])) {
+    const per = unit === 'in' ? 1016 : 40;
+    return {
+      x: nums[0] / per,
+      y: nums[1] / per,
+      penDown: nums.length >= 3 ? nums[2] === 1 : undefined,
+    };
+  }
+  return null;
+}
+
+/** Page rectangle from an OH; (hard-clip limits) reply, in the operator's
+ *  unit. Null when unparseable. */
+export function parsePageReply(reply: string, unit: 'mm' | 'in' = 'mm'): { x0: number; y0: number; x1: number; y1: number } | null {
+  const raw = reply.replace(/[\r\n;]+$/g, '').replaceAll(ETX, '').trim();
+  if (!raw) return null;
+  const nums = raw.split(',').map(Number);
+  if (nums.length < 4 || !nums.slice(0, 4).every(Number.isFinite)) return null;
+  const per = unit === 'in' ? 1016 : 40;
+  return { x0: nums[0] / per, y0: nums[1] / per, x1: nums[2] / per, y1: nums[3] / per };
 }

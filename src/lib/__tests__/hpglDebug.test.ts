@@ -9,6 +9,8 @@ import {
   lintJob,
   simulateMachineCode,
   explainStep,
+  parsePositionReply,
+  parsePageReply,
   QUICK_COMMANDS,
 } from '../hpglDebug';
 
@@ -322,5 +324,58 @@ describe('explainStep', () => {
     expect(pick('G20', 'G20')).toContain('inches');
     expect(pick('G90', 'G90')).toContain('Absolute');
     expect(pick('M30', 'M30')).toContain('End');
+  });
+});
+
+describe('parsePositionReply', () => {
+  it('parses HP-GL OA replies including pen state', () => {
+    expect(parsePositionReply('hpgl', '400,800,1\r', 'mm')).toEqual({ x: 10, y: 20, penDown: true });
+    expect(parsePositionReply('hpgl', '400,800,0', 'mm')).toEqual({ x: 10, y: 20, penDown: false });
+    expect(parsePositionReply('hpgl', '1016,0,1', 'in')).toEqual({ x: 1, y: 0, penDown: true });
+  });
+
+  it('parses grbl MPos/WPos status reports with the state word', () => {
+    expect(parsePositionReply('gcode', '<Idle|MPos:10.500,20.000,5.000|FS:0,0>')).toEqual({ x: 10.5, y: 20, state: 'Idle' });
+    expect(parsePositionReply('gcode', '<Run|WPos:1.0,2.0,0.0>')).toEqual({ x: 1, y: 2, state: 'Run' });
+    // Sub-state variants like Hold:0 keep the bare word.
+    expect(parsePositionReply('gcode', '<Hold:0|MPos:0.000,0.000,0.000>')?.state).toBe('Hold');
+  });
+
+  it('returns null for silence or garbage', () => {
+    expect(parsePositionReply('hpgl', '')).toBeNull();
+    expect(parsePositionReply('hpgl', '\r\n')).toBeNull();
+    expect(parsePositionReply('gcode', 'ok')).toBeNull();
+  });
+});
+
+describe('parsePageReply', () => {
+  it('parses OH hard-clip limits into the operator unit', () => {
+    expect(parsePageReply('0,0,11280,7920\r\n', 'mm')).toEqual({ x0: 0, y0: 0, x1: 282, y1: 198 });
+    expect(parsePageReply('0,0,10160,10160', 'in')).toEqual({ x0: 0, y0: 0, x1: 10, y1: 10 });
+  });
+
+  it('returns null for short or non-numeric replies', () => {
+    expect(parsePageReply('')).toBeNull();
+    expect(parsePageReply('0,0')).toBeNull();
+    expect(parsePageReply('a,b,c,d')).toBeNull();
+  });
+});
+
+describe('MachineRun.segs — statement tagging', () => {
+  it('tags each polyline with the statement that produced it', () => {
+    const code = ['IN;', 'PU400,800;', 'PD400,1200,800,1200;', 'PU0,0;'].join('\n');
+    const run = simulateMachineCode('hpgl', code, 'mm');
+    expect(run.segs.map(s => ({ down: s.penDown, step: s.stepIndex }))).toEqual([
+      { down: false, step: 1 }, // PU400,800 travel to the start point
+      { down: true, step: 2 },  // PD… (pen drops, then cuts)
+      { down: false, step: 3 }, // PU0,0 travel
+    ]);
+  });
+
+  it('keeps seg points identical to the cuts/travels arrays', () => {
+    const code = 'IN;PU400,800;PD400,1200,800,1200;';
+    const run = simulateMachineCode('hpgl', code, 'mm');
+    expect(run.segs.filter(s => s.penDown).map(s => s.pts)).toEqual(run.cuts);
+    expect(run.segs.filter(s => !s.penDown).map(s => s.pts)).toEqual(run.travels);
   });
 });
