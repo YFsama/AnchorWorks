@@ -1,14 +1,19 @@
 import { useCallback, useState } from 'react';
-import { X, Hash } from 'lucide-react';
+import { X, Hash, FileText, Table2 } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { getCanvas } from '../lib/canvasEngine';
 import {
+  applyDataMerge,
   buildSerialValues,
   dedupeVariableListValues,
   estimateVariableDataGaps,
   generateVariableData,
+  parseCsv,
   parseVariableListValues,
+  planDataMerge,
   previewVariableDataValues,
+  resolveDataMergeTargets,
+  type DataMergeBinding,
   type VariableDataFillOrder,
   reverseVariableListValues,
   sortVariableListValues,
@@ -49,7 +54,7 @@ export function VariableDataDialog() {
   const open = useEditor(s => s.showVariableData);
   const close = useCallback(() => useEditor.getState().setModal('showVariableData', false), []);
 
-  const [mode, setMode] = useState<'number' | 'list'>('number');
+  const [mode, setMode] = useState<'number' | 'list' | 'csv'>('number');
   const [start, setStart] = useState(1);
   const [step, setStep] = useState(1);
   const [count, setCount] = useState(10);
@@ -60,6 +65,12 @@ export function VariableDataDialog() {
   const [gapX, setGapX] = useState(40);
   const [gapY, setGapY] = useState(20);
   const [linkGaps, setLinkGaps] = useState(false);
+  // CSV data-merge state: pasted/loaded CSV text, header flag, and the
+  // column → object-name binding rows.
+  const [csvText, setCsvText] = useState('');
+  const [csvHasHeader, setCsvHasHeader] = useState(true);
+  const [csvTargets, setCsvTargets] = useState<Record<string, string>>({});
+  const [reviewedTokenChip, setReviewedTokenChip] = useState('');
   const [reviewedSerialPreset, setReviewedSerialPreset] = useState('');
   const [reviewedColumnPreset, setReviewedColumnPreset] = useState('');
   const [reviewedGapXPreset, setReviewedGapXPreset] = useState('');
@@ -83,12 +94,43 @@ export function VariableDataDialog() {
   }
 
   const listValues = parseVariableListValues(listText);
-  const preview = previewVariableDataValues(mode === 'number' ? buildSerialValues(start, step, count, pad) : listValues);
+  // CSV mode: parse on the fly and derive the column → object-name bindings
+  // (a binding row only counts once its target name is non-empty).
+  const csv = mode === 'csv' ? parseCsv(csvText, csvHasHeader) : null;
+  const csvBindings: DataMergeBinding[] = (csv?.columns ?? [])
+    .map(column => ({ column, target: (csvTargets[column] ?? '').trim() }))
+    .filter(binding => binding.target !== '');
+  const activeValues = mode === 'number'
+    ? buildSerialValues(start, step, count, pad)
+    : mode === 'list'
+      ? listValues
+      : (csv?.records ?? []).map(record => Object.values(record).filter(Boolean).join(' '));
+  const preview = previewVariableDataValues(activeValues);
   const gridSummary = summarizeVariableDataGrid(preview.total, cols);
   const previewSample = preview.values.slice(0, 3).join(', ');
+  const modeLabel = mode === 'number' ? t('Numbers') : mode === 'list' ? t('List') : t('CSV');
   const previewStatus = preview.total > 0
-    ? `${t('Generation preview')}: ${mode === 'number' ? t('Numbers') : t('List')}. ${preview.total} ${t('values')}. ${t('Grid')}: ${gridSummary.rows} × ${gridSummary.cols}. ${previewSample}`
+    ? `${t('Generation preview')}: ${modeLabel}. ${preview.total} ${t('values')}. ${t('Grid')}: ${gridSummary.rows} × ${gridSummary.cols}. ${previewSample}`
     : `${t('Generation preview')}: ${t('No values to preview')}`;
+
+  // Live preview of the FIRST record: resolve the binding target names
+  // against the canvas text objects and run them through the real planner.
+  let firstRecordMissing: string[] = [];
+  let firstRecordLines: Array<{ column: string; target: string; resolved: boolean; missing: boolean; text: string }> = [];
+  if (csv && csv.records.length > 0 && csvBindings.length > 0) {
+    const namedTexts = (getCanvas()?.getObjects() ?? []).filter(o => typeof (o as { text?: unknown }).text === 'string');
+    const { targets } = resolveDataMergeTargets(namedTexts, csvBindings);
+    const templateTexts = targets.map(target => String((target as { text?: unknown } | null)?.text ?? ''));
+    const first = planDataMerge(csv.records.slice(0, 1), csvBindings, templateTexts, { cols, gapXmm: gapX, gapYmm: gapY, fillOrder }).records[0];
+    firstRecordMissing = first?.ok ? [] : (first?.missing ?? []);
+    firstRecordLines = csvBindings.map((binding, i) => ({
+      column: binding.column,
+      target: binding.target,
+      resolved: !!targets[i],
+      missing: !first?.ok && !!first?.missing.includes(binding.column),
+      text: first?.ok ? (first.entries[i]?.text ?? '') : '',
+    }));
+  }
 
   const describeSerialPreset = (preset: (typeof SERIAL_PRESETS)[number]) => (
     `${t(preset.label)} · ${t('Start')} ${preset.start}, ${t('Step')} ${preset.step}, ${t('Count')} ${preset.count}, ${t('Pad')} ${preset.pad}, ${t('Columns')} ${preset.cols}`
@@ -105,6 +147,21 @@ export function VariableDataDialog() {
   if (!open) return null;
 
   const apply = async () => {
+    if (mode === 'csv') {
+      if (!csv || csv.records.length === 0) { toast.warn(t('No values to generate.'), { title: t('Variable Data') }); return; }
+      if (csvBindings.length === 0) { toast.warn(t('Bind at least one column to a named text object.'), { title: t('Variable Data') }); return; }
+      const outcome = await applyDataMerge(csv.records, csvBindings, { cols, gapXmm: gapX, gapYmm: gapY, fillOrder });
+      if (outcome.unmatched.length > 0) {
+        toast.warn(`${t('No object named')} ${outcome.unmatched.join(', ')}`, { title: t('Variable Data') });
+      }
+      if (outcome.generated > 0) {
+        toast.success(`${outcome.generated} ${t('records merged')}${outcome.skipped > 0 ? ` · ${outcome.skipped} ${t('records skipped (missing columns)')}` : ''}`, { title: t('Variable Data') });
+        close();
+      } else {
+        toast.warn(t('No records merged.'), { title: t('Variable Data') });
+      }
+      return;
+    }
     const o = selectedText();
     if (!o) { toast.warn(t('Select a single text object to enable'), { title: t('Variable Data') }); return; }
     const values = mode === 'number'
@@ -139,7 +196,7 @@ export function VariableDataDialog() {
   const handleModeKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const modes: Array<typeof mode> = ['number', 'list'];
+    const modes: Array<typeof mode> = ['number', 'list', 'csv'];
     const index = modes.indexOf(mode);
     const nextIndex = event.key === 'Home'
       ? 0
@@ -147,6 +204,40 @@ export function VariableDataDialog() {
         ? modes.length - 1
         : (index + (event.key === 'ArrowRight' ? 1 : -1) + modes.length) % modes.length;
     focusMode(modes[nextIndex]);
+  };
+
+  /** Load a .csv / .txt file into the paste box (read as UTF-8 text). */
+  const onCsvFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setCsvText(await file.text());
+    event.target.value = '';
+  };
+
+  /** Copy a column's {{token}} so it can be pasted into the template text. */
+  const copyToken = async (column: string) => {
+    try {
+      await navigator.clipboard.writeText(`{{${column}}}`);
+      toast.success(t('Token copied to clipboard'));
+    } catch {
+      toast.warn(t('Clipboard unavailable.'));
+    }
+  };
+
+  const handleTokenChipKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const chips = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-token]'));
+    if (chips.length === 0) return;
+    event.preventDefault();
+    const activeIndex = Math.max(0, chips.findIndex((chip) => chip === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? chips.length - 1
+        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + chips.length) % chips.length;
+    const next = chips[nextIndex];
+    setReviewedTokenChip(next?.dataset.review ?? '');
+    next?.focus();
   };
 
   const focusFillOrder = (nextOrder: VariableDataFillOrder) => {
@@ -318,7 +409,9 @@ export function VariableDataDialog() {
         </div>
 
         <p className="text-[10px] text-muted mb-2 leading-relaxed">
-          {t('Duplicate the selected text. A "#" run is the slot (e.g. No. ###); otherwise the whole text is replaced.')}
+          {mode === 'csv'
+            ? t('Bind CSV columns to named text objects (Rename Selection…). Use {{Column}} tokens in the text; a "#" run still substitutes.')
+            : t('Duplicate the selected text. A "#" run is the slot (e.g. No. ###); otherwise the whole text is replaced.')}
         </p>
 
         <Field label={t('Source')}>
@@ -331,10 +424,118 @@ export function VariableDataDialog() {
           >
             <Seg id="variable-mode-number" active={mode === 'number'} onClick={() => setMode('number')} label={t('Numbers')} />
             <Seg id="variable-mode-list" active={mode === 'list'} onClick={() => setMode('list')} label={t('List')} />
+            <Seg id="variable-mode-csv" active={mode === 'csv'} onClick={() => setMode('csv')} label={t('CSV')} />
           </div>
         </Field>
 
-        {mode === 'number' ? (
+        {mode === 'csv' ? (
+          <>
+            <Field label={t('CSV data (paste or load a file)')}>
+              <textarea
+                className="input-num h-16 resize-none font-mono text-[11px]"
+                value={csvText}
+                onChange={(e) => setCsvText(e.target.value)}
+                placeholder={'Name,Room\n"Alice Chen",101\n"Bob Li",102'}
+                aria-describedby="variable-data-csv-summary"
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-2 mb-2 text-[10px]">
+              <label className="inline-flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={csvHasHeader}
+                  onChange={(e) => setCsvHasHeader(e.target.checked)}
+                />
+                {t('First row is header')}
+              </label>
+              <label className="btn !py-1 !px-2 !text-[10px] cursor-pointer inline-flex items-center gap-1">
+                <FileText size={11} aria-hidden="true" />
+                {t('Load CSV file…')}
+                <input
+                  type="file"
+                  accept=".csv,.txt,text/csv,text/plain"
+                  className="hidden"
+                  onChange={(e) => { void onCsvFile(e); }}
+                />
+              </label>
+              <span id="variable-data-csv-summary" className="text-muted tabular-nums" aria-live="polite">
+                {csv && csv.records.length > 0
+                  ? `${csv.records.length} ${t('records')} · ${csv.columns.length} ${t('columns')}`
+                  : t('No CSV data yet.')}
+              </span>
+            </div>
+
+            {/* Column → named-object binding rows + {{token}} chips. */}
+            <div className="mb-2">
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted flex items-center gap-1">
+                <Table2 size={10} aria-hidden="true" />
+                {t('Columns → named objects')}
+              </div>
+              <div
+                className="flex flex-wrap gap-1 mb-1.5"
+                role="toolbar"
+                aria-label={t('Column token chips')}
+                aria-describedby="variable-data-token-review-status"
+                title={t('Use arrow keys to review token chips')}
+                onKeyDown={handleTokenChipKeys}
+              >
+                <span id="variable-data-token-review-status" className="sr-only" aria-live="polite">
+                  {`${t('Reviewing')} ${reviewedTokenChip || t('Column token chips')}`}
+                </span>
+                {(csv?.columns ?? []).map((column) => (
+                  <button
+                    key={column}
+                    type="button"
+                    data-variable-data-token={column}
+                    data-review={`${t('Insert token')} {{${column}}}`}
+                    className="btn !py-0.5 !px-1.5 !text-[10px] font-mono"
+                    onFocus={(event) => setReviewedTokenChip(event.currentTarget.dataset.review ?? '')}
+                    onClick={() => { void copyToken(column); }}
+                    title={`${t('Copy the {{token}} for this column to the clipboard.')} — {{${column}}}`}
+                  >
+                    {`{{${column}}}`}
+                  </button>
+                ))}
+              </div>
+              {(csv?.columns ?? []).map((column) => (
+                <div key={column} className="flex items-center gap-1 mb-1">
+                  <span className="font-mono text-[10px] text-muted w-24 shrink-0 truncate" title={column}>{column}</span>
+                  <input
+                    className="input-num flex-1 !py-1 !text-[11px]"
+                    value={csvTargets[column] ?? ''}
+                    onChange={(e) => setCsvTargets({ ...csvTargets, [column]: e.target.value })}
+                    placeholder={t('Object name')}
+                    aria-label={`${t('Bind to object name')} — ${column}`}
+                  />
+                </div>
+              ))}
+              {(!csv || csv.columns.length === 0) && (
+                <div className="text-[10px] text-muted">{t('No CSV data yet.')}</div>
+              )}
+            </div>
+
+            {/* Live preview of the first record through the real planner. */}
+            {firstRecordLines.length > 0 && (
+              <div className="mb-2 rounded-md border border-border bg-panel2/60 p-2" role="status" aria-live="polite" aria-label={t('Live preview (first record)')}>
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">{t('Live preview (first record)')}</div>
+                {firstRecordLines.map((line, index) => (
+                  <div key={`${line.column}-${index}`} className="flex items-baseline gap-1 text-[10px] leading-relaxed">
+                    <span className="font-mono text-muted shrink-0">{line.target}</span>
+                    <span aria-hidden="true">→</span>
+                    <span className={line.resolved && !line.missing ? 'text-ink' : 'text-warning'}>
+                      {line.resolved ? (line.text || '—') : t('No object with this name')}
+                    </span>
+                  </div>
+                ))}
+                {firstRecordMissing.length > 0 && (
+                  <div className="mt-1 text-[10px] text-warning">
+                    {t('Missing columns')}: {firstRecordMissing.join(', ')}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        ) : mode === 'number' ? (
           <>
             <div className="grid grid-cols-4 gap-2">
               <Field label={t('Start')}>

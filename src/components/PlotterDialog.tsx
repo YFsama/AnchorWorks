@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
+import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
+import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
+import { buildAbortSnippet, lintJob, type LintResult } from '../lib/hpglDebug';
+import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSpeed } from '../lib/machineProfiles';
+import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
+import { estimateTransferSeconds } from '../lib/plotterDiag';
 import { addPlotterBridges, addPlotterRegistrationMarks, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders } from '../lib/cutPrepActions';
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { optimizeOrder, cutStats, estimateSeconds, formatDuration, type PolyLite } from '../lib/cutOptimize';
@@ -13,6 +18,7 @@ import { toast } from '../lib/toast';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { CutPreview } from './CutPreview';
+import { PlotterConsole } from './PlotterConsole';
 
 const OVERCUT_PRESETS_MM = [0, 0.1, 0.2, 0.3, 0.5, 1];
 const FEED_RATE_PRESETS = [200, 400, 800, 1200];
@@ -61,17 +67,32 @@ export function PlotterDialog() {
   const t = useT();
   const open = useEditor(s => s.showPlotter);
   const close = useCallback(() => useEditor.getState().setModal('showPlotter', false), []);
-  const [opts, setOpts] = useState<PlotterOptions>(defaultPlotterOptions);
-  const [format, setFormat] = useState<'gcode' | 'hpgl'>('hpgl');
+  // Machine settings hydrate from localStorage (see savePlotterPrefs) so a
+  // dialled-in cutter setup survives dialog reopens and app restarts.
+  const savedPrefs = useMemo(() => loadPlotterPrefs(), []);
+  const [opts, setOpts] = useState<PlotterOptions>(savedPrefs.opts ?? defaultPlotterOptions);
+  const [format, setFormat] = useState<'gcode' | 'hpgl'>(savedPrefs.format ?? 'hpgl');
   const [code, setCode] = useState('');
+  // Preflight dry-run result for the Code tab (see lintJob in hpglDebug).
+  const [lint, setLint] = useState<LintResult | null>(null);
   const [busy, setBusy] = useState(false);
+  // Shared persistent serial link — kept open across dialog reopens so the
+  // console log, connection, and jog state survive a close/reopen cycle.
+  const link = getSharedPlotterLink();
+  const [baud, setBaud] = useState(savedPrefs.baud ?? 115200);
+  const [flow, setFlow] = useState<FlowControl>(savedPrefs.flowControl ?? 'none');
+  const [jobProgress, setJobProgress] = useState<{ sent: number; total: number } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const [, linkTick] = useReducer((x: number) => x + 1, 0);
   // Preview mode: 'outline' = graphical SVG of the cut geometry (default —
   // it's what a cutter operator actually wants to verify), 'code' = the
   // raw G-code / HP-GL text for the machine.
   const [previewMode, setPreviewMode] = useState<PreviewMode>('outline');
   const [showPrint, setShowPrint] = useState(true);
   const [showOrder, setShowOrder] = useState(false);
-  const [materialId, setMaterialId] = useState('');
+  // Animated cut simulation replaying the optimized job order.
+  const [simulate, setSimulate] = useState(false);
+  const [materialId, setMaterialId] = useState(savedPrefs.materialId ?? '');
   const [materialQuery, setMaterialQuery] = useState('');
   // Cut-by-colour: which source swatches are muted (excluded from this job).
   const [mutedColors, setMutedColors] = useState<Set<string>>(() => new Set());
@@ -92,9 +113,66 @@ export function PlotterDialog() {
   const [reviewedBridgePreset, setReviewedBridgePreset] = useState('');
   const [reviewedPrepAction, setReviewedPrepAction] = useState('');
   const [nativePorts, setNativePorts] = useState<NativeSerialPort[]>([]);
-  const [selectedPort, setSelectedPort] = useState('');
+  const [selectedPort, setSelectedPort] = useState(savedPrefs.lastPort ?? '');
   const [portsLoading, setPortsLoading] = useState(false);
   const [portsError, setPortsError] = useState('');
+  // Selected brand profile (see machineProfiles.ts) — loads dialect/baud/
+  // flow/force defaults + operator notes for the physical cutter in front
+  // of the operator. '' = generic / manual.
+  const [profileId, setProfileId] = useState(savedPrefs.profileId ?? '');
+  const profile = getMachineProfile(profileId);
+  // Bumped after every job-log entry so the console's history list refetches.
+  const [jobLogVersion, setJobLogVersion] = useState(0);
+
+  // Round-trip the machine settings whenever any of them change.
+  useEffect(() => {
+    savePlotterPrefs({ opts, format, materialId, baud, flowControl: flow, lastPort: selectedPort, profileId });
+  }, [opts, format, materialId, baud, flow, selectedPort, profileId]);
+
+  // Apply a brand profile: dialect + serial knobs + force/speed starting
+  // points. Every field stays manually overridable afterwards — a profile
+  // is a starting point, not a lock.
+  const applyProfile = (id: string) => {
+    setProfileId(id);
+    const p = getMachineProfile(id);
+    if (!p) return;
+    setOpts(o => ({
+      ...o,
+      dialect: p.dialect,
+      ...(p.panelOnly ? {} : { graphtecForce: p.defaultForce, graphtecSpeed: p.defaultSpeed }),
+    }));
+    setBaud(p.baud);
+    setFlow(p.flowControl);
+  };
+
+  // Snapshot / restore the full cutter setup — backs the console's saved
+  // machine rows (one record per physical cutter).
+  const snapshotConfig = (): MachineDraft => ({
+    name: '',
+    profileId,
+    format,
+    opts,
+    materialId,
+    baud,
+    flowControl: flow,
+    portPath: selectedPort,
+    notes: '',
+  });
+  const applyConfig = (rec: MachineRecord) => {
+    setProfileId(rec.profileId);
+    setFormat(rec.format);
+    setOpts(rec.opts);
+    setMaterialId(rec.materialId);
+    setBaud(rec.baud);
+    setFlow(rec.flowControl);
+    if (rec.portPath) setSelectedPort(rec.portPath);
+  };
+
+  // Re-render on link status transitions so the Send button / hints reflect
+  // connects and disconnects made from the console.
+  useEffect(() => link.subscribe(ev => {
+    if (ev.type === 'status' || ev.type === 'done') linkTick();
+  }), [link]);
 
   const cutPaths = useEditor(s => s.cutPaths);
   const clearCutPaths = useEditor(s => s.clearCutPaths);
@@ -189,12 +267,6 @@ export function PlotterDialog() {
     return () => window.clearTimeout(timer);
   }, [open, native, refreshSerialPorts]);
 
-  const formatNativePort = (port: NativeSerialPort) => {
-    const details = [port.product, port.manufacturer, port.kind.toUpperCase()].filter(Boolean).join(' · ');
-    const ids = port.vid !== undefined && port.pid !== undefined ? ` · ${port.vid.toString(16).padStart(4, '0')}:${port.pid.toString(16).padStart(4, '0')}` : '';
-    return `${port.path}${details ? ` — ${details}` : ''}${ids}`;
-  };
-
   const stats = useMemo(() => {
     let polys: PolyLite[] = [];
     for (const c of previewPaths) {
@@ -228,13 +300,32 @@ export function PlotterDialog() {
   const outputBlockedReason = outputBlocked ? t('No active cut paths — enable at least one color before saving or sending.') : '';
   const overrideCuts = cutPathCount > 0 ? activePaths : undefined;
   const buildOut = () => buildPlotterOutput(format, opts, overrideCuts);
+  // Preflight dry-run of the machine code — lintJob is pure, so it can run
+  // on every generate/preview refresh without touching the machine.
+  const lintContext = {
+    unit: opts.unit,
+    originBottomLeft: opts.originBottomLeft,
+    paperHeightUnits: opts.paperHeightUnits,
+    penDownZ: opts.penDownZ,
+    penUpZ: opts.penUpZ,
+  };
+  const runPreflight = (source?: string) => {
+    if (outputBlocked) return;
+    setLint(lintJob(format, source ?? (code || buildOut()), lintContext));
+  };
   const generate = () => {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
-    setCode(buildOut());
+    const out = buildOut();
+    setCode(out);
+    setLint(lintJob(format, out, lintContext));
   };
   const setPreview = (mode: PreviewMode) => {
     setPreviewMode(mode);
-    if (mode === 'code' && !code) setCode(buildOut());
+    if (mode === 'code' && !code) {
+      const out = buildOut();
+      setCode(out);
+      setLint(lintJob(format, out, lintContext));
+    }
   };
   const focusPreviewTab = (mode: PreviewMode) => {
     setPreview(mode);
@@ -379,13 +470,69 @@ export function PlotterDialog() {
     download(fileName, code || buildOut(), 'text/plain');
   };
 
+  /** Stream a job over the persistent link when connected — paced writes,
+   *  live progress, and a real Cancel that lifts the blade. Falls back to
+   *  the legacy one-shot send (which opens/picks the port itself) when the
+   *  operator never connected. Every outcome lands in the job history
+   *  (plotterRecords) so yesterday's working settings stay traceable. */
+  const streamJob = async (payload: string, successMsg: string, kind: 'job' | 'test-cut' = 'job') => {
+    const bytes = new TextEncoder().encode(payload).length;
+    const logJob = (result: 'ok' | 'aborted' | 'error', seconds: number, target: string) => {
+      addJobLog({
+        kind,
+        target,
+        profileId,
+        format,
+        baud: link.status === 'connected' ? link.baud : baud,
+        paths: kind === 'test-cut' ? 2 : previewPaths.length,
+        bytes,
+        seconds,
+        result,
+        materialId,
+      });
+      setJobLogVersion(v => v + 1);
+    };
+    if (link.status === 'connected') {
+      const abort = new AbortController();
+      abortRef.current = abort;
+      setJobProgress({ sent: 0, total: bytes });
+      const t0 = Date.now();
+      try {
+        await link.send(payload, {
+          signal: abort.signal,
+          onProgress: (sent, total) => setJobProgress({ sent, total }),
+        });
+        toast.success(successMsg);
+        logJob('ok', (Date.now() - t0) / 1000, link.describe());
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') {
+          // Stop safely: pen up (HP-GL) / feed hold (grbl) as a best effort.
+          await link.send(buildAbortSnippet(format)).catch(() => undefined);
+          toast.warn(t('Job cancelled — blade raised'));
+          logJob('aborted', (Date.now() - t0) / 1000, link.describe());
+        } else {
+          toast.error((e as Error).message);
+          logJob('error', (Date.now() - t0) / 1000, link.describe());
+        }
+      } finally {
+        setJobProgress(null);
+        abortRef.current = null;
+      }
+      return;
+    }
+    const t0 = Date.now();
+    await sendOverSerial(payload, baud, native ? selectedPort || undefined : undefined);
+    toast.success(successMsg);
+    logJob('ok', (Date.now() - t0) / 1000, selectedPort || 'serial');
+  };
+
+  const cancelJob = () => { abortRef.current?.abort(); };
+
   const send = async () => {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
     setBusy(true);
     try {
-      const out = code || buildOut();
-      await sendOverSerial(out, undefined, native ? selectedPort || undefined : undefined);
-      toast.success(t('✅ Sent to plotter'));
+      await streamJob(code || buildOut(), t('✅ Sent to plotter'));
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -421,6 +568,7 @@ export function PlotterDialog() {
     setPreviewMode('outline');
     setShowPrint(true);
     setShowOrder(false);
+    setSimulate(false);
     setReviewedPrepAction(t('Reset output settings'));
     toast.success(t('Output settings reset'));
   };
@@ -454,6 +602,12 @@ export function PlotterDialog() {
     ? ` · ${t('Force')} ${opts.graphtecForce} · ${t('Speed')} ${opts.graphtecSpeed}`
     : '';
   const jobSummaryLabel = `${format.toUpperCase()} · ${outputSourceLabel} · ${previewPaths.length} ${t('paths')} · ${colorSummaryLabel} · ${machineSummaryLabel} · ${materialSummaryLabel} · ${speedSummaryLabel}${cutterPressureSummaryLabel} · ~${formatDuration(stats.seconds)}`;
+  // Serial transfer preview at the current knobs — a 2 MB PLT at 9600 baud
+  // is ~25 s of streaming before the blade moves; the operator should see
+  // that coming. Uses the generated preview code when present.
+  const transferEstimateLabel = code
+    ? ` · ${t('transfer')} ~${estimateTransferSeconds(code.length, baud, flow)}s @${baud}`
+    : '';
   const allColorsVisible = colors.length > 0 && mutedColors.size === 0;
   const noColorsVisible = colors.length > 0 && visibleColors.length === 0;
   const activeSoloColor = visibleColors.length === 1 ? visibleColors[0] : null;
@@ -488,8 +642,7 @@ export function PlotterDialog() {
     if (!canSend) { download(`test-cut.${format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl')}`, out, 'text/plain'); return; }
     setBusy(true);
     try {
-      await sendOverSerial(out, undefined, native ? selectedPort || undefined : undefined);
-      toast.success(t('✅ Test cut sent'));
+      await streamJob(out, t('✅ Test cut sent'), 'test-cut');
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -651,6 +804,35 @@ export function PlotterDialog() {
                 )}
               </Field>
             </div>
+            {format === 'hpgl' && (
+              <div className="col-span-2">
+                <Field label={t('Machine profile')}>
+                  <select
+                    className="input"
+                    value={profileId}
+                    onChange={(e) => applyProfile(e.target.value)}
+                    aria-label={t('Machine profile')}
+                    title={t('Pick your cutter brand — loads dialect, baud, flow control, force/speed defaults and field notes.')}
+                  >
+                    <option value="">{t('Generic / manual')}</option>
+                    {MACHINE_PROFILES.map((p) => (
+                      <option key={p.id} value={p.id}>{`${t(p.brand)} — ${t(p.label)}`}</option>
+                    ))}
+                  </select>
+                  {profile && (
+                    <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] text-muted leading-relaxed">
+                      <div className="text-ink/80">{t(profile.models)}</div>
+                      <div>{t('Recommends')} {profile.baud} {t('Baud').toLowerCase()} · {t(profile.flowControl === 'none' ? 'None (paced)' : profile.flowControl === 'hardware' ? 'Hardware RTS/CTS' : 'Software XON/XOFF')}{profile.panelOnly ? ` · ${t('force/speed on the machine panel')}` : ` · FS/VS ${profile.defaultForce}g/${profile.defaultSpeed}`}</div>
+                      <ul className="mt-0.5 list-none space-y-0.5">
+                        {profile.quirks.map((q) => (
+                          <li key={q}>· {t(q)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Field>
+              </div>
+            )}
             <Field label={t('Format')}>
               <div
                 className="grid grid-cols-2 gap-1"
@@ -978,12 +1160,19 @@ export function PlotterDialog() {
                 showPrint={showPrint}
                 mirror={opts.mirror}
                 showOrder={showOrder}
+                simulate={simulate}
+                feedMmMin={opts.unit === 'mm' ? opts.feedRate : opts.feedRate * 25.4}
+                travelMmMin={opts.unit === 'mm' ? opts.travelRate : opts.travelRate * 25.4}
+                optimize={opts.optimize}
                 className="w-full h-56 bg-panel2 border border-border rounded-sm"
               />
             ) : (
-              <pre className="bg-panel2 border border-border rounded-sm p-2 h-56 overflow-auto text-[10px] font-mono text-ink/85">
-                {code || t('(click Generate Preview)')}
-              </pre>
+              <div className="flex flex-col gap-1.5 min-h-0">
+                <pre className="bg-panel2 border border-border rounded-sm p-2 h-44 overflow-auto text-[10px] font-mono text-ink/85">
+                  {code || t('(click Generate Preview)')}
+                </pre>
+                <PreflightPanel lint={lint} unit={opts.unit} />
+              </div>
             )}
 
             {/* Job estimate — cut length, travel saved by ordering, time. */}
@@ -1115,14 +1304,14 @@ export function PlotterDialog() {
                   aria-describedby="plotter-preview-toggle-review-status"
                   title={t('Use Left/Right arrows to switch options')}
                   onKeyDown={(event) => {
-                    handleToolbarKeys(event, ['print', 'order'] as const);
+                    handleToolbarKeys(event, ['print', 'order', 'simulate'] as const);
                     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
                       requestAnimationFrame(() => setReviewedPreviewToggle((document.activeElement as HTMLElement | null)?.dataset.review ?? ''));
                     }
                   }}
                 >
                   <span id="plotter-preview-toggle-review-status" className="sr-only" aria-live="polite">
-                    {`${t('Reviewing')} ${reviewedPreviewToggle || `${t('Plotter preview toggles')} · ${t('Show print')} ${showPrint ? t('on') : t('off')} · ${t('Cut order')} ${showOrder ? t('on') : t('off')}`}`}
+                    {`${t('Reviewing')} ${reviewedPreviewToggle || `${t('Plotter preview toggles')} · ${t('Show print')} ${showPrint ? t('on') : t('off')} · ${t('Cut order')} ${showOrder ? t('on') : t('off')} · ${t('Simulate')} ${simulate ? t('on') : t('off')}`}`}
                   </span>
                   <button
                     type="button"
@@ -1150,10 +1339,33 @@ export function PlotterDialog() {
                     <Route size={11} aria-hidden="true" />
                     {t('Cut order')}
                   </button>
+                  <button
+                    type="button"
+                    data-value="simulate"
+                    data-review={`${t('Simulate')} · ${simulate ? t('on') : t('off')}`}
+                    className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 transition-colors ${simulate ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink hover:bg-panel2'}`}
+                    onFocus={(event) => setReviewedPreviewToggle(event.currentTarget.dataset.review ?? '')}
+                    onClick={() => setSimulate(!simulate)}
+                    title={t('Replay the optimized cut order as an animation paced by the feed rate.')}
+                    aria-pressed={simulate}
+                  >
+                    <Play size={11} aria-hidden="true" />
+                    {t('Simulate')}
+                  </button>
                 </span>
               )}
               {previewMode === 'code' && (
-                <button type="button" className="btn !py-1 !text-[10px]" onClick={generate}>{t('Generate Preview')}</button>
+                <>
+                  <button type="button" className="btn !py-1 !text-[10px]" onClick={generate}>{t('Generate Preview')}</button>
+                  <button
+                    type="button"
+                    className={`btn !py-1 !text-[10px] ${lint && !lint.ok ? 'border-warning text-warning' : lint ? 'border-success text-success' : ''}`}
+                    onClick={() => runPreflight()}
+                    title={t('Dry-run check of the machine code — catches empty jobs, plots taller than the page, negative coordinates, missing feed rates.')}
+                  >
+                    {t('Preflight')}
+                  </button>
+                </>
               )}
               <div className="flex-1" />
               <span className="flex items-center gap-0.5 text-muted" title={t('Weed grid dividers (rows × columns).')}>
@@ -1425,7 +1637,7 @@ export function PlotterDialog() {
           <div className="mb-3 rounded border border-accent2/40 bg-accent2/10 px-2 py-1.5 text-[10px] text-accent2 flex items-center gap-1.5 tabular-nums" title={t('Final output summary before Save or Send')}>
             <Scissors size={12} aria-hidden="true" className="shrink-0" />
             <span className="font-medium">{t('Ready to output')}:</span>
-            <span>{jobSummaryLabel}</span>
+            <span>{jobSummaryLabel}{transferEstimateLabel}</span>
           </div>
           {outputBlocked && (
             <div className="-mt-2 mb-3 rounded border border-warning/50 bg-warning/10 px-2 py-1.5 text-[10px] text-warning">
@@ -1433,34 +1645,49 @@ export function PlotterDialog() {
             </div>
           )}
 
-          {native && (
-            <div className="mb-3 rounded border border-border bg-panel2/60 p-2 text-[11px]">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <label className="font-medium text-ink" htmlFor="plotter-native-port">{t('Desktop USB port')}</label>
-                <button type="button" className="btn !py-1 !px-2 !text-[10px]" onClick={refreshSerialPorts} disabled={portsLoading}>
-                  {portsLoading ? t('Refreshing…') : t('Refresh')}
-                </button>
+          {/* Connection + debug console. The native port picker lives here
+              now, alongside baud / flow control, quick machine commands,
+              jog, and the TX/RX traffic log. */}
+          <PlotterConsole
+            link={link}
+            format={format}
+            unit={opts.unit}
+            native={native}
+            webSerial={webSerial}
+            sending={jobProgress !== null}
+            nativePorts={nativePorts}
+            selectedPort={selectedPort}
+            setSelectedPort={setSelectedPort}
+            refreshPorts={() => { void refreshSerialPorts(); }}
+            portsLoading={portsLoading}
+            portsError={portsError}
+            baud={baud}
+            setBaud={setBaud}
+            flow={flow}
+            setFlow={setFlow}
+            force={opts.graphtecForce}
+            speed={opts.graphtecSpeed}
+            feedRate={opts.feedRate}
+            profile={profile}
+            connectInit={format === 'hpgl' ? profileConnectInit(profile, opts.graphtecForce, opts.graphtecSpeed) : ''}
+            forceSpeedCommand={format === 'hpgl' ? profileForceSpeed(profile, opts.graphtecForce, opts.graphtecSpeed) : ''}
+            snapshotConfig={snapshotConfig}
+            applyConfig={applyConfig}
+            jobLogVersion={jobLogVersion}
+          />
+
+          {jobProgress && (
+            <div className="mb-3 flex items-center gap-2 text-[10px] text-muted tabular-nums" role="status" aria-live="polite">
+              <span className="shrink-0">{t('Sending')} {jobProgress.sent}/{jobProgress.total} B ({Math.floor((jobProgress.sent / Math.max(1, jobProgress.total)) * 100)}%)</span>
+              <div className="h-1.5 min-w-0 flex-1 rounded bg-border overflow-hidden">
+                <div
+                  className="h-full bg-accent2 transition-[width] duration-150"
+                  style={{ width: `${(jobProgress.sent / Math.max(1, jobProgress.total)) * 100}%` }}
+                />
               </div>
-              <select
-                id="plotter-native-port"
-                className="input"
-                value={selectedPort}
-                onChange={(event) => setSelectedPort(event.target.value)}
-                disabled={portsLoading || nativePorts.length === 0}
-                aria-label={t('Desktop USB port')}
-              >
-                <option value="">{nativePorts.length === 0 ? t('No serial ports detected') : t('Auto-select USB port')}</option>
-                {nativePorts.map((port) => (
-                  <option key={port.path} value={port.path}>{formatNativePort(port)}</option>
-                ))}
-              </select>
-              <p className="mt-1 text-[10px] text-muted">
-                {portsError
-                  ? portsError
-                  : nativePorts.length > 1
-                    ? t('Choose the cutter USB serial port before sending.')
-                    : t('Desktop app can send directly to OS serial ports.')}
-              </p>
+              <button type="button" className="btn !py-1 !px-2 !text-[10px] text-danger shrink-0" onClick={cancelJob}>
+                {t('Stop job')}
+              </button>
             </div>
           )}
 
@@ -1521,6 +1748,52 @@ export function PlotterDialog() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Preflight dry-run panel for the Code tab — issue list + plot extents
+ *  computed by lintJob, so the operator can sanity-check the job before
+ *  it reaches a blade. */
+function PreflightPanel({ lint, unit }: { lint: LintResult | null; unit: 'mm' | 'in' }) {
+  const t = useT();
+  if (!lint) return null;
+  const counts = { error: 0, warn: 0, info: 0 };
+  for (const issue of lint.issues) counts[issue.severity]++;
+  const headline = counts.error > 0
+    ? { cls: 'text-danger', icon: '✕', text: t('Preflight found problems') }
+    : counts.warn > 0
+      ? { cls: 'text-warning', icon: '!', text: t('Preflight passed with warnings') }
+      : { cls: 'text-success', icon: '✓', text: t('Preflight passed') };
+  return (
+    <div
+      className="rounded border border-border bg-panel2 px-2 py-1.5 text-[10px] leading-relaxed"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`flex items-center gap-1 font-medium ${headline.cls}`}>
+          <span aria-hidden="true">{headline.icon}</span>
+          {headline.text}
+        </span>
+        <span className="text-muted tabular-nums">
+          {lint.stats.statements} {t('statements')} · {lint.stats.penDownMoves} {t('pen-down moves')}
+          {lint.stats.plot ? ` · ${t('Plot size')} ${lint.stats.plot.w.toFixed(0)} × ${lint.stats.plot.h.toFixed(0)} ${unit}` : ''}
+        </span>
+      </div>
+      {lint.issues.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {lint.issues.map((issue, i) => (
+            <li
+              key={i}
+              className={`flex gap-1.5 ${issue.severity === 'error' ? 'text-danger' : issue.severity === 'warn' ? 'text-warning' : 'text-muted'}`}
+            >
+              <span aria-hidden="true" className="shrink-0 font-semibold">{issue.severity === 'error' ? '✕' : issue.severity === 'warn' ? '!' : 'ℹ'}</span>
+              <span>{issue.message}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

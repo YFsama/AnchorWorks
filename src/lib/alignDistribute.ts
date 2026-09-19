@@ -15,6 +15,7 @@
 
 import { getCanvas, pushHistory } from './canvasEngine';
 import { useEditor } from '../store/editor';
+import { nestRects } from './nesting';
 
 export type AlignAxis = 'left' | 'centerH' | 'right' | 'top' | 'centerV' | 'bottom';
 export type DistributeDir = 'horizontal' | 'vertical';
@@ -130,6 +131,74 @@ export function autoArrangeSelection(gapMm = 5): number {
   canvas.requestRenderAll();
   pushHistory();
   return objs.length;
+}
+
+export interface NestSelectionResult {
+  /** Objects nested (the whole selection). */
+  arranged: number;
+  /** How many were turned 90° to fit tighter. */
+  rotated: number;
+  /** Sheet height consumed, mm. */
+  usedHeightMm: number;
+  /** Packed area ÷ consumed sheet, 0–1. */
+  utilization: number;
+}
+
+/**
+ * Rotation-aware nesting of the selection (SignMaster Nesting+, the upgrade
+ * over `autoArrangeSelection`'s shelf packer). Measures each object's
+ * transformed bounding rect, skyline-packs those rects against the material
+ * width (first artboard width, else document width) with an optional `gapMm`
+ * kerf, then repositions the objects — rotating packed items by +90° about
+ * their centre when that slot is better, exactly the way the packer planned.
+ * Existing transforms are respected (positions are adjusted by the same
+ * left/top delta convention the align tools use). Single history push for
+ * the whole batch. Requires 2+ objects; null when it can't run.
+ */
+export function nestSelection(gapMm = 5): NestSelectionResult | null {
+  const canvas = getCanvas();
+  if (!canvas) return null;
+  const objs = canvas.getActiveObjects();
+  if (objs.length < 2) return null;
+  const gap = Math.max(0, gapMm) * MM_TO_PX;
+
+  const ab = useEditor.getState().artboards[0];
+  const doc = useEditor.getState().doc;
+  const sheetWidth = ab ? ab.width : (doc.width || 800);
+
+  const items = objs.map(o => ({ o, r: o.getBoundingRect() }));
+  const startX = ab ? ab.x : Math.min(...items.map(i => i.r.left));
+  const startY = ab ? ab.y : Math.min(...items.map(i => i.r.top));
+
+  const nest = nestRects(items.map(i => ({ w: i.r.width, h: i.r.height })), sheetWidth, gap, true);
+
+  let rotated = 0;
+  nest.placements.forEach((p, i) => {
+    const { o, r } = items[i];
+    const targetLeft = startX + p.x;
+    const targetTop = startY + p.y;
+    if (p.rotated) {
+      // +90° about the object's centre: the bounding box exactly swaps
+      // width/height (an isometry), so re-measuring post-rotation and
+      // nudging left/top lands the new box's top-left on the target.
+      o.rotate((o.angle ?? 0) + 90);
+      o.setCoords();
+      const r2 = o.getBoundingRect();
+      o.set({ left: (o.left ?? 0) + (targetLeft - r2.left), top: (o.top ?? 0) + (targetTop - r2.top) });
+      rotated++;
+    } else {
+      o.set({ left: (o.left ?? 0) + (targetLeft - r.left), top: (o.top ?? 0) + (targetTop - r.top) });
+    }
+    o.setCoords();
+  });
+  canvas.requestRenderAll();
+  pushHistory();
+  return {
+    arranged: objs.length,
+    rotated,
+    usedHeightMm: nest.usedHeight / MM_TO_PX,
+    utilization: nest.utilization,
+  };
 }
 
 /**
