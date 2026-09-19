@@ -50,6 +50,13 @@ tauri-plugin-deep-link = "2"
 # use case — users explicitly pick a port from a list anyway. macOS /
 # Windows builds aren't affected (they don't use libudev either way).
 serialport = { version = "4", default-features = false }
+# Epson inkjet maintenance channel (epsonprint.rs). WinSpool RAW jobs are
+# the one way to talk BIDIRECTIONALLY to a USB printer-class device on
+# Windows without swapping the driver to WinUSB: OpenPrinter + StartDoc
+# ("RAW") + WritePrinter sends arbitrary ESC sequences, ReadPrinter brings
+# status replies back. Target-gated so other platforms still build.
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winspool", "winerror"] }
 
 [features]
 # This feature is used for production builds or when a dev server is not

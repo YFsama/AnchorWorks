@@ -16,6 +16,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
 mod serial;
+mod epsonprint;
 
 /// Authoritative platform info — what runtime.ts's `getOS()` heuristic
 /// approximates from the User-Agent string when the app boots in a browser.
@@ -298,6 +299,8 @@ pub fn run() {
             serial::serial_read,
             serial::serial_set_control,
             serial::serial_close,
+            epsonprint::epson_list_printers,
+            epsonprint::epson_raw_transact,
             print_native,
         ])
         .run(tauri::generate_context!())

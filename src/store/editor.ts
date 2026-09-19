@@ -167,6 +167,7 @@ interface EditorState {
 
   // Modal flags
   showPlotter: boolean;
+  showEpsonMaint: boolean;
   showPrint: boolean;
   openPrintPrep: boolean;
   showDocSettings: boolean;
@@ -206,7 +207,7 @@ interface EditorState {
   showWarp: boolean;
   showGrommets: boolean;
   showMarginGuides: boolean;
-  setModal: (k: 'openPrintPrep' | 'showPlotter' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showStar' | 'showFindReplace' | 'showSingleLineText' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMarginGuides', v: boolean) => void;
+  setModal: (k: 'openPrintPrep' | 'showPlotter' | 'showEpsonMaint' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showStar' | 'showFindReplace' | 'showSingleLineText' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMarginGuides', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -339,6 +340,7 @@ export const useEditor = create<EditorState>((set) => ({
   setHistoryFlags: (u, r) => set({ canUndo: u, canRedo: r }),
 
   showPlotter: false,
+  showEpsonMaint: false,
   showPrint: false,
   openPrintPrep: false,
   showDocSettings: false,

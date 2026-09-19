@@ -28,6 +28,7 @@ import { initUpdaterOnBoot } from './lib/updater';
 // Code-split the heaviest dialogs / panels — they only load when opened.
 const AIPanel = lazy(() => import('./components/AIPanel').then(m => ({ default: m.AIPanel })));
 const PlotterDialog = lazy(() => import('./components/PlotterDialog').then(m => ({ default: m.PlotterDialog })));
+const EpsonMaintDialog = lazy(() => import('./components/EpsonMaintDialog'));
 const CutContourDialog = lazy(() => import('./components/CutContourDialog').then(m => ({ default: m.CutContourDialog })));
 const PrintDialog = lazy(() => import('./components/PrintDialog').then(m => ({ default: m.PrintDialog })));
 const TemplatesDialog = lazy(() => import('./components/TemplatesDialog').then(m => ({ default: m.TemplatesDialog })));
@@ -734,6 +735,7 @@ export default function App() {
   const setTool = useEditor(s => s.setTool);
   const setModal = useEditor(s => s.setModal);
   const showPlotter = useEditor(s => s.showPlotter);
+  const showEpsonMaint = useEditor(s => s.showEpsonMaint);
   const showCutContour = useEditor(s => s.showCutContour);
   const showPrint = useEditor(s => s.showPrint);
   const showDocSettings = useEditor(s => s.showDocSettings);
@@ -1402,6 +1404,11 @@ export default function App() {
       {showPlotter && (
         <Suspense fallback={null}>
           <PlotterDialog />
+        </Suspense>
+      )}
+      {showEpsonMaint && (
+        <Suspense fallback={null}>
+          <EpsonMaintDialog />
         </Suspense>
       )}
       {showCutContour && (

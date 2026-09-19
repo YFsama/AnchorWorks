@@ -362,6 +362,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Clear bridges'), onClick: () => clearPlotterBridges(t) },
         { label: t('Clear cut paths'), onClick: () => clearCutJob(), disabled: cutPathCount === 0 },
         { label: t('Send to Plotter…'), onClick: () => setModal('showPlotter', true), kbd: getBinding('window.plotter') },
+        { label: t('Epson maintenance…'), onClick: () => setModal('showEpsonMaint', true) },
         ...buildRecentFilesItems(recent),
       ]} />
 
