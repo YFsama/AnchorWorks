@@ -4014,4 +4014,9 @@ export const zhDict: Record<string, string> = {
   "Type raw text below; queries automatically wait for the reply.": "在下方输入原始指令；查询类指令会自动等待应答。",
   "more statements not shown": "条语句未显示",
   "of line rate": "线速",
+  "Force test": "压力试切",
+  "✅ Force test sent": "✅ 压力试切已发送",
+  "Cut a strip of 5 squares at increasing force to find the right blade pressure in one pass.": "一行切出 5 个递增压力的小方块，一次找出合适的刀压。",
+  "Eject sheet after job (!PG)": "作业后退纸 (!PG)",
+  "Feed the sheet out after the job finishes (Roland !PG). Turn off to nest several jobs on one piece of material.": "作业结束后自动走纸退出（Roland !PG）。关闭后可在同一张料上连续排多个作业。",
 };

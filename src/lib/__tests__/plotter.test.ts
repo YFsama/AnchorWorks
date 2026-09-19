@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   svgToPolylines,
+  buildForceTest,
   generateGCode,
   generateHPGL,
   defaultPlotterOptions,
@@ -217,5 +218,59 @@ describe('plotter preferences', () => {
     expect(p.opts?.paperHeightUnits).toBe(1);
     expect(p.baud).toBeUndefined(); // outside the accepted band → dropped
     window.localStorage.clear();
+  });
+});
+
+describe('dialect force/speed embedding + eject option', () => {
+  const rolandOpts = { ...defaultPlotterOptions, dialect: 'roland-camm' as const };
+
+  it('embeds FS/VS into the Roland (clone) dialect header', () => {
+    const out = generateHPGL([], rolandOpts);
+    expect(out).toMatch(/FS30;/);
+    expect(out).toMatch(/VS20;/);
+  });
+
+  it('skips FS/VS when set to 0', () => {
+    const out = generateHPGL([], { ...rolandOpts, graphtecForce: 0, graphtecSpeed: 0 });
+    expect(out).not.toMatch(/FS\d/);
+    expect(out).not.toMatch(/VS\d/);
+  });
+
+  it('never puts FS/VS into the bare pen-plotter dialect', () => {
+    const out = generateHPGL([], defaultPlotterOptions);
+    expect(out).not.toMatch(/FS\d/);
+    expect(out).not.toMatch(/VS\d/);
+  });
+
+  it('ejects by default but honours ejectAfter=false (job nesting)', () => {
+    expect(generateHPGL([], rolandOpts)).toMatch(/!PG;/);
+    const nested = generateHPGL([], { ...rolandOpts, ejectAfter: false });
+    expect(nested).not.toMatch(/!PG;/);
+    expect(nested).toMatch(/PU0,0;/);
+  });
+});
+
+describe('buildForceTest', () => {
+  it('cuts one square per force step and restores the configured force', () => {
+    const out = buildForceTest('hpgl', { ...defaultPlotterOptions, dialect: 'roland-camm' });
+    for (const f of [30, 40, 50, 60, 70]) expect(out).toMatch(new RegExp(`FS${f};`));
+    // five PD squares + closing PD back at start
+    expect(out.match(/PD[^;]+;/g)?.length).toBe(5);
+    // restore the operator force after the strip
+    expect(out.lastIndexOf('FS30;')).toBeGreaterThan(out.lastIndexOf('FS70;'));
+    expect(out).toMatch(/!PG;/);
+  });
+
+  it('respects start/step/count overrides', () => {
+    const out = buildForceTest('hpgl', defaultPlotterOptions, 80, 5, 3);
+    expect(out).toMatch(/FS80;/);
+    expect(out).toMatch(/FS90;/);
+    expect(out).not.toMatch(/FS95;/);
+    expect(out.match(/PD[^;]+;/g)?.length).toBe(3);
+  });
+
+  it('falls back to the plain test cut for gcode (pen plotters have no force)', async () => {
+    const { buildTestCut } = await import('../plotter');
+    expect(buildForceTest('gcode', defaultPlotterOptions)).toBe(buildTestCut('gcode', defaultPlotterOptions));
   });
 });

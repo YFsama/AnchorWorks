@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
+import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
 import { buildAbortSnippet, lintJob, simulateMachineCode, type LintResult, type MachineRun } from '../lib/hpglDebug';
 import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSpeed } from '../lib/machineProfiles';
@@ -73,7 +73,7 @@ const CODE_VIEW_OPTIONS = [
 ] as const;
 type CodeViewMode = typeof CODE_VIEW_OPTIONS[number]['value'];
 /** Shared empty run so the annotated/sim views can render before code exists. */
-const EMPTY_RUN: MachineRun = { steps: [], cuts: [], travels: [], bbox: null, cutLen: 0, travelLen: 0, penDownMoves: 0 };
+const EMPTY_RUN: MachineRun = { steps: [], cuts: [], travels: [], segs: [], bbox: null, cutLen: 0, travelLen: 0, penDownMoves: 0 };
 
 export function PlotterDialog() {
   const t = useT();
@@ -96,6 +96,8 @@ export function PlotterDialog() {
   const [baud, setBaud] = useState(savedPrefs.baud ?? 115200);
   const [flow, setFlow] = useState<FlowControl>(savedPrefs.flowControl ?? 'none');
   const [jobProgress, setJobProgress] = useState<{ sent: number; total: number } | null>(null);
+  // True while the operator paused the running job stream (see togglePauseJob).
+  const [jobPaused, setJobPaused] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const [, linkTick] = useReducer((x: number) => x + 1, 0);
   // Preview mode: 'outline' = graphical SVG of the cut geometry (default —
@@ -493,9 +495,19 @@ export function PlotterDialog() {
   };
 
   const fileName = `design.${format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl')}`;
+  /** Download name at click time: profile + timestamp so the operator can
+   *  tell yesterday's GX job from today's clone job in the downloads
+   *  folder. Built inside handlers — reading the clock during render
+   *  trips the purity lint. */
+  const stampedFileName = (prefix = 'design') => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ext = format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl');
+    return `${profileId ? `${profileId}-` : ''}${prefix}-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`;
+  };
   const saveFile = () => {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
-    download(fileName, code || buildOut(), 'text/plain');
+    download(stampedFileName(), code || buildOut(), 'text/plain');
   };
 
   /** Stream a job over the persistent link when connected — paced writes,
@@ -524,6 +536,7 @@ export function PlotterDialog() {
       const abort = new AbortController();
       abortRef.current = abort;
       setJobProgress({ sent: 0, total: bytes });
+      setJobPaused(false);
       const t0 = Date.now();
       try {
         await link.send(payload, {
@@ -535,7 +548,8 @@ export function PlotterDialog() {
       } catch (e) {
         if ((e as Error).name === 'AbortError') {
           // Stop safely: pen up (HP-GL) / feed hold (grbl) as a best effort.
-          await link.send(buildAbortSnippet(format)).catch(() => undefined);
+          // pauseImmune so the snippet goes out even mid-pause.
+          await link.send(buildAbortSnippet(format), { pauseImmune: true }).catch(() => undefined);
           toast.warn(t('Job cancelled — blade raised'));
           logJob('aborted', (Date.now() - t0) / 1000, link.describe());
         } else {
@@ -543,6 +557,8 @@ export function PlotterDialog() {
           logJob('error', (Date.now() - t0) / 1000, link.describe());
         }
       } finally {
+        link.resume(); // release the pause gate whatever happened
+        setJobPaused(false);
         setJobProgress(null);
         abortRef.current = null;
       }
@@ -554,7 +570,25 @@ export function PlotterDialog() {
     logJob('ok', (Date.now() - t0) / 1000, selectedPort || 'serial');
   };
 
-  const cancelJob = () => { abortRef.current?.abort(); };
+  /** Pause the stream between chunks — the machine drains its buffer and
+   *  stops. grbl machines additionally get a feed hold; resume sends the
+   *  cycle-start. HP-GL machines just stop when the buffer runs dry. */
+  const togglePauseJob = async () => {
+    if (jobPaused) {
+      link.resume();
+      setJobPaused(false);
+      if (format === 'gcode') await link.send('~', { pauseImmune: true }).catch(() => undefined);
+    } else {
+      link.pause();
+      setJobPaused(true);
+      if (format === 'gcode') await link.send('!', { pauseImmune: true }).catch(() => undefined);
+    }
+  };
+
+  const cancelJob = () => {
+    link.resume(); // unblock the sender so abort can take effect
+    abortRef.current?.abort();
+  };
 
   const send = async () => {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
@@ -667,10 +701,23 @@ export function PlotterDialog() {
   // Sends when a direct path exists, otherwise saves the file.
   const testCut = async () => {
     const out = buildTestCut(format, opts);
-    if (!canSend) { download(`test-cut.${format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl')}`, out, 'text/plain'); return; }
+    if (!canSend) { download(stampedFileName('test-cut'), out, 'text/plain'); return; }
     setBusy(true);
     try {
       await streamJob(out, t('✅ Test cut sent'), 'test-cut');
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  // Force test strip: five squares at rising blade pressure in one pass —
+  // weed them left→right and the first clean lift is the force to use.
+  // HP-GL only (pen plotters have no force concept).
+  const forceTest = async () => {
+    const out = buildForceTest(format, opts);
+    if (!canSend) { download(stampedFileName('force-test'), out, 'text/plain'); return; }
+    setBusy(true);
+    try {
+      await streamJob(out, t('✅ Force test sent'), 'test-cut');
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
   };
@@ -1120,6 +1167,16 @@ export function PlotterDialog() {
                   );
                 })}
               </div>
+              {format === 'hpgl' && opts.dialect === 'roland-camm' && (
+                <label className="mt-1 flex items-center gap-1.5 text-[10px] text-muted cursor-pointer" title={t('Feed the sheet out after the job finishes (Roland !PG). Turn off to nest several jobs on one piece of material.')}>
+                  <input
+                    type="checkbox"
+                    checked={opts.ejectAfter}
+                    onChange={(e) => setOpts({ ...opts, ejectAfter: e.target.checked })}
+                  />
+                  {t('Eject sheet after job (!PG)')}
+                </label>
+              )}
             </div>
             <Field label={`${t('Overcut')} (mm)`}>
               <input
@@ -1789,13 +1846,23 @@ export function PlotterDialog() {
 
           {jobProgress && (
             <div className="mb-3 flex items-center gap-2 text-[10px] text-muted tabular-nums" role="status" aria-live="polite">
-              <span className="shrink-0">{t('Sending')} {jobProgress.sent}/{jobProgress.total} B ({Math.floor((jobProgress.sent / Math.max(1, jobProgress.total)) * 100)}%)</span>
+              <span className={`shrink-0 ${jobPaused ? 'text-warning' : ''}`}>
+                {jobPaused ? t('Paused') : t('Sending')} {jobProgress.sent}/{jobProgress.total} B ({Math.floor((jobProgress.sent / Math.max(1, jobProgress.total)) * 100)}%)
+              </span>
               <div className="h-1.5 min-w-0 flex-1 rounded bg-border overflow-hidden">
                 <div
-                  className="h-full bg-accent2 transition-[width] duration-150"
+                  className={`h-full transition-[width] duration-150 ${jobPaused ? 'bg-warning' : 'bg-accent2'}`}
                   style={{ width: `${(jobProgress.sent / Math.max(1, jobProgress.total)) * 100}%` }}
                 />
               </div>
+              <button
+                type="button"
+                className="btn !py-1 !px-2 !text-[10px] shrink-0"
+                onClick={() => { void togglePauseJob(); }}
+                title={t('Hold the stream between chunks — the machine drains its buffer and stops. grbl also gets a feed hold.')}
+              >
+                {jobPaused ? t('Resume') : t('Pause')}
+              </button>
               <button type="button" className="btn !py-1 !px-2 !text-[10px] text-danger shrink-0" onClick={cancelJob}>
                 {t('Stop job')}
               </button>
@@ -1826,6 +1893,20 @@ export function PlotterDialog() {
             >
               <FlaskConical size={12} aria-hidden="true" />{t('Test cut')}
             </button>
+            {format === 'hpgl' && (
+              <button
+                type="button"
+                data-value="force-test"
+                data-review={`${t('Force test')} · ${t('Cut a strip of 5 squares at increasing force to find the right blade pressure in one pass.')}`}
+                className="btn flex items-center gap-1"
+                onFocus={(event) => setReviewedOutputAction(event.currentTarget.dataset.review ?? '')}
+                onClick={forceTest}
+                disabled={busy}
+                title={t('Cut a strip of 5 squares at increasing force to find the right blade pressure in one pass.')}
+              >
+                <FlaskConical size={12} aria-hidden="true" />{t('Force test')}
+              </button>
+            )}
             <div className="flex-1" />
             {/* Save File is the primary action when direct USB isn't
                 available, so non-Chrome / PWA users get an unmistakable

@@ -39,10 +39,15 @@ export interface PlotterOptions {
   dialect: HpglDialect;
   /** Roland TB overcut in plotter units (40/mm). 25 = 0.625mm — matches `1.plt`. */
   rolandOvercutUnits: number;
-  /** Graphtec FS (force, gf) — 0 to skip. */
+  /** Graphtec FS (force, gf) — 0 to skip. Also embedded into Roland-dialect
+   *  job headers so clone cutters receive the pressure with the file. */
   graphtecForce: number;
   /** Graphtec VS (velocity, cm/s) — 0 to skip. */
   graphtecSpeed: number;
+  /** Feed the sheet out after the job (Roland `!PG;`). Default true —
+   *  the classic CAMM behaviour; turn off to nest several jobs on one
+   *  piece of material. */
+  ejectAfter: boolean;
   /** Mirror output horizontally — required for heat-transfer vinyl (HTV),
    *  which is cut from the carrier side and applied face-down. */
   mirror: boolean;
@@ -100,6 +105,7 @@ export const defaultPlotterOptions: PlotterOptions = {
   overcutMm: 0,
   reverse: false,
   insideFirst: false,
+  ejectAfter: true,
 };
 
 /* ------------------------------------------------------------------ *
@@ -175,6 +181,7 @@ function sanitizePlotterOptions(o: Partial<PlotterOptions>): PlotterOptions {
     overcutMm: num(o.overcutMm, d.overcutMm, 0, 10),
     reverse: Boolean(o.reverse),
     insideFirst: Boolean(o.insideFirst),
+    ejectAfter: typeof o.ejectAfter === 'boolean' ? o.ejectAfter : d.ejectAfter,
   };
 }
 
@@ -391,14 +398,10 @@ export function generateGCode(polylines: Polyline[], opts: PlotterOptions): stri
   return lines.join('\n');
 }
 
-/** Generate HPGL (HP-GL pen plotter language). Units = plotter units (~1016/inch). */
-export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): string {
+/** Page footprint in plotter units: at least the geometry plus a margin,
+ *  or half / full paper height when the geometry is smaller. */
+function pageFootprint(polylines: Polyline[], opts: PlotterOptions): { pageW: number; pageH: number; unitsPerInput: number } {
   const unitsPerInput = opts.unit === 'mm' ? 40 : 1016; // HPGL plotter units
-  const dialect = opts.dialect ?? 'bare';
-
-  // Compute bounds + page footprint in plotter units. Roland uses the page
-  // size header to tell the cutter how much material to advance; if the
-  // user hasn't set one we infer from the geometry bounds.
   let maxX = 0, maxY = 0;
   for (const pl of polylines) for (const [x, y] of pl.points) {
     const X = x * unitsPerInput, Y = y * unitsPerInput;
@@ -406,33 +409,63 @@ export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): strin
   }
   const pageW = Math.max(Math.ceil(maxX) + 200, Math.round(opts.paperHeightUnits * unitsPerInput / 2));
   const pageH = Math.max(Math.ceil(maxY) + 200, Math.round(opts.paperHeightUnits * unitsPerInput));
+  return { pageW, pageH, unitsPerInput };
+}
 
-  const parts: string[] = [];
-
-  // --- Dialect-specific header ---
+/** Dialect-specific opening statements. Cutters that accept FS/VS get the
+ *  configured force/speed embedded (not just Graphtec — Roland-dialect
+ *  clones need it in the file too, or they cut with whatever pressure the
+ *  panel last had). The bare dialect targets real HP pen plotters, where
+ *  FS/VS would be a command error, so it stays clean. */
+function hpglDialectHeader(opts: PlotterOptions, pageW: number, pageH: number): string[] {
+  const dialect = opts.dialect ?? 'bare';
   if (dialect === 'roland-camm') {
     // Matches the `TB25;11280,7920;CT1;` template from real Roland-flavoured
     // cutter files. TB sets overcut depth (corner overshoot for clean
     // tangential cuts), the bare-number statement is page size, CT1 selects
     // cut-through mode 1. Three IN's drain any prior state from the buffer
     // — superstitious but harmless and consistent with the reference files.
-    parts.push(`TB${opts.rolandOvercutUnits};`);
-    parts.push(`${pageW},${pageH};`);
-    parts.push('CT1;');
-    parts.push('IN;');
-    parts.push('IN;');
-    parts.push('IN;');
-    parts.push('PA;');
-  } else if (dialect === 'graphtec-fc') {
-    parts.push('IN;');
-    parts.push('SP1;');
-    if (opts.graphtecForce > 0) parts.push(`FS${opts.graphtecForce};`);
-    if (opts.graphtecSpeed > 0) parts.push(`VS${opts.graphtecSpeed};`);
-    parts.push('PA;');
-  } else {
-    parts.push('IN;');
-    parts.push('SP1;');
+    const parts = [
+      `TB${opts.rolandOvercutUnits};`,
+      `${pageW},${pageH};`,
+      'CT1;',
+      'IN;',
+      'IN;',
+      'IN;',
+      'PA;',
+    ];
+    if (opts.graphtecForce > 0) parts.push(`FS${Math.round(opts.graphtecForce)};`);
+    if (opts.graphtecSpeed > 0) parts.push(`VS${Math.round(opts.graphtecSpeed)};`);
+    return parts;
   }
+  if (dialect === 'graphtec-fc') {
+    const parts = ['IN;', 'SP1;'];
+    if (opts.graphtecForce > 0) parts.push(`FS${Math.round(opts.graphtecForce)};`);
+    if (opts.graphtecSpeed > 0) parts.push(`VS${Math.round(opts.graphtecSpeed)};`);
+    parts.push('PA;');
+    return parts;
+  }
+  return ['IN;', 'SP1;'];
+}
+
+/** Dialect-specific closing statements. Roland ejects (`!PG;`) unless the
+ *  operator disabled it to nest jobs on one piece of material. */
+function hpglDialectFooter(opts: PlotterOptions, pageW: number): string[] {
+  const dialect = opts.dialect ?? 'bare';
+  if (dialect === 'roland-camm') {
+    if (opts.ejectAfter === false) return ['PU0,0;'];
+    // Park near top-right then page eject. The reference files use
+    // x = pageW + ~200 (just past the geometry) which Roland treats as the
+    // material advance position.
+    return [`PU${pageW + 200},200;`, '!PG;'];
+  }
+  return ['PU0,0;', 'SP0;'];
+}
+
+/** Generate HPGL (HP-GL pen plotter language). Units = plotter units (~1016/inch). */
+export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): string {
+  const { pageW, pageH, unitsPerInput } = pageFootprint(polylines, opts);
+  const parts: string[] = [...hpglDialectHeader(opts, pageW, pageH)];
 
   // --- Geometry ---
   for (const pl of polylines) {
@@ -445,21 +478,7 @@ export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): strin
     parts.push(`PD${rest};`);
   }
 
-  // --- Dialect-specific footer ---
-  if (dialect === 'roland-camm') {
-    // Park near top-right then page eject. The reference files use
-    // x = pageW + ~200 (just past the geometry) which Roland treats as the
-    // material advance position.
-    parts.push(`PU${pageW + 200},200;`);
-    parts.push('!PG;');
-  } else if (dialect === 'graphtec-fc') {
-    parts.push('PU0,0;');
-    parts.push('SP0;');
-  } else {
-    parts.push('PU0,0;');
-    parts.push('SP0;');
-  }
-
+  parts.push(...hpglDialectFooter(opts, pageW));
   return parts.join('\n');
 }
 
@@ -537,6 +556,58 @@ export function buildTestCut(format: 'gcode' | 'hpgl', opts: PlotterOptions): st
   ];
   const polylines = [{ points: square, closed: true }, { points: triangle, closed: true }];
   return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
+}
+
+/**
+ * Force test strip — `count` 10mm squares in a row, each cut at a
+ * different blade pressure (startForce, +step each). The classic one-pass
+ * calibration: run it on scrap, weed the squares left→right, and the
+ * first one that lifts cleanly tells you the force to use. The job embeds
+ * a FS statement before each square (works on Roland-dialect clones and
+ * Graphtec) and restores the configured force at the end.
+ *
+ * G-code pen plotters have no force concept — they get the plain test cut.
+ */
+export function buildForceTest(
+  format: 'gcode' | 'hpgl',
+  opts: PlotterOptions,
+  startForce = 30,
+  step = 10,
+  count = 5,
+): string {
+  if (format === 'gcode') return buildTestCut(format, opts);
+  count = Math.max(1, Math.min(12, Math.round(count)));
+  step = Math.max(1, Math.round(step));
+  startForce = Math.max(1, Math.round(startForce));
+
+  const sq = 10; // mm
+  const pitch = sq + 4; // 4mm gap between squares
+  const ox = 10, oy = 10; // mm in from origin
+  const flip = (yMm: number) => (opts.originBottomLeft ? opts.paperHeightUnits - yMm : yMm);
+
+  const forceAt = (i: number) => startForce + step * i;
+  const squares: Array<Array<[number, number]>> = [];
+  for (let i = 0; i < count; i++) {
+    const x0 = ox + i * pitch;
+    squares.push([
+      [x0, flip(oy)], [x0 + sq, flip(oy)], [x0 + sq, flip(oy + sq)], [x0, flip(oy + sq)], [x0, flip(oy)],
+    ]);
+  }
+
+  const { pageW, pageH, unitsPerInput } = pageFootprint(squares.map(points => ({ points, closed: true })), opts);
+  const U = (v: number) => Math.round(v * unitsPerInput);
+  const parts: string[] = [...hpglDialectHeader(opts, pageW, pageH)];
+  for (let i = 0; i < count; i++) {
+    parts.push(`FS${forceAt(i)};`);
+    const pts = squares[i];
+    parts.push(`PU${U(pts[0][0])},${U(pts[0][1])};`);
+    parts.push(`PD${pts.slice(1).map(([x, y]) => `${U(x)},${U(y)}`).join(',')};`);
+  }
+  // Restore the operator's configured force so the next job isn't left at
+  // the highest test pressure.
+  if (opts.graphtecForce > 0) parts.push(`FS${Math.round(opts.graphtecForce)};`);
+  parts.push(...hpglDialectFooter(opts, pageW));
+  return parts.join('\n');
 }
 
 /**
