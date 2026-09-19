@@ -7,6 +7,8 @@ import {
   isQueryCommand,
   decodeReply,
   lintJob,
+  simulateMachineCode,
+  explainStep,
   QUICK_COMMANDS,
 } from '../hpglDebug';
 
@@ -216,5 +218,109 @@ describe('lintJob — G-code', () => {
     const res = lintJob('gcode', 'G21\nG90\nG0 Z5 F1000\nG1 X1 F1000');
     expect(res.ok).toBe(true);
     expect(res.issues.some(i => i.severity === 'info' && i.message.includes('M30'))).toBe(true);
+  });
+});
+
+describe('simulateMachineCode — HP-GL', () => {
+  const square = ['IN;', 'SP1;', 'PU400,800;', 'PD400,1200,800,1200,800,800;', 'PU0,0;', 'SP0;'].join('\n');
+
+  it('parses pen-down runs including the drop position', () => {
+    const run = simulateMachineCode('hpgl', square, 'mm');
+    // One cut polyline: (10,20) → (10,30) → (20,30) → (20,20)
+    expect(run.cuts).toHaveLength(1);
+    expect(run.cuts[0]).toEqual([[10, 20], [10, 30], [20, 30], [20, 20]]);
+    expect(run.penDownMoves).toBe(3);
+  });
+
+  it('reports cut/travel lengths and the bbox in operator units', () => {
+    const run = simulateMachineCode('hpgl', square, 'mm');
+    expect(run.cutLen).toBeCloseTo(30, 6); // 10+10+10
+    expect(run.travelLen).toBeGreaterThan(0);
+    expect(run.bbox).toEqual({ minX: 0, minY: 0, maxX: 20, maxY: 30 });
+  });
+
+  it('converts to inches at 1016 units', () => {
+    const run = simulateMachineCode('hpgl', 'IN;PD1016,0;', 'in');
+    expect(run.cutLen).toBeCloseTo(1, 6);
+  });
+
+  it('classifies setup / query / vendor statements', () => {
+    const run = simulateMachineCode('hpgl', ['TB25;', '11280,7920;', 'CT1;', 'OE;', 'PD400,400;', '!PG;'].join('\n'), 'mm');
+    const kinds = Object.fromEntries(run.steps.map(s => [s.stmt, s.kind]));
+    expect(kinds['TB25']).toBe('setup');
+    expect(kinds['11280,7920']).toBe('setup');
+    expect(kinds['CT1']).toBe('setup');
+    expect(kinds['OE']).toBe('query');
+    expect(kinds['!PG']).toBe('vendor');
+  });
+
+  it('returns an empty run for empty code', () => {
+    const run = simulateMachineCode('hpgl', '  ');
+    expect(run.steps).toHaveLength(0);
+    expect(run.bbox).toBeNull();
+  });
+});
+
+describe('simulateMachineCode — G-code', () => {
+  const job = [
+    'G21 ; mm',
+    'G90 ; absolute',
+    'G0 Z5.000 F3000',
+    'G0 X1.000 Y2.000 F3000',
+    'G1 Z-1.000 F1500',
+    'G1 X10.000 Y2.000 F1500',
+    'G0 Z5.000 F3000',
+    'M30 ; end',
+  ].join('\n');
+
+  it('tracks the pen-drop position into the cut run', () => {
+    const run = simulateMachineCode('gcode', job);
+    expect(run.cuts).toHaveLength(1);
+    expect(run.cuts[0]).toEqual([[1, 2], [10, 2]]);
+    expect(run.penDownMoves).toBe(1);
+    expect(run.cutLen).toBeCloseTo(9, 6);
+  });
+
+  it('classifies setup and end lines', () => {
+    const run = simulateMachineCode('gcode', job);
+    const kinds = Object.fromEntries(run.steps.map(s => [s.stmt, s.kind]));
+    expect(kinds['G21 ; mm']).toBe('setup');
+    expect(kinds['G90 ; absolute']).toBe('setup');
+    expect(kinds['M30 ; end']).toBe('end');
+    expect(kinds['G1 X10.000 Y2.000 F1500']).toBe('cut');
+    expect(kinds['G0 X1.000 Y2.000 F3000']).toBe('travel');
+  });
+
+  it('handles relative mode', () => {
+    const run = simulateMachineCode('gcode', 'G91\nG1 Z-1 F500\nG1 X10 Y0 F500\nG1 X0 Y10 F500');
+    expect(run.cuts[0]).toEqual([[0, 0], [10, 0], [10, 10]]);
+  });
+});
+
+describe('explainStep', () => {
+  const explain = (stmt: string, format: 'gcode' | 'hpgl' = 'hpgl') => {
+    const run = simulateMachineCode(format, stmt.includes(';') ? stmt : stmt, 'mm');
+    return run.steps.length > 0 ? explainStep(run.steps[run.steps.length - 1], 'mm') : '';
+  };
+
+  it('explains common HP-GL statements in operator units', () => {
+    expect(explain('IN;')).toContain('Initialize');
+    expect(explain('FS30;')).toContain('30');
+    expect(explain('VS20;')).toContain('20');
+    expect(explain('PU;')).toContain('Raise');
+    expect(explain('PD400,800;')).toContain('(10.00, 20.00)');
+    expect(explain('OE;')).toContain('expects a reply');
+    expect(explain('!PG;')).toContain('eject');
+  });
+
+  it('explains G-code setup and motion lines', () => {
+    const pick = (code: string, needle: string) => {
+      const run = simulateMachineCode('gcode', code);
+      return explainStep(run.steps.find(s => s.stmt.includes(needle))!, 'mm');
+    };
+    expect(pick('G21', 'G21')).toContain('millimetres');
+    expect(pick('G20', 'G20')).toContain('inches');
+    expect(pick('G90', 'G90')).toContain('Absolute');
+    expect(pick('M30', 'M30')).toContain('End');
   });
 });

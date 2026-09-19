@@ -404,3 +404,329 @@ export function lintJob(format: OutputFormat, code: string, ctx: LintOptions = {
   else lintGcode(code, ctx, issues, stats);
   return { issues, stats, ok: !issues.some(i => i.severity !== 'info') };
 }
+
+/* ------------------------------------------------------------------ *
+ * Machine-code run parser — shared engine behind the Annotated view
+ * and the machine-code simulator. It walks the ACTUAL text that will
+ * ship to the machine (not the design geometry), tracking carriage
+ * position and pen state statement by statement, so generator or
+ * dialect mistakes become visible before the blade touches media.
+ */
+
+export type StepKind = 'setup' | 'travel' | 'cut' | 'query' | 'vendor' | 'unknown' | 'end';
+
+export interface RunStep {
+  index: number;
+  /** Raw statement / line exactly as it appears in the code tab. */
+  stmt: string;
+  mnemonic: string;
+  kind: StepKind;
+  /** Carriage position before / after the step, in the operator's unit. */
+  from: [number, number];
+  to: [number, number];
+  /** Pen state AFTER the step. */
+  penDown: boolean;
+  moved: boolean;
+  /** Distance travelled by this step, in the operator's unit. */
+  distance: number;
+}
+
+export interface MachineRun {
+  steps: RunStep[];
+  /** Pen-down polylines in operator units — what the blade marks. */
+  cuts: Array<Array<[number, number]>>;
+  /** Pen-up repositioning polylines in operator units. */
+  travels: Array<Array<[number, number]>>;
+  bbox: { minX: number; minY: number; maxX: number; maxY: number } | null;
+  cutLen: number;
+  travelLen: number;
+  penDownMoves: number;
+}
+
+const HPGL_QUERY_INFO: Record<string, string> = {
+  OA: 'carriage position', OB: 'buffered position', OC: 'digitalise position',
+  OD: 'output digitised point', OE: 'last error code', OF: 'feed/speed factors',
+  OH: 'hard-clip page limits', OI: 'machine identification', OK: 'key state',
+  OL: 'software clip limits', OP: 'paged preview area', OS: 'machine status word',
+  OT: 'carousel type', OW: 'hard-clip corner points',
+};
+
+const HPGL_SETUP_MNEMONICS = new Set([
+  'IN', 'SP', 'FS', 'VS', 'IP', 'SC', 'TB', 'CT', 'NP', 'FR', 'LT', 'PT',
+  'AC', 'IM', 'CB', 'MC', 'SM', 'EA', 'RA', 'PW', 'AA', 'CI',
+]);
+
+function runHpgl(code: string, per: number): MachineRun {
+  const steps: RunStep[] = [];
+  const cuts: Array<Array<[number, number]>> = [];
+  const travels: Array<Array<[number, number]>> = [];
+  let penDown = false;
+  let x = 0, y = 0; // tracked position in plotter units
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let cutLen = 0, travelLen = 0, penDownMoves = 0;
+  let cut: Array<[number, number]> | null = null;
+  let travel: Array<[number, number]> | null = null;
+
+  const u = (v: number) => v / per;
+  const touch = (px: number, py: number) => {
+    minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+    minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+  };
+  /** Plotter-unit move with polyline-run bookkeeping; returns operator-unit distance. */
+  const movePoint = (nx: number, ny: number): number => {
+    touch(x, y); touch(nx, ny);
+    const d = Math.hypot(nx - x, ny - y) / per;
+    if (penDown) {
+      cutLen += d; penDownMoves++;
+      if (!cut) { cut = [[u(x), u(y)]]; cuts.push(cut); }
+      cut.push([u(nx), u(ny)]);
+      travel = null;
+    } else {
+      travelLen += d;
+      if (!travel) { travel = [[u(x), u(y)]]; travels.push(travel); }
+      travel.push([u(nx), u(ny)]);
+      cut = null;
+    }
+    x = nx; y = ny;
+    return d;
+  };
+
+  const stmts = code.split(';').map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  stmts.forEach((stmt, i) => {
+    const from: [number, number] = [u(x), u(y)];
+    const isVendor = stmt.startsWith('!');
+    const m = isVendor ? null : stmt.match(/^([A-Za-z]{2})\s*(.*)$/);
+    const mnemonic = isVendor ? '!PG' : m ? m[1].toUpperCase() : '';
+    const args = m ? (m[2] || '').split(',').map(Number).filter(Number.isFinite) : [];
+
+    let kind: StepKind = 'unknown';
+    let distance = 0;
+    let moved = false;
+
+    if (isVendor) kind = 'vendor';
+    else if (/^[-\d.,]/.test(stmt)) kind = 'setup'; // Roland bare page-size statement
+    else if (HPGL_QUERY_INFO[mnemonic]) kind = 'query';
+    else if (mnemonic === 'PU' || mnemonic === 'PD') {
+      if (mnemonic === 'PD' && !penDown) {
+        // Pen drops at the CURRENT position — the cut run starts there.
+        cut = [[u(x), u(y)]]; cuts.push(cut); travel = null;
+      } else if (mnemonic === 'PU' && penDown) {
+        cut = null; travel = null;
+      }
+      penDown = mnemonic === 'PD';
+      kind = penDown ? 'cut' : 'travel';
+      for (let k = 0; k + 1 < args.length; k += 2) {
+        distance += movePoint(args[k], args[k + 1]);
+        moved = true;
+      }
+    } else if (mnemonic === 'PR' || mnemonic === 'PA') {
+      kind = penDown ? 'cut' : 'travel';
+      for (let k = 0; k + 1 < args.length; k += 2) {
+        const nx = mnemonic === 'PR' ? x + args[k] : args[k];
+        const ny = mnemonic === 'PR' ? y + args[k + 1] : args[k + 1];
+        distance += movePoint(nx, ny);
+        moved = true;
+      }
+    } else if (mnemonic === 'PG') kind = 'end';
+    else if (HPGL_SETUP_MNEMONICS.has(mnemonic)) kind = 'setup';
+
+    steps.push({
+      index: i, stmt, mnemonic: mnemonic || stmt.slice(0, 2).toUpperCase(),
+      kind, from, to: [u(x), u(y)], penDown, moved,
+      distance: Math.round(distance * 1000) / 1000,
+    });
+  });
+
+  return {
+    steps, cuts, travels,
+    bbox: Number.isFinite(minX) ? { minX: u(minX), minY: u(minY), maxX: u(maxX), maxY: u(maxY) } : null,
+    cutLen, travelLen, penDownMoves,
+  };
+}
+
+function runGcode(code: string): MachineRun {
+  // G-code coordinates are already in the operator's unit (per = 1).
+  const steps: RunStep[] = [];
+  const cuts: Array<Array<[number, number]>> = [];
+  const travels: Array<Array<[number, number]>> = [];
+  let penDown = false;
+  let absolute = true;
+  let x = 0, y = 0;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let cutLen = 0, travelLen = 0, penDownMoves = 0;
+  let cut: Array<[number, number]> | null = null;
+  let travel: Array<[number, number]> | null = null;
+
+  const touch = (px: number, py: number) => {
+    minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+    minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+  };
+  const movePoint = (nx: number, ny: number): number => {
+    touch(x, y); touch(nx, ny);
+    const d = Math.hypot(nx - x, ny - y);
+    if (penDown) {
+      cutLen += d; penDownMoves++;
+      if (!cut) { cut = [[x, y]]; cuts.push(cut); }
+      cut.push([nx, ny]);
+      travel = null;
+    } else {
+      travelLen += d;
+      if (!travel) { travel = [[x, y]]; travels.push(travel); }
+      travel.push([nx, ny]);
+      cut = null;
+    }
+    x = nx; y = ny;
+    return d;
+  };
+
+  let index = 0;
+  for (const rawLine of code.split('\n')) {
+    const line = rawLine.trim();
+    const bare = line.replace(/;.*$/, '').replace(/\([^)]*\)/g, '').trim();
+    if (!bare) continue;
+    const from: [number, number] = [x, y];
+
+    if (bare.startsWith('$')) {
+      steps.push({ index: index++, stmt: line, mnemonic: bare.split(/[ =]/)[0], kind: 'setup', from, to: [x, y], penDown, moved: false, distance: 0 });
+      continue;
+    }
+
+    const words: Array<[string, number]> = [];
+    for (const w of bare.matchAll(/([A-Za-z])([-+]?\d*\.?\d+)/g)) words.push([w[1].toUpperCase(), Number(w[2])]);
+
+    let motion: 0 | 1 | 2 | 3 | null = null;
+    let nx: number | null = null, ny: number | null = null;
+    let zValue: number | null = null;
+    let feed: number | null = null;
+    let programEnd = false;
+    let unitSel = '';
+    let coordMode: 'abs' | 'rel' | '' = '';
+
+    for (const [letter, value] of words) {
+      switch (letter) {
+        case 'G':
+          if (value === 0 || value === 1 || value === 2 || value === 3) motion = value as 0 | 1 | 2 | 3;
+          else if (value === 20) unitSel = 'in';
+          else if (value === 21) unitSel = 'mm';
+          else if (value === 90) coordMode = 'abs';
+          else if (value === 91) coordMode = 'rel';
+          break;
+        case 'X': nx = value; break;
+        case 'Y': ny = value; break;
+        case 'Z': zValue = value; break;
+        case 'F': feed = value; break;
+        case 'M': if (value === 30 || value === 2) programEnd = true; break;
+      }
+    }
+    if (coordMode === 'abs') absolute = true;
+    else if (coordMode === 'rel') absolute = false;
+
+    let kind: StepKind = 'unknown';
+    let distance = 0;
+    let moved = false;
+    let mnemonic = motion !== null ? `G${motion}` : '';
+
+    if (zValue !== null) {
+      // Pen-lift lines: pen drops at the CURRENT position — the cut run
+      // starts there (mirrors the HP-GL PD-at-position semantics).
+      const down = zValue < 0;
+      if (down && !penDown) {
+        cut = [[x, y]]; cuts.push(cut); travel = null;
+      } else if (!down && penDown) {
+        cut = null; travel = null;
+      }
+      penDown = down;
+    }
+
+    if (unitSel || coordMode || (feed !== null && motion === null && nx === null && ny === null && zValue === null)) {
+      kind = 'setup';
+      mnemonic = mnemonic || (unitSel ? `G${unitSel === 'mm' ? 21 : 20}` : coordMode ? `G${coordMode === 'abs' ? 90 : 91}` : 'F');
+    } else if (programEnd) {
+      kind = 'end';
+      mnemonic = mnemonic || 'M30';
+    } else if (motion !== null) {
+      kind = penDown ? 'cut' : 'travel';
+      if (nx !== null || ny !== null) {
+        const tx = nx === null ? x : absolute ? nx : x + nx;
+        const ty = ny === null ? y : absolute ? ny : y + ny;
+        distance += movePoint(tx, ty);
+        moved = true;
+      }
+    } else if (zValue !== null) {
+      kind = penDown ? 'cut' : 'travel';
+    }
+
+    steps.push({
+      index: index++, stmt: line, mnemonic: mnemonic || line.slice(0, 2).toUpperCase(),
+      kind, from, to: [x, y], penDown, moved,
+      distance: Math.round(distance * 1000) / 1000,
+    });
+  }
+
+  return {
+    steps, cuts, travels,
+    bbox: Number.isFinite(minX) ? { minX, minY, maxX, maxY } : null,
+    cutLen, travelLen, penDownMoves,
+  };
+}
+
+/** Parse the machine code into a carriage-run timeline. Pure — safe to run
+ *  on every preview refresh. Throws nothing, even on garbage input. */
+export function simulateMachineCode(format: OutputFormat, code: string, unit: 'mm' | 'in' = 'mm'): MachineRun {
+  if (!code.trim()) {
+    return { steps: [], cuts: [], travels: [], bbox: null, cutLen: 0, travelLen: 0, penDownMoves: 0 };
+  }
+  if (format === 'hpgl') return runHpgl(code, unit === 'in' ? 1016 : 40);
+  return runGcode(code);
+}
+
+/** One human sentence describing what a step does to the machine. */
+export function explainStep(step: RunStep, unit: 'mm' | 'in' = 'mm'): string {
+  const n = (v: number) => v.toFixed(2);
+  const pos = (p: [number, number]) => `(${n(p[0])}, ${n(p[1])}) ${unit}`;
+  const num = (fallback: number) => {
+    const m = step.stmt.match(/(-?\d+(?:\.\d+)?)/);
+    return m ? Number(m[1]) : fallback;
+  };
+  switch (step.kind) {
+    case 'setup': {
+      const mn = step.mnemonic;
+      if (mn === 'IN') return 'Initialize — reset the machine to power-on defaults.';
+      if (mn === 'SP') return `Select pen ${num(1)}${step.penDown ? ' — blade/pen active' : ' — pen stowed'}.`;
+      if (mn === 'FS') return `Set cutting force to ${num(0)} gf.`;
+      if (mn === 'VS') return `Set velocity to ${num(0)} cm/s.`;
+      if (mn === 'TB') return `Roland overcut ${num(0)} plotter units (${(num(25) / 40).toFixed(2)} mm).`;
+      if (mn === 'CT') return `Cut-through mode ${num(1)}.`;
+      if (mn === 'IP') return 'Declare the current position as the origin.';
+      if (mn === 'G21') return 'Units: millimetres.';
+      if (mn === 'G20') return 'Units: inches.';
+      if (mn === 'G90') return 'Absolute coordinates from here on.';
+      if (mn === 'G91') return 'Relative (incremental) coordinates from here on.';
+      if (mn === 'F') return `Feed rate ${num(0)} ${unit}/min.`;
+      if (/^[-\d.,]/.test(step.stmt)) {
+        const nums = step.stmt.split(',').map(Number).filter(Number.isFinite);
+        if (nums.length >= 2) return `Roland page size ${n(nums[0] / 40)} × ${n(nums[1] / 40)} mm.`;
+      }
+      if (step.mnemonic.startsWith('$')) return `grbl control: ${step.stmt}`;
+      return `${step.mnemonic}: ${step.stmt}`;
+    }
+    case 'query': {
+      const what = HPGL_QUERY_INFO[step.mnemonic] ?? 'status';
+      return `Ask the machine for its ${what} (${step.mnemonic};) — expects a reply.`;
+    }
+    case 'travel':
+      return step.moved
+        ? `Pen up → ${pos(step.to)} · ${n(step.distance)} ${unit} of travel.`
+        : 'Raise the pen / blade.';
+    case 'cut':
+      return step.moved
+        ? `Cut to ${pos(step.to)} · ${n(step.distance)} ${unit} of blade-down.`
+        : 'Lower the pen / blade here.';
+    case 'vendor':
+      return 'Page eject — advance the sheet out (Roland !PG).';
+    case 'end':
+      return 'End of program / page.';
+    default:
+      return `Unrecognised statement: ${step.stmt.slice(0, 40)}`;
+  }
+}

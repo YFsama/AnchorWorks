@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { estimateTransferSeconds, probeBaud, runConnectionSelfTest } from '../plotterDiag';
+import { buildDiagnosticsReport, estimateTransferSeconds, probeBaud, runConnectionSelfTest, type DiagReportInput } from '../plotterDiag';
 import type { LinkStatus } from '../plotterLink';
 
 describe('estimateTransferSeconds', () => {
@@ -140,3 +140,47 @@ describe('runConnectionSelfTest', () => {
   });
 });
 
+
+describe('buildDiagnosticsReport', () => {
+  const base: DiagReportInput = {
+    shell: 'desktop',
+    linkStatus: 'connected',
+    linkDescription: 'COM3 @ 9600',
+    baud: 9600,
+    flow: 'none',
+    txBytes: 1234,
+    rxBytes: 56,
+    lastTransfer: { bps: 800, pct: 800 / 960 },
+    format: 'hpgl',
+    dialect: 'roland-camm',
+    unit: 'mm',
+    profileLabel: 'Generic HP-GL cutter',
+    machineCount: 2,
+    jobs: [{
+      ts: 1700000000000, kind: 'job', target: 'COM3', format: 'hpgl',
+      baud: 9600, paths: 12, bytes: 2048, seconds: 8, result: 'ok',
+    }],
+    logLines: ['10:00:00.000 TX   12B  IN;'],
+    now: new Date('2026-01-01T00:00:00Z'),
+  };
+
+  it('renders every section with the given data', () => {
+    const report = buildDiagnosticsReport({ ...base });
+    expect(report).toContain('AnchorWorks plotter diagnostics');
+    expect(report).toContain('2026-01-01T00:00:00.000Z');
+    expect(report).toContain('COM3 @ 9600');
+    expect(report).toContain('9600 / none');
+    expect(report).toContain('83% of line rate');
+    expect(report).toContain('roland-camm');
+    expect(report).toContain('Generic HP-GL cutter');
+    expect(report).toContain('12 paths');
+    expect(report).toContain('IN;');
+  });
+
+  it('handles an empty history and missing transfer gracefully', () => {
+    const report = buildDiagnosticsReport({ ...base, jobs: [], logLines: [], lastTransfer: null });
+    expect(report).toContain('- none');
+    expect(report).toContain('(empty)');
+    expect(report).toContain('- Last transfer: —');
+  });
+});

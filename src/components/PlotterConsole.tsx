@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
-  ChevronDown, ChevronRight, Terminal, Trash2, Copy, Download,
+  ChevronDown, ChevronRight, Terminal, Trash2, Copy, Download, HelpCircle,
   ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Crosshair, Plug, Unplug, Loader2, RefreshCw,
 } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import { toast } from '../lib/toast';
 import { download } from '../lib/io';
 import type { FlowControl, PlotterLink } from '../lib/plotterLink';
-import { toHex } from '../lib/plotterLink';
+import { lineRateBytesPerSec, toHex } from '../lib/plotterLink';
 import type { NativeSerialPort } from '../lib/plotter';
 import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildSetOrigin, decodeReply, isQueryCommand, type QuickCommand } from '../lib/hpglDebug';
-import { probeBaud, runConnectionSelfTest } from '../lib/plotterDiag';
+import { buildDiagnosticsReport, probeBaud, runConnectionSelfTest } from '../lib/plotterDiag';
 import { autoDetectCutter, chipForPort, identifyMachine } from '../lib/plotterIdentify';
 import { clearJobLog, deleteMachine, listJobLog, listMachines, saveMachine, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
 import type { MachineProfile } from '../lib/machineProfiles';
@@ -99,6 +99,9 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   const [signals, setSignals] = useState({ dtr: false, rts: false });
   const [autoPoll, setAutoPoll] = useState(false);
   const [lastPoll, setLastPoll] = useState('');
+  // Command-reference panel + last-transfer throughput analysis.
+  const [refOpen, setRefOpen] = useState(false);
+  const [lastTransfer, setLastTransfer] = useState<{ bps: number; pct: number | null } | null>(null);
   // Saved machine configs + job history (plotterRecords).
   const [machines, setMachines] = useState<MachineRecord[]>(() => listMachines());
   const [selectedMachineId, setSelectedMachineId] = useState('');
@@ -148,6 +151,14 @@ export function PlotterConsole(props: PlotterConsoleProps) {
         else if (ev.status === 'idle') push({ ts: nowMs(), dir: 'info', text: t('Disconnected') });
       } else if (ev.type === 'done') {
         forceTick();
+        // Effective throughput vs theoretical line rate — tells the
+        // operator whether pacing/flow settings leave bandwidth on the
+        // table (or the buffer is overrun-risky).
+        if (!ev.aborted && !ev.error && ev.ms && ev.ms > 0) {
+          const bps = ev.total / (ev.ms / 1000);
+          const line = lineRateBytesPerSec(link.baud, link.flowControl);
+          setLastTransfer({ bps, pct: line > 0 ? bps / line : null });
+        }
         if (ev.aborted) push({ ts: nowMs(), dir: 'warn', text: `${t('Transfer cancelled')} — ${ev.sent}/${ev.total} B` });
         else if (ev.error) push({ ts: nowMs(), dir: 'err', text: ev.error });
         else push({ ts: nowMs(), dir: 'info', text: `${t('Transfer finished')} — ${ev.error ?? ''}` });
@@ -176,6 +187,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     const timer = window.setInterval(() => { void tick(); }, 2500);
     return () => { stopped = true; window.clearInterval(timer); };
   }, [connected, autoPoll, sending, format, unit, link]);
+
 
   const toggleSignal = async (line: 'dtr' | 'rts') => {
     const next = !signals[line];
@@ -230,6 +242,29 @@ export function PlotterConsole(props: PlotterConsoleProps) {
       push({ ts: nowMs(), dir: 'err', text: (e as Error).message });
     }
   };
+
+  // Keyboard jog — arrow keys move the carriage while the console is open;
+  // plain arrows use the selected step, Shift+arrows do a 1-unit fine trim.
+  // Skipped whenever focus is in an editable control so typing stays safe.
+  useEffect(() => {
+    if (!open || !connected || sending) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      const map: Record<string, [number, number]> = {
+        ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+      };
+      const dir = map[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      void exec(buildJog(format, dir[0] * (e.shiftKey ? 1 : jogStep), dir[1] * (e.shiftKey ? 1 : jogStep), unit, feedRate));
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, connected, sending, format, unit, feedRate, jogStep]);
 
   const runQuick = (cmd: QuickCommand) => {
     const text = cmd.id === 'force-speed' ? (forceSpeedCommand || buildForceSpeed(force, speed)) : cmd.command;
@@ -324,6 +359,29 @@ export function PlotterConsole(props: PlotterConsoleProps) {
       title: t('Identify machine'),
       action: { label: t('Apply'), onClick: () => applyProfile(profileId) },
     });
+  };
+
+  /** Everything an operator might be asked for on a support forum, in one
+   *  plain-text file — see buildDiagnosticsReport in plotterDiag.ts. */
+  const downloadReport = () => {
+    const report = buildDiagnosticsReport({
+      shell: native ? 'desktop' : 'web',
+      linkStatus: link.status,
+      linkDescription: connected ? link.describe() : link.detail,
+      baud,
+      flow,
+      txBytes: link.txBytes,
+      rxBytes: link.rxBytes,
+      lastTransfer,
+      format,
+      unit,
+      profileLabel: profile?.label,
+      machineCount: machines.length,
+      jobs: jobHistory.slice(0, 20),
+      logLines: plainLog().split('\n').slice(-200),
+    });
+    download('plotter-diagnostics.txt', report, 'text/plain');
+    toast.success(t('Diagnostics report downloaded'));
   };
 
   /** Saved-machine rows — one record per physical cutter. */
@@ -554,7 +612,43 @@ export function PlotterConsole(props: PlotterConsoleProps) {
                 {t(cmd.label)}
               </button>
             ))}
+            <button
+              type="button"
+              className={`btn !py-0.5 !px-1 !text-[10px] ${refOpen ? 'border-accent2 text-accent2' : ''}`}
+              onClick={() => setRefOpen(!refOpen)}
+              aria-pressed={refOpen}
+              aria-expanded={refOpen}
+              title={t('Show what each command sends and what it means.')}
+            >
+              <HelpCircle size={11} aria-hidden="true" />
+            </button>
           </div>
+
+          {/* Command reference — the quick buttons' tooltips, readable. */}
+          {refOpen && (
+            <div className="mt-1 rounded border border-border bg-panel px-2 py-1 text-[10px]">
+              <div className="mb-1 text-muted">
+                {t('Commands for')} {format === 'hpgl' ? 'HP-GL' : 'grbl G-code'} ·
+                {' '}{t('Type raw text below; queries automatically wait for the reply.')}
+              </div>
+              <div className="max-h-32 overflow-y-auto divide-y divide-border/40">
+                {quickCommands.map((cmd) => (
+                  <div key={cmd.id} className="flex flex-wrap items-baseline gap-x-2 py-0.5">
+                    <span className="w-24 shrink-0 font-medium text-ink/90">{t(cmd.label)}</span>
+                    <code className="shrink-0 rounded bg-panel2 px-1 font-mono text-[#5b9cff]">
+                      {cmd.id === 'force-speed' ? (forceSpeedCommand || 'FS..;VS..;') : cmd.command}
+                    </code>
+                    <span className="min-w-0 flex-1 text-muted">
+                      {cmd.description}{cmd.expectsReply ? ` ${t('(awaits reply)')}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 text-muted">
+                {t('Keyboard jog')}: ↑↓←→ {jogStep}{unit} · Shift+↑↓←→ 1{unit}
+              </div>
+            </div>
+          )}
 
           {/* Diagnostics */}
           <div className="mt-1.5 flex flex-wrap items-center gap-1" role="toolbar" aria-label={t('Diagnostics')}>
@@ -589,6 +683,14 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             {identified && (
               <span className="text-[10px] text-success" title={t('Model reported by the machine')}>{identified}</span>
             )}
+            <button
+              type="button"
+              className="btn !py-0.5 !px-1.5 !text-[10px]"
+              onClick={downloadReport}
+              title={t('Download a plain-text bundle: connection state, serial knobs, throughput, job history and the traffic log.')}
+            >
+              {t('Download report')}
+            </button>
             {profile && (
               <span className="text-[10px] text-muted" title={t('Active brand profile')}>
                 {t('Profile')}: {t(profile.label)}
@@ -663,6 +765,15 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             <span className="tabular-nums" title={t('Lifetime bytes sent / received over this connection')}>
               TX {fmtBytes(link.txBytes)} · RX {fmtBytes(link.rxBytes)}
             </span>
+            {lastTransfer && (
+              <span
+                className="tabular-nums"
+                title={t('Effective throughput of the last transfer vs the theoretical line rate.')}
+              >
+                · {t('Last transfer')} {fmtBytes(lastTransfer.bps)}/s
+                {lastTransfer.pct !== null && lastTransfer.pct > 0 ? ` (${Math.round(lastTransfer.pct * 100)}% ${t('of line rate')})` : ''}
+              </span>
+            )}
             <div className="flex-1" />
             <button type="button" className={`btn !py-0.5 !px-1.5 !text-[10px] ${hexView ? 'border-accent2 text-accent2' : ''}`} onClick={() => setHexView(!hexView)} aria-pressed={hexView} title={t('Toggle HEX / ASCII view')}>HEX</button>
             <button type="button" className={`btn !py-0.5 !px-1.5 !text-[10px] ${autoScroll ? 'border-accent2 text-accent2' : ''}`} onClick={() => setAutoScroll(!autoScroll)} aria-pressed={autoScroll} title={t('Follow new traffic automatically')}>{t('Auto')}</button>

@@ -147,3 +147,74 @@ export function estimateTransferSeconds(bytes: number, baud: number, flow: FlowC
   const rate = lineRateBytesPerSec(baud, flow);
   return Math.max(0.1, Math.round((bytes / rate) * 10) / 10);
 }
+
+/* ------------------------------------------------------------------ *
+ * One-file "what happened" bundle for support / forums: connection
+ * state, serial knobs, throughput, job history and the raw traffic log
+ * in a single plain-text report the operator can attach.
+ */
+
+export interface DiagReportInput {
+  shell: 'desktop' | 'web';
+  linkStatus: string;
+  linkDescription: string;
+  baud: number;
+  flow: FlowControl;
+  txBytes: number;
+  rxBytes: number;
+  lastTransfer: { bps: number; pct: number | null } | null;
+  format: OutputFormat;
+  dialect?: string;
+  unit: string;
+  profileLabel?: string;
+  machineCount: number;
+  jobs: Array<{ ts: number; kind: string; target: string; format: string; baud: number; paths: number; bytes: number; seconds: number; result: string }>;
+  /** Pre-formatted console lines (most recent last). */
+  logLines: string[];
+  /** Override for tests / deterministic output. */
+  now?: Date;
+}
+
+export function buildDiagnosticsReport(input: DiagReportInput): string {
+  const stamp = (input.now ?? new Date()).toISOString();
+  const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
+  const lines: string[] = [
+    'AnchorWorks plotter diagnostics',
+    '================================',
+    `Generated: ${stamp}`,
+    `Shell: ${input.shell}`,
+    '',
+    'Connection',
+    `- Status: ${input.linkStatus}`,
+    `- Link: ${input.linkDescription || '—'}`,
+    `- Baud / flow: ${input.baud} / ${input.flow}`,
+    `- Traffic: TX ${input.txBytes} B · RX ${input.rxBytes} B`,
+  ];
+  if (input.lastTransfer) {
+    const pct = input.lastTransfer.pct !== null && input.lastTransfer.pct > 0
+      ? ` (${Math.round(input.lastTransfer.pct * 100)}% of line rate)`
+      : '';
+    lines.push(`- Last transfer: ${input.lastTransfer.bps.toFixed(0)} B/s${pct}`);
+  } else {
+    lines.push('- Last transfer: —');
+  }
+  lines.push(
+    '',
+    'Job settings',
+    `- Format: ${input.format}${input.dialect ? ` (${input.dialect})` : ''} · unit ${input.unit}`,
+  );
+  if (input.profileLabel) lines.push(`- Machine profile: ${input.profileLabel}`);
+  lines.push(`- Saved machines: ${input.machineCount}`, '');
+
+  lines.push(`Job history (last ${input.jobs.length})`);
+  if (input.jobs.length === 0) lines.push('- none');
+  for (const j of input.jobs) {
+    lines.push(
+      `- ${new Date(j.ts).toLocaleString()} [${j.result}] ${j.kind} → ${j.target} · ${j.format} · ${j.baud} baud · ${j.paths} paths · ${kb(j.bytes)} · ${j.seconds}s`,
+    );
+  }
+  lines.push('', `Console log (last ${input.logLines.length} lines)`);
+  if (input.logLines.length === 0) lines.push('  (empty)');
+  for (const l of input.logLines) lines.push(`  ${l}`);
+  return lines.join('\n');
+}

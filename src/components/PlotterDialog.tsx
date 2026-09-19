@@ -3,7 +3,7 @@ import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIc
 import { useEditor } from '../store/editor';
 import { buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
-import { buildAbortSnippet, lintJob, type LintResult } from '../lib/hpglDebug';
+import { buildAbortSnippet, lintJob, simulateMachineCode, type LintResult, type MachineRun } from '../lib/hpglDebug';
 import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSpeed } from '../lib/machineProfiles';
 import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
 import { estimateTransferSeconds } from '../lib/plotterDiag';
@@ -20,6 +20,7 @@ import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { CutPreview } from './CutPreview';
 import { PlotterConsole } from './PlotterConsole';
+import { AnnotatedCode, MachineSim } from './PlotterCodeViews';
 
 const OVERCUT_PRESETS_MM = [0, 0.1, 0.2, 0.3, 0.5, 1];
 const FEED_RATE_PRESETS = [200, 400, 800, 1200];
@@ -63,6 +64,16 @@ const CUT_STRATEGY_OPTIONS = [
 ] as const;
 const PREVIEW_MODES = ['outline', 'code'] as const;
 type PreviewMode = typeof PREVIEW_MODES[number];
+/** Code-tab sub-views: raw text / per-statement explanation / animated
+ *  replay of the machine code itself (see PlotterCodeViews.tsx). */
+const CODE_VIEW_OPTIONS = [
+  { value: 'raw', label: 'Raw', title: 'The raw machine text exactly as it ships.' },
+  { value: 'annotated', label: 'Annotated', title: 'Every statement explained: position, pen state, distances.' },
+  { value: 'sim', label: 'Replay', title: 'Animated replay of the parsed machine code — cut vs travel, with a scrubbable playhead.' },
+] as const;
+type CodeViewMode = typeof CODE_VIEW_OPTIONS[number]['value'];
+/** Shared empty run so the annotated/sim views can render before code exists. */
+const EMPTY_RUN: MachineRun = { steps: [], cuts: [], travels: [], bbox: null, cutLen: 0, travelLen: 0, penDownMoves: 0 };
 
 export function PlotterDialog() {
   const t = useT();
@@ -76,6 +87,8 @@ export function PlotterDialog() {
   const [code, setCode] = useState('');
   // Preflight dry-run result for the Code tab (see lintJob in hpglDebug).
   const [lint, setLint] = useState<LintResult | null>(null);
+  // Code-tab sub-view: raw text / annotated statements / animated replay.
+  const [codeView, setCodeView] = useState<CodeViewMode>('raw');
   const [busy, setBusy] = useState(false);
   // Shared persistent serial link — kept open across dialog reopens so the
   // console log, connection, and jog state survive a close/reopen cycle.
@@ -292,6 +305,13 @@ export function PlotterDialog() {
   useEscapeClose(open, close);
   useFocusRestore(open);
 
+  // Parsed carriage-run of the generated machine code — powers the
+  // Annotated and Replay sub-views. Only computed while the code tab
+  // could be visible.
+  const codeRun = useMemo<MachineRun | null>(
+    () => (previewMode === 'code' && code ? simulateMachineCode(format, code, opts.unit) : null),
+    [previewMode, code, format, opts.unit],
+  );
   if (!open) return null;
 
   // Two independent capabilities decide what the user can do:
@@ -1188,10 +1208,33 @@ export function PlotterDialog() {
               </>
             ) : (
               <div className="flex flex-col gap-1.5 min-h-0">
-                <pre className="bg-panel2 border border-border rounded-sm p-2 h-44 overflow-auto text-[10px] font-mono text-ink/85">
-                  {code || t('(click Generate Preview)')}
-                </pre>
-                <PreflightPanel lint={lint} unit={opts.unit} />
+                <div className="flex items-center gap-1" role="group" aria-label={t('Code view modes')}>
+                  {CODE_VIEW_OPTIONS.map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-value={option.value}
+                      className={`rounded border px-1.5 py-0.5 text-[10px] transition-colors ${codeView === option.value ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink'}`}
+                      onClick={() => setCodeView(option.value)}
+                      aria-pressed={codeView === option.value}
+                      title={t(option.title)}
+                    >
+                      {t(option.label)}
+                    </button>
+                  ))}
+                </div>
+                {codeView === 'raw' && (
+                  <pre className="bg-panel2 border border-border rounded-sm p-2 h-44 overflow-auto text-[10px] font-mono text-ink/85">
+                    {code || t('(click Generate Preview)')}
+                  </pre>
+                )}
+                {codeView === 'annotated' && (
+                  <AnnotatedCode run={codeRun ?? EMPTY_RUN} unit={opts.unit} />
+                )}
+                {codeView === 'sim' && (
+                  <MachineSim run={codeRun ?? EMPTY_RUN} unit={opts.unit} />
+                )}
+                {codeView !== 'sim' && <PreflightPanel lint={lint} unit={opts.unit} />}
               </div>
             )}
 

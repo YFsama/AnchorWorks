@@ -30,7 +30,7 @@ export type LinkEvent =
   | { type: 'tx'; text: string; bytes: number; ts: number; raw: Uint8Array }
   | { type: 'rx'; text: string; bytes: number; ts: number; raw: Uint8Array }
   | { type: 'progress'; sent: number; total: number }
-  | { type: 'done'; sent: number; total: number; aborted: boolean; error?: string };
+  | { type: 'done'; sent: number; total: number; aborted: boolean; error?: string; ms?: number };
 
 export interface LinkOpenOptions {
   /** OS port path (native only). Web Serial shows its own chooser. */
@@ -254,14 +254,14 @@ export class PlotterLink {
         if (delay > 0 && off + LINK_CHUNK_BYTES < total) await sleep(delay);
       }
       const ms = Date.now() - t0;
-      this.emit({ type: 'done', sent, total, aborted: false, error: `${(total / 1024).toFixed(1)} KB in ${(ms / 1000).toFixed(1)} s` });
+      this.emit({ type: 'done', sent, total, aborted: false, error: `${(total / 1024).toFixed(1)} KB in ${(ms / 1000).toFixed(1)} s`, ms });
     } catch (e) {
       const aborted = (e as Error).name === 'AbortError';
       // A write that throws hard (device unplugged, driver reset) must not
       // leave the link pretending to be connected — tear it down with the
       // reason instead of silently dropping every later command.
       if (!aborted) await this.fatalError((e as Error).message).catch(() => undefined);
-      this.emit({ type: 'done', sent, total, aborted, error: aborted ? undefined : (e as Error).message });
+      this.emit({ type: 'done', sent, total, aborted, error: aborted ? undefined : (e as Error).message, ms: Date.now() - t0 });
       throw e;
     }
   }
