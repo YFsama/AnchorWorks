@@ -8,6 +8,7 @@ export type ToolId =
   | 'pen'
   | 'pencil'
   | 'eraser'
+  | 'knife'
   | 'text'
   | 'hand'
   | 'zoom'

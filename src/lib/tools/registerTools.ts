@@ -31,6 +31,13 @@ import {
   eraserEnd,
 } from './eraserTool';
 import {
+  isKnifeActive,
+  knifeBegin,
+  knifeStroke,
+  knifeEnd,
+  knifeCancel,
+} from './knifeTool';
+import {
   isShapeDrawActive,
   shapeDrawBegin,
   shapeDrawUpdate,
@@ -45,7 +52,7 @@ import { PressureBrush } from '../pressureBrush';
 import { computeBrushBaseWidth, getBrushPreset } from '../brushPresets';
 import { panBegin } from '../panSession';
 import {
-  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Type, Hand, ZoomIn, Ruler, Pipette,
+  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Slice, Type, Hand, ZoomIn, Ruler, Pipette,
 } from 'lucide-react';
 
 let initialized = false;
@@ -197,6 +204,26 @@ export function registerBuiltInTools(): void {
     onMouseDown: (ctx) => eraserBegin(ctx.sp),
     onMouseMove: (ctx) => { if (isEraserActive()) eraserStroke(ctx.sp); },
     onMouseUp: () => { if (isEraserActive()) eraserEnd(); },
+  });
+
+  // Freehand knife — drag a polyline across the selection (or everything,
+  // when nothing is selected) to slice objects along the drawn corridor.
+  // Same pointer-capture + suspend-history model as the eraser; the cut
+  // itself and the dashed live preview live in knifeTool.ts / knife.ts.
+  registerTool({
+    id: 'knife',
+    label: 'Knife',
+    icon: Slice,
+    keywords: 'slice cut split scissors divide carve',
+    shortcut: 'K',
+    cursor: 'crosshair',
+    skipTargetFind: true,
+    onMouseDown: (ctx) => knifeBegin(ctx.sp),
+    onMouseMove: (ctx) => { if (isKnifeActive()) knifeStroke(ctx.sp); },
+    onMouseUp: () => { if (isKnifeActive()) knifeEnd(); },
+    // Switching tools mid-drag cancels the stroke (no cut) — knifeCancel is
+    // idempotent when no drag is in flight.
+    onDeactivate: () => knifeCancel(),
   });
 
   // Text + viewport.
