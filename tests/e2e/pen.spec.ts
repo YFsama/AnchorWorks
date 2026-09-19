@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, toolsToolbar } from './fixtures';
 
 // Pen tool — exercise the new bezier authoring path. After the rewrite,
 // the pen accepts:
@@ -10,7 +10,7 @@ import { test, expect } from './fixtures';
 
 test('Pen + clicks + Escape commits a Path layer', async ({ page }) => {
   await page.goto('/');
-  const toolbar = page.locator('[role="toolbar"]').first();
+  const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
 
   const penBtn = toolbar.locator('button[aria-label="Pen"]');
@@ -49,7 +49,7 @@ test('Pen + clicks + Escape commits a Path layer', async ({ page }) => {
 
 test('Pen + drag-tangent + Enter closes a path with a smooth anchor', async ({ page }) => {
   await page.goto('/');
-  const toolbar = page.locator('[role="toolbar"]').first();
+  const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
   await page.keyboard.press('p');
 

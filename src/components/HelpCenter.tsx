@@ -2410,6 +2410,16 @@ export function HelpCenter() {
                 </div>
               </div>
             </div>
+            {/* sr-only review announcer for the topics list below. Kept as a
+                sibling, NOT inside the listbox — an aria-live region carries
+                an implicit role "status" which is not a valid listbox child
+                (axe aria-required-children). aria-describedby on the listbox
+                still resolves it by id. */}
+            <div id="help-topic-review-status" className="sr-only" aria-live="polite">
+              {selectedTopicIndex >= 0
+                ? `${t('Reviewing')} ${selectedTopic.title} ${selectedTopicIndex + 1} / ${filtered.length}. ${selectedTopic.category}`
+                : t('No topics match')}
+            </div>
             <div
               className="flex-1 overflow-y-auto py-2"
               role="listbox"
@@ -2418,11 +2428,6 @@ export function HelpCenter() {
               title={t('Use arrow keys to review help topics')}
               onKeyDown={handleTopicListKeys}
             >
-              <div id="help-topic-review-status" className="sr-only" aria-live="polite">
-                {selectedTopicIndex >= 0
-                  ? `${t('Reviewing')} ${selectedTopic.title} ${selectedTopicIndex + 1} / ${filtered.length}. ${selectedTopic.category}`
-                  : t('No topics match')}
-              </div>
               {grouped.length === 0 ? (
                 <div className="flex flex-col items-center text-center px-3 py-6">
                   {/* Open-book + question-mark — matches the other empty-state
@@ -2451,8 +2456,15 @@ export function HelpCenter() {
                 grouped.map((g) => {
                   const Icon = CATEGORY_ICONS[categoryEnglish.get(g.category) ?? ''] ?? Wand2;
                   return (
-                    <div key={g.category} className="mb-3">
-                      <h3 className="field-label flex items-center gap-1.5 px-3 font-semibold">
+                    // role="group" per category — a listbox may only own
+                    // option/group children (axe aria-required-children), and
+                    // even inside a group a heading role counts as an
+                    // unallowed child. The group's aria-label carries the
+                    // category name to screen readers; the visual header is
+                    // marked presentational so only the options remain in the
+                    // a11y tree (the standard grouped-listbox pattern).
+                    <div key={g.category} className="mb-3" role="group" aria-label={g.category}>
+                      <h3 role="presentation" className="field-label flex items-center gap-1.5 px-3 font-semibold">
                         <Icon size={11} aria-hidden="true" />
                         <span>{g.category}</span>
                       </h3>

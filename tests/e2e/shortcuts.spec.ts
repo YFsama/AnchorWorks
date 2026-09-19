@@ -1,4 +1,4 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect, toolsToolbar, type Page } from './fixtures';
 
 // Keyboard-shortcut suite — verifies the round-trip from a key press through
 // the canvas store update through the StatusBar's live counters:
@@ -11,7 +11,7 @@ import { test, expect, type Page } from './fixtures';
 // from the StatusBar — see src/components/StatusBar.tsx.
 
 async function drawOneRect(page: Page): Promise<void> {
-  const toolbar = page.locator('[role="toolbar"]').first();
+  const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
   await page.keyboard.press('r');
   await expect(toolbar.locator('button[aria-label^="Rectangle"]')).toHaveAttribute('aria-pressed', 'true');

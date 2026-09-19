@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, toolsToolbar } from './fixtures';
 
 // Drawing — the rectangle tool's mouse-drag drawing flow. Pressing R should
 // activate the rect tool; dragging on #main-canvas should add a `Rect` object
@@ -10,9 +10,9 @@ import { test, expect } from './fixtures';
 // events on the wrapper bubble down to it.
 test('pressing R + dragging on the canvas adds a Rectangle layer', async ({ page }) => {
   await page.goto('/');
-  // Wait for the chrome (the toolbar is the tool-state mirror) so single-key
+  // Wait for the chrome (the tool rail is the tool-state mirror) so single-key
   // shortcuts don't get eaten by the splash.
-  const toolbar = page.locator('[role="toolbar"]').first();
+  const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
 
   // Activate rect tool. Verify against the toolbar's aria-pressed signal so

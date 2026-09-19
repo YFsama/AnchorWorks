@@ -1,4 +1,4 @@
-import { test, expect, type Page } from './fixtures';
+import { test, expect, toolsToolbar, type Page } from './fixtures';
 
 // LayersPanel interactions — once a layer exists, the user can toggle its
 // visibility (Eye / EyeOff icon swap) and rename it via double-click → input
@@ -11,7 +11,7 @@ import { test, expect, type Page } from './fixtures';
  * the canonical sequence in drawing.spec.ts.
  */
 async function drawOneRect(page: Page): Promise<void> {
-  const toolbar = page.locator('[role="toolbar"]').first();
+  const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
   await page.keyboard.press('r');
   await expect(toolbar.locator('button[aria-label^="Rectangle"]')).toHaveAttribute('aria-pressed', 'true');
@@ -45,21 +45,22 @@ test('toggling a layer\'s visibility swaps the Eye icon to EyeOff', async ({ pag
   const rectRow = section.locator('div.relative').filter({ has: page.getByText('Rect', { exact: true }) }).first();
   await expect(rectRow).toBeVisible();
 
-  // Pre-toggle: button starts as the "Eye" icon (visible). We can't rely on
+  // Pre-toggle: the row renders the "Eye" icon (visible). We can't rely on
   // the `title` attribute because TooltipHost stashes it into
   // `data-tip-orig=""` after first DOM scan, leaving title="" on the live
   // node. Instead match on the lucide-eye/lucide-eye-off SVG class — the
-  // structural signal of which icon is rendered.
+  // structural signal of which icon is rendered. All queries stay scoped to
+  // the row: the panel's "Layer quick actions" toolbar above the list also
+  // carries Eye/EyeOff buttons (Show All / Hide Others) and would otherwise
+  // swallow the assertions.
   const eyeBtn = rectRow.locator('button:has(svg.lucide-eye)').first();
   await expect(eyeBtn).toBeVisible();
 
-  // Click the visibility button. After the toggle the same button slot
-  // should render the EyeOff (lucide-eye-off) icon, and the original Eye
-  // should be gone from the panel.
+  // Click the visibility button. After the toggle the same button slot in
+  // the row renders the EyeOff icon and the original Eye is gone from it.
   await eyeBtn.click();
-  await expect(section.locator('button:has(svg.lucide-eye-off)').first()).toBeVisible();
-  // The original Eye icon should no longer appear anywhere in the section.
-  await expect(section.locator('svg.lucide-eye')).toHaveCount(0);
+  await expect(rectRow.locator('button:has(svg.lucide-eye-off)')).toBeVisible();
+  await expect(rectRow.locator('svg.lucide-eye')).toHaveCount(0);
 });
 
 test('double-clicking a layer name opens an input and Enter commits the new name', async ({ page }) => {

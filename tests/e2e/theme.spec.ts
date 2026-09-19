@@ -41,11 +41,11 @@ test('Help menu Light Theme item toggles the theme attribute', async ({ page }) 
   await helpTrigger.hover();
 
   // The Light/Dark item's label switches based on current theme — it reads
-  // "Light Theme" in dark mode and "Dark Theme" in light mode. The item is
-  // a `menuitemcheckbox` (W3C ARIA — it's a toggle, the ✓ shown when active
-  // is now a separate Check icon, not part of the label).
+  // "Light Theme" in dark mode and "Dark Theme" in light mode. The item is a
+  // plain `menuitem` (MenuBar's Help menu toggles act immediately, they don't
+  // expose checked state).
   const themeItem = page.getByRole('menu', { name: 'Help' })
-    .getByRole('menuitemcheckbox', { name: /^(Light|Dark) Theme$/ });
+    .getByRole('menuitem', { name: /^(Light|Dark) Theme$/ });
   await themeItem.first().click();
 
   await expect(html).toHaveAttribute('data-theme', other);

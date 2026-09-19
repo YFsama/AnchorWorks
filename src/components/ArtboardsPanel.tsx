@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target, Copy, Frame, Search, RotateCw } from 'lucide-react';
 import { zoomToArtboard } from '../lib/canvasEngine';
 import { mmToPx } from '../lib/paperSizes';
@@ -244,19 +244,19 @@ export function ArtboardsPanel() {
               )}
             </div>
           ) : (
+            <Fragment>
             <div
               className="space-y-2"
-              role="listbox"
+              role="list"
               aria-label={t('Artboards')}
               aria-describedby="artboards-review-status"
               title={t('Use arrow keys to review artboards')}
               onKeyDown={handleArtboardListKeys}
             >
-              <div id="artboards-review-status" className="sr-only" aria-live="polite">
-                {reviewedArtboard
-                  ? `${t('Reviewing')} ${reviewedArtboard.name} ${reviewedArtboardIndex + 1} / ${filteredArtboards.length}. ${reviewedArtboardSize}`
-                  : t('No artboards found.')}
-              </div>
+              {/* sr-only review announcer. Lives OUTSIDE the list semantics —
+                  an aria-live region (implicit role "status") inside a
+                  role="list" is an invalid child (axe aria-required-children);
+                  aria-describedby still resolves by id from either position. */}
               {filteredArtboards.map((a, index) => (
                 <ArtboardRow
                   key={a.id}
@@ -270,6 +270,12 @@ export function ArtboardsPanel() {
                 />
               ))}
             </div>
+            <div id="artboards-review-status" className="sr-only" aria-live="polite">
+              {reviewedArtboard
+                ? `${t('Reviewing')} ${reviewedArtboard.name} ${reviewedArtboardIndex + 1} / ${filteredArtboards.length}. ${reviewedArtboardSize}`
+                : t('No artboards found.')}
+            </div>
+            </Fragment>
           )}
         </div>
       )}
@@ -537,8 +543,13 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
       className={`rounded border p-2 space-y-1.5 focus-within:border-accent2 focus:outline-none focus:ring-1 focus:ring-accent2/60 transition-colors ${selected ? 'border-accent2 bg-accent/10 shadow-[0_0_0_1px_rgba(var(--color-accent2),0.25)]' : 'border-border bg-panel2'}`}
       tabIndex={0}
       data-artboard-row
-      role="option"
-      aria-selected={selected}
+      // Rows are editor cards (name/X/Y/W/H inputs + per-row actions), not
+      // listbox options — an option must not own interactive descendants
+      // (axe nested-interactive). `listitem` keeps list semantics for screen
+      // readers while allowing the embedded controls; aria-current marks the
+      // reviewed row the way aria-selected would have.
+      role="listitem"
+      aria-current={selected ? 'true' : undefined}
       aria-label={`${t('Artboard row')}: ${artboard.name}`}
       aria-keyshortcuts="Enter Control+D Meta+D Delete Backspace R"
       onFocus={onReview}

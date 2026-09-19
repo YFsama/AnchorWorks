@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, toolsToolbar } from './fixtures';
 
 // Smoke test — confirms the bundle parses, React mounts, the splash hides,
 // and the three top-level chrome regions (menu bar, toolbar, status bar)
@@ -22,14 +22,17 @@ test('app boots, splash hides, and chrome renders', async ({ page }) => {
 
   // Top-level chrome regions. The selectors below match the live DOM:
   //   MenuBar  — role="menubar" on the top strip
-  //   Toolbar  — role="toolbar" on the left rail (also serves as a tool-count guard)
+  //   Toolbar  — role="toolbar" with name "Tools" on the left rail (the top
+  //              strip and status bar expose their own labelled toolbars, so
+  //              we can't just take the first one in DOM order)
   //   StatusBar — role="status" along the bottom of the canvas pane
   await expect(page.locator('[role="menubar"]')).toBeVisible();
-  const toolbar = page.locator('[role="toolbar"]').first();
+  const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
-  // 11 tools today: Select, Rect, Ellipse, Line, Polygon, Pen, Pencil,
-  // Eraser, Text, Hand, Zoom. Asserting count guards against accidental removal.
-  await expect(toolbar.locator('button')).toHaveCount(11);
+  // 14 tools today: Select, Rect, Ellipse, Line, Polygon, Pen, Pencil,
+  // Eraser, Knife, Text, Hand, Zoom, Measure, Eyedropper. Asserting count
+  // guards against accidental removal.
+  await expect(toolbar.locator('button')).toHaveCount(14);
 
   await expect(page.locator('[role="status"]').first()).toBeVisible();
 

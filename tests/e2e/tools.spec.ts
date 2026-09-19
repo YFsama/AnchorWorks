@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, toolsToolbar } from './fixtures';
 
 // Keyboard tool switching — exercises the global onKey handler in App.tsx
 // that routes V/R/X (and other letter keys) to setTool. Catches regressions
@@ -6,9 +6,9 @@ import { test, expect } from './fixtures';
 test('keyboard shortcuts switch tools and the toolbar reflects the active tool', async ({ page }) => {
   await page.goto('/');
 
-  // Wait for the toolbar to mount before sending keys (otherwise our
+  // Wait for the tool rail to mount before sending keys (otherwise our
   // keystrokes hit the splash and get dropped on the floor).
-  const toolbar = page.locator('[role="toolbar"]').first();
+  const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
 
   // Tool buttons use aria-label="Rectangle (R)" etc. — match by prefix so

@@ -107,9 +107,14 @@ export function StatusBar() {
       <Sep />
       <ZoomField zoom={zoom} label={t('Zoom')} />
       <Sep />
-      <span className="tabular-nums" aria-label={`${t('Objects')} ${objectCount}`}>{t('Objects')} <span className="text-ink">{objectCount}</span></span>
+      {/* role="status" (implicit polite live region) per the comment above —
+          the counts are the values screen readers should hear change. The
+          zoom chip stays a plain button: it's interactive, so a live-region
+          role would mask its button semantics; its label already carries
+          the current percentage. */}
+      <span className="tabular-nums" role="status" aria-label={`${t('Objects')} ${objectCount}`}>{t('Objects')} <span className="text-ink">{objectCount}</span></span>
       <Sep />
-      <span className="tabular-nums" aria-label={`${t('Selected')} ${selectionIds.length}`}>{t('Selected')} <span className="text-ink">{selectionIds.length}</span></span>
+      <span className="tabular-nums" role="status" aria-label={`${t('Selected')} ${selectionIds.length}`}>{t('Selected')} <span className="text-ink">{selectionIds.length}</span></span>
       {summary && selectionIds.length === 1 && (
         <>
           <Sep />
@@ -252,7 +257,10 @@ function ZoomField({ zoom, label }: { zoom: number; label: string }) {
       onClick={() => setEditing(true)}
       className="tabular-nums hover:text-ink transition-colors"
       title={t('Set zoom percentage')}
-      aria-label={`${label} ${pct}%`}
+      // Distinct from MenuBar's ZoomChip ("Zoom 97%") — two controls
+      // announcing the identical name is its own a11y problem, so this one
+      // leads with its action. The visible "Zoom" label stays untouched.
+      aria-label={`${t('Set zoom percentage')} — ${label} ${pct}%`}
     >
       {label} <span className="text-ink">{pct}%</span>
     </button>

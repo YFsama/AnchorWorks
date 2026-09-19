@@ -224,7 +224,7 @@ export function PreferencesDialog() {
   const tabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>; keywords: string[] }> = [
     { id: 'general',   label: t('General'),   icon: Settings, keywords: ['language', 'theme', 'canvas', 'width', 'height', 'background', 'autosave', 'keyboard increment', 'grid size', t('Language'), t('Default theme'), t('Default canvas size'), t('Autosave interval (seconds)'), t('Keyboard increment'), t('Grid size (px)')] },
     { id: 'ai',        label: t('AI'),        icon: Sparkles, keywords: ['api key', 'model', 'base url', 'vision', 'stream', t('API key'), t('Model'), t('Base URL'), t('Vision'), t('Stream responses')] },
-    { id: 'editor',    label: t('Editor'),    icon: PenTool, keywords: ['snap', 'grid', 'smart guides', 'anchor', t('Snap to Grid'), t('Smart Guides'), t('Snap to anchor points')] },
+    { id: 'editor',    label: t('Editor'),    icon: PenTool, keywords: ['snap', 'grid', 'smart guides', 'anchor', 'wheel', 'mouse', 'zoom', 'pan', t('Snap to Grid'), t('Smart Guides'), t('Snap to anchor points'), t('Mouse wheel')] },
     { id: 'workspace', label: t('Workspace'), icon: Monitor, keywords: ['theme', 'light', 'dark', 'system', 'contrast', 'accessibility', t('Default theme'), t('Light Theme'), t('Dark Theme'), t('System'), t('High contrast')] },
   ];
   const normalizedPrefQuery = prefQuery.trim().toLowerCase();
@@ -317,13 +317,11 @@ export function PreferencesDialog() {
           </div>
         </div>
         <div className="flex flex-1 min-h-0">
-          <nav
-            className="w-[170px] shrink-0 bg-panel2 border-r border-border py-2 flex flex-col"
-            role="tablist"
-            aria-label={t('Preferences')}
-            aria-orientation="vertical"
-            onKeyDown={onTabKeyDown}
-          >
+          {/* Left rail. The search cluster and the tablist are siblings — a
+              role="tablist" may only own role="tab" children (axe
+              aria-required-children), so the search input / live counter /
+              quick-action toolbar sit outside the <nav>, visually unchanged. */}
+          <div className="w-[170px] shrink-0 bg-panel2 border-r border-border py-2 flex flex-col">
             <div className="px-2 pb-2">
               <div className="input-num flex items-center gap-1.5 px-2 py-1 focus-within:border-accent2">
                 <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
@@ -428,6 +426,13 @@ export function PreferencesDialog() {
                 )}
               </div>
             )}
+            <nav
+              className="flex flex-col"
+              role="tablist"
+              aria-label={t('Preferences')}
+              aria-orientation="vertical"
+              onKeyDown={onTabKeyDown}
+            >
             {visibleTabs.map((tb) => {
               const Icon = tb.icon;
               const active = activeTab === tb.id;
@@ -451,7 +456,8 @@ export function PreferencesDialog() {
                 </button>
               );
             })}
-          </nav>
+            </nav>
+          </div>
 
           <div
             id="pref-tab-panel"
@@ -622,30 +628,6 @@ function GeneralTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
           onChange={(e) => { const v = Math.max(2, Math.min(500, Math.round(+e.target.value || 20))); patch.prefs({ gridSizePx: v }); useEditor.getState().setGridSize(v); }}
         />
       </Field>
-
-      {/* Wheel behaviour — 'pan' keeps the Figma-style default (wheel scrolls,
-          Ctrl/Cmd+wheel zooms); 'zoom' flips it for Inkscape/Illustrator muscle
-          memory. Read live per wheel event, so Apply makes it effective
-          immediately. Shift+wheel pans horizontally in either mode. */}
-      <Field label={t('Mouse wheel')}>
-        <div className="flex items-center gap-1.5" role="group" aria-label={t('Mouse wheel')}>
-          {(['pan', 'zoom'] as const).map((mode) => {
-            const active = draft.prefs.wheelMode === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                aria-pressed={active}
-                title={mode === 'pan' ? t('Wheel scrolls, Ctrl/Cmd+wheel zooms (Figma-style)') : t('Wheel zooms at the cursor, Ctrl/Cmd+wheel scrolls (Illustrator-style)')}
-                onClick={() => patch.prefs({ wheelMode: mode })}
-              >
-                {mode === 'pan' ? t('Scroll (Ctrl+wheel zooms)') : t('Zoom (Ctrl+wheel scrolls)')}
-              </button>
-            );
-          })}
-        </div>
-      </Field>
     </div>
   );
 }
@@ -722,6 +704,35 @@ function EditorTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
         onChange={(v) => patch.top({ anchorSnap: v })}
         label={t('Snap to anchor points')}
       />
+      {/* Wheel behaviour — 'pan' keeps the Figma-style default (wheel scrolls,
+          Ctrl/Cmd+wheel zooms); 'zoom' flips it for Inkscape/Illustrator muscle
+          memory. Read live per wheel event, so Apply makes it effective
+          immediately. Shift+wheel pans horizontally in either mode. Lives on
+          the Editor tab with the other canvas-input behaviour, not General.
+          Deliberately NOT a `Field`: Field wraps its children in a <label>,
+          and a label's first button becomes its labelled control — screen
+          readers would announce "Mouse wheel Mouse wheel" instead of the
+          button's own text. Plain wrapper, same field-label styling. */}
+      <div className="block">
+        <div className="field-label">{t('Mouse wheel')}</div>
+        <div className="flex items-center gap-1.5" role="group" aria-label={t('Mouse wheel')}>
+          {(['pan', 'zoom'] as const).map((mode) => {
+            const active = draft.prefs.wheelMode === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                aria-pressed={active}
+                title={mode === 'pan' ? t('Wheel scrolls, Ctrl/Cmd+wheel zooms (Figma-style)') : t('Wheel zooms at the cursor, Ctrl/Cmd+wheel scrolls (Illustrator-style)')}
+                onClick={() => patch.prefs({ wheelMode: mode })}
+              >
+                {mode === 'pan' ? t('Scroll (Ctrl+wheel zooms)') : t('Zoom (Ctrl+wheel scrolls)')}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

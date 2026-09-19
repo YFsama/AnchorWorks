@@ -14,10 +14,11 @@ test('F1 opens the Help Center with the Welcome topic, and Escape dismisses it',
   // The HelpCenter chunk is code-split; give the lazy import time to land.
   await expect(dialog).toBeVisible({ timeout: 10_000 });
 
-  // The left rail enumerates topics; one of them must be the introductory
-  // "Welcome" topic. Use getByRole('button') so we ignore the title-card
-  // heading on the body side.
-  await expect(dialog.getByRole('button', { name: 'Welcome' })).toBeVisible();
+  // The left rail enumerates topics as a listbox (each topic is a button
+  // carrying role="option", see HelpCenter.tsx); one of them must be the
+  // introductory "Welcome" topic. Matching on the option role also ignores
+  // the title-card heading on the body side.
+  await expect(dialog.getByRole('option', { name: 'Welcome' })).toBeVisible();
 
   // Escape closes the dialog. The capture-phase document listener (added
   // to HelpCenter) sits ahead of the search input's own keydown handler so

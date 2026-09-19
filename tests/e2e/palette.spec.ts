@@ -20,14 +20,21 @@ test('Ctrl+K opens the command palette, filters by query, and closes on Escape',
   const search = dialog.locator('input[placeholder="Type a command or search…"]');
   await expect(search).toBeVisible();
 
-  // Typing "outline" should narrow the list to exactly the "Outline View"
-  // command (only entry whose label/keywords contain "outline").
-  await search.fill('outline');
+  // Typing "outline view" narrows the list to exactly the "Outline View"
+  // command. (A bare "outline" isn't unique anymore — dozens of vinyl/sign
+  // commands carry "outline" in their keywords: contours, swatch strokes,
+  // multi-outline, …. The two-word query pins the label itself, whose
+  // keywords are "wireframe geometry preview".)
+  await search.fill('outline view');
   const options = dialog.locator('[role="option"]');
   await expect(options).toHaveCount(1);
-  await expect(options.first()).toContainText(/outline/i);
+  await expect(options.first()).toContainText(/outline view/i);
 
   // Escape closes the palette — the dialog should detach from the DOM.
+  // The palette's input consumes the FIRST Escape to clear a non-empty
+  // query (see CommandPalette onKeyDown); only the second closes. Empty
+  // the box first so a single Escape demonstrably closes.
+  await search.fill('');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });

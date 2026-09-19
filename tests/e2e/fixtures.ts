@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
 // Shared Playwright base test for Anchorworks.
 //
@@ -22,3 +22,14 @@ export const test = base.extend({
 });
 
 export { expect };
+
+// The app renders several ARIA toolbars at once (top-bar History / Canvas
+// helper / Output clusters, the left tool rail, StatusBar actions, and
+// per-panel action groups), so "the first role=toolbar in the DOM" stopped
+// being the tool rail when the top strip gained toolbar semantics. Specs
+// target the rail by its accessible name ("Tools", see Toolbar.tsx) —
+// order-independent and localised with the app under test like every other
+// role/name lookup in this suite.
+export function toolsToolbar(page: Page): Locator {
+  return page.getByRole('toolbar', { name: 'Tools' });
+}

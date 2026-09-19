@@ -1342,11 +1342,16 @@ export default function App() {
         {/* Drag handle: a 4px-wide hit strip on the LEFT edge of the right
             aside. CSS positions it as a sibling so the cursor + hover tint
             don't bleed into the aside content. Hidden on mobile (≤ 900px)
-            where the slide-over takes over. */}
+            where the slide-over takes over. Focusable separators are window
+            splitters in ARIA terms, so they must expose their value range
+            (axe aria-required-attr) — the px width matches the aside below. */}
         <div
           role="separator"
           aria-orientation="vertical"
           aria-label={t('Resize right panel')}
+          aria-valuemin={240}
+          aria-valuemax={560}
+          aria-valuenow={rightPanelWidth}
           tabIndex={-1}
           className="aside-resize-handle"
           onMouseDown={onRightPanelResizeStart}
