@@ -145,14 +145,13 @@ export function t(k: string): string {
 /**
  * React hook returning a translator bound to the current language.
  * Components calling `useT()` automatically re-render when the language
- * changes OR when the lazy Chinese dictionary finishes loading, because
- * both are Zustand subscriptions.
+ * changes OR when the lazy Chinese dictionary finishes loading: the
+ * selector packs both signals into one subscription, and the returned
+ * translator reads live state at call time (stable function reference).
  */
 export function useT(): (k: string) => string {
-  const lang = useI18n((s) => s.lang);
-  const zhReady = useI18n((s) => s.zhReady);
-  void zhReady; // subscription only — the translator reads the module cache
-  return (k: string) => t(k);
+  useI18n((s) => `${s.lang}:${s.zhReady}`);
+  return t;
 }
 
 /**
