@@ -102,6 +102,82 @@ export const defaultPlotterOptions: PlotterOptions = {
   insideFirst: false,
 };
 
+/* ------------------------------------------------------------------ *
+ * Persisted plotter settings — the dialog used to reset to defaults
+ * every time it reopened, which is exactly the behaviour you don't
+ * want while dialling in a cutter between jobs. Everything the dialog
+ * collects (machine options, format, material, serial knobs) round-
+ * trips through localStorage, sanitised on load.
+ * ------------------------------------------------------------------ */
+
+const PLOTTER_PREFS_KEY = 'vector.plotter.prefs';
+
+export type SerialFlowControl = 'none' | 'hardware' | 'software';
+
+export interface PlotterPrefs {
+  opts: PlotterOptions;
+  format: 'gcode' | 'hpgl';
+  materialId: string;
+  baud: number;
+  flowControl: SerialFlowControl;
+  lastPort: string;
+  /** Selected machine-profile id (see machineProfiles.ts), '' = none. */
+  profileId: string;
+}
+
+export function savePlotterPrefs(p: PlotterPrefs): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(PLOTTER_PREFS_KEY, JSON.stringify(p));
+  } catch { /* quota / private mode — settings just won't persist */ }
+}
+
+/** Load + sanitise. Unknown or out-of-range fields fall back to the
+ *  defaults so a corrupt / hand-edited blob can never wedge the dialog. */
+export function loadPlotterPrefs(): Partial<PlotterPrefs> {
+  const out: Partial<PlotterPrefs> = {};
+  if (typeof window === 'undefined') return out;
+  try {
+    const raw = window.localStorage.getItem(PLOTTER_PREFS_KEY);
+    if (!raw) return out;
+    const p = JSON.parse(raw) as Partial<PlotterPrefs>;
+    if (p.opts && typeof p.opts === 'object') out.opts = sanitizePlotterOptions(p.opts);
+    if (p.format === 'gcode' || p.format === 'hpgl') out.format = p.format;
+    if (typeof p.materialId === 'string') out.materialId = p.materialId;
+    if (typeof p.baud === 'number' && Number.isFinite(p.baud) && p.baud >= 300 && p.baud <= 1_000_000) out.baud = Math.round(p.baud);
+    if (p.flowControl === 'none' || p.flowControl === 'hardware' || p.flowControl === 'software') out.flowControl = p.flowControl;
+    if (typeof p.lastPort === 'string') out.lastPort = p.lastPort;
+    if (typeof p.profileId === 'string') out.profileId = p.profileId;
+  } catch { /* corrupt blob — treat as absent */ }
+  return out;
+}
+
+function sanitizePlotterOptions(o: Partial<PlotterOptions>): PlotterOptions {
+  const d = defaultPlotterOptions;
+  const num = (v: unknown, fallback: number, min: number, max: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
+  return {
+    unit: o.unit === 'in' ? 'in' : 'mm',
+    pxPerUnit: o.unit === 'in' ? 96 : num(o.pxPerUnit, d.pxPerUnit, 0.1, 10000),
+    feedRate: num(o.feedRate, d.feedRate, 1, 100000),
+    travelRate: num(o.travelRate, d.travelRate, 1, 100000),
+    penDownZ: num(o.penDownZ, d.penDownZ, -100, 100),
+    penUpZ: num(o.penUpZ, d.penUpZ, -100, 100),
+    originBottomLeft: typeof o.originBottomLeft === 'boolean' ? o.originBottomLeft : d.originBottomLeft,
+    paperHeightUnits: num(o.paperHeightUnits, d.paperHeightUnits, 1, 10000),
+    curveTolerance: num(o.curveTolerance, d.curveTolerance, 0.01, 20),
+    dialect: o.dialect === 'roland-camm' || o.dialect === 'graphtec-fc' ? o.dialect : 'bare',
+    rolandOvercutUnits: num(o.rolandOvercutUnits, d.rolandOvercutUnits, 0, 200),
+    graphtecForce: num(o.graphtecForce, d.graphtecForce, 0, 500),
+    graphtecSpeed: num(o.graphtecSpeed, d.graphtecSpeed, 0, 200),
+    mirror: Boolean(o.mirror),
+    optimize: typeof o.optimize === 'boolean' ? o.optimize : d.optimize,
+    overcutMm: num(o.overcutMm, d.overcutMm, 0, 10),
+    reverse: Boolean(o.reverse),
+    insideFirst: Boolean(o.insideFirst),
+  };
+}
+
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
 
 /** Flatten current canvas SVG into polylines (units), ready for G-code/HPGL. */

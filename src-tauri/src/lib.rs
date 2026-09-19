@@ -15,6 +15,8 @@ use tauri::menu::{Menu, MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilde
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
+mod serial;
+
 /// Authoritative platform info — what runtime.ts's `getOS()` heuristic
 /// approximates from the User-Agent string when the app boots in a browser.
 /// Returned as JSON so the frontend can `(await invoke('platform_info'))
@@ -128,94 +130,9 @@ async fn fs_open_project<R: Runtime>(
     }))
 }
 
-/// One serial port descriptor — matches the shape the Plotter dialog expects
-/// to render the picker dropdown. `usb_info` fields are `None` for built-in
-/// UARTs and Bluetooth virtual ports.
-#[derive(Serialize)]
-struct SerialPortDescriptor {
-    /// OS-level path — `/dev/ttyUSB0` on Linux, `COM3` on Windows,
-    /// `/dev/cu.usbmodem*` on macOS. This is what the frontend hands back
-    /// to `serial_send` when the user picks a port.
-    path: String,
-    /// Human-readable port kind — `usb` / `bluetooth` / `pci` / `unknown`.
-    kind: &'static str,
-    /// USB vendor name, when the port is a USB serial adapter and the
-    /// platform driver populates the field. `None` for built-in UARTs.
-    manufacturer: Option<String>,
-    /// USB vendor id (e.g. `0x0403` for FTDI). `None` for non-USB ports.
-    vid: Option<u16>,
-    /// USB product id. `None` for non-USB ports.
-    pid: Option<u16>,
-    /// Free-form product string, when available. `None` for built-in UARTs.
-    product: Option<String>,
-}
-
-/// Enumerate serial ports the OS knows about. Replaces the Web Serial
-/// `navigator.serial.requestPort()` chooser when running under Tauri —
-/// the desktop shell can show the full list without requiring user gesture
-/// + permission grant per port (which the web API mandates).
-#[tauri::command]
-fn serial_list_ports() -> Result<Vec<SerialPortDescriptor>, String> {
-    let ports = serialport::available_ports().map_err(|e| e.to_string())?;
-    Ok(ports
-        .into_iter()
-        .map(|p| {
-            use serialport::SerialPortType;
-            match p.port_type {
-                SerialPortType::UsbPort(info) => SerialPortDescriptor {
-                    path: p.port_name,
-                    kind: "usb",
-                    manufacturer: info.manufacturer,
-                    vid: Some(info.vid),
-                    pid: Some(info.pid),
-                    product: info.product,
-                },
-                SerialPortType::BluetoothPort => SerialPortDescriptor {
-                    path: p.port_name,
-                    kind: "bluetooth",
-                    manufacturer: None,
-                    vid: None,
-                    pid: None,
-                    product: None,
-                },
-                SerialPortType::PciPort => SerialPortDescriptor {
-                    path: p.port_name,
-                    kind: "pci",
-                    manufacturer: None,
-                    vid: None,
-                    pid: None,
-                    product: None,
-                },
-                SerialPortType::Unknown => SerialPortDescriptor {
-                    path: p.port_name,
-                    kind: "unknown",
-                    manufacturer: None,
-                    vid: None,
-                    pid: None,
-                    product: None,
-                },
-            }
-        })
-        .collect())
-}
-
-/// Stream bytes to a serial port. The Plotter dialog calls this once the
-/// user has picked a port from `serial_list_ports()`. We open the port,
-/// write the entire payload in 256-byte chunks (matching the web path's
-/// flow-control friendly cadence), then drop the handle which flushes +
-/// closes the underlying file descriptor.
-#[tauri::command]
-fn serial_send(path: String, baud: u32, payload: String) -> Result<(), String> {
-    let mut port = serialport::new(path, baud)
-        .timeout(std::time::Duration::from_millis(5000))
-        .open()
-        .map_err(|e| e.to_string())?;
-    for chunk in payload.as_bytes().chunks(256) {
-        port.write_all(chunk).map_err(|e| e.to_string())?;
-    }
-    port.flush().map_err(|e| e.to_string())?;
-    Ok(())
-}
+/// One serial port descriptor — see `serial.rs` for the registry-based
+/// link commands (`serial_open` / `serial_write` / `serial_read` /
+/// `serial_close`) and the legacy one-shot `serial_send`.
 
 /// Trigger the OS print dialog for the current webview. The webview itself
 /// rasterises its DOM to a print surface — same code path used by
@@ -374,8 +291,13 @@ pub fn run() {
             fs_save_project,
             fs_open_project,
             fs_read_path,
-            serial_list_ports,
-            serial_send,
+            serial::serial_list_ports,
+            serial::serial_send,
+            serial::serial_open,
+            serial::serial_write,
+            serial::serial_read,
+            serial::serial_set_control,
+            serial::serial_close,
             print_native,
         ])
         .run(tauri::generate_context!())

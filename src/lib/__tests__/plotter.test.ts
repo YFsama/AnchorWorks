@@ -168,3 +168,54 @@ describe('generateHPGL', () => {
     expect(out).toMatch(/SP0;/);
   });
 });
+
+describe('plotter preferences', () => {
+  it('round-trips machine settings through localStorage', async () => {
+    const { savePlotterPrefs, loadPlotterPrefs } = await import('../plotter');
+    savePlotterPrefs({
+      opts: { ...defaultPlotterOptions, feedRate: 999, dialect: 'roland-camm' },
+      format: 'gcode',
+      materialId: 'htv',
+      baud: 9600,
+      flowControl: 'hardware',
+      lastPort: 'COM7',
+      profileId: 'china-clone',
+    });
+    const p = loadPlotterPrefs();
+    expect(p.opts?.feedRate).toBe(999);
+    expect(p.opts?.dialect).toBe('roland-camm');
+    expect(p.format).toBe('gcode');
+    expect(p.materialId).toBe('htv');
+    expect(p.baud).toBe(9600);
+    expect(p.flowControl).toBe('hardware');
+    expect(p.lastPort).toBe('COM7');
+    expect(p.profileId).toBe('china-clone');
+    window.localStorage.clear();
+  });
+
+  it('falls back to defaults on a corrupt or hostile blob', async () => {
+    const { loadPlotterPrefs } = await import('../plotter');
+    window.localStorage.setItem('vector.plotter.prefs', '{"opts":{"feedRate":"fast","unit":"cubits","dialect":42},"format":"plt","baud":-5,"flowControl":"smoke"}');
+    const p = loadPlotterPrefs();
+    expect(p.format).toBeUndefined();
+    expect(p.baud).toBeUndefined();
+    expect(p.flowControl).toBeUndefined();
+    expect(p.opts?.unit).toBe('mm');        // invalid unit → default
+    expect(p.opts?.dialect).toBe('bare');   // invalid dialect → default
+    expect(p.opts?.feedRate).toBe(defaultPlotterOptions.feedRate); // non-numeric → default
+    window.localStorage.clear();
+  });
+
+  it('clamps out-of-range numerics into safe bands', async () => {
+    const { loadPlotterPrefs } = await import('../plotter');
+    window.localStorage.setItem(
+      'vector.plotter.prefs',
+      JSON.stringify({ opts: { ...defaultPlotterOptions, feedRate: 1e9, paperHeightUnits: -20 }, baud: 4000000 }),
+    );
+    const p = loadPlotterPrefs();
+    expect(p.opts?.feedRate).toBe(100000);
+    expect(p.opts?.paperHeightUnits).toBe(1);
+    expect(p.baud).toBeUndefined(); // outside the accepted band → dropped
+    window.localStorage.clear();
+  });
+});
