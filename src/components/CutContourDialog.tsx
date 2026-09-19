@@ -1,17 +1,19 @@
 import { useCallback, useMemo, useState } from 'react';
 import * as fabric from 'fabric';
 import {
-  X, Scissors, ImageDown, Crosshair, Eye, EyeOff, Trash2, Wand2, RefreshCw,
+  X, Scissors, ImageDown, Crosshair, Eye, EyeOff, Trash2, Wand2, RefreshCw, Palette,
 } from 'lucide-react';
 import { useEditor, type CutPath } from '../store/editor';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
-import { getCanvas } from '../lib/canvasEngine';
+import { getCanvas, getHistory, pushHistory } from '../lib/canvasEngine';
 import {
   traceBitmap,
+  traceMultiColorAsync,
   generateRegMarks,
   defaultTraceOptions,
+  TRACE_PRESETS,
 } from '../lib/cutContour';
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { toast } from '../lib/toast';
@@ -57,7 +59,12 @@ export function CutContourDialog() {
   const [traceThreshold, setTraceThreshold] = useState(defaultTraceOptions.threshold);
   const [traceUseAlpha, setTraceUseAlpha] = useState(defaultTraceOptions.useAlpha);
   const [traceSimplify, setTraceSimplify] = useState(defaultTraceOptions.simplifyTolerance);
+  const [traceMinSize, setTraceMinSize] = useState(defaultTraceOptions.minSizeMm);
   const [replaceExistingTrace, setReplaceExistingTrace] = useState(true);
+  // Multi-colour trace: mode toggle + k-means colour count + live progress.
+  const [traceMode, setTraceMode] = useState<'single' | 'multi'>('single');
+  const [traceColors, setTraceColors] = useState(6);
+  const [traceProgress, setTraceProgress] = useState('');
   // RegMark params. Roland CutStudio default is symmetric (5mm uniform
   // inset) but real print jobs often want a wider top inset to clear a
   // title bar / a deeper right inset to clear bleed. Split into X and Y
@@ -194,28 +201,43 @@ export function CutContourDialog() {
     );
   };
 
-  const runTrace = async () => {
+  /**
+   * Shared image prep for both trace flavours: find the selected image,
+   * render it offscreen (optionally downsampled), read pixels, and compute
+   * the pixel→mm scale plus the image's on-canvas top-left. Returns null
+   * after toasting when anything blocks the trace.
+   */
+  const prepareTraceImage = (maxDim?: number): {
+    imgData: ImageData;
+    pixelSizeMm: number;
+    leftPx: number;
+    topPx: number;
+    sourceObjectId?: string;
+  } | null => {
     const c = getCanvas();
-    if (!c) return;
+    if (!c) return null;
     const selected = c.getActiveObjects();
     const image = selected.find((o): o is fabric.FabricImage => o instanceof fabric.FabricImage);
     if (!image) {
       toast.warn(t('Select a placed image first.'), { title: t('Nothing to trace') });
-      return;
+      return null;
     }
-    // Render the image to an offscreen canvas at native pixel size so we
-    // can read its pixels for marching squares.
     const src = (image as fabric.FabricImage & { _src?: string; _element?: HTMLImageElement })._element;
     if (!src) {
       toast.error(t('Image source unavailable.'), { title: t('Trace failed') });
-      return;
+      return null;
     }
+    // Render at native pixel size by default; multi-colour tracing passes a
+    // cap so the k-means + per-cluster walk stays snappy on huge photos.
+    const naturalW = src.naturalWidth;
+    const naturalH = src.naturalHeight;
+    const scale = maxDim ? Math.min(1, maxDim / Math.max(naturalW, naturalH)) : 1;
     const tmp = document.createElement('canvas');
-    tmp.width = src.naturalWidth;
-    tmp.height = src.naturalHeight;
+    tmp.width = Math.max(1, Math.round(naturalW * scale));
+    tmp.height = Math.max(1, Math.round(naturalH * scale));
     const tctx = tmp.getContext('2d', { willReadFrequently: true });
-    if (!tctx) return;
-    tctx.drawImage(src, 0, 0);
+    if (!tctx) return null;
+    tctx.drawImage(src, 0, 0, tmp.width, tmp.height);
     // getImageData throws SecurityError on a tainted canvas — that's what
     // happens when the placed image was loaded from a cross-origin URL
     // (e.g. dragged from a browser tab rather than the file system).
@@ -233,19 +255,36 @@ export function CutContourDialog() {
       } else {
         toast.error((err as Error).message, { title: t('Trace failed') });
       }
-      return;
+      return null;
     }
 
-    // Pixel size in mm: image's on-canvas display width divided by its
-    // natural pixel width tells us how big a single source pixel renders
-    // on the page, then divide by MM_TO_PX to get mm.
+    // Pixel size in mm: image's on-canvas display width divided by the
+    // rendered pixel width tells us how big a single rendered pixel is on
+    // the page, then divide by MM_TO_PX to get mm.
     const screenW = (image.width ?? 1) * (image.scaleX ?? 1);
     const pixelSizeMm = (screenW / Math.max(1, tmp.width)) / MM_TO_PX;
+
+    // Image top-left in canvas px — traced contours are relative to it.
+    const r = image.getBoundingRect();
+    return {
+      imgData,
+      pixelSizeMm,
+      leftPx: r.left,
+      topPx: r.top,
+      sourceObjectId: (image as fabric.FabricImage & { _id?: string })._id,
+    };
+  };
+
+  const runTrace = async () => {
+    const prepared = prepareTraceImage();
+    if (!prepared) return;
+    const { imgData, pixelSizeMm, leftPx, topPx, sourceObjectId } = prepared;
 
     const contours = traceBitmap(imgData, {
       threshold: traceThreshold,
       useAlpha: traceUseAlpha,
       simplifyTolerance: traceSimplify,
+      minSizeMm: traceMinSize,
       pixelSizeMm,
     });
 
@@ -254,19 +293,14 @@ export function CutContourDialog() {
       return;
     }
 
-    // Translate so contour origin lines up with the image's on-canvas
-    // top-left corner. Fabric stores left/top at the centre by default
-    // when originX/Y === 'center'; account for both modes.
-    const r = image.getBoundingRect();
-    const offX = r.left / MM_TO_PX;
-    const offY = r.top / MM_TO_PX;
-
+    const offX = leftPx / MM_TO_PX;
+    const offY = topPx / MM_TO_PX;
     const newPaths: CutPath[] = contours.map((pts, i) => ({
       id: `trace-${Date.now().toString(36)}-${i}`,
       points: pts.map(([x, y]) => [x + offX, y + offY] as [number, number]),
       closed: true,
       kind: 'trace',
-      sourceObjectId: (image as fabric.FabricImage & { _id?: string })._id,
+      sourceObjectId,
       passes: 1,
     }));
     if (replaceExistingTrace) clearCutPaths('trace');
@@ -277,6 +311,92 @@ export function CutContourDialog() {
         : `${newPaths.length} ${t('contour(s) traced')}`,
       { title: t('Bitmap traced') },
     );
+  };
+
+  /**
+   * Multi-colour trace: k-means quantizes the image into `traceColors`
+   * colours (worker thread, live progress), then each colour region becomes
+   * a filled fabric.Path placed exactly over the source image — the
+   * sign-shop "photo cut" where every colour band needs its own vinyl
+   * layer. Unlike the single-contour flavour these are canvas objects (not
+   * CutPaths) because they're art, not blade lines.
+   */
+  const runMultiTrace = async () => {
+    const c = getCanvas();
+    if (!c) return;
+    const prepared = prepareTraceImage(320);
+    if (!prepared) return;
+    const { imgData, pixelSizeMm, leftPx, topPx } = prepared;
+
+    setTraceProgress(t('Tracing colour {0} of {1}…').replace('{0}', '0').replace('{1}', String(traceColors)));
+    let clusters: Awaited<ReturnType<typeof traceMultiColorAsync>>;
+    try {
+      clusters = await traceMultiColorAsync(imgData, {
+        colorCount: traceColors,
+        simplifyTolerance: traceSimplify,
+        pixelSizeMm,
+        minSizeMm: traceMinSize,
+      }, (done, total) => {
+        setTraceProgress(t('Tracing colour {0} of {1}…').replace('{0}', String(done)).replace('{1}', String(total)));
+      });
+    } catch (err) {
+      toast.error((err as Error).message, { title: t('Trace failed') });
+      setTraceProgress('');
+      return;
+    }
+    setTraceProgress('');
+
+    if (clusters.length === 0) {
+      toast.warn(t('Multi-color trace produced no shapes. Try fewer colours or a simpler image.'), { title: t('Trace empty') });
+      return;
+    }
+
+    // One fabric.Path per cluster: all of a colour's contours go into one
+    // path as subpaths with fillRule evenodd, so holes inside a colour
+    // region (e.g. a counter in a letter) knock out correctly.
+    const created: fabric.Path[] = [];
+    for (const cluster of clusters) {
+      const [r, g, b] = cluster.color;
+      const d = cluster.contours
+        .map((pts) => {
+          let dd = `M ${leftPx + pts[0][0] * MM_TO_PX} ${topPx + pts[0][1] * MM_TO_PX}`;
+          for (let i = 1; i < pts.length; i++) dd += ` L ${leftPx + pts[i][0] * MM_TO_PX} ${topPx + pts[i][1] * MM_TO_PX}`;
+          return dd + ' Z';
+        })
+        .join(' ');
+      if (!d) continue;
+      created.push(new fabric.Path(d, {
+        fill: `rgb(${r}, ${g}, ${b})`,
+        stroke: '',
+        strokeWidth: 0,
+        fillRule: 'evenodd',
+        objectCaching: false,
+      }));
+    }
+    if (created.length === 0) return;
+
+    // Bundle the object additions into one undo entry — object:added would
+    // otherwise snapshot per path.
+    getHistory()?.suspend();
+    created.forEach((p) => c.add(p));
+    getHistory()?.resume();
+    pushHistory();
+    c.discardActiveObject();
+    c.setActiveObject(created.length === 1 ? created[0] : new fabric.ActiveSelection(created, { canvas: c }));
+    c.requestRenderAll();
+    toast.success(`${created.length} ${t('color regions traced')}`, { title: t('Bitmap traced (multi-color)') });
+  };
+
+  /** Apply a named trace preset: fills every parameter (and the mode) at once. */
+  const applyTracePreset = (presetId: string) => {
+    const preset = TRACE_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    if (preset.options.threshold !== undefined) setTraceThreshold(preset.options.threshold);
+    if (preset.options.useAlpha !== undefined) setTraceUseAlpha(preset.options.useAlpha);
+    if (preset.options.simplifyTolerance !== undefined) setTraceSimplify(preset.options.simplifyTolerance);
+    if (preset.options.minSizeMm !== undefined) setTraceMinSize(preset.options.minSizeMm);
+    setTraceMode(preset.colorCount ? 'multi' : 'single');
+    if (preset.colorCount) setTraceColors(preset.colorCount);
   };
 
   const runRegMarks = () => {
@@ -355,9 +475,15 @@ export function CutContourDialog() {
                   threshold={traceThreshold} setThreshold={setTraceThreshold}
                   useAlpha={traceUseAlpha} setUseAlpha={setTraceUseAlpha}
                   simplify={traceSimplify} setSimplify={setTraceSimplify}
+                  minSize={traceMinSize} setMinSize={setTraceMinSize}
                   replaceExisting={replaceExistingTrace}
                   setReplaceExisting={setReplaceExistingTrace}
+                  mode={traceMode} setMode={setTraceMode}
+                  colors={traceColors} setColors={setTraceColors}
+                  progress={traceProgress}
+                  onApplyPreset={applyTracePreset}
                   onRun={runTrace}
+                  onRunMulti={runMultiTrace}
                 />
               )}
               {tab === 'regmark' && (
@@ -688,8 +814,14 @@ function TracePane(props: {
   threshold: number; setThreshold: (n: number) => void;
   useAlpha: boolean; setUseAlpha: (v: boolean) => void;
   simplify: number; setSimplify: (n: number) => void;
+  minSize: number; setMinSize: (n: number) => void;
   replaceExisting: boolean; setReplaceExisting: (v: boolean) => void;
+  mode: 'single' | 'multi'; setMode: (m: 'single' | 'multi') => void;
+  colors: number; setColors: (n: number) => void;
+  progress: string;
+  onApplyPreset: (id: string) => void;
   onRun: () => void;
+  onRunMulti: () => void;
 }) {
   const t = useT();
   const [reviewPreset, setReviewPreset] = useState('');
@@ -702,11 +834,81 @@ function TracePane(props: {
   ];
   const describePreset = (preset: (typeof presets)[number]) => `${preset.label}: ${preset.threshold} / ${preset.simplify}px${preset.useAlpha ? ` · ${t('Alpha')}` : ''}`;
   const currentPreset = reviewPreset || describePreset(presets[0]);
+  // Named recipes (Illustrator Image Trace equivalents). Each carries the
+  // full parameter tuple and flips single/multi mode; the photo recipe also
+  // sets the k-means colour count.
+  const describeRecipe = (recipe: (typeof TRACE_PRESETS)[number]) =>
+    `${t(recipe.label)}: ${recipe.options.threshold ?? '—'} / ${recipe.options.simplifyTolerance ?? '—'}px${recipe.colorCount ? ` · ${recipe.colorCount} ${t('Colors')}` : ''}`;
+  const [reviewRecipe, setReviewRecipe] = useState('');
   return (
     <div className="space-y-3">
       <p className="text-muted leading-relaxed">
         {t('Convert a placed bitmap (PNG/JPG) into vector cut paths by tracing the edges of dark or opaque regions.')}
       </p>
+      <div>
+        <div className="field-label">{t('Presets')}</div>
+        <div
+          className="grid grid-cols-3 gap-1"
+          role="toolbar"
+          aria-label={t('Trace preset recipes')}
+          aria-describedby="trace-recipe-review-status"
+          title={t('Use arrow keys to review presets')}
+          onKeyDown={(event) => handlePresetToolbarKeys(event, setReviewRecipe)}
+        >
+          <div id="trace-recipe-review-status" className="sr-only" aria-live="polite">
+            {`${t('Reviewing')} ${reviewRecipe || describeRecipe(TRACE_PRESETS[0])}`}
+          </div>
+          {TRACE_PRESETS.map((recipe) => {
+            const review = describeRecipe(recipe);
+            const active = props.threshold === recipe.options.threshold
+              && Math.abs(props.simplify - (recipe.options.simplifyTolerance ?? 0)) < 0.001
+              && Math.abs(props.minSize - (recipe.options.minSizeMm ?? 0)) < 0.001
+              && props.mode === (recipe.colorCount ? 'multi' : 'single');
+            return (
+              <button
+                key={recipe.id}
+                type="button"
+                data-cut-preset-action
+                data-cut-preset-review={review}
+                className={`min-h-11 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
+                onFocus={(event) => setReviewRecipe(event.currentTarget.dataset.cutPresetReview ?? '')}
+                onClick={() => props.onApplyPreset(recipe.id)}
+                title={review}
+                aria-pressed={active}
+              >
+                <span className="block font-medium">{t(recipe.label)}</span>
+                <span className="block text-muted tabular-nums">
+                  {recipe.options.threshold} · {recipe.options.simplifyTolerance}px{recipe.colorCount ? ` · ${recipe.colorCount} ${t('Colors')}` : ''}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {/* Mode toggle — single contour (blade line) vs multi-colour (filled
+          colour regions per vinyl layer). Radio semantics via aria-pressed
+          pair, matching the preset toolbar pattern used across the app. */}
+      <div>
+        <div className="field-label">{t('Mode')}</div>
+        <div className="grid grid-cols-2 gap-1" role="toolbar" aria-label={t('Trace mode')}>
+          <button
+            type="button"
+            className={`rounded border px-2 py-1.5 text-[11px] transition-colors ${props.mode === 'single' ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
+            onClick={() => props.setMode('single')}
+            aria-pressed={props.mode === 'single'}
+          >
+            {t('Single contour')}
+          </button>
+          <button
+            type="button"
+            className={`rounded border px-2 py-1.5 text-[11px] transition-colors ${props.mode === 'multi' ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
+            onClick={() => props.setMode('multi')}
+            aria-pressed={props.mode === 'multi'}
+          >
+            {t('Multi-color')}
+          </button>
+        </div>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label={`${t('Threshold')} (0–255)`}>
           <input
@@ -724,14 +926,31 @@ function TracePane(props: {
             onChange={(e) => props.setSimplify(Math.max(0, parseFloat(e.target.value) || 0))}
           />
         </Field>
-        <label className="col-span-2 flex items-center gap-2 cursor-pointer">
+        {props.mode === 'multi' ? (
+          <Field label={`${t('Colors')} (2–8)`}>
+            <input
+              type="number" min={2} max={8} className="input-num"
+              value={props.colors}
+              onChange={(e) => props.setColors(Math.max(2, Math.min(8, parseInt(e.target.value, 10) || 6)))}
+            />
+          </Field>
+        ) : (
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={props.useAlpha}
+              onChange={(e) => props.setUseAlpha(e.target.checked)}
+            />
+            <span>{t('Use alpha channel (best for transparent PNGs)')}</span>
+          </label>
+        )}
+        <Field label={`${t('Minimum size')} (mm)`}>
           <input
-            type="checkbox"
-            checked={props.useAlpha}
-            onChange={(e) => props.setUseAlpha(e.target.checked)}
+            type="number" step={0.1} min={0} className="input-num"
+            value={props.minSize}
+            onChange={(e) => props.setMinSize(Math.max(0, parseFloat(e.target.value) || 0))}
           />
-          <span>{t('Use alpha channel (best for transparent PNGs)')}</span>
-        </label>
+        </Field>
       </div>
       <div>
         <div className="field-label">{t('Trace presets')}</div>
@@ -772,22 +991,33 @@ function TracePane(props: {
           })}
         </div>
       </div>
-      <label className="flex items-center gap-2 cursor-pointer text-[11px]">
-        <input
-          type="checkbox"
-          checked={props.replaceExisting}
-          onChange={(e) => props.setReplaceExisting(e.target.checked)}
-        />
-        <span>{t('Replace existing trace paths')}</span>
-      </label>
+      {props.mode === 'single' && (
+        <label className="flex items-center gap-2 cursor-pointer text-[11px]">
+          <input
+            type="checkbox"
+            checked={props.replaceExisting}
+            onChange={(e) => props.setReplaceExisting(e.target.checked)}
+          />
+          <span>{t('Replace existing trace paths')}</span>
+        </label>
+      )}
+      {props.progress && (
+        <p className="text-[10px] text-[#ff2e9a] tabular-nums" aria-live="polite">{props.progress}</p>
+      )}
       <button
         type="button"
         className="btn-primary flex items-center gap-1.5 w-full justify-center"
-        onClick={props.onRun}
-        title={props.replaceExisting ? t('Replace old bitmap traces and keep outline/reg marks') : t('Append trace paths to the current cut job')}
+        onClick={props.mode === 'multi' ? props.onRunMulti : props.onRun}
+        disabled={!!props.progress}
+        title={props.mode === 'multi'
+          ? t('Trace every colour region as a filled vector path')
+          : props.replaceExisting
+            ? t('Replace old bitmap traces and keep outline/reg marks')
+            : t('Append trace paths to the current cut job')}
       >
-        <ImageDown size={12} aria-hidden="true" />
-        {t('Trace Selected Image')}
+        {props.mode === 'multi'
+          ? <><Palette size={12} aria-hidden="true" />{t('Trace Multi-Color')}</>
+          : <><ImageDown size={12} aria-hidden="true" />{t('Trace Selected Image')}</>}
       </button>
     </div>
   );

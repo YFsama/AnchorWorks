@@ -270,6 +270,23 @@ export function traceBitmap(
     }
   }
 
+  return traceInkBitmap(ink, W, H, o.simplifyTolerance, o.pixelSizeMm, o.minSizeMm);
+}
+
+/**
+ * Shared Moore-neighbour contour walk over a pre-thresholded ink bitmap.
+ * Extracted from traceBitmap so the multi-colour tracer can reuse the exact
+ * same boundary-following + simplification + min-size pipeline per colour
+ * cluster (identical output characteristics for single- and multi-colour).
+ */
+function traceInkBitmap(
+  ink: Uint8Array,
+  W: number,
+  H: number,
+  simplifyTolerance: number,
+  pixelSizeMm: number,
+  minSizeMm: number,
+): Array<Array<[number, number]>> {
   const seen = new Uint8Array(W * H);
   const contours: Array<Array<[number, number]>> = [];
 
@@ -288,10 +305,10 @@ export function traceBitmap(
       }
       const ring = mooreContour(ink, W, H, x, y, seen);
       if (ring.length >= 4) {
-        const simplified = douglasPeucker(ring, o.simplifyTolerance);
+        const simplified = douglasPeucker(ring, simplifyTolerance);
         // Convert pixel coords → mm.
         const mm = simplified.map(([px, py]) =>
-          [px * o.pixelSizeMm, py * o.pixelSizeMm] as [number, number],
+          [px * pixelSizeMm, py * pixelSizeMm] as [number, number],
         );
         // Drop tiny contours (single-pixel noise).
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -299,7 +316,7 @@ export function traceBitmap(
           if (px < minX) minX = px; if (px > maxX) maxX = px;
           if (py < minY) minY = py; if (py > maxY) maxY = py;
         }
-        if (Math.max(maxX - minX, maxY - minY) >= o.minSizeMm) {
+        if (Math.max(maxX - minX, maxY - minY) >= minSizeMm) {
           contours.push(mm);
         }
       }
@@ -386,6 +403,338 @@ export function douglasPeucker(
   const out: Array<[number, number]> = [];
   for (let i = 0; i < pts.length; i++) if (keep[i]) out.push(pts[i]);
   return out;
+}
+
+/* ============================================================ */
+/* Trace presets                                                  */
+/* ============================================================ */
+
+/**
+ * Named trace recipes (Illustrator Image Trace equivalents, cutter-flavoured).
+ * Each tuple carries the full TraceOptions override — clicking the preset in
+ * the dialog applies every parameter at once rather than nudging one slider.
+ */
+export interface TracePreset {
+  id: string;
+  /** i18n key — the English label doubles as the translation key. */
+  label: string;
+  /** Single-contour parameters (applied to the threshold trace pipeline). */
+  options: Partial<TraceOptions>;
+  /** Multi-pass preset: runs k-means quantization with this many colours. */
+  colorCount?: number;
+}
+
+export const TRACE_PRESETS: TracePreset[] = [
+  {
+    id: 'bw-logo',
+    label: 'Black & White logo',
+    options: { threshold: 128, useAlpha: false, simplifyTolerance: 1, minSizeMm: 1 },
+  },
+  {
+    id: 'line-art',
+    label: 'Line art / sketch',
+    options: { threshold: 200, useAlpha: false, simplifyTolerance: 0.5, minSizeMm: 0.5 },
+  },
+  {
+    id: 'photo-cut',
+    label: 'Photo cut (multi-pass)',
+    options: { threshold: 160, useAlpha: false, simplifyTolerance: 2, minSizeMm: 2 },
+    colorCount: 6,
+  },
+];
+
+/** Look up a preset's TraceOptions tuple by id (undefined when unknown). */
+export function tracePresetOptions(id: string): Partial<TraceOptions> | undefined {
+  return TRACE_PRESETS.find((p) => p.id === id)?.options;
+}
+
+/* ============================================================ */
+/* Multi-colour trace — seeded k-means + per-cluster contours     */
+/* ============================================================ */
+
+/** One quantized colour: the centroid RGB plus its sampled-pixel weight. */
+export interface ColorCluster {
+  color: [number, number, number];
+  pixels: number;
+}
+
+/** One traced colour region: the cluster colour + its mm-space contours. */
+export interface TraceClusterResult {
+  color: [number, number, number];
+  contours: Array<Array<[number, number]>>;
+}
+
+export interface KMeansOptions {
+  /** Iteration cap. 12 is plenty for image quantization convergence. */
+  maxIterations?: number;
+  /** Cap on sampled pixels fed to the solver (stride downsampling). */
+  maxSamples?: number;
+  /** Stop early once every center moves less than this (0–255 scale). */
+  epsilon?: number;
+}
+
+const DEFAULT_KMEANS: Required<KMeansOptions> = { maxIterations: 12, maxSamples: 20000, epsilon: 0.75 };
+
+/**
+ * Deterministic k-means colour quantization over an image's opaque pixels.
+ *
+ * Seeding is the deterministic part that matters: samples are sorted by
+ * luminance and k centers are spread evenly through that ordering, so the
+ * same image always yields the same clusters (no RNG, no run-to-run drift —
+ * which also keeps unit tests and saved presets reproducible). Lloyd
+ * iterations then refine the centers as usual; clusters that lose every
+ * pixel are dropped, so the result can contain fewer than k colours.
+ */
+export function kmeansQuantize(img: ImageData, k: number, opts: KMeansOptions = {}): ColorCluster[] {
+  const o = { ...DEFAULT_KMEANS, ...opts };
+  const kk = Math.max(1, Math.min(16, Math.floor(k)));
+  const { width: W, height: H, data } = img;
+
+  // Stride-sample opaque pixels.
+  const total = W * H;
+  const stride = Math.max(1, Math.ceil(total / o.maxSamples));
+  const samples: Array<[number, number, number]> = [];
+  for (let p = 0; p < total; p += stride) {
+    const i = p * 4;
+    if (data[i + 3] < 128) continue; // transparent pixels belong to no colour
+    samples.push([data[i], data[i + 1], data[i + 2]]);
+  }
+  if (samples.length === 0) return [];
+  if (samples.length <= kk) {
+    // Fewer distinct samples than colours — dedupe and call it done.
+    const unique = new Map<string, [number, number, number]>();
+    for (const s of samples) unique.set(s.join(','), s);
+    return [...unique.values()].map((color) => ({ color, pixels: 1 }));
+  }
+
+  // Deterministic seeding: luminance-sorted evenly spaced samples.
+  const luma = (c: [number, number, number]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  samples.sort((a, b) => luma(a) - luma(b));
+  let centers: Array<[number, number, number]> = [];
+  for (let c = 0; c < kk; c++) {
+    centers.push(samples[Math.floor(((c + 0.5) / kk) * samples.length)].slice() as [number, number, number]);
+  }
+
+  const assign = new Uint16Array(samples.length);
+  for (let iter = 0; iter < o.maxIterations; iter++) {
+    // Assignment step — nearest center by squared RGB distance.
+    let moved = 0;
+    for (let s = 0; s < samples.length; s++) {
+      assign[s] = nearestClusterIndex(samples[s], centers);
+    }
+    // Update step — per-cluster mean; empty clusters are dropped here.
+    const sums = centers.map(() => [0, 0, 0, 0]);
+    for (let s = 0; s < samples.length; s++) {
+      const a = assign[s];
+      const [r, g, b] = samples[s];
+      sums[a][0] += r; sums[a][1] += g; sums[a][2] += b; sums[a][3] += 1;
+    }
+    const next: Array<[number, number, number]> = [];
+    for (let c = 0; c < centers.length; c++) {
+      const [sr, sg, sb, n] = sums[c];
+      if (n === 0) continue; // empty cluster dies
+      const mean: [number, number, number] = [sr / n, sg / n, sb / n];
+      moved = Math.max(
+        moved,
+        Math.abs(mean[0] - centers[c][0]) + Math.abs(mean[1] - centers[c][1]) + Math.abs(mean[2] - centers[c][2]),
+      );
+      next.push(mean);
+    }
+    centers = next;
+    if (centers.length <= 1 || moved < o.epsilon) break;
+  }
+
+  // Final pass: count pixels per surviving center.
+  const counts = new Map<string, { color: [number, number, number]; pixels: number }>();
+  for (let s = 0; s < samples.length; s++) {
+    const ci = nearestClusterIndex(samples[s], centers);
+    const center = centers[ci];
+    const key = center.join(',');
+    const entry = counts.get(key) ?? { color: [round8(center[0]), round8(center[1]), round8(center[2])], pixels: 0 };
+    entry.pixels += 1;
+    counts.set(key, entry);
+  }
+  return [...counts.values()].sort((a, b) => b.pixels - a.pixels);
+}
+
+function round8(v: number): number {
+  return Math.max(0, Math.min(255, Math.round(v)));
+}
+
+/** Index of the cluster whose color is nearest (squared RGB distance). */
+export function nearestClusterIndex(
+  color: readonly [number, number, number],
+  centers: ReadonlyArray<readonly [number, number, number]>,
+): number {
+  let best = 0;
+  let bestDist = Infinity;
+  for (let c = 0; c < centers.length; c++) {
+    const dr = color[0] - centers[c][0];
+    const dg = color[1] - centers[c][1];
+    const db = color[2] - centers[c][2];
+    const d = dr * dr + dg * dg + db * db;
+    if (d < bestDist) { bestDist = d; best = c; }
+  }
+  return best;
+}
+
+export interface MultiTraceOptions {
+  /** Number of colours to quantize into (2..8 is the useful cutter range). */
+  colorCount: number;
+  /** Douglas-Peucker tolerance in bitmap pixels (per cluster contour). */
+  simplifyTolerance: number;
+  /** Pixel size in mm (same convention as TraceOptions). */
+  pixelSizeMm: number;
+  /** Drop cluster contours smaller than this (mm). */
+  minSizeMm: number;
+  /** Pre-computed clusters — when omitted, kmeansQuantize derives them. */
+  clusters?: ColorCluster[];
+}
+
+/**
+ * Multi-colour trace: quantize the image into k colours, then trace each
+ * colour's region boundaries with the same marching-squares walk the single
+ * contour tracer uses. One cluster can produce many contours (disjoint
+ * regions of the same colour); clusters with no surviving contours are
+ * dropped. Pure function — the worker runs this off the main thread and the
+ * dialog falls back to calling it directly when no Worker is available.
+ * `onProgress` fires once per traced cluster (done counts up to total).
+ */
+export function traceMultiColor(
+  img: ImageData,
+  opts: MultiTraceOptions,
+  onProgress?: (done: number, total: number) => void,
+): TraceClusterResult[] {
+  const clusters = opts.clusters ?? kmeansQuantize(img, opts.colorCount);
+  if (clusters.length === 0) return [];
+  const { width: W, height: H, data } = img;
+
+  // Per-pixel cluster assignment (255 = transparent / no cluster). Single
+  // pass — the per-cluster loop below only extracts masks.
+  const owner = new Uint8Array(W * H).fill(255);
+  const centers = clusters.map((c) => c.color);
+  for (let p = 0, i = 0; p < W * H; p++, i += 4) {
+    if (data[i + 3] < 128) continue;
+    const nearest = nearestClusterIndex([data[i], data[i + 1], data[i + 2]], centers);
+    if (nearest > 254) continue; // can't happen with <=16 clusters; type guard
+    owner[p] = nearest;
+  }
+
+  const out: TraceClusterResult[] = [];
+  for (let c = 0; c < clusters.length; c++) {
+    const ink = new Uint8Array(W * H);
+    for (let p = 0; p < owner.length; p++) ink[p] = owner[p] === c ? 1 : 0;
+    const contours = traceInkBitmap(ink, W, H, opts.simplifyTolerance, opts.pixelSizeMm, opts.minSizeMm);
+    if (contours.length > 0) out.push({ color: clusters[c].color, contours });
+    onProgress?.(c + 1, clusters.length);
+  }
+  return out;
+}
+
+/* ----------------------- worker plumbing ----------------------- */
+
+/**
+ * Multi-colour trace request sent to the trace worker. Kept structurally
+ * distinct from the legacy single-polygon request (`{id, imageData,
+ * threshold}`) via the `kind` tag so the worker can dispatch without
+ * guessing, and so io3.ts's older RPC continues to work unchanged.
+ */
+export interface MultiTraceRequest {
+  id: number;
+  kind: 'multi';
+  imageData: ImageData;
+  colorCount: number;
+  simplifyTolerance: number;
+  pixelSizeMm: number;
+  minSizeMm: number;
+}
+
+export type MultiTraceResponse =
+  | { id: number; progress: true; done: number; total: number }
+  | { id: number; ok: true; clusters: TraceClusterResult[] }
+  | { id: number; ok: false; error: string };
+
+let multiWorker: Worker | null = null;
+let multiWorkerFailed = false;
+let nextMultiReqId = 1;
+interface MultiPending {
+  resolve: (clusters: TraceClusterResult[]) => void;
+  reject: (err: Error) => void;
+  onProgress?: (done: number, total: number) => void;
+}
+const multiPending = new Map<number, MultiPending>();
+
+function getMultiTraceWorker(): Worker | null {
+  if (multiWorkerFailed) return null;
+  if (multiWorker) return multiWorker;
+  if (typeof Worker === 'undefined') return null; // SSR / test env
+  try {
+    // Standard Vite worker bootstrap (`new URL` form). Unlike the `?worker`
+    // suffix imports used in io3.ts / booleanOps.ts, this only evaluates when
+    // the multi-colour trace actually runs, so importing cutContour.ts from
+    // unit tests never needs a Worker implementation.
+    const w = new Worker(new URL('./workers/trace.worker.ts', import.meta.url), { type: 'module' });
+    w.onmessage = (ev: MessageEvent<MultiTraceResponse>): void => {
+      const data = ev.data;
+      const entry = multiPending.get(data.id);
+      if (!entry) return;
+      if ('progress' in data) {
+        entry.onProgress?.(data.done, data.total);
+        return;
+      }
+      multiPending.delete(data.id);
+      if (data.ok) entry.resolve(data.clusters);
+      else entry.reject(new Error(data.error));
+    };
+    w.onerror = (ev: ErrorEvent): void => {
+      const err = new Error(ev.message || 'trace worker error');
+      for (const p of multiPending.values()) p.reject(err);
+      multiPending.clear();
+    };
+    multiWorker = w;
+    return w;
+  } catch {
+    multiWorkerFailed = true;
+    return null;
+  }
+}
+
+/**
+ * Multi-colour trace with progress, off the main thread when possible.
+ * Falls back to the synchronous pure implementation when Workers aren't
+ * available (SSR, restricted environments, unit tests).
+ */
+export function traceMultiColorAsync(
+  img: ImageData,
+  opts: MultiTraceOptions,
+  onProgress?: (done: number, total: number) => void,
+): Promise<TraceClusterResult[]> {
+  const w = getMultiTraceWorker();
+  if (!w) {
+    // Synchronous fallback — report the clusters as one completed step so
+    // progress-driven UIs still get a final tick.
+    try {
+      const clusters = traceMultiColor(img, opts);
+      onProgress?.(clusters.length, clusters.length);
+      return Promise.resolve(clusters);
+    } catch (err) {
+      return Promise.reject(err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+  return new Promise<TraceClusterResult[]>((resolve, reject) => {
+    const id = nextMultiReqId++;
+    multiPending.set(id, { resolve, reject, onProgress });
+    const req: MultiTraceRequest = {
+      id,
+      kind: 'multi',
+      imageData: img,
+      colorCount: opts.colorCount,
+      simplifyTolerance: opts.simplifyTolerance,
+      pixelSizeMm: opts.pixelSizeMm,
+      minSizeMm: opts.minSizeMm,
+    };
+    w.postMessage(req);
+  });
 }
 
 /* ============================================================ */

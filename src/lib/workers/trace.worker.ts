@@ -5,17 +5,32 @@
  *   import TraceWorker from './workers/trace.worker.ts?worker';
  *   const worker = new TraceWorker();
  *
- * Message protocol:
+ * Message protocol (two request kinds, dispatched on the `kind` tag):
+ *
+ *  Legacy single-polygon trace (io3.ts):
  *   Request:  { id: number; imageData: ImageData; threshold?: number }
  *   Response: { id: number; ok: true; polygon: Array<[number, number]> }
  *           | { id: number; ok: false; error: string }
  *
- * The algorithm mirrors `traceSelectedImage` in src/lib/io3.ts: threshold to
- * B/W (luminance < threshold = ink), collect edge pixels around the ink
- * region, order them by polar angle around the centroid, then down-sample to
- * ~96 points. Workers can't share state with the main thread, so the pixel
- * loop is duplicated here.
+ *  Multi-colour trace (cutContour.ts traceMultiColorAsync):
+ *   Request:  { id: number; kind: 'multi'; imageData: ImageData;
+ *              colorCount; simplifyTolerance; pixelSizeMm; minSizeMm }
+ *   Response: { id: number; progress: true; done; total }   (per cluster)
+ *           | { id: number; ok: true; clusters: TraceClusterResult[] }
+ *           | { id: number; ok: false; error: string }
+ *
+ * The legacy algorithm mirrors `traceSelectedImage` in src/lib/io3.ts:
+ * threshold to B/W (luminance < threshold = ink), collect edge pixels around
+ * the ink region, order them by polar angle around the centroid, then
+ * down-sample to ~96 points. Workers can't share state with the main thread,
+ * so the pixel loop is duplicated here.
+ *
+ * The multi-colour path reuses the pure k-means + marching-squares code from
+ * ../cutContour so both the worker and the main-thread fallback produce
+ * identical output.
  */
+
+import { traceMultiColor, type MultiTraceRequest, type MultiTraceResponse } from '../cutContour';
 
 interface TraceRequest {
   id: number;
@@ -31,8 +46,8 @@ type TraceResponse =
 // minimal surface we use (postMessage + onmessage). `self` inside a worker is
 // the dedicated worker scope, but TypeScript types it as Window here — cast.
 interface WorkerScope {
-  onmessage: ((event: MessageEvent<TraceRequest>) => void) | null;
-  postMessage(message: TraceResponse): void;
+  onmessage: ((event: MessageEvent<TraceRequest | MultiTraceRequest>) => void) | null;
+  postMessage(message: TraceResponse | MultiTraceResponse): void;
 }
 const ctx = self as unknown as WorkerScope;
 
@@ -81,16 +96,37 @@ function tracePolygon(imageData: ImageData, threshold: number): Array<[number, n
   return sampled;
 }
 
-ctx.onmessage = (event: MessageEvent<TraceRequest>): void => {
-  const { id, imageData, threshold } = event.data;
+/**
+ * Multi-colour trace with per-cluster progress posts: k-means quantization
+ * runs first (one pass over the pixels), then each cluster's mask is traced
+ * and a progress message flies home so the dialog can render a live count.
+ */
+function runMultiTrace(req: MultiTraceRequest): void {
+  const clusters = traceMultiColor(req.imageData, {
+    colorCount: req.colorCount,
+    simplifyTolerance: req.simplifyTolerance,
+    pixelSizeMm: req.pixelSizeMm,
+    minSizeMm: req.minSizeMm,
+  }, (done, total) => {
+    ctx.postMessage({ id: req.id, progress: true, done, total });
+  });
+  ctx.postMessage({ id: req.id, ok: true, clusters });
+}
+
+ctx.onmessage = (event: MessageEvent<TraceRequest | MultiTraceRequest>): void => {
+  const data = event.data;
   try {
+    if ('kind' in data && data.kind === 'multi') {
+      runMultiTrace(data);
+      return;
+    }
+    const { id, imageData, threshold } = data as TraceRequest;
     const polygon = tracePolygon(imageData, threshold ?? 128);
     const response: TraceResponse = { id, ok: true, polygon };
     ctx.postMessage(response);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const response: TraceResponse = { id, ok: false, error: message };
-    ctx.postMessage(response);
+    ctx.postMessage({ id: data.id, ok: false, error: message });
   }
 };
 
