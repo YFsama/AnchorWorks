@@ -4,6 +4,26 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Plotter debug console**: the Send to Plotter dialog now has a built-in serial console. Connect once and keep the cutter link alive across dialog reopens, pick the baud rate (most HP-GL vinyl cutters speak 9600, not the previous hard-coded 115200) and flow control (none / RTS-CTS / XON-XOFF), then use one-click machine commands (initialize, pen up, blade tap, HP-GL OE/OH/OA/OS queries, grbl status / unlock / home / pause / resume, immediate force/speed push), a jog pad with set-origin, and a raw-command input with automatic reply decoding. The TX/RX traffic log timestamps every byte with an ASCII/HEX toggle plus copy / download / clear.
+- **Paced, cancellable job streaming**: Send via USB and Test cut now stream through the persistent link with chunk pacing below the line rate (protects cutters whose tiny buffers overflow without RTS/CTS wiring), a live progress bar, and a Stop button that aborts the transfer and lifts the blade (PU; / grbl feed-hold). Falls back to the legacy one-shot send when no connection is open.
+- **Native persistent serial link (Tauri)**: new serial_open / serial_write / serial_read / serial_close commands keep OS handles in a Rust-side registry with configurable flow control, so read-back and interleaved operations work in the desktop app; all serial commands now run off the main thread.
+- **Persistent plotter settings**: machine options, format, material preset, baud, flow control, and last-used port round-trip through localStorage (sanitised on load), so a dialled-in setup survives dialog reopens and app restarts instead of resetting to defaults.
+- **Brand machine profiles**: a profile picker covering the real cutter families — Roland CAMM-1 GX/GS and legacy PNC, Graphtec CE/FC/CE7000, the Roland-compatible Chinese clones (Liyu / Rabbit / Teneth / Redsail / Creation / Saga / 文泰-Artcut ecosystem), Mimaki CG, Summa, and GCC. Each profile loads the right dialect, baud, flow control, force/speed starting points and field notes (buffer quirks, panel-only machines, TB-overcut tips), sends a brand-correct init statement on connect, and drives the profile-aware force/speed quick command.
+- **Plotter diagnostics**: one-click connection self-test (OE/OH/OA or grbl ?/$I with decoded answers and round-trip latency), automatic baud-rate detection (reconnects at each common rate and watches for a reply, restoring the link afterwards), and a transfer-time estimate in the output summary.
+- **Configuration records**: named saved machines — full setup snapshots (profile, dialect, force/speed, baud, flow, port, material) with save / load / update / delete — plus a job history of the last 50 sends with settings, byte counts, durations and results.
+- **Freehand knife tool (`K`)**: drag a polyline across objects to slice them along the cut corridor (kerf-modelled, curve-refit pieces) — Illustrator-style freehand cutting for vinyl/laser prep, with a live dashed preview, Esc cancel, and one undo entry per gesture.
+- **Trace presets + multi-color trace**: three named recipes (Black & White logo / Line art / Photo cut) plus deterministic seeded k-means colour quantization (2–8 colours) that traces one filled path per colour region through the existing worker, with per-colour progress. Single-contour API unchanged.
+- **Vector PDF import** (`File > Import PDF…` + drag-drop): pdf.js operator-list walker emitting SVG paths with full transform-stack, RGB/CMYK/gray, and even-odd support; text runs are skipped with a counted warning. Ships as a separate lazily-loaded, PWA-precached chunk.
+- **Animated cut simulation**: a Simulate toggle in the plotter preview replays the optimized cut order at the configured feed rate — crosshair cutter head, pen-up hop trails, 0.5×–4× speed, progress and elapsed readout; the timeline provably matches the job time estimate, and prefers-reduced-motion skips straight to the end.
+- **Rotation-aware nesting**: first-fit-decreasing skyline packer with 90° rotation against the artboard width (`Nest (rotation-aware)` next to Auto-arrange) — measurably better material utilization than the shelf packer, single undo step.
+- **CSV data merge**: RFC-4180-tolerant CSV source in the Variable Data dialog with column↔named-text-object bindings, `{{token}}` substitution, live first-record preview, and per-record clones on the existing grid — the Etsy/name-badge workflow.
+- **Editor operability**: live W×H / angle HUD while scaling/rotating, Shift+drag axis-lock, Shift+wheel horizontal pan, and a Mouse-wheel preference (Figma-style scroll default or Illustrator-style wheel-zoom) in Preferences → Editor.
+- **First-paint**: CommandPalette and the canvas context menu are now lazy chunks (entry 1,851 kB → 1,306 kB, −29.4%); history snapshots cost one canvas stringify instead of three with zero-copy cut-path sharing.
+- **Test infra**: jsdom localStorage shim for Node ≥ 26 (the inert experimental global shadowed jsdom's Storage and broke 31 storage tests).
+
 ## [0.12.1] — 2026-06-10
 
 ### Added
