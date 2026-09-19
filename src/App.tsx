@@ -107,10 +107,14 @@ import { ToastHost } from './components/ToastHost';
 import { TooltipHost } from './components/TooltipHost';
 import { ConfirmHost } from './components/ConfirmHost';
 import { OfflineBanner } from './components/OfflineBanner';
-import { CanvasContextMenu } from './components/CanvasContextMenu';
+// Context menu — thin lazy shell; the 157 kB menu module only loads on the
+// first right-click (or after the shell's idle warm-up), not with the entry.
+import { LazyCanvasContextMenu } from './components/LazyCanvasContextMenu';
 import { IsolationBadge } from './components/IsolationBadge';
 import { copySelection, cutSelection, pasteFromClipboard } from './lib/clipboard';
-import { CommandPalette } from './components/CommandPalette';
+// Command palette — 681 kB of command bindings; lazy-loaded on first open
+// (plus an idle warm-up below) so it leaves the eagerly-loaded entry chunk.
+const CommandPalette = lazy(() => import('./components/CommandPalette').then(m => ({ default: m.CommandPalette })));
 import { getBinding as getKeyBinding, comboMatchesEvent } from './lib/keymap';
 import { showConfirm } from './lib/confirm';
 import { importImageFile } from './lib/io3';
@@ -761,6 +765,7 @@ export default function App() {
   const showMarginGuides = useEditor(s => s.showMarginGuides);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
+  const showCommandPalette = useEditor(s => s.showCommandPalette);
   const highContrast = useEditor(s => s.highContrast);
   const liveRef = useRef<HTMLDivElement>(null);
   // Hidden file inputs driven by the command palette (the menu bar has its
@@ -1279,6 +1284,14 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, []);
 
+  // Warm the command-palette chunk a few seconds after boot (after the
+  // critical path has settled) so the first Ctrl+K opens instantly while the
+  // palette code still stays out of the eagerly-parsed entry chunk.
+  useEffect(() => {
+    const id = window.setTimeout(() => { void import('./components/CommandPalette'); }, 5000);
+    return () => window.clearTimeout(id);
+  }, []);
+
   // Under Tauri, hook up the native menu listener so File / Edit / View
   // picks dispatch to the same handlers as the DOM MenuBar. No-op in PWA.
   useEffect(() => { void installNativeMenuListener(); }, []);
@@ -1567,7 +1580,7 @@ export default function App() {
       <ConfirmHost />
       <OfflineBanner />
       <IsolationBadge />
-      <CanvasContextMenu
+      <LazyCanvasContextMenu
         onNewDocument={async () => {
           if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) {
             location.reload();
@@ -1577,18 +1590,22 @@ export default function App() {
         onImportImage={() => paletteImageRef.current?.click()}
         onToggleDebug={() => setShowDebug(v => !v)}
       />
-      <CommandPalette
-        onToggleAI={() => setShowAI(v => !v)}
-        onToggleDebug={() => setShowDebug(v => !v)}
-        onShowOnboarding={() => setShowOnboarding(true)}
-        onNewDocument={async () => {
-          if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) {
-            location.reload();
-          }
-        }}
-        onOpenFile={() => paletteOpenRef.current?.click()}
-        onImportImage={() => paletteImageRef.current?.click()}
-      />
+      {showCommandPalette && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            onToggleAI={() => setShowAI(v => !v)}
+            onToggleDebug={() => setShowDebug(v => !v)}
+            onShowOnboarding={() => setShowOnboarding(true)}
+            onNewDocument={async () => {
+              if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) {
+                location.reload();
+              }
+            }}
+            onOpenFile={() => paletteOpenRef.current?.click()}
+            onImportImage={() => paletteImageRef.current?.click()}
+          />
+        </Suspense>
+      )}
       <input
         ref={paletteOpenRef}
         type="file"

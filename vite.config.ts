@@ -149,5 +149,11 @@ export default defineConfig({
     // Rolldown-backed Vite also exposes rolldownOptions; configure identically
     // so we get the same behavior under either backend.
     rolldownOptions: { output: { manualChunks } },
+    // The fabric (300 kB) and canvasEngine (721 kB) chunks are deliberate
+    // manual-chunk groupings pulled by the first canvas paint — they are not
+    // accidental bloat, so the default 500 kB warning is noise for them.
+    // Keep the limit above their size so only genuinely oversized chunks
+    // (the entry, until the i18n dictionary / MenuBar slim-downs land) warn.
+    chunkSizeWarningLimit: 750,
   } as unknown as Record<string, unknown>,
 })
