@@ -748,7 +748,13 @@ export interface RegMarkOptions {
   armLength: number;
   /** Inset from the bounds corner in mm. Roland default is 5mm. */
   inset: number;
+  /** Mark shape: `L` (Roland CutStudio corner brackets — default),
+   *  `cross` (full + at each corner), `square` / `circle` (ARMS-style
+   *  solid-shape marks that cutter camera systems recognise). */
+  style?: RegMarkStyle;
 }
+
+export type RegMarkStyle = 'L' | 'cross' | 'square' | 'circle';
 
 const REGMARK_LENGTH = 10;
 const REGMARK_INSET = 5;
@@ -770,11 +776,55 @@ const REGMARK_INSET = 5;
 export function generateRegMarks(opts: Partial<RegMarkOptions> & {
   bounds: RegMarkOptions['bounds'];
 }): CutPath[] {
-  const { bounds, armLength = REGMARK_LENGTH, inset = REGMARK_INSET } = opts;
+  const { bounds, armLength = REGMARK_LENGTH, inset = REGMARK_INSET, style = 'L' } = opts;
   const { x, y, w, h } = bounds;
   const make = (id: string, pts: Array<[number, number]>): CutPath => ({
     id, points: pts, closed: false, kind: 'regmark', passes: 1,
   });
+
+  // ARMS-style solid shapes: a closed square / circle centred at each
+  // corner anchor. Graphtec ARMS recognises ~4mm squares or circles;
+  // armLength doubles as the shape size so existing presets still work.
+  if (style === 'square' || style === 'circle') {
+    const size = Math.max(2, armLength);
+    const anchors: Array<[string, number, number]> = [
+      ['tl', x + inset + size / 2, y + inset + size / 2],
+      ['tr', x + w - inset - size / 2, y + inset + size / 2],
+      ['bl', x + inset + size / 2, y + h - inset - size / 2],
+      ['br', x + w - inset - size / 2, y + h - inset - size / 2],
+    ];
+    return anchors.map(([id, cx, cy]) => {
+      if (style === 'square') {
+        const h2 = size / 2;
+        return make(`regmark-${id}`, [
+          [cx - h2, cy - h2], [cx + h2, cy - h2], [cx + h2, cy + h2], [cx - h2, cy + h2], [cx - h2, cy - h2],
+        ]);
+      }
+      const r = size / 2;
+      const pts: Array<[number, number]> = [];
+      for (let i = 0; i <= 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+      }
+      return make(`regmark-${id}`, pts);
+    }).map(p => ({ ...p, closed: true }));
+  }
+
+  if (style === 'cross') {
+    // Full + at each corner anchor — easy to eyeball alignment by hand.
+    const a = armLength / 2;
+    const anchors: Array<[string, number, number]> = [
+      ['tl', x + inset + a, y + inset + a],
+      ['tr', x + w - inset - a, y + inset + a],
+      ['bl', x + inset + a, y + h - inset - a],
+      ['br', x + w - inset - a, y + h - inset - a],
+    ];
+    return anchors.flatMap(([id, cx, cy]) => [
+      make(`regmark-${id}-h`, [[cx - a, cy], [cx + a, cy]]),
+      make(`regmark-${id}-v`, [[cx, cy - a], [cx, cy + a]]),
+    ]);
+  }
+
   return [
     // Top-left ┌
     make('regmark-tl', [

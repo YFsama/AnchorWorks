@@ -11,8 +11,10 @@ import { toHex } from '../lib/plotterLink';
 import type { NativeSerialPort } from '../lib/plotter';
 import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildSetOrigin, decodeReply, isQueryCommand, type QuickCommand } from '../lib/hpglDebug';
 import { probeBaud, runConnectionSelfTest } from '../lib/plotterDiag';
+import { autoDetectCutter, chipForPort, identifyMachine } from '../lib/plotterIdentify';
 import { clearJobLog, deleteMachine, listJobLog, listMachines, saveMachine, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
 import type { MachineProfile } from '../lib/machineProfiles';
+import { getMachineProfile } from '../lib/machineProfiles';
 
 const BAUD_RATES = [9600, 19200, 38400, 57600, 115200, 230400, 250000];
 const FLOW_OPTIONS: Array<{ value: FlowControl; label: string }> = [
@@ -69,6 +71,8 @@ export interface PlotterConsoleProps {
   applyConfig: (rec: MachineRecord) => void;
   /** Bumped by the dialog after each job-log entry. */
   jobLogVersion: number;
+  /** Apply a machine profile id (used by identify's suggestion). */
+  applyProfile: (id: string) => void;
 }
 
 let entrySeq = 1;
@@ -81,7 +85,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     link, format, unit, native, webSerial, sending,
     nativePorts, selectedPort, setSelectedPort, refreshPorts, portsLoading, portsError,
     baud, setBaud, flow, setFlow, force, speed, feedRate,
-    profile, connectInit, forceSpeedCommand, snapshotConfig, applyConfig, jobLogVersion,
+    profile, connectInit, forceSpeedCommand, snapshotConfig, applyConfig, jobLogVersion, applyProfile,
   } = props;
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -100,6 +104,8 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   const [selectedMachineId, setSelectedMachineId] = useState('');
   const [machineName, setMachineName] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Model string reported by the last identify run (OI; reply).
+  const [identified, setIdentified] = useState('');
   const [, forceTick] = useReducer((x: number) => x + 1, 0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -275,6 +281,51 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     }
   };
 
+  /** Identify the machine: OI; query when connected, port scan when not.
+   *  Suggests the matching brand profile with a one-click apply toast. */
+  const identify = async () => {
+    setBusy(true);
+    push({ ts: nowMs(), dir: 'info', text: `— ${t('Identify machine')} —` });
+    try {
+      if (link.status === 'connected') {
+        const r = await identifyMachine(link, format);
+        setIdentified(r.model);
+        push({ ts: nowMs(), dir: r.model ? 'info' : 'warn', text: r.summary });
+        offerProfile(r.suggestedProfileId);
+      } else if (native && nativePorts.length > 0) {
+        const found = await autoDetectCutter(link, nativePorts, {
+          flowControl: flow,
+          onLog: (line) => push({ ts: nowMs(), dir: 'info', text: line }),
+        });
+        if (found) {
+          setSelectedPort(found.portPath);
+          setBaud(found.baud);
+          setIdentified(found.model);
+          const chip = found.chip ? ` (${found.chip.chip})` : '';
+          push({ ts: nowMs(), dir: 'info', text: `${t('Cutter found')}: ${found.portPath}${chip} @ ${found.baud}${found.model ? ` — ${found.model}` : ''}` });
+          offerProfile(found.suggestedProfileId);
+        } else {
+          push({ ts: nowMs(), dir: 'warn', text: t('No cutter answered on any port — check power / cable, or connect manually and run the self-test.') });
+        }
+      } else {
+        toast.warn(t('Connect the cutter first (browsers cannot scan ports).'), { title: t('Identify machine') });
+      }
+    } finally {
+      setBusy(false);
+      forceTick();
+    }
+  };
+
+  const offerProfile = (profileId: string | null) => {
+    if (!profileId) return;
+    const p = getMachineProfile(profileId);
+    if (!p) return;
+    toast.info(`${t('Suggested profile')}: ${p.label}`, {
+      title: t('Identify machine'),
+      action: { label: t('Apply'), onClick: () => applyProfile(profileId) },
+    });
+  };
+
   /** Saved-machine rows — one record per physical cutter. */
   const saveMachineAsNew = () => {
     const name = machineName.trim();
@@ -396,11 +447,14 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               aria-label={t('Cutter port')}
             >
               <option value="">{nativePorts.length === 0 ? t('No serial ports detected') : t('Auto-select USB port')}</option>
-              {nativePorts.map((p) => (
-                <option key={p.path} value={p.path}>
-                  {p.path}{p.product || p.manufacturer ? ` — ${p.product ?? p.manufacturer}` : ''}
-                </option>
-              ))}
+              {nativePorts.map((p) => {
+                const chip = chipForPort(p);
+                return (
+                  <option key={p.path} value={p.path}>
+                    {p.path}{p.product || p.manufacturer ? ` — ${p.product ?? p.manufacturer}` : ''}{chip ? ` · ${chip.chip}${chip.likelihood === 'high' ? ` ★${t('cutter')}` : ''}` : ''}
+                  </option>
+                );
+              })}
             </select>
             <button
               type="button"
@@ -523,6 +577,18 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             >
               {t('Detect baud')}
             </button>
+            <button
+              type="button"
+              className="btn !py-0.5 !px-1.5 !text-[10px]"
+              onClick={() => { void identify(); }}
+              disabled={sending || busy}
+              title={t('Ask the machine for its model (OI;) or scan ports for a cutter, then suggest the right profile.')}
+            >
+              {t('Identify machine')}
+            </button>
+            {identified && (
+              <span className="text-[10px] text-success" title={t('Model reported by the machine')}>{identified}</span>
+            )}
             {profile && (
               <span className="text-[10px] text-muted" title={t('Active brand profile')}>
                 {t('Profile')}: {t(profile.label)}

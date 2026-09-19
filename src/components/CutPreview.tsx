@@ -22,6 +22,12 @@ interface CutPreviewProps {
   /** Overlay cut-order numbers + a start arrow per path (same greedy order the
    *  output uses) so the operator can see the travel sequence. */
   showOrder?: boolean;
+  /** Mark the job's very first blade touch-down with a distinct START
+   *  crosshair + label — where the cut begins on the material. */
+  showStart?: boolean;
+  /** Annotate the job's tight bounding box with W×H dimensions in mm so
+   *  the operator can verify it fits the material before cutting. */
+  showDims?: boolean;
   /** Replay the job as an animated cut simulation: a cutter-head marker
    *  travels each polyline at the configured feed rate, pen-up hops render
    *  as faint dashed lines, with play / pause / restart + speed controls. */
@@ -54,6 +60,8 @@ export function CutPreview({
   showPrint = false,
   mirror = false,
   showOrder = false,
+  showStart = false,
+  showDims = false,
   simulate = false,
   feedMmMin = 200,
   travelMmMin = 800,
@@ -135,9 +143,28 @@ export function CutPreview({
   // Cut-order overlay: order the outlines exactly the way the output does
   // (greedy travel optimise) and place a numbered badge + start arrow on each.
   const badgeR = Math.max(2, Math.max(bounds.w, bounds.h) * 0.018);
-  const order = (showOrder && outlines.length > 0 && outlines.length <= ORDER_BADGE_LIMIT)
+  // Also computed for showStart alone — the START marker rides the first
+  // ordered path even when the full numbering is hidden.
+  const needOrder = (showOrder || showStart) && outlines.length > 0;
+  const order = (needOrder && outlines.length <= ORDER_BADGE_LIMIT)
     ? optimizeOrder(outlines.map(p => ({ points: p.points, closed: p.closed })))
     : [];
+
+  // Tight job bounds (mm) for the dimension annotation — outlines + regmarks,
+  // no preview padding. Plain loop (not useMemo) — it sits below the early
+  // return, and one pass over the points is trivially cheap.
+  const dims = (() => {
+    if (!showDims) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of cutPaths) {
+      for (const [x, y] of p.points) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+    if (!Number.isFinite(minX)) return null;
+    return { minX, minY, w: maxX - minX, h: maxY - minY };
+  })();
 
   const renderSvg = (overlay: React.ReactNode) => (
     <svg
@@ -207,6 +234,53 @@ export function CutPreview({
           />
         );
       })}
+
+      {/* Dimension annotation — tight job bounds with W×H labels (mm),
+          so material fit is verifiable before cutting. */}
+      {dims && (
+        <g>
+          <rect
+            x={dims.minX} y={dims.minY} width={dims.w} height={dims.h}
+            fill="none" stroke="#22d3ee" strokeWidth={0.8} strokeDasharray="2 2" opacity={0.7}
+            vectorEffect="non-scaling-stroke"
+          />
+          <text
+            x={dims.minX + dims.w / 2} y={dims.minY - badgeR * 0.4}
+            fontSize={badgeR * 1.6} fill="#22d3ee" textAnchor="middle" dominantBaseline="auto"
+            fontFamily="sans-serif" vectorEffect="non-scaling-stroke"
+          >
+            {dims.w.toFixed(dims.w < 100 ? 1 : 0)} mm
+          </text>
+          <text
+            x={dims.minX - badgeR * 0.4} y={dims.minY + dims.h / 2}
+            fontSize={badgeR * 1.6} fill="#22d3ee" textAnchor="end" dominantBaseline="central"
+            fontFamily="sans-serif"
+            transform={`rotate(-90 ${dims.minX - badgeR * 0.4} ${dims.minY + dims.h / 2})`}
+          >
+            {dims.h.toFixed(dims.h < 100 ? 1 : 0)} mm
+          </text>
+        </g>
+      )}
+
+      {/* START marker — where the blade first touches the material (first
+          path in the optimised travel order, same order the output uses). */}
+      {showStart && order.length > 0 && (() => {
+        const a = order[0].points[0];
+        if (!a) return null;
+        const r = badgeR * 1.6;
+        return (
+          <g>
+            <circle cx={a[0]} cy={a[1]} r={r} fill="#0b1220" stroke="#4ade80" strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
+            <line x1={a[0] - r * 1.5} y1={a[1]} x2={a[0] - r * 0.6} y2={a[1]} stroke="#4ade80" strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+            <line x1={a[0] + r * 0.6} y1={a[1]} x2={a[0] + r * 1.5} y2={a[1]} stroke="#4ade80" strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+            <line x1={a[0]} y1={a[1] - r * 1.5} x2={a[0]} y2={a[1] - r * 0.6} stroke="#4ade80" strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+            <line x1={a[0]} y1={a[1] + r * 0.6} x2={a[0]} y2={a[1] + r * 1.5} stroke="#4ade80" strokeWidth={1.4} vectorEffect="non-scaling-stroke" />
+            <text x={a[0]} y={a[1] + r * 2.6} fontSize={badgeR * 1.7} fill="#4ade80" textAnchor="middle" fontFamily="sans-serif">
+              {t('START')}
+            </text>
+          </g>
+        );
+      })()}
 
       {/* Cut-order overlay — start arrow + numbered badge per path. */}
       {order.map((p, i) => {

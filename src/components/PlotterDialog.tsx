@@ -8,6 +8,7 @@ import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSp
 import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
 import { estimateTransferSeconds } from '../lib/plotterDiag';
 import { addPlotterBridges, addPlotterRegistrationMarks, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders } from '../lib/cutPrepActions';
+import type { RegMarkStyle } from '../lib/cutContour';
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { optimizeOrder, cutStats, estimateSeconds, formatDuration, type PolyLite } from '../lib/cutOptimize';
 import { getCanvas } from '../lib/canvasEngine';
@@ -92,6 +93,13 @@ export function PlotterDialog() {
   const [showOrder, setShowOrder] = useState(false);
   // Animated cut simulation replaying the optimized job order.
   const [simulate, setSimulate] = useState(false);
+  // Preview annotations: START marker on the first blade touch-down and a
+  // W×H dimension frame around the job (see CutPreview).
+  const [showStart, setShowStart] = useState(false);
+  const [showDims, setShowDims] = useState(false);
+  // Registration-mark recipe: shape + arm/shape size in mm (cutContour).
+  const [markStyle, setMarkStyle] = useState<RegMarkStyle>('L');
+  const [markArm, setMarkArm] = useState(10);
   const [materialId, setMaterialId] = useState(savedPrefs.materialId ?? '');
   const [materialQuery, setMaterialQuery] = useState('');
   // Cut-by-colour: which source swatches are muted (excluded from this job).
@@ -537,7 +545,7 @@ export function PlotterDialog() {
     finally { setBusy(false); }
   };
 
-  const addRegMarks = () => addPlotterRegistrationMarks(t);
+  const addRegMarks = () => addPlotterRegistrationMarks(t, markStyle, markArm);
   const clearRegMarks = () => clearPlotterRegistrationMarks(t);
 
   const applyWeedGridPreset = (value: string) => {
@@ -1155,17 +1163,29 @@ export function PlotterDialog() {
             </div>
 
             {previewMode === 'outline' ? (
+              <>
               <CutPreview
                 cutPaths={previewPaths}
                 showPrint={showPrint}
                 mirror={opts.mirror}
                 showOrder={showOrder}
+                showStart={showStart}
+                showDims={showDims}
                 simulate={simulate}
                 feedMmMin={opts.unit === 'mm' ? opts.feedRate : opts.feedRate * 25.4}
                 travelMmMin={opts.unit === 'mm' ? opts.travelRate : opts.travelRate * 25.4}
                 optimize={opts.optimize}
                 className="w-full h-56 bg-panel2 border border-border rounded-sm"
               />
+
+              {/* Colour legend for the preview overlays. */}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[9px] text-muted">
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t-2 border-dashed border-[#ff2e9a]" aria-hidden="true" />{t('Cut line')}</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t-2 border-[#ff9a1f]" aria-hidden="true" />{t('Positioning marks')}</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t-2 border-[#22d3ee]" aria-hidden="true" />{t('Order / start / dims')}</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t-2 border-[#4ade80]" aria-hidden="true" />{t('START point')}</span>
+              </div>
+              </>
             ) : (
               <div className="flex flex-col gap-1.5 min-h-0">
                 <pre className="bg-panel2 border border-border rounded-sm p-2 h-44 overflow-auto text-[10px] font-mono text-ink/85">
@@ -1304,14 +1324,14 @@ export function PlotterDialog() {
                   aria-describedby="plotter-preview-toggle-review-status"
                   title={t('Use Left/Right arrows to switch options')}
                   onKeyDown={(event) => {
-                    handleToolbarKeys(event, ['print', 'order', 'simulate'] as const);
+                    handleToolbarKeys(event, ['print', 'order', 'simulate', 'start', 'dims'] as const);
                     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
                       requestAnimationFrame(() => setReviewedPreviewToggle((document.activeElement as HTMLElement | null)?.dataset.review ?? ''));
                     }
                   }}
                 >
                   <span id="plotter-preview-toggle-review-status" className="sr-only" aria-live="polite">
-                    {`${t('Reviewing')} ${reviewedPreviewToggle || `${t('Plotter preview toggles')} · ${t('Show print')} ${showPrint ? t('on') : t('off')} · ${t('Cut order')} ${showOrder ? t('on') : t('off')} · ${t('Simulate')} ${simulate ? t('on') : t('off')}`}`}
+                    {`${t('Reviewing')} ${reviewedPreviewToggle || `${t('Plotter preview toggles')} · ${t('Show print')} ${showPrint ? t('on') : t('off')} · ${t('Cut order')} ${showOrder ? t('on') : t('off')} · ${t('Simulate')} ${simulate ? t('on') : t('off')} · ${t('Start mark')} ${showStart ? t('on') : t('off')} · ${t('Dimensions')} ${showDims ? t('on') : t('off')}`}`}
                   </span>
                   <button
                     type="button"
@@ -1351,6 +1371,32 @@ export function PlotterDialog() {
                   >
                     <Play size={11} aria-hidden="true" />
                     {t('Simulate')}
+                  </button>
+                  <button
+                    type="button"
+                    data-value="start"
+                    data-review={`${t('Start mark')} · ${showStart ? t('on') : t('off')}`}
+                    className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 transition-colors ${showStart ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink hover:bg-panel2'}`}
+                    onFocus={(event) => setReviewedPreviewToggle(event.currentTarget.dataset.review ?? '')}
+                    onClick={() => setShowStart(!showStart)}
+                    title={t('Mark where the blade first touches the material (first path in cut order).')}
+                    aria-pressed={showStart}
+                  >
+                    <Crosshair size={11} aria-hidden="true" />
+                    {t('Start mark')}
+                  </button>
+                  <button
+                    type="button"
+                    data-value="dims"
+                    data-review={`${t('Dimensions')} · ${showDims ? t('on') : t('off')}`}
+                    className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 transition-colors ${showDims ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink hover:bg-panel2'}`}
+                    onFocus={(event) => setReviewedPreviewToggle(event.currentTarget.dataset.review ?? '')}
+                    onClick={() => setShowDims(!showDims)}
+                    title={t('Frame the job with its W×H dimensions in mm.')}
+                    aria-pressed={showDims}
+                  >
+                    <Ruler size={11} aria-hidden="true" />
+                    {t('Dimensions')}
                   </button>
                 </span>
               )}
@@ -1422,6 +1468,27 @@ export function PlotterDialog() {
                 title={t('Use arrow keys to review output prep actions')}
                 onKeyDown={handlePrepActionKeys}
               >
+                <span className="inline-flex items-center gap-0.5" role="group" aria-label={t('Positioning mark style')}>
+                  {(['L', 'cross', 'square', 'circle'] as const).map((style) => (
+                    <button
+                      key={style}
+                      type="button"
+                      className={`rounded border px-1 py-0.5 text-[10px] transition-colors ${markStyle === style ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink'}`}
+                      onClick={() => setMarkStyle(style)}
+                      aria-pressed={markStyle === style}
+                      title={t('Positioning mark style for the Add positioning marks action.')}
+                    >
+                      {style === 'L' ? 'L' : style === 'cross' ? '+' : style === 'square' ? '■' : '●'}
+                    </button>
+                  ))}
+                  <input
+                    type="number" min={2} max={40} value={markArm}
+                    onChange={(e) => setMarkArm(Math.max(2, Math.min(40, parseFloat(e.target.value) || 10)))}
+                    className="input-num !w-10 !py-0.5 !text-[10px] text-center"
+                    aria-label={t('Mark size (mm)')}
+                    title={t('Arm length for L/cross marks, side/diameter for square/circle marks.')}
+                  />
+                </span>
                 <button
                   type="button"
                   data-plotter-prep-action
@@ -1674,6 +1741,7 @@ export function PlotterDialog() {
             snapshotConfig={snapshotConfig}
             applyConfig={applyConfig}
             jobLogVersion={jobLogVersion}
+            applyProfile={applyProfile}
           />
 
           {jobProgress && (

@@ -1,6 +1,6 @@
 import { useEditor } from '../store/editor';
 import { addBridges } from './bridges';
-import { generateRegMarks, generateWeedBorder, generateWeedLines } from './cutContour';
+import { generateRegMarks, generateWeedBorder, generateWeedLines, type RegMarkStyle } from './cutContour';
 import { grommetsFromSelection } from './grommets';
 import { getCanvas } from './canvasEngine';
 import { rhinestoneFromSelection } from './rhinestone';
@@ -53,12 +53,13 @@ function fallbackBounds(): Bounds {
   return { x: 0, y: 0, w: 297, h: 210 };
 }
 
-export function addPlotterRegistrationMarks(t: T) {
+export function addPlotterRegistrationMarks(t: T, style: RegMarkStyle = 'L', armLength = 10, inset = 5) {
   const editor = useEditor.getState();
   const bounds = boundsFromCutPaths(5) ?? fallbackBounds();
   editor.clearCutPaths('regmark');
-  editor.addCutPaths(generateRegMarks({ bounds, armLength: 10, inset: 5 }));
-  toast.success(`${t('4-corner registration marks added.')} ${bounds.w.toFixed(0)}×${bounds.h.toFixed(0)} mm`, { title: t('Reg marks') });
+  editor.addCutPaths(generateRegMarks({ bounds, armLength, inset, style }));
+  const styleLabel = style === 'L' ? t('L corner') : style === 'cross' ? t('cross') : style === 'square' ? t('square') : t('circle');
+  toast.success(`${t('4-corner registration marks added.')} ${bounds.w.toFixed(0)}×${bounds.h.toFixed(0)} mm · ${styleLabel} ${armLength} mm`, { title: t('Reg marks') });
 }
 
 export function addPlotterWeedBorder(t: T, rows = 0, cols = 0) {

@@ -290,3 +290,43 @@ describe('flattenSvgPath', () => {
     expect(last[1]).toBeCloseTo(0);
   });
 });
+
+describe('generateRegMarks styles', () => {
+  const bounds = { x: 0, y: 0, w: 100, h: 60 };
+
+  it('default L style keeps the 4 corner brackets', () => {
+    const marks = generateRegMarks({ bounds });
+    expect(marks).toHaveLength(4);
+    expect(marks.every(m => m.kind === 'regmark' && !m.closed)).toBe(true);
+    expect(marks.map(m => m.id)).toEqual(['regmark-tl', 'regmark-tr', 'regmark-bl', 'regmark-br']);
+  });
+
+  it('cross style emits two strokes per corner', () => {
+    const marks = generateRegMarks({ bounds, style: 'cross', armLength: 10 });
+    expect(marks).toHaveLength(8);
+    expect(marks.filter(m => m.id.endsWith('-h'))).toHaveLength(4);
+    expect(marks.filter(m => m.id.endsWith('-v'))).toHaveLength(4);
+  });
+
+  it('square style emits closed squares', () => {
+    const marks = generateRegMarks({ bounds, style: 'square', armLength: 8 });
+    expect(marks).toHaveLength(4);
+    expect(marks.every(m => m.closed)).toBe(true);
+    // 8mm square → 5 points, ~8mm wide
+    const xs = marks[0].points.map(p => p[0]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(8, 5);
+  });
+
+  it('circle style emits a closed 24-gon of the right diameter', () => {
+    const marks = generateRegMarks({ bounds, style: 'circle', armLength: 10 });
+    expect(marks).toHaveLength(4);
+    expect(marks.every(m => m.closed)).toBe(true);
+    expect(marks[0].points).toHaveLength(25); // 24 segments + closing point
+    const pts = marks[0].points;
+    const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
+    const r = Math.hypot(pts[0][0] - cx, pts[0][1] - pts[1 % pts.length][1]);
+    void r;
+    const xs = pts.map(p => p[0]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(10, 3);
+  });
+});
