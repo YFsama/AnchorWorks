@@ -68,6 +68,19 @@ export function buildSetOrigin(format: OutputFormat): string {
   return format === 'hpgl' ? 'IP;' : 'G92 X0 Y0';
 }
 
+/** Absolute move with the pen up — "go to X,Y" for positioning checks,
+ *  plus the classic "return to origin" (0,0). HP-GL: our job headers put
+ *  the machine in PA mode, where `PU x,y;` is absolute. */
+export function buildMoveTo(format: OutputFormat, x: number, y: number, unit: 'mm' | 'in', feedMmMin = 3000): string {
+  if (format === 'hpgl') {
+    const per = unit === 'mm' ? 40 : 1016;
+    return `PU${Math.round(x * per)},${Math.round(y * per)};`;
+  }
+  const modal = unit === 'mm' ? 'G21' : 'G20';
+  const digits = unit === 'mm' ? 2 : 3;
+  return `$J=G90 ${modal} X${x.toFixed(digits)} Y${y.toFixed(digits)} F${Math.max(100, Math.round(feedMmMin))}`;
+}
+
 /** The FS/VS values the dialog collected, as an immediate HP-GL statement. */
 export function buildForceSpeed(force: number, speed: number): string {
   const parts: string[] = [];

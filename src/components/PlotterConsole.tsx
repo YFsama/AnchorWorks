@@ -9,7 +9,7 @@ import { download } from '../lib/io';
 import type { FlowControl, PlotterLink } from '../lib/plotterLink';
 import { lineRateBytesPerSec, toHex } from '../lib/plotterLink';
 import type { NativeSerialPort } from '../lib/plotter';
-import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildSetOrigin, decodeReply, isQueryCommand, parsePageReply, parsePositionReply, type MachinePosition, type QuickCommand } from '../lib/hpglDebug';
+import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildMoveTo, buildSetOrigin, decodeReply, isQueryCommand, parsePageReply, parsePositionReply, type MachinePosition, type QuickCommand } from '../lib/hpglDebug';
 import { buildDiagnosticsReport, probeBaud, runConnectionSelfTest } from '../lib/plotterDiag';
 import { autoDetectCutter, chipForPort, identifyMachine } from '../lib/plotterIdentify';
 import { clearJobLog, deleteMachine, listJobLog, listMachines, saveMachine, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
@@ -94,11 +94,15 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [input, setInput] = useState('');
   const [jogStep, setJogStep] = useState(10);
+  // Absolute move-to target (comma-separated X,Y in the output unit).
+  const [moveTo, setMoveTo] = useState('');
   const [busy, setBusy] = useState(false);
   // Control-line toggles + periodic machine poll (debug liveness probes).
   const [signals, setSignals] = useState({ dtr: false, rts: false });
   const [autoPoll, setAutoPoll] = useState(false);
   const [lastPoll, setLastPoll] = useState('');
+  // Round-trip latency stats for the auto-poll (reset on toggle).  
+  const [pollStats, setPollStats] = useState<{ n: number; min: number; avg: number; max: number }>({ n: 0, min: Infinity, avg: 0, max: 0 });
   // Structured live position (from auto-poll) + page limits (from OH;).
   const [position, setPosition] = useState<MachinePosition | null>(null);
   const [page, setPage] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -190,12 +194,22 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     const cmd = format === 'hpgl' ? 'OA;' : '?';
     const tick = async () => {
       if (stopped || link.status !== 'connected') return;
+      const t0 = Date.now();
       try {
         const reply = await link.query(cmd, 1500);
         if (!stopped) {
           setLastPoll(decodeReply(format, cmd, reply, unit));
           const pos = parsePositionReply(format, reply, unit);
           if (pos) setPosition(pos);
+          // Round-trip latency stats — a drifting max means the machine (or
+          // the USB stack) is struggling before it outright fails.
+          const ms = Date.now() - t0;
+          setPollStats(p => ({
+            n: p.n + 1,
+            min: Math.min(p.min, ms),
+            avg: Math.round(((p.avg * p.n) + ms) / (p.n + 1)),
+            max: Math.max(p.max, ms),
+          }));
         }
       } catch { /* the query attempt is already visible in the log */ }
     };
@@ -452,6 +466,13 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     void exec(buildJog(format, dx * jogStep, dy * jogStep, unit, feedRate));
   };
 
+  /** Absolute positioning: parse "X,Y" and move there with the blade up. */
+  const submitMoveTo = () => {
+    const m = moveTo.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+    if (!m) { toast.warn(t('Enter coordinates as X,Y — e.g. 25,10.'), { title: t('Move to coordinates') }); return; }
+    void exec(buildMoveTo(format, Number(m[1]), Number(m[2]), unit, feedRate));
+  };
+
   /** Soft guard: when the live position and page limits are known (auto
    *  status + OH; on connect), warn before jogging off the material. */
   const warnIfJogExitsPage = (dx: number, dy: number) => {
@@ -650,7 +671,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             <button
               type="button"
               className={`btn !py-0.5 !px-1.5 !text-[10px] ${autoPoll ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-              onClick={() => setAutoPoll(!autoPoll)}
+              onClick={() => { setPollStats({ n: 0, min: Infinity, avg: 0, max: 0 }); setAutoPoll(!autoPoll); }}
               disabled={sending}
               aria-pressed={autoPoll}
               title={t('Poll the machine every 2.5 s (OA; / ?) and show the live reply.')}
@@ -659,6 +680,14 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </button>
             {autoPoll && lastPoll && (
               <span className="text-[10px] text-ink/80 tabular-nums" title={t('Latest machine poll reply')}>{lastPoll}</span>
+            )}
+            {autoPoll && pollStats.n >= 2 && (
+              <span
+                className="text-[10px] text-muted tabular-nums"
+                title={t('Round-trip latency of the status polls — a rising max hints at link trouble before it fails.')}
+              >
+                ⏱ {pollStats.min}/{pollStats.avg}/{pollStats.max} ms
+              </span>
             )}
           </span>
         )}
@@ -830,6 +859,39 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               <span />
               <button type="button" className="btn !p-1 flex items-center justify-center" onClick={() => jog(0, -1)} disabled={!connected || sending} title={t('Move down')} aria-label={t('Move down')}><ArrowDown size={11} aria-hidden="true" /></button>
               <span />
+            </span>
+            <span className="flex items-center gap-1">
+              <input
+                type="text"
+                className="input !py-0.5 !text-[10px] font-mono !w-20"
+                value={moveTo}
+                onChange={(e) => setMoveTo(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); submitMoveTo(); }
+                }}
+                placeholder="X,Y"
+                aria-label={t('Move to coordinates')}
+                disabled={!connected || sending}
+                title={t('Absolute move with the blade up — park the carriage at X,Y (output unit).')}
+              />
+              <button
+                type="button"
+                className="btn !py-0.5 !px-1.5 !text-[10px]"
+                onClick={submitMoveTo}
+                disabled={!connected || sending || !moveTo.trim()}
+                title={t('Move the carriage to the X,Y coordinates.')}
+              >
+                {t('Go')}
+              </button>
+              <button
+                type="button"
+                className="btn !py-0.5 !px-1.5 !text-[10px]"
+                onClick={() => { void exec(buildMoveTo(format, 0, 0, unit, feedRate)); }}
+                disabled={!connected || sending}
+                title={t('Return the carriage to the origin (0,0).')}
+              >
+                {t('Home')}
+              </button>
             </span>
           </div>
 

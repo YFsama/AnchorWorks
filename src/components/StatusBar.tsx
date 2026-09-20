@@ -5,6 +5,7 @@ import { useT } from '../lib/i18n';
 import { zoomToArtboard, zoomToPercent } from '../lib/canvasEngine';
 import { getTool } from '../lib/tools/types';
 import { toast } from '../lib/toast';
+import { PlotterStatusChip } from './PlotterStatusChip';
 
 export function StatusBar() {
   const t = useT();
@@ -195,6 +196,7 @@ export function StatusBar() {
             <span className="tabular-nums">{cutPathCount}</span>
           </button>
         )}
+        <PlotterStatusChip />
         <Badge active={gridVisible} icon={<Hash size={11} aria-hidden="true" />} label={t('GRID')} onToggle={() => setGridVisible(!gridVisible)} />
         <Badge active={snapEnabled} icon={<Magnet size={11} aria-hidden="true" />} label={t('SNAP')} onToggle={() => setSnapEnabled(!snapEnabled)} />
         <Badge active={smartGuides} icon={<Crosshair size={11} aria-hidden="true" />} label={t('GUIDES')} onToggle={() => setSmartGuidesEnabled(!smartGuides)} />

@@ -218,3 +218,12 @@ export function buildDiagnosticsReport(input: DiagReportInput): string {
   for (const l of input.logLines) lines.push(`  ${l}`);
   return lines.join('\n');
 }
+
+/** Remaining-time estimate for an in-flight transfer, from the measured
+ *  pace so far: elapsed × remaining/sent. Linear — pacing is constant per
+ *  baud, so this tracks reality well. Returns null before 1% is sent. */
+export function estimateEtaSeconds(sent: number, total: number, elapsedMs: number): number | null {
+  if (sent <= 0 || total <= 0 || elapsedMs <= 0) return null;
+  if (sent / total < 0.01) return null;
+  return Math.max(0, Math.round(((elapsedMs / 1000) * (total - sent)) / sent));
+}

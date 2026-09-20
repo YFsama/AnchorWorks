@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDiagnosticsReport, estimateTransferSeconds, probeBaud, runConnectionSelfTest, type DiagReportInput } from '../plotterDiag';
+import { buildDiagnosticsReport, estimateEtaSeconds, estimateTransferSeconds, probeBaud, runConnectionSelfTest, type DiagReportInput } from '../plotterDiag';
 import type { LinkStatus } from '../plotterLink';
 
 describe('estimateTransferSeconds', () => {
@@ -182,5 +182,22 @@ describe('buildDiagnosticsReport', () => {
     expect(report).toContain('- none');
     expect(report).toContain('(empty)');
     expect(report).toContain('- Last transfer: —');
+  });
+});
+
+describe('estimateEtaSeconds', () => {
+  it('returns null before enough data (guards div-by-zero)', () => {
+    expect(estimateEtaSeconds(0, 1000, 5000)).toBeNull();
+    expect(estimateEtaSeconds(5, 1000, 100)).toBeNull(); // < 1%
+    expect(estimateEtaSeconds(500, 0, 1000)).toBeNull();
+  });
+
+  it('extrapolates linearly from the measured pace', () => {
+    // Halfway after 10 s → 10 s remaining.
+    expect(estimateEtaSeconds(500, 1000, 10000)).toBe(10);
+    // Quarter after 5 s → 15 s remaining.
+    expect(estimateEtaSeconds(250, 1000, 5000)).toBe(15);
+    // Complete → 0.
+    expect(estimateEtaSeconds(1000, 1000, 20000)).toBe(0);
   });
 });

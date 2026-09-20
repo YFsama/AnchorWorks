@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildMoveTo,
   buildJog,
   buildSetOrigin,
   buildAbortSnippet,
@@ -434,5 +435,18 @@ describe('sniffFormat', () => {
 
   it('falls back to HP-GL for headerless .plt-style content', () => {
     expect(sniffFormat('100,200,300,400\n')).toBe('hpgl');
+  });
+});
+
+describe('buildMoveTo', () => {
+  it('emits an absolute pen-up move in HP-GL plotter units', () => {
+    expect(buildMoveTo('hpgl', 10, 5, 'mm')).toBe('PU400,200;');
+    expect(buildMoveTo('hpgl', 1, 0, 'in')).toBe('PU1016,0;');
+    expect(buildMoveTo('hpgl', 0, 0, 'mm')).toBe('PU0,0;'); // home
+  });
+
+  it('emits an absolute grbl jog for gcode', () => {
+    expect(buildMoveTo('gcode', 10, 5, 'mm', 1500)).toBe('$J=G90 G21 X10.00 Y5.00 F1500');
+    expect(buildMoveTo('gcode', 1, 0, 'in', 1500)).toBe('$J=G90 G20 X1.000 Y0.000 F1500');
   });
 });

@@ -6,7 +6,7 @@ import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
 import { buildAbortSnippet, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
 import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSpeed } from '../lib/machineProfiles';
 import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
-import { estimateTransferSeconds } from '../lib/plotterDiag';
+import { estimateEtaSeconds, estimateTransferSeconds } from '../lib/plotterDiag';
 import { addPlotterBridges, addPlotterRegistrationMarks, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders } from '../lib/cutPrepActions';
 import type { RegMarkStyle } from '../lib/cutContour';
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
@@ -97,7 +97,7 @@ export function PlotterDialog() {
   const link = getSharedPlotterLink();
   const [baud, setBaud] = useState(savedPrefs.baud ?? 115200);
   const [flow, setFlow] = useState<FlowControl>(savedPrefs.flowControl ?? 'none');
-  const [jobProgress, setJobProgress] = useState<{ sent: number; total: number } | null>(null);
+  const [jobProgress, setJobProgress] = useState<{ sent: number; total: number; eta: number | null } | null>(null);
   // True while the operator paused the running job stream (see togglePauseJob).
   const [jobPaused, setJobPaused] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -564,13 +564,16 @@ export function PlotterDialog() {
     if (link.status === 'connected') {
       const abort = new AbortController();
       abortRef.current = abort;
-      setJobProgress({ sent: 0, total: bytes });
+      // Fresh handle: mutating the render-scope link trips the compiler's
+      // immutability lint — a handler-local reference is fine.
+      getSharedPlotterLink().activeJobSignal = abort;
+      setJobProgress({ sent: 0, total: bytes, eta: null });
       setJobPaused(false);
       const t0 = Date.now();
       try {
         await link.send(payload, {
           signal: abort.signal,
-          onProgress: (sent, total) => setJobProgress({ sent, total }),
+          onProgress: (sent, total) => setJobProgress({ sent, total, eta: estimateEtaSeconds(sent, total, Date.now() - t0) }),
         });
         toast.success(successMsg);
         logJob('ok', (Date.now() - t0) / 1000, link.describe());
@@ -590,6 +593,7 @@ export function PlotterDialog() {
         setJobPaused(false);
         setJobProgress(null);
         abortRef.current = null;
+        getSharedPlotterLink().activeJobSignal = null;
       }
       return;
     }
@@ -1911,7 +1915,7 @@ export function PlotterDialog() {
           {jobProgress && (
             <div className="mb-3 flex items-center gap-2 text-[10px] text-muted tabular-nums" role="status" aria-live="polite">
               <span className={`shrink-0 ${jobPaused ? 'text-warning' : ''}`}>
-                {jobPaused ? t('Paused') : t('Sending')} {jobProgress.sent}/{jobProgress.total} B ({Math.floor((jobProgress.sent / Math.max(1, jobProgress.total)) * 100)}%)
+                {jobPaused ? t('Paused') : t('Sending')} {jobProgress.sent}/{jobProgress.total} B ({Math.floor((jobProgress.sent / Math.max(1, jobProgress.total)) * 100)}%){jobProgress.eta !== null ? ` · ETA ~${jobProgress.eta}s` : ''}
               </span>
               <div className="h-1.5 min-w-0 flex-1 rounded bg-border overflow-hidden">
                 <div

@@ -152,6 +152,10 @@ export class PlotterLink {
   /** Lifetime traffic counters for the console's status line. */
   txBytes = 0;
   rxBytes = 0;
+  /** AbortController of the in-flight JOB send (set by the dialog's
+   *  streamJob). Exposed so the status-bar chip can Stop a job even when
+   *  the plotter dialog is closed. Null while no job is streaming. */
+  activeJobSignal: AbortController | null = null;
   /** True while the operator has paused the active job stream. */
   paused = false;
   /** Resolvers for senders parked at the pause gate. */
