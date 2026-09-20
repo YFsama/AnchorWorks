@@ -301,6 +301,7 @@ pub fn run() {
             serial::serial_close,
             epsonprint::epson_list_printers,
             epsonprint::epson_raw_transact,
+            epsonprint::epson_raw_script,
             print_native,
         ])
         .run(tauri::generate_context!())

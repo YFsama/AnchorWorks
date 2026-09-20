@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X, RefreshCw, Printer, Send, Trash2, AlertTriangle, FlaskConical, Recycle, Timer, HardDriveDownload } from 'lucide-react';
+import { X, RefreshCw, Printer, Send, Trash2, AlertTriangle, FlaskConical, Recycle, Timer, HardDriveDownload, Save, Upload, BarChart3 } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { isTauri } from '../lib/runtime';
 import { useT } from '../lib/i18n';
@@ -24,9 +24,12 @@ import {
   formatSt2Summary, listEpsonPrinters, parseEjlIdReply, parseOldInkReply, parseSt2Status,
   saveEpsonPrefs, loadEpsonPrefs,
   epsonReadWaste, epsonResetWastePermanent, epsonResetWasteTemporary, guessEpsonModel,
-  type EpsonAction, type EpsonPrinter, type St2Status, type WasteReadResult,
+  epsonDumpEeprom, epsonRestoreBackup, epsonReadStats, makeEepromBackup, parseEepromBackup,
+  type EpsonAction, type EpsonPrinter, type EpsonStatReading, type EpsonTransport,
+  type St2Status, type WasteReadResult,
 } from '../lib/epsonMaint';
 import { EPSON_MODELS } from '../lib/epsonModels';
+import { download } from '../lib/io';
 
 interface LogEntry {
   id: number;
@@ -55,6 +58,9 @@ export default function EpsonMaintDialog() {
   const [model, setModel] = useState(loadEpsonPrefs().model ?? '');
   const [serialText, setSerialText] = useState(loadEpsonPrefs().serial ?? '');
   const [waste, setWaste] = useState<WasteReadResult | null>(null);
+  const [transport, setTransport] = useState<EpsonTransport>(loadEpsonPrefs().transport ?? 'bare');
+  const [stats, setStats] = useState<EpsonStatReading[] | null>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
   // Structured readouts from the last status/identity action.
   const [st2, setSt2] = useState<St2Status | null>(null);
   const [identity, setIdentity] = useState('');
@@ -107,6 +113,7 @@ export default function EpsonMaintDialog() {
   useEffect(() => { saveEpsonPrefs({ lastCustomHex: customHex }); }, [customHex]);
   useEffect(() => { saveEpsonPrefs({ model }); }, [model]);
   useEffect(() => { saveEpsonPrefs({ serial: serialText }); }, [serialText]);
+  useEffect(() => { saveEpsonPrefs({ transport }); }, [transport]);
 
   // Adopt the serial the printer reports in its ST2 status block.
   const adoptSerial = (st: St2Status) => {
@@ -189,7 +196,7 @@ export default function EpsonMaintDialog() {
     setBusy(true);
     setWaste(null);
     try {
-      const result = await epsonReadWaste(printer, modelEntry, push);
+      const result = await epsonReadWaste(printer, modelEntry, push, transport);
       setWaste(result);
       if (result.readings.every(r => r.percent === null)) {
         push('info', t('No EEPROM answers — check the model choice; a wrong read key keeps the printer silent.'));
@@ -211,7 +218,7 @@ export default function EpsonMaintDialog() {
     if (!window.confirm(t('Temporary reset clears the waste-ink error until the printer is power-cycled. Continue?'))) return;
     setBusy(true);
     try {
-      const r = await epsonResetWasteTemporary(printer, serial, push);
+      const r = await epsonResetWasteTemporary(printer, serial, push, transport);
       push(r.ok ? 'info' : 'err', r.ok
         ? t('Temporary reset acknowledged (rw:OK).')
         : t('The printer denied the reset (NA) or stayed silent — wrong serial or unsupported firmware.'));
@@ -232,10 +239,75 @@ export default function EpsonMaintDialog() {
     if (!window.confirm(t('Really write to the EEPROM now?'))) return;
     setBusy(true);
     try {
-      const r = await epsonResetWastePermanent(printer, modelEntry, push);
+      const r = await epsonResetWastePermanent(printer, modelEntry, push, transport);
       push(r.ok ? 'info' : 'err', `${t('Writes acknowledged')}: ${r.okCount}/${r.total}${r.naCount > 0 ? ` · NA ${r.naCount}` : ''}`);
       if (r.ok) toast.success(t('Waste counters reset. Read them back to verify.'));
       else push('err', t('Not every write was acknowledged — verify the model choice and try reading the counters.'));
+    } catch (e) {
+      push('err', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runStats = async () => {
+    if (!printer || !modelEntry) { toast.warn(t('Pick a printer and model first.'), { title: t('Epson maintenance') }); return; }
+    setBusy(true);
+    setStats(null);
+    try {
+      const result = await epsonReadStats(printer, modelEntry, push, transport);
+      setStats(result);
+      if (result.every(s => s.value === null)) {
+        push('info', t('No EEPROM answers — check the model choice; a wrong read key keeps the printer silent.'));
+      }
+    } catch (e) {
+      push('err', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runBackup = async () => {
+    if (!printer || !modelEntry) { toast.warn(t('Pick a printer and model first.'), { title: t('Epson maintenance') }); return; }
+    if (!window.confirm(t('Back up the EEPROM now? This only reads — nothing is modified.'))) return;
+    setBusy(true);
+    try {
+      // Counters and stats all live in 0..511; add the serial range when
+      // the model keeps it higher (e.g. ET series near 1604).
+      const addrs = new Set<number>();
+      for (let a = 0; a <= 511; a++) addrs.add(a);
+      for (const a of modelEntry.serial ?? []) addrs.add(a);
+      const dump = await epsonDumpEeprom(printer, modelEntry, [...addrs], { transport, log: push });
+      if (dump.answered === 0) {
+        push('info', t('No EEPROM answers — check the model choice; a wrong read key keeps the printer silent.'));
+        return;
+      }
+      const backup = makeEepromBackup(model!, dump.values, serialText.trim() || undefined);
+      const stamp = new Date().toISOString().slice(0, 10);
+      download(`epson-${model.replace(/[^\w-]+/g, '_')}-eeprom-${stamp}.json`, JSON.stringify(backup, null, 1), 'application/json');
+      push('info', `${t('Backup saved')}: ${dump.answered}/${dump.requested}`);
+      toast.success(`${t('Backup saved')}: ${dump.answered}/${dump.requested}`);
+    } catch (e) {
+      push('err', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRestoreFile = async (file: File) => {
+    if (!printer || !modelEntry) { toast.warn(t('Pick a printer and model first.'), { title: t('Epson maintenance') }); return; }
+    try {
+      const text = await file.text();
+      const backup = parseEepromBackup(text);
+      if (backup.model !== model) {
+        toast.warn(`${t('The backup is for model')} ${backup.model} — ${t('current selection')}: ${model}`, { title: t('Epson maintenance') });
+        if (!window.confirm(`${t('The backup is for model')} ${backup.model}, ${t('current selection')}: ${model}. ${t('Restore anyway?')}`)) return;
+      }
+      const n = Object.keys(backup.values).length;
+      if (!window.confirm(`${t('Restore writes')} ${n} ${t('EEPROM bytes from the backup. Continue?')} (${backup.savedAt})`)) return;
+      setBusy(true);
+      const r = await epsonRestoreBackup(printer, modelEntry, backup, { transport, log: push });
+      push(r.ok ? 'info' : 'err', `${t('Writes acknowledged')}: ${r.okCount}/${r.total}${r.naCount > 0 ? ` · NA ${r.naCount}` : ''}`);
     } catch (e) {
       push('err', (e as Error).message);
     } finally {
@@ -380,6 +452,16 @@ export default function EpsonMaintDialog() {
                 aria-label={t('Serial number')}
                 spellCheck={false}
               />
+              <select
+                className="input w-36 shrink-0"
+                value={transport}
+                onChange={(e) => setTransport(e.target.value as EpsonTransport)}
+                aria-label={t('Transport')}
+                title={t('escputil-style bare packets vs the full IEEE 1284.4 handshake session')}
+              >
+                <option value="bare">{t('Simple transport')}</option>
+                <option value="d4">{t('1284.4 handshake')}</option>
+              </select>
             </div>
             <div className="mt-1.5 grid grid-cols-3 gap-1">
               <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runWasteRead(); }}>
@@ -395,6 +477,31 @@ export default function EpsonMaintDialog() {
                 <span className="truncate">{t('Factory reset')}</span>
               </button>
             </div>
+            <div className="mt-1 grid grid-cols-3 gap-1">
+              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runBackup(); }} title={t('Reads the EEPROM counters and saves a JSON backup you can restore later')}>
+                <Save size={12} aria-hidden="true" className="text-[#5b9cff]" />
+                <span className="truncate">{t('Back up EEPROM')}</span>
+              </button>
+              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => restoreInputRef.current?.click()} title={t('Writes a previously saved backup back to the EEPROM')}>
+                <Upload size={12} aria-hidden="true" className="text-[#5b9cff]" />
+                <span className="truncate">{t('Restore backup')}</span>
+              </button>
+              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runStats(); }} title={t('Page, cleaning and usage counters from the EEPROM')}>
+                <BarChart3 size={12} aria-hidden="true" className="text-[#5b9cff]" />
+                <span className="truncate">{t('Read statistics')}</span>
+              </button>
+            </div>
+            <input
+              ref={restoreInputRef}
+              type="file"
+              accept=".json,application/json"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void onRestoreFile(file);
+              }}
+            />
             {waste && (
               <div className="mt-1.5 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px]" role="status">
                 {waste.readings.map((r, i) => (
@@ -414,6 +521,17 @@ export default function EpsonMaintDialog() {
                     <div className="mt-0.5 font-mono text-[9px] text-muted">
                       {r.oids.map(a => `#${a}=${waste.values.get(a) !== undefined ? waste.values.get(a)!.toString(16).padStart(2, '0') : '??'}`).join(' ')}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {stats && stats.length > 0 && (
+              <div className="mt-1.5 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px]" role="status">
+                <div className="field-label !mb-1">{t('Statistics')}</div>
+                {stats.map((s, i) => (
+                  <div key={i} className="flex items-center justify-between gap-2">
+                    <span className="truncate text-muted">{s.name}</span>
+                    <span className="shrink-0 tabular-nums">{s.value === null ? '—' : s.value.toLocaleString()}</span>
                   </div>
                 ))}
               </div>

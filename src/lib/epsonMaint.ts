@@ -364,6 +364,91 @@ export function parseOldInkReply(bytes: Uint8Array): Array<{ color: string; leve
   return out;
 }
 
+/* ---------------- scripted transport (interleaved write/read) --------- *
+ * A RAW spooler job can also run a sequence of write→read steps, which
+ * stateful exchanges need. The big one is the FULL IEEE 1284.4 handshake
+ * (reinkpy's D4Link, protocol cross-referenced): enter D4, Init on the
+ * transaction channel, OpenChannel(2,2) for "EPSON-CTRL", then each
+ * EPSON-CTRL frame wrapped in a 1284.4 packet header (psid, ssid, BE16
+ * total length, credit, control), finally Exit. Newer firmware that stays
+ * silent to escputil-style bare packets often answers this session.
+ */
+
+export interface EpsonScriptStep {
+  hex: string;
+  readMs: number;
+}
+
+/** Run interleaved write/read steps inside ONE RAW job. */
+export async function epsonScript(printer: string, steps: EpsonScriptStep[]): Promise<Uint8Array[]> {
+  const replies = await callNative<string[]>(
+    'epson_raw_script',
+    { printer, steps },
+    async () => { throw new Error('Epson maintenance needs the Windows desktop app.'); },
+  );
+  return (replies ?? []).map(hexOfReply => parseHex(hexOfReply || ''));
+}
+
+/** reinkpy D4Link.CMD_ENTER_D4 — ends with two bare "@EJL\n" lines, no ESC @. */
+const D4_ENTER_FULL = [
+  0x00, 0x00, 0x00, 0x1b, 0x01, 0x40, 0x45, 0x4a, 0x4c, 0x20, 0x31, 0x32, 0x38, 0x34, 0x2e, 0x34, 0x0a,
+  0x40, 0x45, 0x4a, 0x4c, 0x0a, 0x40, 0x45, 0x4a, 0x4c, 0x0a,
+];
+
+/** 1284.4 packet: [psid][ssid][BE16 total length][credit][control] + payload. */
+export function d4Packet(psid: number, ssid: number, payload: number[]): number[] {
+  const len = 6 + payload.length;
+  return [psid, ssid, (len >> 8) & 0xff, len & 0xff, 1, 0, ...payload];
+}
+
+/** One "EPSON-CTRL" channel packet (socket 2/2, credit 1). */
+export function d4CtrlPacket(ctrlFrame: number[]): number[] {
+  return d4Packet(2, 2, ctrlFrame);
+}
+
+/** The full-session step list: enter, Init(rev 0x20), OpenChannel(2,2), one packet per frame, Exit. */
+export function buildD4SessionSteps(ctrlFrames: number[][], dataReadMs = 1200): EpsonScriptStep[] {
+  return [
+    { hex: hexOf(D4_ENTER_FULL), readMs: 400 },
+    { hex: hexOf(d4Packet(0, 0, [0x00, 0x20])), readMs: 400 },
+    { hex: hexOf(d4Packet(0, 0, [0x01, 0x02, 0x02, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00])), readMs: 400 },
+    ...ctrlFrames.map(f => ({ hex: hexOf(d4CtrlPacket(f)), readMs: dataReadMs })),
+    { hex: hexOf(d4Packet(0, 0, [0x08])), readMs: 120 },
+  ];
+}
+
+export interface D4PacketInfo {
+  psid: number;
+  ssid: number;
+  payload: number[];
+}
+
+/** Split a reply stream into 1284.4 packets using the length header. */
+export function parseD4Packets(bytes: Uint8Array): D4PacketInfo[] {
+  const out: D4PacketInfo[] = [];
+  let i = 0;
+  while (i + 6 <= bytes.length) {
+    const psid = bytes[i];
+    const ssid = bytes[i + 1];
+    const len = (bytes[i + 2] << 8) | bytes[i + 3];
+    if (len < 6 || i + len > bytes.length) break;
+    out.push({ psid, ssid, payload: [...bytes.subarray(i + 6, i + len)] });
+    i += len;
+  }
+  return out;
+}
+
+/** Concatenate the payloads of every EPSON-CTRL (2/2) packet in the replies. */
+export function extractD4CtrlPayloads(replies: Uint8Array[]): number[] {
+  const out: number[] = [];
+  for (const r of replies) {
+    for (const p of parseD4Packets(r)) {
+      if (p.psid === 2 && p.ssid === 2) out.push(...p.payload);
+    }
+  }
+  return out;
+}
+
 /* ---------------- EEPROM access ("||" command family) ----------------- *
  * Wire format verified against epson_print_conf (Ircama, EUPL-1.2) and
  * reinkpy (AGPL, protocol cross-reference only): an EPSON-CTRL command
@@ -478,6 +563,19 @@ export function parseRwReply(bytes: Uint8Array): { ok: boolean; text: string } {
 
 export type EpsonLogFn = (dir: 'tx' | 'rx' | 'info' | 'err', text: string) => void;
 
+/** 'bare' = escputil-style packets straight after the D4 entry (default);
+ *  'd4' = full IEEE 1284.4 handshake session for newer firmware. */
+export type EpsonTransport = 'bare' | 'd4';
+
+/** Send EPSON-CTRL frames through the chosen transport, return the combined reply bytes. */
+async function ctrlExchange(printer: string, frames: number[][], transport: EpsonTransport, readMs: number): Promise<Uint8Array> {
+  if (transport === 'd4') {
+    const replies = await epsonScript(printer, buildD4SessionSteps(frames, readMs));
+    return new Uint8Array(extractD4CtrlPayloads(replies));
+  }
+  return epsonTransact(printer, hexOf([...D4_ENTER, ...frames.flat()]), Math.max(readMs, 1200));
+}
+
 export interface WasteReading {
   label: string;
   percent: number | null;
@@ -499,12 +597,13 @@ export interface WasteReadResult {
  * D4 entry followed by all frames in one RAW job, then map "EE:" answers
  * back onto addresses. No state is modified.
  */
-export async function epsonReadWaste(printer: string, model: EpsonModelEntry, log?: EpsonLogFn): Promise<WasteReadResult> {
+export async function epsonReadWaste(
+  printer: string, model: EpsonModelEntry, log?: EpsonLogFn, transport: EpsonTransport = 'bare',
+): Promise<WasteReadResult> {
   const oids = [...new Set([...model.mainWaste.oids, ...(model.borderlessWaste?.oids ?? [])])];
   const frames = oids.map(a => eepromReadFrame(model.readKey, a));
-  const hex = hexOf([...D4_ENTER, ...frames.flat()]);
-  log?.('tx', `EEPROM read ${oids.length} addresses (D4): ${hex.slice(0, 96)}${hex.length > 96 ? ' …' : ''}`);
-  const reply = await epsonTransact(printer, hex, 1500);
+  log?.('tx', `EEPROM read ${oids.length} addresses (${transport}): ${hexOf(frames[0])}${oids.length > 1 ? ' +…' : ''}`);
+  const reply = await ctrlExchange(printer, frames, transport, 1500);
   log?.('rx', explainEpsonReply(reply));
   const reads = parseEepromReads(reply);
   const values = new Map<number, number>(reads.map(r => [r.addr, r.value]));
@@ -533,12 +632,12 @@ export async function epsonResetWastePermanent(
   printer: string,
   model: EpsonModelEntry,
   log?: EpsonLogFn,
+  transport: EpsonTransport = 'bare',
 ): Promise<{ ok: boolean; okCount: number; naCount: number; total: number; reply: Uint8Array }> {
   const entries = Object.entries(model.rawReset).map(([a, v]) => ({ addr: parseInt(a, 10), value: v }));
   const frames = entries.map(e => eepromWriteFrame(model.readKey, model.writeKey, e.addr, e.value));
-  const hex = hexOf([...D4_ENTER, ...frames.flat()]);
-  log?.('tx', `EEPROM write ${entries.length} bytes (D4): ${hex.slice(0, 96)}${hex.length > 96 ? ' …' : ''}`);
-  const reply = await epsonTransact(printer, hex, 1500);
+  log?.('tx', `EEPROM write ${entries.length} bytes (${transport}): ${hexOf(frames[0])}${entries.length > 1 ? ' +…' : ''}`);
+  const reply = await ctrlExchange(printer, frames, transport, 1500);
   log?.('rx', explainEpsonReply(reply));
   const { ok, na } = parseEepromStatus(reply);
   return { ok: entries.length > 0 && ok >= entries.length && na === 0, okCount: ok, naCount: na, total: entries.length, reply };
@@ -553,15 +652,139 @@ export async function epsonResetWasteTemporary(
   printer: string,
   serial: string,
   log?: EpsonLogFn,
+  transport: EpsonTransport = 'bare',
 ): Promise<{ ok: boolean; reply: Uint8Array }> {
   const digest = await sha1Bytes(serial);
   const frame = rwResetFrame(digest);
-  const hex = hexOf([...D4_ENTER, ...frame]);
-  log?.('tx', `rw temporary reset (D4): ${hexOf(frame)}`);
-  const reply = await epsonTransact(printer, hex, 1200);
+  log?.('tx', `rw temporary reset (${transport}): ${hexOf(frame)}`);
+  const reply = await ctrlExchange(printer, [frame], transport, 1200);
   log?.('rx', explainEpsonReply(reply));
   const { ok } = parseRwReply(reply);
   return { ok, reply };
+}
+
+/* ---------------- EEPROM dump / backup / restore / stats ------------- */
+
+/** Backup file shape — a plain JSON snapshot of EEPROM addresses. */
+export interface EepromBackup {
+  app: 'AnchorWorks';
+  kind: 'epson-eeprom';
+  model: string;
+  savedAt: string;
+  serial?: string;
+  /** EEPROM address -> byte value (decimal). */
+  values: Record<string, number>;
+}
+
+export function makeEepromBackup(model: string, values: Map<number, number>, serial?: string): EepromBackup {
+  const out: Record<string, number> = {};
+  for (const [a, v] of values) out[String(a)] = v;
+  return { app: 'AnchorWorks', kind: 'epson-eeprom', model, savedAt: new Date().toISOString(), serial, values: out };
+}
+
+/** Validate and parse a backup file; throws with a readable reason. */
+export function parseEepromBackup(text: string): EepromBackup {
+  const data = JSON.parse(text) as Partial<EepromBackup>;
+  if (data.app !== 'AnchorWorks' || data.kind !== 'epson-eeprom' || typeof data.values !== 'object' || data.values === null) {
+    throw new Error('not an AnchorWorks EEPROM backup file');
+  }
+  if (!data.model || !EPSON_MODELS[data.model]) {
+    throw new Error(`backup is for unknown model "${data.model}"`);
+  }
+  return data as EepromBackup;
+}
+
+/**
+ * Read a set of EEPROM addresses in chunks (one RAW job per chunk so the
+ * spooler and the printer both breathe). The caller picks the addresses —
+ * typically 0..511 (all counter/stats addresses live there) plus the
+ * model's serial range when it sits higher.
+ */
+export async function epsonDumpEeprom(
+  printer: string,
+  model: EpsonModelEntry,
+  addresses: number[],
+  opts: { transport?: EpsonTransport; chunk?: number; log?: EpsonLogFn } = {},
+): Promise<{ values: Map<number, number>; answered: number; requested: number }> {
+  const transport = opts.transport ?? 'bare';
+  const chunk = Math.min(Math.max(opts.chunk ?? 32, 1), 64);
+  const values = new Map<number, number>();
+  const total = addresses.length;
+  let done = 0;
+  for (let i = 0; i < addresses.length; i += chunk) {
+    const addrs = addresses.slice(i, i + chunk);
+    const frames = addrs.map(a => eepromReadFrame(model.readKey, a));
+    const reply = await ctrlExchange(printer, frames, transport, 1500);
+    for (const r of parseEepromReads(reply)) values.set(r.addr, r.value);
+    done += addrs.length;
+    opts.log?.('info', `dump ${done}/${total} — ${values.size} answered`);
+  }
+  return { values, answered: values.size, requested: total };
+}
+
+/**
+ * Restore a backup: write every byte back (chunked). Only addresses in
+ * the file are touched; the writeKey comes from the CURRENT model entry,
+ * so the backup's model must match what is selected.
+ */
+export async function epsonRestoreBackup(
+  printer: string,
+  model: EpsonModelEntry,
+  backup: EepromBackup,
+  opts: { transport?: EpsonTransport; chunk?: number; log?: EpsonLogFn } = {},
+): Promise<{ ok: boolean; okCount: number; naCount: number; total: number }> {
+  const transport = opts.transport ?? 'bare';
+  const chunk = Math.min(Math.max(opts.chunk ?? 16, 1), 32);
+  const entries = Object.entries(backup.values).map(([a, v]) => ({ addr: parseInt(a, 10), value: v & 0xff }));
+  let okCount = 0, naCount = 0;
+  for (let i = 0; i < entries.length; i += chunk) {
+    const part = entries.slice(i, i + chunk);
+    const frames = part.map(e => eepromWriteFrame(model.readKey, model.writeKey, e.addr, e.value));
+    const reply = await ctrlExchange(printer, frames, transport, 1500);
+    const { ok, na } = parseEepromStatus(reply);
+    okCount += ok; naCount += na;
+    opts.log?.('info', `restore ${Math.min(i + chunk, entries.length)}/${entries.length} — OK ${okCount} · NA ${naCount}`);
+  }
+  return { ok: entries.length > 0 && okCount >= entries.length && naCount === 0, okCount, naCount, total: entries.length };
+}
+
+export interface EpsonStatReading {
+  name: string;
+  value: number | null;
+}
+
+/** Big-endian counter across an address list: FIRST address = most
+ *  significant byte (epson_print_conf get_stats shifts left through the
+ *  list in order — the opposite of the waste counters). */
+export function bigEndianValue(bytes: Array<number | undefined | null>): number | null {
+  if (bytes.some(b => b === undefined || b === null)) return null;
+  return (bytes as number[]).reduce((acc, b) => (acc << 8) + b, 0) >>> 0;
+}
+
+/**
+ * Read the model's statistics counters (page counts, cleaning counts,
+ * first-use date…). Counters are big-endian across their address list:
+ * the FIRST address holds the most significant byte (epson_print_conf
+ * get_stats: total = (total << 8) + byte — note this is the opposite of
+ * the waste counters).
+ */
+export async function epsonReadStats(
+  printer: string,
+  model: EpsonModelEntry,
+  log?: EpsonLogFn,
+  transport: EpsonTransport = 'bare',
+): Promise<EpsonStatReading[]> {
+  const stats = model.stats ?? {};
+  const allAddrs = [...new Set(Object.values(stats).flat())];
+  const frames = allAddrs.map(a => eepromReadFrame(model.readKey, a));
+  log?.('tx', `EEPROM read ${allAddrs.length} stat addresses (${transport})`);
+  const reply = await ctrlExchange(printer, frames, transport, 1500);
+  log?.('rx', explainEpsonReply(reply));
+  const values = new Map<number, number>(parseEepromReads(reply).map(r => [r.addr, r.value]));
+  return Object.entries(stats).map(([name, addrs]) => ({
+    name,
+    value: bigEndianValue(addrs.map(a => values.get(a))),
+  }));
 }
 
 /**
@@ -715,6 +938,8 @@ export interface EpsonPrefs {
   model?: string;
   /** Last known serial (from ST2 or typed) for the rw temporary reset. */
   serial?: string;
+  /** 'bare' (escputil-style) or 'd4' (full 1284.4 handshake). */
+  transport?: EpsonTransport;
 }
 
 const PREFS_KEY = 'vector.epson.prefs';

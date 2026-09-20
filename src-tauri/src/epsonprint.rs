@@ -110,6 +110,16 @@ mod imp {
     /// One bidirectional RAW transaction: send `out`, then drain replies
     /// until `read_ms` of silence or `max_read` bytes.
     pub fn transact(printer: &str, out: &[u8], read_ms: u32, max_read: usize) -> Result<Vec<u8>, String> {
+        self::script(printer, &[(out.to_vec(), read_ms)], max_read)
+            .map(|mut replies| replies.swap_remove(0))
+    }
+
+    /// A scripted RAW job: write each step, then drain its replies before
+    /// the next write, all inside ONE spooler job. This is what stateful
+    /// exchanges need — e.g. the full IEEE 1284.4 handshake (enter D4,
+    /// Init, OpenChannel, channel packets, Exit) must interleave writes
+    /// and reads on the same open job.
+    pub fn script(printer: &str, steps: &[(Vec<u8>, u32)], max_read: usize) -> Result<Vec<Vec<u8>>, String> {
         use winapi::um::winspool::{
             ClosePrinter, EndDocPrinter, OpenPrinterA, ReadPrinter, StartDocPrinterA,
             WritePrinter, DOC_INFO_1A,
@@ -136,16 +146,17 @@ mod imp {
                 return Err("StartDocPrinter(RAW) failed — the driver may not accept raw jobs.".into());
             }
 
-            let mut result = Vec::<u8>::new();
+            let mut replies = Vec::<Vec<u8>>::with_capacity(steps.len());
             let mut failure = String::new();
 
-            let mut written: u32 = 0;
-            if WritePrinter(handle, out.as_ptr() as *mut _, out.len() as u32, &mut written) == 0 {
-                failure = "WritePrinter failed.".into();
-            } else {
-                // Read phase: poll ReadPrinter until it stays quiet past
-                // the deadline (many printers answer within ~300 ms).
-                let deadline = Instant::now() + Duration::from_millis(read_ms.max(50) as u64);
+            'steps: for (out, read_ms) in steps {
+                let mut result = Vec::<u8>::new();
+                let mut written: u32 = 0;
+                if WritePrinter(handle, out.as_ptr() as *mut _, out.len() as u32, &mut written) == 0 {
+                    failure = "WritePrinter failed.".into();
+                    break 'steps;
+                }
+                let deadline = Instant::now() + Duration::from_millis((*read_ms).max(50) as u64);
                 let mut chunk = [0u8; 512];
                 let mut read: u32 = 0;
                 loop {
@@ -162,6 +173,7 @@ mod imp {
                     }
                     sleep(Duration::from_millis(25));
                 }
+                replies.push(result);
             }
 
             EndDocPrinter(handle);
@@ -169,7 +181,7 @@ mod imp {
             if !failure.is_empty() {
                 return Err(failure);
             }
-            Ok(result)
+            Ok(replies)
         }
     }
 }
@@ -181,6 +193,9 @@ mod imp {
         Err("Epson maintenance needs the Windows desktop build (WinSpool RAW jobs).".into())
     }
     pub fn transact(_printer: &str, _out: &[u8], _read_ms: u32, _max_read: usize) -> Result<Vec<u8>, String> {
+        Err("Epson maintenance needs the Windows desktop build (WinSpool RAW jobs).".into())
+    }
+    pub fn script(_printer: &str, _steps: &[(Vec<u8>, u32)], _max_read: usize) -> Result<Vec<Vec<u8>>, String> {
         Err("Epson maintenance needs the Windows desktop build (WinSpool RAW jobs).".into())
     }
 }
@@ -204,6 +219,36 @@ pub async fn epson_raw_transact(
         let bytes = from_hex(&hex)?;
         let reply = imp::transact(&printer, &bytes, read_ms.unwrap_or(600) as u32, max_read.unwrap_or(4096))?;
         Ok(reply.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// One scripted step of an interleaved exchange.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptStep {
+    pub hex: String,
+    pub read_ms: u64,
+}
+
+/// Run write→read steps inside ONE RAW spooler job and return each step's
+/// reply hex-encoded. Needed for stateful protocols (IEEE 1284.4 handshake).
+#[tauri::command]
+pub async fn epson_raw_script(
+    printer: String,
+    steps: Vec<ScriptStep>,
+) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let parsed = steps
+            .iter()
+            .map(|s| from_hex(&s.hex).map(|b| (b, s.read_ms.max(50) as u32)))
+            .collect::<Result<Vec<_>, String>>()?;
+        let replies = imp::script(&printer, &parsed, 4096)?;
+        Ok(replies
+            .iter()
+            .map(|r| r.iter().map(|b| format!("{:02x}", b)).collect::<String>())
+            .collect())
     })
     .await
     .map_err(|e| e.to_string())?

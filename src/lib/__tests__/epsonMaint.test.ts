@@ -9,6 +9,8 @@ import {
   parseEepromReads, parseEepromStatus, wastePercent,
   rwResetFrame, parseRwReply, sha1Bytes,
   guessEpsonModel,
+  d4Packet, d4CtrlPacket, parseD4Packets, extractD4CtrlPayloads, buildD4SessionSteps,
+  makeEepromBackup, parseEepromBackup, bigEndianValue,
 } from '../epsonMaint';
 import { EPSON_MODELS } from '../epsonModels';
 
@@ -324,5 +326,74 @@ describe('guessEpsonModel', () => {
 
   it('returns null when nothing matches', () => {
     expect(guessEpsonModel('HP DeskJet 2130', 'MFG:HP;MDL:2130;')).toBeNull();
+  });
+});
+
+describe('IEEE 1284.4 session layer (reinkpy cross-reference)', () => {
+  const hexOf = (bytes: number[]) => bytes.map(b => b.toString(16).padStart(2, '0')).join(' ');
+
+  it('wraps payloads in the >BBHBB packet header with BE16 total length', () => {
+    // Init(rev 0x20) on the transaction channel: len = 6 + 2 = 8.
+    expect(hexOf(d4Packet(0, 0, [0x00, 0x20]))).toBe('00 00 00 08 01 00 00 20');
+    // EPSON-CTRL channel packet: len = 6 + 5 = 11.
+    expect(hexOf(d4CtrlPacket([0x73, 0x74, 0x01, 0x00, 0x01]))).toBe('02 02 00 0b 01 00 73 74 01 00 01');
+  });
+
+  it('splits reply streams into packets by length and keeps only channel 2/2', () => {
+    const stream = new Uint8Array([
+      ...d4Packet(0, 0, [0x80, 0x00, 0x20]),        // InitReply on TX channel
+      ...d4CtrlPacket([0x40, 0x42, 0x44, 0x43]),    // data on 2/2
+      ...d4CtrlPacket([0x45, 0x45]),                // more data on 2/2
+    ]);
+    const packets = parseD4Packets(stream);
+    expect(packets).toHaveLength(3);
+    expect(packets[0]).toEqual({ psid: 0, ssid: 0, payload: [0x80, 0x00, 0x20] });
+    expect(extractD4CtrlPayloads([stream])).toEqual([0x40, 0x42, 0x44, 0x43, 0x45, 0x45]);
+  });
+
+  it('builds the full session: enter, Init, OpenChannel(2,2), frames, Exit', () => {
+    const steps = buildD4SessionSteps([[0x73, 0x74, 0x01, 0x00, 0x01]]);
+    expect(steps).toHaveLength(5);
+    // reinkpy CMD_ENTER_D4: two bare @EJL lines, no trailing ESC @.
+    expect(steps[0].hex.startsWith('00 00 00 1b 01 40 45 4a 4c 20 31 32 38 34 2e 34 0a')).toBe(true);
+    expect(steps[0].hex.endsWith('40 45 4a 4c 0a 40 45 4a 4c 0a')).toBe(true);
+    // Init(0x20) then OpenChannel with sid 2/2, maxPTS/maxSTP 0x0100.
+    expect(steps[1].hex).toBe('00 00 00 08 01 00 00 20');
+    expect(steps[2].hex).toBe('00 00 00 0f 01 00 01 02 02 01 00 01 00 00 00');
+    // The data frame rides the 2/2 channel; the session ends with Exit (0x08).
+    expect(steps[3].hex).toBe('02 02 00 0b 01 00 73 74 01 00 01');
+    expect(steps[4].hex).toBe('00 00 00 07 01 00 08');
+  });
+});
+
+describe('EEPROM backup files', () => {
+  it('round-trips values through makeEepromBackup and parseEepromBackup', () => {
+    const values = new Map([[24, 0x5a], [25, 0], [46, 94]]);
+    const backup = makeEepromBackup('L386', values, 'XJ123456');
+    expect(backup.values).toEqual({ '24': 90, '25': 0, '46': 94 });
+    const parsed = parseEepromBackup(JSON.stringify(backup));
+    expect(parsed.model).toBe('L386');
+    expect(parsed.serial).toBe('XJ123456');
+    expect(parsed.values['46']).toBe(94);
+  });
+
+  it('rejects foreign files and unknown models', () => {
+    expect(() => parseEepromBackup('{"hello":"world"}')).toThrow(/not an AnchorWorks/);
+    const bogus = JSON.stringify({ app: 'AnchorWorks', kind: 'epson-eeprom', model: 'NOT-A-MODEL', values: {} });
+    expect(() => parseEepromBackup(bogus)).toThrow(/unknown model/);
+  });
+});
+
+describe('bigEndianValue (stats counters)', () => {
+  it('treats the first address as the most significant byte', () => {
+    // epson_print_conf: total = (total << 8) + byte, list order preserved.
+    expect(bigEndianValue([0x01, 0x00])).toBe(256);
+    expect(bigEndianValue([167, 166, 165, 164].map(() => 0x01))).toBe(0x01010101);
+    expect(bigEndianValue([0, 0])).toBe(0);
+  });
+
+  it('returns null when an address went unanswered', () => {
+    expect(bigEndianValue([1, undefined])).toBeNull();
+    expect(bigEndianValue([null])).toBeNull();
   });
 });
