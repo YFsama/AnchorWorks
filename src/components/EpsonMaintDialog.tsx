@@ -19,8 +19,9 @@ import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import {
   EPSON_ACTIONS, EPSON_TEMPLATES, epsonTransact, explainEpsonReply,
-  listEpsonPrinters, loadEpsonPrefs, saveEpsonPrefs,
-  type EpsonAction, type EpsonPrinter,
+  formatSt2Summary, listEpsonPrinters, parseEjlIdReply, parseOldInkReply, parseSt2Status,
+  saveEpsonPrefs, loadEpsonPrefs,
+  type EpsonAction, type EpsonPrinter, type St2Status,
 } from '../lib/epsonMaint';
 
 interface LogEntry {
@@ -46,6 +47,10 @@ export default function EpsonMaintDialog() {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [customHex, setCustomHex] = useState(loadEpsonPrefs().lastCustomHex ?? '');
   const [expectReply, setExpectReply] = useState(true);
+  // Structured readouts from the last status/identity action.
+  const [st2, setSt2] = useState<St2Status | null>(null);
+  const [identity, setIdentity] = useState('');
+  const [oldInk, setOldInk] = useState<Array<{ color: string; level: number }> | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const selected = useMemo(() => printers.find(p => p.name === printer) ?? null, [printers, printer]);
@@ -92,15 +97,43 @@ export default function EpsonMaintDialog() {
   useFocusRestore(open);
   if (!open) return null;
 
-  const run = async (label: string, hex: string, wantsReply: boolean) => {
+  const run = async (label: string, hex: string, wantsReply: boolean, actionId?: string) => {
     if (!printer) { toast.warn(t('Pick a printer first.'), { title: t('Epson maintenance') }); return; }
     if (!hex.trim()) { toast.warn(t('The command is empty.')); return; }
     setBusy(true);
+    setSt2(null);
+    setIdentity('');
+    setOldInk(null);
     push('tx', `${label} · ${hex.replace(/\s+/g, ' ')}`);
     try {
-      const reply = await epsonTransact(printer, hex, wantsReply ? 800 : 250);
-      if (reply.length > 0) push('rx', explainEpsonReply(reply));
-      else if (wantsReply) push('info', t('No reply (see the warning above about model-specific queries).'));
+      const reply = await epsonTransact(printer, hex, wantsReply ? 1200 : 250);
+      if (reply.length > 0) {
+        push('rx', explainEpsonReply(reply));
+        // Structured decoding per action: ST2 status card, @EJL identity,
+        // classic IQ: ink table. Fall back to the raw hex above.
+        if (actionId === 'status-st2') {
+          const st = parseSt2Status(reply);
+          if (st) {
+            setSt2(st);
+            push('info', formatSt2Summary(st).join(' · '));
+          } else {
+            push('info', t('Reply was not an ST2 block — try the classic ink query.'));
+          }
+        } else if (actionId === 'identify') {
+          const id = parseEjlIdReply(reply);
+          if (id) { setIdentity(id); push('info', id); }
+        } else if (actionId === 'status-old') {
+          const inks = parseOldInkReply(reply);
+          if (inks && inks.length > 0) {
+            setOldInk(inks);
+            push('info', inks.map(i => `${i.color} ${i.level}%`).join(' · '));
+          } else {
+            push('info', t('No IQ: ink data in the reply — try the ST2 query for newer models.'));
+          }
+        }
+      } else if (wantsReply) {
+        push('info', t('No reply (see the warning above about model-specific queries).'));
+      }
     } catch (e) {
       push('err', (e as Error).message);
     } finally {
@@ -108,7 +141,7 @@ export default function EpsonMaintDialog() {
     }
   };
 
-  const runAction = (action: EpsonAction) => { void run(action.label, action.hex, action.expectsReply); };
+  const runAction = (action: EpsonAction) => { void run(action.label, action.hex, action.expectsReply, action.id); };
 
   const applyTemplate = (id: string) => {
     const tpl = EPSON_TEMPLATES.find(x => x.id === id);
@@ -204,6 +237,78 @@ export default function EpsonMaintDialog() {
           <div className="mt-1 text-[10px] text-muted">
             <span className="text-success">●</span> {t('documented')} · <span className="text-warning">●</span> {t('experimental')}
           </div>
+
+          {/* Structured readout card — parsed from the last status action. */}
+          {(st2 || identity || oldInk) && (
+            <div className="mt-2 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px]" role="status">
+              <div className="field-label !mb-1">{t('Printer readout')}</div>
+              {identity && (
+                <div className="mb-1 font-mono text-ink/90 break-all">{identity}</div>
+              )}
+              {st2 && formatSt2Summary(st2).slice(0, 3).map((line, i) => (
+                <div key={i} className="mb-0.5 text-ink/85">{line}</div>
+              ))}
+              {st2?.errors.map((e, i) => (
+                <div key={`e${i}`} className="mb-0.5 font-medium text-danger">✕ {e}</div>
+              ))}
+              {st2?.warnings.map((w, i) => (
+                <div key={`w${i}`} className="mb-0.5 text-warning">! {w}</div>
+              ))}
+              {(st2?.ink.length ?? 0) > 0 && (
+                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                  {st2!.ink.map((ink, i) => (
+                    <div key={`ink${i}`} className="flex items-center gap-1.5" title={`${ink.cartridge} (${ink.color})`}>
+                      <span className="w-20 shrink-0 truncate text-muted">{ink.cartridge}</span>
+                      <div className="h-1.5 min-w-0 flex-1 rounded bg-border overflow-hidden">
+                        <div
+                          className={`h-full ${ink.level <= 10 ? 'bg-danger' : ink.level <= 25 ? 'bg-warning' : 'bg-success'}`}
+                          style={{ width: `${Math.min(100, Math.max(0, ink.level))}%` }}
+                        />
+                      </div>
+                      <span className="w-8 shrink-0 text-right tabular-nums">{ink.level}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {oldInk && (
+                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                  {oldInk.map((ink, i) => (
+                    <div key={`oi${i}`} className="flex items-center gap-1.5">
+                      <span className="w-20 shrink-0 truncate text-muted">{ink.color}</span>
+                      <div className="h-1.5 min-w-0 flex-1 rounded bg-border overflow-hidden">
+                        <div
+                          className={`h-full ${ink.level <= 10 ? 'bg-danger' : ink.level <= 25 ? 'bg-warning' : 'bg-success'}`}
+                          style={{ width: `${Math.min(100, Math.max(0, ink.level))}%` }}
+                        />
+                      </div>
+                      <span className="w-8 shrink-0 text-right tabular-nums">{ink.level}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(st2?.maintenanceBoxes.length ?? 0) > 0 && (
+                <div className="mt-1 text-ink/85">
+                  {st2!.maintenanceBoxes.map((box, i) => {
+                    const label = box.level === 0 ? t('not full') : box.level === 1 ? t('near full') : box.level === 2 ? t('FULL') : `level ${box.level}`;
+                    return (
+                      <div key={`mb${i}`}>
+                        {t('Maintenance box')} {i + 1}: <span className={box.level === 2 ? 'text-danger font-semibold' : box.level === 1 ? 'text-warning' : 'text-success'}>{label}</span>
+                        {box.resetCount !== undefined && <span className="text-muted"> · {t('resets')}: {box.resetCount}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {st2?.paperCount && (
+                <div className="mt-1 text-muted tabular-nums">
+                  {t('Pages')}: {st2.paperCount.page} · {t('color')} {st2.paperCount.color} · {t('mono')} {st2.paperCount.mono}
+                </div>
+              )}
+              {st2 && st2.errors.length === 0 && st2.maintenanceBoxes.length === 0 && (
+                <div className="mt-1 text-[9px] text-muted">{t('Field availability depends on the model — unknown fields stay in the console log.')}</div>
+              )}
+            </div>
+          )}
 
           {/* Custom command workbench */}
           <div className="mt-3 field-label">{t('Command workbench')}</div>
