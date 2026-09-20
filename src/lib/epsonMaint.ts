@@ -16,6 +16,7 @@
  */
 
 import { callNative } from './runtime';
+import { EPSON_MODELS, type EpsonModelEntry } from './epsonModels';
 
 export interface EpsonPrinter {
   name: string;
@@ -363,6 +364,228 @@ export function parseOldInkReply(bytes: Uint8Array): Array<{ color: string; leve
   return out;
 }
 
+/* ---------------- EEPROM access ("||" command family) ----------------- *
+ * Wire format verified against epson_print_conf (Ircama, EUPL-1.2) and
+ * reinkpy (AGPL, protocol cross-reference only): an EPSON-CTRL command
+ * named "||" (0x7C 0x7C) whose payload is
+ *   [readKey LE16]['A'|'B'][~cmd][rot(cmd)][addr LE16]        (read)
+ *   [readKey LE16]['B'][~'B'][rot('B')][addr LE16][value]     (write)
+ *   … + writeKey with every byte Caesar-shifted +1             (write)
+ * Replies carry "EE:xxxxxx;" (4 hex address + 2 hex value) and ":OK;" /
+ * ":NA;" status tokens. The golden sample frame from epson_print_conf
+ * (7C 7C 10 00 49 08 42 BD 21 30 00 1A 42 73 62 6F 75 6A 67 70 — readKey
+ * 73/8, write "Arantifo") is covered by the tests byte for byte.
+ */
+
+/** (c >> 1 & 0x7f) | (c << 7 & 0x80) — the rotate check byte epson_print_conf sends. */
+function eepromRot(c: number): number {
+  return ((c >> 1) & 0x7f) | ((c << 7) & 0x80);
+}
+
+/** writeKey bytes as they travel: each byte +1 (epson_print_conf `caesar`). */
+export function caesarShift(key: string): number[] {
+  return [...key].map(ch => {
+    const b = ch.charCodeAt(0) & 0xff;
+    return b === 0 ? 0 : (b + 1) & 0xff;
+  });
+}
+
+/** Read frame for one EEPROM address (little-endian split at 0x100). */
+export function eepromReadFrame(readKey: readonly number[], addr: number): number[] {
+  const lsb = addr & 0xff;
+  const msb = (addr >> 8) & 0xff;
+  const payload = [readKey[0] & 0xff, readKey[1] & 0xff, 0x41, (~0x41) & 0xff, eepromRot(0x41), lsb, msb];
+  return [0x7c, 0x7c, payload.length & 0xff, (payload.length >> 8) & 0xff, ...payload];
+}
+
+/** Write frame for one EEPROM address/value, authenticated by the model's writeKey. */
+export function eepromWriteFrame(readKey: readonly number[], writeKey: string, addr: number, value: number): number[] {
+  const lsb = addr & 0xff;
+  const msb = (addr >> 8) & 0xff;
+  const payload = [
+    readKey[0] & 0xff, readKey[1] & 0xff,
+    0x42, (~0x42) & 0xff, eepromRot(0x42),
+    lsb, msb, value & 0xff,
+    ...caesarShift(writeKey),
+  ];
+  return [0x7c, 0x7c, payload.length & 0xff, (payload.length >> 8) & 0xff, ...payload];
+}
+
+export interface EepromReadResult {
+  addr: number;
+  value: number;
+}
+
+/** All "EE:aavv;" occurrences in a reply, in order (read answers). */
+export function parseEepromReads(bytes: Uint8Array): EepromReadResult[] {
+  const text = new TextDecoder('latin1').decode(bytes);
+  const out: EepromReadResult[] = [];
+  const re = /EE:([0-9A-Fa-f]{6});?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ addr: parseInt(m[1].slice(0, 4), 16), value: parseInt(m[1].slice(4), 16) });
+  }
+  return out;
+}
+
+/** Status tokens: ':OK;' count (write acknowledged) and ':NA;' count (denied). */
+export function parseEepromStatus(bytes: Uint8Array): { ok: number; na: number } {
+  const text = new TextDecoder('latin1').decode(bytes);
+  return {
+    ok: (text.match(/:OK;/g) ?? []).length,
+    na: (text.match(/:NA;/g) ?? []).length,
+  };
+}
+
+/**
+ * Waste-ink counters are big-endian multi-byte values stored across the
+ * model's oids (most significant byte LAST in oid order — epson_print_conf
+ * joins the reversed hex strings). Percent = value / divider.
+ */
+export function wastePercent(values: Array<number | null | undefined>, divider: number): number | null {
+  if (values.some(v => v === null || v === undefined)) return null;
+  const hex = values.map(v => (v as number).toString(16).padStart(2, '0')).reverse().join('');
+  return Math.round((parseInt(hex, 16) / divider) * 100) / 100;
+}
+
+/* ---------------- temporary "rw" reset (serial-authenticated) ---------- *
+ * epson_print_conf temporary_reset_waste: the "rw" command carries
+ * struct.pack('<H', 1) + sha1(serial). Only the serial is needed — no
+ * read_key — so it works on firmware that locks the EEPROM interface
+ * (L3250 class). The reset survives until the printer is power-cycled.
+ */
+
+/** SHA-1 digest of the serial (Web Crypto, 20 bytes). */
+export async function sha1Bytes(text: string): Promise<number[]> {
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-1', data);
+  return [...new Uint8Array(digest)];
+}
+
+/** "rw" frame with a precomputed digest (mode byte 1 — must be 0x01 to work). */
+export function rwResetFrame(digest: number[], mode = 1): number[] {
+  const payload = [mode & 0xff, 0, ...digest];
+  return [0x72, 0x77, payload.length & 0xff, (payload.length >> 8) & 0xff, ...payload];
+}
+
+/** Did the printer acknowledge an "rw" reset? Token "rw:01:OK;". */
+export function parseRwReply(bytes: Uint8Array): { ok: boolean; text: string } {
+  const text = new TextDecoder('latin1').decode(bytes);
+  return { ok: /rw:\d+:OK;/.test(text), text };
+}
+
+/* ---------------- high-level one-click flows -------------------------- */
+
+export type EpsonLogFn = (dir: 'tx' | 'rx' | 'info' | 'err', text: string) => void;
+
+export interface WasteReading {
+  label: string;
+  percent: number | null;
+  /** Raw per-address values that fed the percentage, for the log card. */
+  oids: number[];
+}
+
+export interface WasteReadResult {
+  readings: WasteReading[];
+  /** value per EEPROM address actually answered. */
+  values: Map<number, number>;
+  reply: Uint8Array;
+  reads: EepromReadResult[];
+}
+
+/**
+ * Read the waste-ink counters of one model in a single D4 session: build a
+ * read frame for every unique counter address (main + borderless), send the
+ * D4 entry followed by all frames in one RAW job, then map "EE:" answers
+ * back onto addresses. No state is modified.
+ */
+export async function epsonReadWaste(printer: string, model: EpsonModelEntry, log?: EpsonLogFn): Promise<WasteReadResult> {
+  const oids = [...new Set([...model.mainWaste.oids, ...(model.borderlessWaste?.oids ?? [])])];
+  const frames = oids.map(a => eepromReadFrame(model.readKey, a));
+  const hex = hexOf([...D4_ENTER, ...frames.flat()]);
+  log?.('tx', `EEPROM read ${oids.length} addresses (D4): ${hex.slice(0, 96)}${hex.length > 96 ? ' …' : ''}`);
+  const reply = await epsonTransact(printer, hex, 1500);
+  log?.('rx', explainEpsonReply(reply));
+  const reads = parseEepromReads(reply);
+  const values = new Map<number, number>(reads.map(r => [r.addr, r.value]));
+  const readings: WasteReading[] = [{
+    label: 'Main waste pad',
+    percent: wastePercent(model.mainWaste.oids.map(a => values.get(a) ?? null), model.mainWaste.divider),
+    oids: model.mainWaste.oids,
+  }];
+  if (model.borderlessWaste) {
+    readings.push({
+      label: 'Borderless waste',
+      percent: wastePercent(model.borderlessWaste.oids.map(a => values.get(a) ?? null), model.borderlessWaste.divider),
+      oids: model.borderlessWaste.oids,
+    });
+  }
+  return { readings, values, reply, reads };
+}
+
+/**
+ * Permanent waste-ink reset: write the model's factory map (rawReset —
+ * counter bytes to 0 plus maintenance-level bytes back to 94) in one D4
+ * session. Returns per-address acknowledgement; every write must answer
+ * ":OK;" for success.
+ */
+export async function epsonResetWastePermanent(
+  printer: string,
+  model: EpsonModelEntry,
+  log?: EpsonLogFn,
+): Promise<{ ok: boolean; okCount: number; naCount: number; total: number; reply: Uint8Array }> {
+  const entries = Object.entries(model.rawReset).map(([a, v]) => ({ addr: parseInt(a, 10), value: v }));
+  const frames = entries.map(e => eepromWriteFrame(model.readKey, model.writeKey, e.addr, e.value));
+  const hex = hexOf([...D4_ENTER, ...frames.flat()]);
+  log?.('tx', `EEPROM write ${entries.length} bytes (D4): ${hex.slice(0, 96)}${hex.length > 96 ? ' …' : ''}`);
+  const reply = await epsonTransact(printer, hex, 1500);
+  log?.('rx', explainEpsonReply(reply));
+  const { ok, na } = parseEepromStatus(reply);
+  return { ok: entries.length > 0 && ok >= entries.length && na === 0, okCount: ok, naCount: na, total: entries.length, reply };
+}
+
+/**
+ * Temporary waste-ink reset ("rw", authenticated by SHA-1 of the serial).
+ * Needs no model key; clears the error until the next power cycle. The
+ * serial comes from the ST2 status block (plaintext) or the operator.
+ */
+export async function epsonResetWasteTemporary(
+  printer: string,
+  serial: string,
+  log?: EpsonLogFn,
+): Promise<{ ok: boolean; reply: Uint8Array }> {
+  const digest = await sha1Bytes(serial);
+  const frame = rwResetFrame(digest);
+  const hex = hexOf([...D4_ENTER, ...frame]);
+  log?.('tx', `rw temporary reset (D4): ${hexOf(frame)}`);
+  const reply = await epsonTransact(printer, hex, 1200);
+  log?.('rx', explainEpsonReply(reply));
+  const { ok } = parseRwReply(reply);
+  return { ok, reply };
+}
+
+/**
+ * Guess the database model name from what the spooler and the printer
+ * themselves report: the "MDL:" field of an @EJL ID reply first (most
+ * precise), then the Windows printer name ("EPSON ET-2720 Series").
+ * Longest database name wins so "ET-2720" beats a partial "ET-2".
+ */
+export function guessEpsonModel(printerName: string, identity = ''): string | null {
+  const names = Object.keys(EPSON_MODELS);
+  const mdl = identity.match(/MDL:([^;]+)/i)?.[1]?.trim().replace(/\s+Series$/i, '');
+  if (mdl) {
+    const hit = names.find(n => n.toLowerCase() === mdl.toLowerCase())
+      ?? names.find(n => mdl.toLowerCase().includes(n.toLowerCase()));
+    if (hit) return hit;
+  }
+  let best: string | null = null;
+  const hay = printerName.toLowerCase();
+  for (const n of names) {
+    if (hay.includes(n.toLowerCase()) && (best === null || n.length > best.length)) best = n;
+  }
+  return best;
+}
+
 /** Maintenance actions. `documented` = part of public ESC/P2 reference;
  *  `experimental` = command family known, exact reply/behaviour varies
  *  between model generations — sent at the operator's own judgement. */
@@ -488,6 +711,10 @@ export const EPSON_TEMPLATES: EpsonTemplate[] = [
 export interface EpsonPrefs {
   printer: string;
   lastCustomHex: string;
+  /** Last selected model in the waste-counter section. */
+  model?: string;
+  /** Last known serial (from ST2 or typed) for the rw temporary reset. */
+  serial?: string;
 }
 
 const PREFS_KEY = 'vector.epson.prefs';

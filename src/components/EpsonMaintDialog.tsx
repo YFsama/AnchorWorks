@@ -3,14 +3,16 @@
  *
  * Picks an installed printer (spooler list), then runs maintenance
  * actions over RAW spooler jobs: initialize, head cleaning, nozzle
- * check, test print — plus a hex workbench for pasting model-specific
- * community templates (counter resets are model-specific and NOT built
- * in; every custom send is labelled and logged). All TX/RX traffic
- * lands in a hex console for evidence.
+ * check, test print. The waste-ink section is fully built in: model
+ * database (EEPROM keys + counter addresses from the open-source
+ * epson_print_conf project), one-click counter read, serial-
+ * authenticated temporary reset and the factory EEPROM reset. A hex
+ * workbench covers everything else; all TX/RX traffic lands in a hex
+ * console for evidence.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X, RefreshCw, Printer, Send, Trash2, AlertTriangle, FlaskConical } from 'lucide-react';
+import { X, RefreshCw, Printer, Send, Trash2, AlertTriangle, FlaskConical, Recycle, Timer, HardDriveDownload } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { isTauri } from '../lib/runtime';
 import { useT } from '../lib/i18n';
@@ -21,8 +23,10 @@ import {
   EPSON_ACTIONS, EPSON_TEMPLATES, epsonTransact, explainEpsonReply,
   formatSt2Summary, listEpsonPrinters, parseEjlIdReply, parseOldInkReply, parseSt2Status,
   saveEpsonPrefs, loadEpsonPrefs,
-  type EpsonAction, type EpsonPrinter, type St2Status,
+  epsonReadWaste, epsonResetWastePermanent, epsonResetWasteTemporary, guessEpsonModel,
+  type EpsonAction, type EpsonPrinter, type St2Status, type WasteReadResult,
 } from '../lib/epsonMaint';
+import { EPSON_MODELS } from '../lib/epsonModels';
 
 interface LogEntry {
   id: number;
@@ -47,6 +51,10 @@ export default function EpsonMaintDialog() {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [customHex, setCustomHex] = useState(loadEpsonPrefs().lastCustomHex ?? '');
   const [expectReply, setExpectReply] = useState(true);
+  // Waste-counter section: selected model, serial, last reading.
+  const [model, setModel] = useState(loadEpsonPrefs().model ?? '');
+  const [serialText, setSerialText] = useState(loadEpsonPrefs().serial ?? '');
+  const [waste, setWaste] = useState<WasteReadResult | null>(null);
   // Structured readouts from the last status/identity action.
   const [st2, setSt2] = useState<St2Status | null>(null);
   const [identity, setIdentity] = useState('');
@@ -56,6 +64,8 @@ export default function EpsonMaintDialog() {
   const selected = useMemo(() => printers.find(p => p.name === printer) ?? null, [printers, printer]);
   const epsonPrinters = useMemo(() => printers.filter(p => p.isEpson), [printers]);
   const others = useMemo(() => printers.filter(p => !p.isEpson), [printers]);
+  const modelNames = useMemo(() => Object.keys(EPSON_MODELS).sort(), []);
+  const modelEntry = useMemo(() => (model ? EPSON_MODELS[model] ?? null : null), [model]);
 
   const push = (dir: LogEntry['dir'], text: string) => {
     setEntries(prev => [...prev.slice(-199), { id: logSeq++, ts: nowMs(), dir, text }]);
@@ -70,6 +80,10 @@ export default function EpsonMaintDialog() {
       if (list.length > 0 && !list.some(p => p.name === printer)) {
         const first = list.find(p => p.isEpson) ?? list[0];
         setPrinter(first.name);
+        if (!model) {
+          const g = guessEpsonModel(first.name, identity);
+          if (g) setModel(g);
+        }
       }
       if (list.length === 0) push('info', t('No printers found — install the printer driver first.'));
     } catch (e) {
@@ -77,6 +91,9 @@ export default function EpsonMaintDialog() {
     } finally {
       setLoading(false);
     }
+    // Auto-model-guess reads identity/model on purpose; the dialog re-runs
+    // refresh only on open/printer changes anyway.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [native, printer, t]);
 
   useEffect(() => {
@@ -88,6 +105,29 @@ export default function EpsonMaintDialog() {
 
   useEffect(() => { saveEpsonPrefs({ printer }); }, [printer]);
   useEffect(() => { saveEpsonPrefs({ lastCustomHex: customHex }); }, [customHex]);
+  useEffect(() => { saveEpsonPrefs({ model }); }, [model]);
+  useEffect(() => { saveEpsonPrefs({ serial: serialText }); }, [serialText]);
+
+  // Adopt the serial the printer reports in its ST2 status block.
+  const adoptSerial = (st: St2Status) => {
+    const s = st.serial ?? st.serialInfo;
+    if (s && !s.includes('?') && s !== serialText) setSerialText(s);
+  };
+
+  // Auto-pick the model from the freshly decoded identity when none was chosen.
+  const adoptModelFromIdentity = (id: string) => {
+    if (model || !id) return;
+    const guess = guessEpsonModel(printer, id);
+    if (guess) setModel(guess);
+  };
+
+  const choosePrinter = (name: string) => {
+    setPrinter(name);
+    if (!model) {
+      const guess = guessEpsonModel(name, identity);
+      if (guess) setModel(guess);
+    }
+  };
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -115,13 +155,14 @@ export default function EpsonMaintDialog() {
           const st = parseSt2Status(reply);
           if (st) {
             setSt2(st);
+            adoptSerial(st);
             push('info', formatSt2Summary(st).join(' · '));
           } else {
             push('info', t('Reply was not an ST2 block — try the classic ink query.'));
           }
         } else if (actionId === 'identify') {
           const id = parseEjlIdReply(reply);
-          if (id) { setIdentity(id); push('info', id); }
+          if (id) { setIdentity(id); adoptModelFromIdentity(id); push('info', id); }
         } else if (actionId === 'status-old') {
           const inks = parseOldInkReply(reply);
           if (inks && inks.length > 0) {
@@ -142,6 +183,65 @@ export default function EpsonMaintDialog() {
   };
 
   const runAction = (action: EpsonAction) => { void run(action.label, action.hex, action.expectsReply, action.id); };
+
+  const runWasteRead = async () => {
+    if (!printer || !modelEntry) { toast.warn(t('Pick a printer and model first.'), { title: t('Epson maintenance') }); return; }
+    setBusy(true);
+    setWaste(null);
+    try {
+      const result = await epsonReadWaste(printer, modelEntry, push);
+      setWaste(result);
+      if (result.readings.every(r => r.percent === null)) {
+        push('info', t('No EEPROM answers — check the model choice; a wrong read key keeps the printer silent.'));
+      }
+    } catch (e) {
+      push('err', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runTempReset = async () => {
+    if (!printer) { toast.warn(t('Pick a printer first.'), { title: t('Epson maintenance') }); return; }
+    const serial = serialText.trim();
+    if (!serial) {
+      toast.warn(t('Serial number unknown — run the ST2 status query once, or type the serial.'), { title: t('Epson maintenance') });
+      return;
+    }
+    if (!window.confirm(t('Temporary reset clears the waste-ink error until the printer is power-cycled. Continue?'))) return;
+    setBusy(true);
+    try {
+      const r = await epsonResetWasteTemporary(printer, serial, push);
+      push(r.ok ? 'info' : 'err', r.ok
+        ? t('Temporary reset acknowledged (rw:OK).')
+        : t('The printer denied the reset (NA) or stayed silent — wrong serial or unsupported firmware.'));
+    } catch (e) {
+      push('err', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runFactoryReset = async () => {
+    if (!printer || !modelEntry) { toast.warn(t('Pick a printer and model first.'), { title: t('Epson maintenance') }); return; }
+    const n = Object.keys(modelEntry.rawReset).length;
+    const first = window.confirm(
+      `${t('Factory reset permanently writes the waste-counter EEPROM for this model. Run it ONLY right after replacing the waste ink pads or maintenance box — it cannot be undone.')}\n\n${model} · ${n} ${t('bytes')}`
+    );
+    if (!first) return;
+    if (!window.confirm(t('Really write to the EEPROM now?'))) return;
+    setBusy(true);
+    try {
+      const r = await epsonResetWastePermanent(printer, modelEntry, push);
+      push(r.ok ? 'info' : 'err', `${t('Writes acknowledged')}: ${r.okCount}/${r.total}${r.naCount > 0 ? ` · NA ${r.naCount}` : ''}`);
+      if (r.ok) toast.success(t('Waste counters reset. Read them back to verify.'));
+      else push('err', t('Not every write was acknowledged — verify the model choice and try reading the counters.'));
+    } catch (e) {
+      push('err', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const applyTemplate = (id: string) => {
     const tpl = EPSON_TEMPLATES.find(x => x.id === id);
@@ -182,7 +282,7 @@ export default function EpsonMaintDialog() {
             <select
               className="input flex-1"
               value={printer}
-              onChange={(e) => setPrinter(e.target.value)}
+              onChange={(e) => choosePrinter(e.target.value)}
               disabled={loading}
               aria-label={t('Printer')}
             >
@@ -213,7 +313,7 @@ export default function EpsonMaintDialog() {
           <div className="mt-2 flex items-start gap-1.5 rounded border border-warning/50 bg-warning/10 px-2 py-1.5 text-[10px] text-warning leading-relaxed">
             <AlertTriangle size={12} aria-hidden="true" className="mt-px shrink-0" />
             <span>
-              {t('Maintenance commands go straight to the printer. "Documented" actions come from public Epson references; "experimental" ones vary by model — expect silence rather than damage. Counter resets are NOT built in: paste your model\'s community sequence in the workbench below.')}
+              {t('Maintenance commands go straight to the printer. "Documented" actions come from public Epson references; "experimental" ones vary by model. The waste-ink section below is built in from the open-source epson_print_conf project — reading is safe; resets rewrite persistent counters.')}
             </span>
           </div>
 
@@ -236,6 +336,88 @@ export default function EpsonMaintDialog() {
           </div>
           <div className="mt-1 text-[10px] text-muted">
             <span className="text-success">●</span> {t('documented')} · <span className="text-warning">●</span> {t('experimental')}
+          </div>
+
+          {/* Waste ink counters — model database + one-click read/reset */}
+          <div className="mt-3 pt-2 border-t border-border">
+            <div className="field-label">{t('Waste ink counters')}</div>
+            <div className="mt-1 flex items-center gap-1.5">
+              <select
+                className="input flex-1"
+                value={model}
+                onChange={(e) => { setModel(e.target.value); setWaste(null); }}
+                aria-label={t('Model')}
+              >
+                <option value="">{t('Select model…')}</option>
+                {modelNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <button
+                type="button"
+                className="btn shrink-0"
+                disabled={busy || !printer}
+                onClick={() => {
+                  const guess = guessEpsonModel(printer, identity);
+                  if (guess) { setModel(guess); setWaste(null); }
+                  else toast.warn(t('Could not guess the model — the printer name and ID reply hold no known model.'));
+                }}
+                title={t('Match the Windows printer name / ID reply against the model database')}
+              >
+                {t('Guess')}
+              </button>
+            </div>
+            {modelEntry && (
+              <div className="mt-1 text-[10px] text-muted tabular-nums">
+                {t('read key')} {modelEntry.readKey[0]}/{modelEntry.readKey[1]} · {t('main counter')} {modelEntry.mainWaste.oids.join(',')} ÷ {modelEntry.mainWaste.divider}
+              </div>
+            )}
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <input
+                type="text"
+                className="input font-mono flex-1"
+                value={serialText}
+                onChange={(e) => setSerialText(e.target.value)}
+                placeholder={t('Serial number (filled from ST2 status)')}
+                aria-label={t('Serial number')}
+                spellCheck={false}
+              />
+            </div>
+            <div className="mt-1.5 grid grid-cols-3 gap-1">
+              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runWasteRead(); }}>
+                <HardDriveDownload size={12} aria-hidden="true" className="text-success" />
+                <span className="truncate">{t('Read counters')}</span>
+              </button>
+              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer} onClick={() => { void runTempReset(); }} title={t('Clears the error until power-off; needs only the serial')}>
+                <Timer size={12} aria-hidden="true" className="text-warning" />
+                <span className="truncate">{t('Temporary reset')}</span>
+              </button>
+              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left !border-danger/40 hover:!border-danger" disabled={busy || !printer || !modelEntry} onClick={() => { void runFactoryReset(); }} title={t('Rewrites the EEPROM counters to factory state')}>
+                <Recycle size={12} aria-hidden="true" className="text-danger" />
+                <span className="truncate">{t('Factory reset')}</span>
+              </button>
+            </div>
+            {waste && (
+              <div className="mt-1.5 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px]" role="status">
+                {waste.readings.map((r, i) => (
+                  <div key={i} className="mb-1 last:mb-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted">{t(r.label)}</span>
+                      <span className={`tabular-nums font-semibold ${r.percent === null ? 'text-muted' : r.percent >= 90 ? 'text-danger' : r.percent >= 70 ? 'text-warning' : 'text-success'}`}>
+                        {r.percent === null ? '—' : `${r.percent}%`}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 h-1.5 rounded bg-border overflow-hidden">
+                      <div
+                        className={`h-full ${r.percent === null ? 'bg-border' : r.percent >= 90 ? 'bg-danger' : r.percent >= 70 ? 'bg-warning' : 'bg-success'}`}
+                        style={{ width: `${Math.min(100, Math.max(0, r.percent ?? 0))}%` }}
+                      />
+                    </div>
+                    <div className="mt-0.5 font-mono text-[9px] text-muted">
+                      {r.oids.map(a => `#${a}=${waste.values.get(a) !== undefined ? waste.values.get(a)!.toString(16).padStart(2, '0') : '??'}`).join(' ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Structured readout card — parsed from the last status action. */}
