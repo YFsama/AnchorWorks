@@ -227,3 +227,110 @@ export function estimateEtaSeconds(sent: number, total: number, elapsedMs: numbe
   if (sent / total < 0.01) return null;
   return Math.max(0, Math.round(((elapsedMs / 1000) * (total - sent)) / sent));
 }
+
+/* ------------------------------------------------------------------ *
+ * Cut-completion watch — the last leg of job monitoring.
+ *
+ * Transfer finishing ≠ cutting finished: after the last byte is handed
+ * to the machine, the blade keeps running for minutes. Cutters that
+ * answer status queries let us close that loop: HP-GL `OS;` reports the
+ * machine state word (2 = busy), grbl `?` reports `<Run|…>`. Machines
+ * that stay silent (most Chinese clones) simply can't be watched — the
+ * watcher gives up quietly after two silent polls instead of nagging.
+ * ------------------------------------------------------------------ */
+
+export type CutState = 'cutting' | 'idle' | 'unknown';
+
+/** Classify a machine's answer to a status poll. */
+export function cutStateFromReply(format: 'gcode' | 'hpgl', reply: string): CutState {
+  const raw = reply.trim();
+  if (!raw) return 'unknown';
+  if (format === 'gcode') {
+    const m = raw.match(/^<(\w+)/);
+    if (!m) return 'unknown';
+    const state = m[1].toLowerCase();
+    if (state === 'run' || state === 'home' || state === 'cycle') return 'cutting';
+    if (state === 'idle' || state === 'hold' || state === 'alarm' || state === 'door') return 'idle';
+    return 'unknown';
+  }
+  const code = raw.match(/-?\d+/);
+  if (!code) return 'unknown';
+  const n = Number(code[0]);
+  if (n === 2) return 'cutting';       // busy — drawing/moving
+  if (n === 0 || n === 1) return 'idle'; // powered/ready
+  return 'unknown';
+}
+
+export interface WatchCutOptions {
+  format: 'gcode' | 'hpgl';
+  /** Fired once the machine reports idle after the transfer. */
+  onDone?: () => void;
+  /** Fired when the machine never answers status polls (clones). */
+  onUnsupported?: () => void;
+  /** Progress/log line per poll (fed into the console log). */
+  onLog?: (line: string) => void;
+  intervalMs?: number;
+  timeoutMs?: number;
+}
+
+export type WatchCutHandle = { cancel: () => void };
+
+/** Poll the machine until it reports idle (cut finished). Returns a
+ *  cancel handle. Two consecutive silent polls → unsupported, stop. */
+export function watchCutCompletion(
+  link: Pick<PlotterLink, 'status' | 'query'>,
+  opts: WatchCutOptions,
+): WatchCutHandle {
+  const interval = opts.intervalMs ?? 3000;
+  const timeout = opts.timeoutMs ?? 15 * 60 * 1000;
+  const cmd = opts.format === 'gcode' ? '?' : 'OS;';
+  const log = opts.onLog ?? (() => {});
+  let silent = 0;
+  let cancelled = false;
+  let timer: number | null = null;
+  const startedAt = Date.now();
+
+  const stop = () => {
+    cancelled = true;
+    if (timer !== null) { window.clearInterval(timer); timer = null; }
+  };
+
+  const poll = async () => {
+    if (cancelled) return;
+    if (link.status !== 'connected') { stop(); return; }
+    if (Date.now() - startedAt > timeout) {
+      log('Cut watch timed out — the machine never reported idle.');
+      stop();
+      return;
+    }
+    let reply = '';
+    try {
+      reply = await link.query(cmd, 1200);
+    } catch {
+      // transient — next tick retries
+    }
+    if (cancelled) return;
+    const state = cutStateFromReply(opts.format, reply);
+    if (state === 'unknown') {
+      silent += 1;
+      if (silent >= 2) {
+        log('Machine does not answer status polls — cut watch off (this is normal for many cutters).');
+        opts.onUnsupported?.();
+        stop();
+      }
+      return;
+    }
+    silent = 0;
+    if (state === 'idle') {
+      log('Machine reports idle — cut complete.');
+      opts.onDone?.();
+      stop();
+    } else {
+      log('Machine is busy — still cutting…');
+    }
+  };
+
+  void poll();
+  timer = window.setInterval(() => { void poll(); }, interval);
+  return { cancel: stop };
+}

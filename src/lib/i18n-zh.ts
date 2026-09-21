@@ -4150,4 +4150,10 @@ export const zhDict: Record<string, string> = {
   "Restore writes": "恢复将写入",
   "EEPROM bytes from the backup. Continue?": "字节的备份数据到 EEPROM。继续吗？",
   "Maintenance commands go straight to the printer. \"Documented\" actions come from public Epson references; \"experimental\" ones vary by model. The waste-ink section below is built in from the open-source epson_print_conf project — reading is safe; resets rewrite persistent counters.": "维护命令直接发送到打印机。“有文档”的操作来自公开的 Epson 资料；“实验性”操作因机型而异。下方废墨功能内置自开源 epson_print_conf 项目——读取是安全的；清零会重写持久计数器。",
+  "Cutting…": "切割中…",
+  "🎉 Cut finished — machine reports idle": "🎉 切割完成——机器报告已就绪",
+  "This machine does not report status — cut watch off. Judge completion visually or by the machine beeping.": "该机器不回报状态——已停止完成监视。请凭目测或机器提示音判断完成。",
+  "Transfer done — the machine is still cutting (polled from its status replies).": "传输已完成——机器仍在切割（依据其状态应答轮询）。",
+  "Connection lost": "连接已断开",
+  "Live machine position (polled while this panel is open).": "机器实时位置（面板打开期间轮询）。",
 };

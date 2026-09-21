@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { buildDiagnosticsReport, estimateEtaSeconds, estimateTransferSeconds, probeBaud, runConnectionSelfTest, type DiagReportInput } from '../plotterDiag';
+import { describe, it, expect, vi } from 'vitest';
+import { buildDiagnosticsReport, cutStateFromReply, estimateEtaSeconds, estimateTransferSeconds, probeBaud, runConnectionSelfTest, watchCutCompletion, type DiagReportInput } from '../plotterDiag';
 import type { LinkStatus } from '../plotterLink';
 
 describe('estimateTransferSeconds', () => {
@@ -199,5 +199,79 @@ describe('estimateEtaSeconds', () => {
     expect(estimateEtaSeconds(250, 1000, 5000)).toBe(15);
     // Complete → 0.
     expect(estimateEtaSeconds(1000, 1000, 20000)).toBe(0);
+  });
+});
+
+describe('cutStateFromReply', () => {
+  it('decodes HP-GL OS status words', () => {
+    expect(cutStateFromReply('hpgl', '2\r\n')).toBe('cutting');
+    expect(cutStateFromReply('hpgl', '1')).toBe('idle');
+    expect(cutStateFromReply('hpgl', '0')).toBe('idle');
+    expect(cutStateFromReply('hpgl', '')).toBe('unknown');
+    expect(cutStateFromReply('hpgl', 'garbage')).toBe('unknown');
+  });
+
+  it('decodes grbl state reports', () => {
+    expect(cutStateFromReply('gcode', '<Run|MPos:1,2,0>')).toBe('cutting');
+    expect(cutStateFromReply('gcode', '<Home|MPos:0,0,0>')).toBe('cutting');
+    expect(cutStateFromReply('gcode', '<Idle|MPos:0,0,0>')).toBe('idle');
+    expect(cutStateFromReply('gcode', '<Hold:0|MPos:0,0,0>')).toBe('idle');
+    expect(cutStateFromReply('gcode', 'ok')).toBe('unknown');
+  });
+});
+
+describe('watchCutCompletion', () => {
+  function watchStub(replies: string[], onQuery?: () => void) {
+    let i = 0;
+    return {
+      status: 'connected' as const,
+      query: async () => { onQuery?.(); return replies[Math.min(i++, replies.length - 1)] ?? ''; },
+    };
+  }
+
+  it('fires onDone when the machine reports idle', async () => {
+    const done = vi.fn();
+    const unsupported = vi.fn();
+    const handle = watchCutCompletion(watchStub(['2\r\n', '2\r\n', '1\r\n']), {
+      format: 'hpgl', intervalMs: 5, onDone: done, onUnsupported: unsupported,
+    });
+    await new Promise(r => setTimeout(r, 60));
+    handle.cancel();
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(unsupported).not.toHaveBeenCalled();
+  });
+
+  it('gives up after two silent polls (clones) via onUnsupported', async () => {
+    const done = vi.fn();
+    const unsupported = vi.fn();
+    const logs: string[] = [];
+    const handle = watchCutCompletion(watchStub(['', '']), {
+      format: 'hpgl', intervalMs: 5, onDone: done, onUnsupported: unsupported, onLog: l => logs.push(l),
+    });
+    await new Promise(r => setTimeout(r, 60));
+    handle.cancel();
+    expect(unsupported).toHaveBeenCalledTimes(1);
+    expect(done).not.toHaveBeenCalled();
+    expect(logs.some(l => l.includes('does not answer'))).toBe(true);
+  });
+
+  it('stops when the link disconnects mid-watch', async () => {
+    const done = vi.fn();
+    const stub = watchStub(['2\r\n']);
+    (stub as { status: string }).status = 'idle'; // simulate drop before first poll lands
+    const handle = watchCutCompletion(stub, { format: 'hpgl', intervalMs: 5, onDone: done });
+    await new Promise(r => setTimeout(r, 30));
+    handle.cancel();
+    expect(done).not.toHaveBeenCalled();
+  });
+
+  it('cancel() stops polling immediately', async () => {
+    let polls = 0;
+    const handle = watchCutCompletion(watchStub(['2'], () => { polls += 1; }), {
+      format: 'hpgl', intervalMs: 5, onDone: () => {},
+    });
+    handle.cancel();
+    await new Promise(r => setTimeout(r, 30));
+    expect(polls).toBeLessThanOrEqual(1);
   });
 });

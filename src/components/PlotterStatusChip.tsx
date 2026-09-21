@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   Usb, Unplug, Plug, Pause, Play, Square, ArrowUp, Scissors, History, ChevronUp, ChevronDown,
 } from 'lucide-react';
@@ -7,8 +7,9 @@ import { toast } from '../lib/toast';
 import { useEditor } from '../store/editor';
 import { getSharedPlotterLink, type LinkEvent } from '../lib/plotterLink';
 import { loadPlotterPrefs } from '../lib/plotter';
-import { estimateEtaSeconds } from '../lib/plotterDiag';
+import { estimateEtaSeconds, watchCutCompletion, type WatchCutHandle } from '../lib/plotterDiag';
 import { listJobLog, type JobLogEntry } from '../lib/plotterRecords';
+import { decodeReply } from '../lib/hpglDebug';
 import { isTauri } from '../lib/runtime';
 
 /**
@@ -36,11 +37,41 @@ export function PlotterStatusChip() {
   const [historyVersion, setHistoryVersion] = useState(0);
   const startTsRef = useRef<number | null>(null);
   const wrapRef = useRef<HTMLSpanElement>(null);
+  // Cut-completion watch: after the transfer ends, poll the machine until
+  // it reports idle (see watchCutCompletion). cutting=true while watching.
+  const [cutting, setCutting] = useState(false);
+  const cutWatchRef = useRef<WatchCutHandle | null>(null);
+  const wasConnectedRef = useRef(false);
+  // Live position readout for the popover (refreshed while it is open).
+  const [positionLine, setPositionLine] = useState('');
 
   const native = isTauri();
   const webSerial = typeof navigator !== 'undefined' && 'serial' in navigator;
   const canConnect = native || webSerial;
   const connected = link.status === 'connected';
+
+  /** After a successful job transfer, poll the machine until it reports
+   *  idle — "transfer done" is not "cut done". Machines that never answer
+   *  status polls (most clones) get one honest notice, then silence. */
+  const startCutWatch = useCallback(() => {
+    cutWatchRef.current?.cancel();
+    const prefs = loadPlotterPrefs();
+    const format = prefs.format === 'gcode' ? 'gcode' : 'hpgl';
+    setCutting(true);
+    cutWatchRef.current = watchCutCompletion(getSharedPlotterLink(), {
+      format,
+      onDone: () => {
+        setCutting(false);
+        cutWatchRef.current = null;
+        toast.success(t('🎉 Cut finished — machine reports idle'));
+      },
+      onUnsupported: () => {
+        setCutting(false);
+        cutWatchRef.current = null;
+        toast.info(t('This machine does not report status — cut watch off. Judge completion visually or by the machine beeping.'));
+      },
+    });
+  }, [t]);
 
   useEffect(() => {
     return link.subscribe((ev: LinkEvent) => {
@@ -50,17 +81,29 @@ export function PlotterStatusChip() {
       } else if (ev.type === 'tx') {
         if (ev.bytes > 1024) startTsRef.current = ev.ts; // a job-sized payload
       } else if (ev.type === 'done') {
+        const wasJob = startTsRef.current !== null;
         startTsRef.current = null;
         setJob(null);
         setPaused(false);
         setHistoryVersion(v => v + 1); // the dialog logs the job around now
+        // Close the monitoring loop: watch the machine until it goes idle.
+        if (wasJob && !ev.aborted && !ev.error) startCutWatch();
       } else if (ev.type === 'flow') {
         setPaused(ev.paused);
       } else if (ev.type === 'status') {
+        if (ev.status === 'error' && wasConnectedRef.current) {
+          toast.error(ev.detail || t('Connection lost'));
+        }
+        if (ev.status !== 'connected') {
+          cutWatchRef.current?.cancel();
+          cutWatchRef.current = null;
+          setCutting(false);
+        }
+        wasConnectedRef.current = ev.status === 'connected';
         forceTick();
       }
     });
-  }, [link]);
+  }, [link, t, startCutWatch]);
 
   // Close the popover on outside clicks.
   useEffect(() => {
@@ -76,6 +119,30 @@ export function PlotterStatusChip() {
   // the external log store, so exhaustive-deps can't see why it matters.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const history = useMemo<JobLogEntry[]>(() => (open ? listJobLog().slice(0, 5) : []), [open, historyVersion]);
+
+  // Cancel the cut watch when a new job starts or on unmount.
+  useEffect(() => () => { cutWatchRef.current?.cancel(); }, []);
+
+  // Live position readout while the popover is open (3 s cadence — the
+  // console's auto-poll stays the richer tool). Stale values are hidden
+  // by the render guard below instead of cleared in the effect body.
+  useEffect(() => {
+    if (!open || !connected) return;
+    let stopped = false;
+    const prefs = loadPlotterPrefs();
+    const format = prefs.format === 'gcode' ? 'gcode' : 'hpgl';
+    const cmd = format === 'gcode' ? '?' : 'OA;';
+    const tick = async () => {
+      if (stopped || link.status !== 'connected') return;
+      try {
+        const reply = await link.query(cmd, 1200);
+        if (!stopped) setPositionLine(decodeReply(format, cmd, reply));
+      } catch { /* transient */ }
+    };
+    void tick();
+    const timer = window.setInterval(() => { void tick(); }, 3000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [open, connected, link]);
 
   const openDialog = () => {
     useEditor.getState().setModal('showPlotter', true);
@@ -143,6 +210,11 @@ export function PlotterStatusChip() {
         <span className={`inline-block h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
         <Usb size={11} aria-hidden="true" className="text-muted" />
         <span className={connected ? '' : 'text-muted'}>{label}</span>
+        {cutting && (
+          <span className="text-warning animate-pulse" title={t('Transfer done — the machine is still cutting (polled from its status replies).')}>
+            {t('Cutting…')}
+          </span>
+        )}
         {job && (
           <span className={`flex items-center gap-1 ${paused ? 'text-warning' : 'text-accent2'}`}>
             <span className="inline-block h-1 w-10 rounded bg-border overflow-hidden" aria-hidden="true">
@@ -177,6 +249,11 @@ export function PlotterStatusChip() {
           {connected && (
             <span className="mt-1 flex items-center gap-2 text-muted tabular-nums" title={t('Lifetime bytes over this connection')}>
               TX {fmtBytes(link.txBytes)} · RX {fmtBytes(link.rxBytes)}
+            </span>
+          )}
+          {open && connected && positionLine && (
+            <span className="mt-0.5 block text-ink/80 tabular-nums" title={t('Live machine position (polled while this panel is open).')}>
+              📍 {positionLine}
             </span>
           )}
 
