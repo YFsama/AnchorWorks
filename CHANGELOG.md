@@ -27,6 +27,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - **Envelope Distort — Make with Top Object**: targets deform into the top object's shape via even-odd scanline chord mapping (row-cached); curves refit after mapping, groups recurse, live text converts through the trace pipeline, the top object is consumed like Illustrator. Registered in Distort & Transform, the command palette, and the Free Distort dialog.
 - **Chinese dictionary lazy chunk**: keys-are-English collapsed the en table to 37 overrides and moved the 3,956-entry zh dictionary behind a dynamic import — entry chunk 1,306 kB → 889 kB (−52% cumulative from 1,851 kB); persisted-zh boots are flash-gated, others warm the chunk idle.
 - **selectionOps decomposition, phase 1**: the select-same and appearance-apply families moved verbatim to `src/lib/selection/` (16,941 → 16,232 lines) with the public surface preserved; next target identified — the template-generated imageHandoff family is 77% of what remains.
+- **Interactive Width tool (`Shift+W`)**: hover a stroked path for station handles, drag perpendicular to set local width with a live outline preview, Alt+click deletes a station — monotone-Hermite interpolation, one undo per gesture, committed outlines stay re-editable in place and profile-menu outputs are editable too. 35 tests.
+- **imageHandoff extraction (selectionOps phase 2)**: the 13,024-line template-generated package/handoff report family moved to its own lazy chunk (671 kB, dynamic-imported by its 662 menu/palette handlers). selectionOps.ts is down to 3,241 lines; the eager canvasEngine chunk drops 726 → 96 kB (−72 kB gzip eager).
 
 ## [0.12.1] — 2026-06-10
 

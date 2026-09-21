@@ -36,7 +36,7 @@ Pre-built installers for every release are on the [Releases page](https://github
 ## Features
 
 **Editor**
-- Tools: Select, Rect, Ellipse, Line, Polygon, Pen, Pencil (pressure-aware), Eraser, Knife (freehand drag-to-cut, `K`), Shape Builder (drag-to-merge / Alt-drag-to-erase regions, `Shift+M`), Text, Hand, Zoom, Measure, Eyedropper (all visible in the left toolbar, with desktop scrolling for short windows)
+- Tools: Select, Rect, Ellipse, Line, Polygon, Pen, Pencil (pressure-aware), Eraser, Knife (freehand drag-to-cut, `K`), Shape Builder (drag-to-merge / Alt-drag-to-erase regions, `Shift+M`), Width (drag station handles for variable-width strokes, `Shift+W`), Text, Hand, Zoom, Measure, Eyedropper (all visible in the left toolbar, with desktop scrolling for short windows)
 - Direct-select path editing (drag individual anchor points)
 - Transform HUD: live W×H / angle readout while scaling/rotating; Shift+drag locks movement to the dominant axis; Shift+wheel pans horizontally; mouse-wheel behaviour switchable between Figma-style scroll and Illustrator-style zoom (Preferences → Editor)
 - Boolean ops: union / subtract / intersect / exclude (web-worker, won't freeze UI)
