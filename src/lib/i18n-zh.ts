@@ -4162,4 +4162,12 @@ export const zhDict: Record<string, string> = {
   "Shape Builder: drag across regions to merge them; Alt-drag to erase.": "形状生成器：拖过区域即可合并；按住 Alt 拖动则擦除。",
   "Merged regions into one shape.": "区域已合并为一个形状。",
   "Erased selected regions.": "已擦除所选区域。",
+  "Envelope Distort — Make with Top Object": "封套扭曲 — 用顶部对象制作",
+  "Envelope Distort": "封套扭曲",
+  "Select the artwork plus one vector shape on top (2+ objects) — the top-most object becomes the envelope.": "请先选中要变形的图形，再在其上方选中一个矢量形状（至少 2 个对象）——最上层的对象将作为封套。",
+  "objects reshaped into the envelope": "个对象已变形并填入封套",
+  "raster images skipped": "张位图已跳过",
+  "Envelope (top object)": "封套（顶部对象）",
+  "Reshape the other selected objects to fill the top-most shape. The top object is consumed, as in Illustrator.": "将其他选中对象变形以填满最上层的形状。与 Illustrator 一致，顶部对象会被消耗掉。",
+  "Make with Top Object": "用顶部对象制作",
 };

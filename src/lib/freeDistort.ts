@@ -134,3 +134,13 @@ export function freeDistortSelection(offsets: FreeDistortCorners): number {
   }
   return count;
 }
+
+// Envelope Distort (Make with Top Object) lives in ./envelope.ts — re-exported
+// here so the free-distort feature family stays reachable from one module.
+export {
+  envelopeSelection,
+  applyEnvelopeWithTopObject,
+  canEnvelopeTopObject,
+  canEnvelopeTargetObject,
+} from './envelope';
+export type { EnvelopeOutcome } from './envelope';

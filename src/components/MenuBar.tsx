@@ -41,6 +41,7 @@ import { isTauri, isMac, getOSLabel, platformInfo, ariaKeyshortcuts, type Native
 import { getAutoSaveStatus, subscribeAutoSaveStatus, type AutoSaveStatus } from '../lib/autosave';
 import { setOutlineMode } from '../lib/outlineView';
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
+import { envelopeSelection } from '../lib/envelope';
 import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, savePlotterTestCut } from '../lib/cutPrepActions';
 import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
 import { applyStrokeAlign } from '../lib/strokeAlign';
@@ -1646,6 +1647,12 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Twist…'), onClick: () => openWithSelection('showTwist') },
           { label: t('Free Distort…'), onClick: () => openWithSelection('showFreeDistort') },
           { label: t('Arc Warp…'), onClick: () => openWithSelection('showWarp') },
+          { label: t('Envelope Distort — Make with Top Object'), onClick: () => {
+            void envelopeSelection().then((r) => {
+              if (r && r.reshaped > 0) toast.success(`${r.reshaped} ${t('objects reshaped into the envelope')}${r.skipped > 0 ? ` · ${r.skipped} ${t('raster images skipped')}` : ''}`, { title: t('Envelope Distort') });
+              else toast.warn(t('Select the artwork plus one vector shape on top (2+ objects) — the top-most object becomes the envelope.'), { title: t('Envelope Distort') });
+            });
+          } },
           { label: t('Blend…'), onClick: () => openWithSelection('showBlend', t('Select 2 or more objects first.'), 2) },
           { label: t('Select Blend Steps'), onClick: () => { const n = selectBlendSteps(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('No generated blend steps found.')); } },
           { label: t('Select Related Blend Steps'), onClick: () => { const n = selectBlendStepsFromSelection(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); } },

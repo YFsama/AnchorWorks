@@ -39,6 +39,7 @@ import { addArrowheads } from '../lib/arrowheads';
 import { averageSelectedAnchors } from '../lib/pathEdit';
 import { toggleIsolationMode } from '../lib/isolationMode';
 import { createOutlinesFromText } from '../lib/textToOutline';
+import { envelopeSelection } from '../lib/envelope';
 import { changeCaseSelection, adjustFontSize, adjustTracking, adjustLeading } from '../lib/textCase';
 import { smartPunctuationSelection } from '../lib/smartPunctuation';
 import { splitTextToLetters, splitTextToLines } from '../lib/splitText';
@@ -1559,6 +1560,12 @@ export function CommandPalette({
     { id: 'path.twist',        label: t('Twist…'),             category: t('Arrange'), keywords: 'twist twirl swirl spiral distort rotate', icon: PenTool, run: () => runWithSelection(() => setModal('showTwist', true)) },
     { id: 'path.freeDistort',  label: t('Free Distort…'),      category: t('Arrange'), keywords: 'free distort perspective envelope corner transform', icon: PenTool, run: () => runWithSelection(() => setModal('showFreeDistort', true)) },
     { id: 'path.warp',         label: t('Arc Warp…'),          category: t('Arrange'), keywords: 'warp arc arch bend banner envelope distort curve', icon: PenTool, run: () => runWithSelection(() => setModal('showWarp', true)) },
+    { id: 'path.envelope',     label: t('Envelope Distort — Make with Top Object'), category: t('Arrange'), keywords: 'envelope distort top object fit shape banner arch badge illustrator', icon: PenTool, run: () => {
+      void envelopeSelection().then((r) => {
+        if (r && r.reshaped > 0) toast.success(`${r.reshaped} ${t('objects reshaped into the envelope')}${r.skipped > 0 ? ` · ${r.skipped} ${t('raster images skipped')}` : ''}`, { title: t('Envelope Distort') });
+        else toast.warn(t('Select the artwork plus one vector shape on top (2+ objects) — the top-most object becomes the envelope.'), { title: t('Envelope Distort') });
+      });
+    } },
     { id: 'insert.star',       label: t('Star / Polygon…'),    category: t('Insert'), keywords: 'star polygon spiral shape burst pentagon hexagon insert create', icon: Star, run: () => setModal('showStar', true) },
     { id: 'symbol.redefine', label: t('Redefine Symbol'), category: t('Arrange'), keywords: 'symbol redefine update master instance library', icon: Star, run: () => { void redefineSymbolFromSelection().then((entry) => { if (entry) toast.success(t('Symbol redefined')); else toast.warn(t('Select a symbol instance first.')); }); } },
     { id: 'symbol.breakLink', label: t('Break Symbol Link'), category: t('Arrange'), keywords: 'symbol break link detach expand instance library', icon: Star, run: () => { const count = detachSymbolInstancesFromSelection(); if (count) toast.success(`${count} ${t('symbol instances detached')}`); else toast.warn(t('Select a symbol instance first.')); } },

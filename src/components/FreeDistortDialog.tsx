@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { X, Move3D } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { clearFreeDistortPreview, freeDistortSelection, updateFreeDistortPreview, type FreeDistortCorner, type FreeDistortCorners } from '../lib/freeDistort';
+import { envelopeSelection } from '../lib/envelope';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
@@ -61,6 +62,14 @@ export function FreeDistortDialog() {
     if (n > 0) toast.success(`${n} ${t('shapes distorted')}`, { title: t('Free Distort') });
     else toast.warn(t('Select one or more paths/shapes first.'), { title: t('Free Distort') });
     close();
+  };
+
+  const applyTopObjectEnvelope = () => {
+    void envelopeSelection().then((r) => {
+      close();
+      if (r && r.reshaped > 0) toast.success(`${r.reshaped} ${t('objects reshaped into the envelope')}${r.skipped > 0 ? ` · ${r.skipped} ${t('raster images skipped')}` : ''}`, { title: t('Envelope Distort') });
+      else toast.warn(t('Select the artwork plus one vector shape on top (2+ objects) — the top-most object becomes the envelope.'), { title: t('Envelope Distort') });
+    });
   };
 
   const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -181,6 +190,21 @@ export function FreeDistortDialog() {
               />
             </div>
           ))}
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-border">
+          <div className="field-label !mb-1">{t('Envelope (top object)')}</div>
+          <p className="text-xs text-muted leading-relaxed mb-2">
+            {t('Reshape the other selected objects to fill the top-most shape. The top object is consumed, as in Illustrator.')}
+          </p>
+          <button
+            type="button"
+            className="btn w-full"
+            onClick={applyTopObjectEnvelope}
+            title={t('Reshape the other selected objects to fill the top-most shape. The top object is consumed, as in Illustrator.')}
+          >
+            {t('Make with Top Object')}
+          </button>
         </div>
 
         <div
