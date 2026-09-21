@@ -45,6 +45,13 @@ import {
   shapeBuilderCancel,
 } from './shapeBuilderTool';
 import {
+  isWidthToolActive,
+  widthToolDown,
+  widthToolMove,
+  widthToolUp,
+  widthToolDeactivate,
+} from './widthTool';
+import {
   isShapeDrawActive,
   shapeDrawBegin,
   shapeDrawUpdate,
@@ -59,7 +66,7 @@ import { PressureBrush } from '../pressureBrush';
 import { computeBrushBaseWidth, getBrushPreset } from '../brushPresets';
 import { panBegin } from '../panSession';
 import {
-  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Slice, Shapes, Type, Hand, ZoomIn, Ruler, Pipette,
+  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Slice, Shapes, StretchHorizontal, Type, Hand, ZoomIn, Ruler, Pipette,
 } from 'lucide-react';
 
 let initialized = false;
@@ -252,6 +259,27 @@ export function registerBuiltInTools(): void {
     onMouseUp: () => { if (isShapeBuilderActive()) shapeBuilderEnd(); },
     // Switching tools mid-drag cancels the sweep without committing.
     onDeactivate: () => shapeBuilderCancel(),
+  });
+
+  // Width (Illustrator Shift+W / Affinity) — hover a stroked path and its
+  // width stations appear; drag a station across the stroke to taper it
+  // with a live preview of the expanded outline. Alt-click removes a
+  // station. Station math in ../variableWidth.ts, pointer state machine +
+  // overlays in widthTool.ts. Same suspend-history-for-one-undo-entry model
+  // as the knife; commit reuses the variable-width outline machinery.
+  registerTool({
+    id: 'width',
+    label: 'Width Tool',
+    icon: StretchHorizontal,
+    keywords: 'width taper variable stroke thickness broaden narrow pressure calligraphy hand lettering',
+    shortcut: 'Shift+W',
+    cursor: 'crosshair',
+    skipTargetFind: true,
+    onMouseDown: (ctx) => widthToolDown(ctx.canvas, ctx.sp, (ctx.raw.e as MouseEvent).altKey),
+    onMouseMove: (ctx) => widthToolMove(ctx.canvas, ctx.sp),
+    onMouseUp: (ctx) => { if (isWidthToolActive()) widthToolUp(ctx.canvas); },
+    // Switching tools mid-drag cancels the edit; overlays come down too.
+    onDeactivate: (canvas) => widthToolDeactivate(canvas),
   });
 
   // Text + viewport.

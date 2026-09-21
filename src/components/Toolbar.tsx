@@ -17,7 +17,7 @@ const toolGroups: ToolId[][] = [
   // Primitive shapes
   ['rect', 'ellipse', 'line', 'polygon', 'shapeBuilder'],
   // Path / drawing
-  ['pen', 'pencil', 'eraser', 'knife'],
+  ['pen', 'pencil', 'eraser', 'knife', 'width'],
   // Text
   ['text'],
   // Viewport navigation

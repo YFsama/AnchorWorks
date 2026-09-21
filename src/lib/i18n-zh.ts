@@ -4170,4 +4170,8 @@ export const zhDict: Record<string, string> = {
   "Envelope (top object)": "封套（顶部对象）",
   "Reshape the other selected objects to fill the top-most shape. The top object is consumed, as in Illustrator.": "将其他选中对象变形以填满最上层的形状。与 Illustrator 一致，顶部对象会被消耗掉。",
   "Make with Top Object": "用顶部对象制作",
+  "Width Tool": "宽度工具",
+  "Width Tool: hover a stroked path to see its width stations; drag a station across the stroke to taper it. Alt-click a station to remove it.": "宽度工具：将光标悬停在描边路径上即可显示宽度站点；垂直于路径拖动站点即可调整局部宽度。按住 Alt 单击站点可将其删除。",
+  "Endpoint stations cannot be deleted.": "端点站点无法删除。",
+  "Width station removed.": "已删除宽度站点。",
 };

@@ -10,6 +10,7 @@ export type ToolId =
   | 'eraser'
   | 'knife'
   | 'shapeBuilder'
+  | 'width'
   | 'text'
   | 'hand'
   | 'zoom'
