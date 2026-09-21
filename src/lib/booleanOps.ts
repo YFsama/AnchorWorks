@@ -168,8 +168,11 @@ function ellipseRings(rx: number, ry: number): [number, number][][] {
 /**
  * Convert any supported Fabric object into polygon rings in canvas coordinates.
  * Returns null if the object can't be reduced to a closed polygon.
+ *
+ * Exported for the Shape Builder tool (./shapeBuilder.ts + ./tools/shapeBuilderTool.ts),
+ * which needs the same object→rings flattening the boolean ops use.
  */
-function objectToRings(obj: FabricObject): [number, number][][] | null {
+export function objectToRings(obj: FabricObject): [number, number][][] | null {
   let local: [number, number][][] | null = null;
 
   if (obj.type === 'path') {
@@ -226,8 +229,11 @@ function objectToRings(obj: FabricObject): [number, number][][] | null {
  * smooth-curve runs and emits real C segments for them, keeping sharp
  * corners as L. The visual result: round inputs stay round after union /
  * difference / intersection / xor.
+ *
+ * Exported for the Shape Builder tool, which rebuilds region geometry into
+ * paths with the same curve-refit pass the boolean ops use.
  */
-function multiPolygonToPathD(mp: MultiPolygon): string {
+export function multiPolygonToPathD(mp: MultiPolygon): string {
   const parts: string[] = [];
   for (const poly of mp) {
     for (const ring of poly) {

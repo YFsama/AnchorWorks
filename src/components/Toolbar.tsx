@@ -15,7 +15,7 @@ const toolGroups: ToolId[][] = [
   // Pointer / selection
   ['select'],
   // Primitive shapes
-  ['rect', 'ellipse', 'line', 'polygon'],
+  ['rect', 'ellipse', 'line', 'polygon', 'shapeBuilder'],
   // Path / drawing
   ['pen', 'pencil', 'eraser', 'knife'],
   // Text

@@ -4156,4 +4156,10 @@ export const zhDict: Record<string, string> = {
   "Transfer done — the machine is still cutting (polled from its status replies).": "传输已完成——机器仍在切割（依据其状态应答轮询）。",
   "Connection lost": "连接已断开",
   "Live machine position (polled while this panel is open).": "机器实时位置（面板打开期间轮询）。",
+  "Shape Builder": "形状生成器",
+  "Shape Builder needs at least two objects. Select overlapping shapes or place more shapes on the canvas.": "形状生成器需要至少两个对象。请先选中相互重叠的形状，或在画布上放置更多形状。",
+  "Shape Builder works on up to 8 objects at once.": "形状生成器一次最多处理 8 个对象。",
+  "Shape Builder: drag across regions to merge them; Alt-drag to erase.": "形状生成器：拖过区域即可合并；按住 Alt 拖动则擦除。",
+  "Merged regions into one shape.": "区域已合并为一个形状。",
+  "Erased selected regions.": "已擦除所选区域。",
 };

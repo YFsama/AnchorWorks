@@ -38,6 +38,13 @@ import {
   knifeCancel,
 } from './knifeTool';
 import {
+  isShapeBuilderActive,
+  shapeBuilderBegin,
+  shapeBuilderStroke,
+  shapeBuilderEnd,
+  shapeBuilderCancel,
+} from './shapeBuilderTool';
+import {
   isShapeDrawActive,
   shapeDrawBegin,
   shapeDrawUpdate,
@@ -52,7 +59,7 @@ import { PressureBrush } from '../pressureBrush';
 import { computeBrushBaseWidth, getBrushPreset } from '../brushPresets';
 import { panBegin } from '../panSession';
 import {
-  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Slice, Type, Hand, ZoomIn, Ruler, Pipette,
+  MousePointer2, Square, Circle, Slash, Pentagon, PenTool, Pencil, Eraser, Slice, Shapes, Type, Hand, ZoomIn, Ruler, Pipette,
 } from 'lucide-react';
 
 let initialized = false;
@@ -224,6 +231,27 @@ export function registerBuiltInTools(): void {
     // Switching tools mid-drag cancels the stroke (no cut) — knifeCancel is
     // idempotent when no drag is in flight.
     onDeactivate: () => knifeCancel(),
+  });
+
+  // Shape Builder (Illustrator Shift+M / Affinity) — drag across the
+  // arrangement regions of 2+ selected (or all top-level) overlapping
+  // objects to merge the swept regions into one path; Alt at drag start
+  // flips the gesture to erase. Region math in ../shapeBuilder.ts, pointer
+  // state machine + live overlays in shapeBuilderTool.ts. Same
+  // suspend-history-for-one-undo-entry model as the knife.
+  registerTool({
+    id: 'shapeBuilder',
+    label: 'Shape Builder',
+    icon: Shapes,
+    keywords: 'merge combine weld regions boolean pathfinder paint shapebuilder subtract erase',
+    shortcut: 'Shift+M',
+    cursor: 'crosshair',
+    skipTargetFind: true,
+    onMouseDown: (ctx) => shapeBuilderBegin(ctx.sp, (ctx.raw.e as MouseEvent).altKey),
+    onMouseMove: (ctx) => { if (isShapeBuilderActive()) shapeBuilderStroke(ctx.sp); },
+    onMouseUp: () => { if (isShapeBuilderActive()) shapeBuilderEnd(); },
+    // Switching tools mid-drag cancels the sweep without committing.
+    onDeactivate: () => shapeBuilderCancel(),
   });
 
   // Text + viewport.
