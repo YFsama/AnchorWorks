@@ -29,10 +29,10 @@ test('app boots, splash hides, and chrome renders', async ({ page }) => {
   await expect(page.locator('[role="menubar"]')).toBeVisible();
   const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
-  // 14 tools today: Select, Rect, Ellipse, Line, Polygon, Pen, Pencil,
-  // Eraser, Knife, Text, Hand, Zoom, Measure, Eyedropper. Asserting count
-  // guards against accidental removal.
-  await expect(toolbar.locator('button')).toHaveCount(14);
+  // 16 tools today: Select, Rect, Ellipse, Line, Polygon, Shape Builder, Pen,
+  // Pencil, Eraser, Knife, Width, Text, Hand, Zoom, Measure, Eyedropper.
+  // Asserting count guards against accidental removal.
+  await expect(toolbar.locator('button')).toHaveCount(16);
 
   await expect(page.locator('[role="status"]').first()).toBeVisible();
 
