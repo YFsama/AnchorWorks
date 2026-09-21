@@ -23,6 +23,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - **Editor operability**: live W×H / angle HUD while scaling/rotating, Shift+drag axis-lock, Shift+wheel horizontal pan, and a Mouse-wheel preference (Figma-style scroll default or Illustrator-style wheel-zoom) in Preferences → Editor.
 - **First-paint**: CommandPalette and the canvas context menu are now lazy chunks (entry 1,851 kB → 1,306 kB, −29.4%); history snapshots cost one canvas stringify instead of three with zero-copy cut-path sharing.
 - **Test infra**: jsdom localStorage shim for Node ≥ 26 (the inert experimental global shadowed jsdom's Storage and broke 31 storage tests).
+- **Interactive Shape Builder (`Shift+M`)**: drag across arrangement regions of 2–8 overlapping objects to merge them into one path, Alt-drag to erase regions — Affinity/Illustrator-style with live region highlighting, one undo per gesture, and untouched sources keeping their object identity.
+- **Envelope Distort — Make with Top Object**: targets deform into the top object's shape via even-odd scanline chord mapping (row-cached); curves refit after mapping, groups recurse, live text converts through the trace pipeline, the top object is consumed like Illustrator. Registered in Distort & Transform, the command palette, and the Free Distort dialog.
+- **Chinese dictionary lazy chunk**: keys-are-English collapsed the en table to 37 overrides and moved the 3,956-entry zh dictionary behind a dynamic import — entry chunk 1,306 kB → 889 kB (−52% cumulative from 1,851 kB); persisted-zh boots are flash-gated, others warm the chunk idle.
+- **selectionOps decomposition, phase 1**: the select-same and appearance-apply families moved verbatim to `src/lib/selection/` (16,941 → 16,232 lines) with the public surface preserved; next target identified — the template-generated imageHandoff family is 77% of what remains.
 
 ## [0.12.1] — 2026-06-10
 
