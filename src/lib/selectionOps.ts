@@ -23,351 +23,80 @@ import { useEditor, type UserGuide } from '../store/editor';
 import { updateSelection } from './selectionApply';
 import { ALL_FONTS } from './fonts';
 
+// Select Same / select-by-attribute family — moved verbatim to ./selection/selectByAttribute.
+export type { SelectSameProp } from './selection/selectByAttribute';
+export {
+  shadowSignature,
+  patternSignature,
+  gradientSignature,
+  overprintSignature,
+  fillStrokeSignature,
+  fillAppearanceSignature,
+  strokeAppearanceSignature,
+  textAppearanceSignature,
+  objectPositionSignature,
+  objectXSignature,
+  objectYSignature,
+  objectRightSignature,
+  objectBottomSignature,
+  objectCenterSignature,
+  objectCenterXSignature,
+  objectCenterYSignature,
+  objectSizeSignature,
+  objectBoundsSignature,
+  objectWidthSignature,
+  objectHeightSignature,
+  objectAreaSignature,
+  objectAspectRatioSignature,
+  objectScaleSignature,
+  objectSkewSignature,
+  objectRotationSignature,
+  objectTransformSignature,
+  artboardPlacementSignature,
+  artboardAnyPlacementSignature,
+  appearanceSignature,
+  selectSameSignature,
+  sameSignature,
+  selectSame,
+  selectSameActiveArtboard,
+} from './selection/selectByAttribute';
+// Same-family signatures still used directly by helpers below (hasPatternFill / hasGradientFill).
+import { patternSignature, gradientSignature } from './selection/selectByAttribute';
+// Appearance apply / prepress fix machinery — moved verbatim to ./selection/appearanceApply.
+import {
+  processPaintFromSpot,
+  processPaintFromLab,
+  processPaintFromGrayscale,
+  processPaintFromRgb,
+  processPaintFromNonCmyk,
+  reducedInkPaint,
+  transformPrepressPaints,
+  transformPrepressPaintsOnActiveArtboard,
+  fixPrepressPaints,
+  fixPrepressPaintsOnActiveArtboard,
+  fixPrepressRisks,
+  clearOverprints,
+  clearWhiteOverprints,
+  clearWhiteOverprintsOnActiveArtboard,
+  fixTransparencyAppearance,
+  fixDashedStrokes,
+  fixThinStrokes,
+} from './selection/appearanceApply';
+
 type FabricObject = fabric.FabricObject;
 
-export type SelectSameProp = 'fill' | 'fillAppearance' | 'stroke' | 'fillStroke' | 'strokeAppearance' | 'strokeWidth' | 'opacity' | 'fontFamily' | 'fontSize' | 'textAppearance' | 'objectX' | 'objectY' | 'objectPosition' | 'objectRight' | 'objectBottom' | 'objectBounds' | 'objectCenterX' | 'objectCenterY' | 'objectCenter' | 'objectWidth' | 'objectHeight' | 'objectSize' | 'objectArea' | 'objectAspectRatio' | 'objectScale' | 'objectSkew' | 'objectRotation' | 'objectTransform' | 'artboardPlacement' | 'artboardAnyPlacement' | 'globalCompositeOperation' | 'strokeLineCap' | 'strokeLineJoin' | 'strokeDashArray' | 'name' | 'shadow' | 'patternSpec' | 'symbolId' | 'clipPath' | 'appearance' | 'gradientFill' | 'overprint' | 'printMarkKind';
+export type MatchableObject = Record<string, unknown>;
 
-type MatchableObject = Record<string, unknown>;
-
-function normalizeString(value: unknown): string | null {
+export function normalizeString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : null;
 }
 
-export function shadowSignature(value: unknown): string | null {
-  if (!value || typeof value !== 'object') return null;
-  const shadow = value as { color?: unknown; blur?: unknown; offsetX?: unknown; offsetY?: unknown };
-  const color = normalizeString(shadow.color);
-  if (!color) return null;
-  const numberPart = [shadow.blur, shadow.offsetX, shadow.offsetY]
-    .map((n) => (typeof n === 'number' && Number.isFinite(n) ? Number(n).toFixed(3) : '0.000'))
-    .join('|');
-  return `${color}|${numberPart}`;
-}
-
-export function patternSignature(value: unknown): string | null {
-  if (!value || typeof value !== 'object') return null;
-  const pattern = value as { kind?: unknown; size?: unknown; color1?: unknown; color2?: unknown };
-  const kind = normalizeString(pattern.kind);
-  const color1 = normalizeString(pattern.color1);
-  const color2 = normalizeString(pattern.color2);
-  const size = typeof pattern.size === 'number' && Number.isFinite(pattern.size) ? Number(pattern.size).toFixed(3) : null;
-  return kind && size && color1 && color2 ? `${kind}|${size}|${color1}|${color2}` : null;
-}
-
-export function gradientSignature(value: unknown): string | null {
-  if (!value || typeof value !== 'object') return null;
-  const gradient = value as { type?: unknown; coords?: Record<string, unknown>; colorStops?: Array<{ offset?: unknown; color?: unknown }> };
-  const type = normalizeString(gradient.type);
-  if (type !== 'linear' && type !== 'radial') return null;
-  const coords = gradient.coords ?? {};
-  const coordPart = ['x1', 'y1', 'x2', 'y2', 'r1', 'r2']
-    .map((key) => numericSignature(coords[key], 0))
-    .join(',');
-  const stops = Array.isArray(gradient.colorStops) ? gradient.colorStops : [];
-  if (stops.length < 2) return null;
-  const stopPart = stops
-    .map((stop) => `${numericSignature(stop.offset, 0)}:${normalizeString(stop.color) ?? ''}`)
-    .join(',');
-  return `${type}|${coordPart}|${stopPart}`;
-}
-
-function overprintFlag(object: MatchableObject, keys: string[]): boolean {
-  return keys.some((key) => object[key] === true);
-}
-
-export function overprintSignature(object: MatchableObject): string | null {
-  const fill = overprintFlag(object, ['fillOverprint', 'overprintFill']);
-  const stroke = overprintFlag(object, ['strokeOverprint', 'overprintStroke']);
-  const both = object.overprint === true;
-  if (!fill && !stroke && !both) return null;
-  return `fill:${fill || both}|stroke:${stroke || both}`;
-}
-
-function numericSignature(value: unknown, fallback = 0): string {
-  return (typeof value === 'number' && Number.isFinite(value) ? value : fallback).toFixed(3);
-}
-
-function paintSignature(value: unknown): string {
-  return typeof value === 'string' ? normalizeString(value) ?? '' : '';
-}
-
-export function fillStrokeSignature(object: MatchableObject): string | null {
-  const fill = paintSignature(object.fill);
-  const stroke = paintSignature(object.stroke);
-  return fill || stroke ? `fill:${fill}|stroke:${stroke}` : null;
-}
-
-export function fillAppearanceSignature(object: MatchableObject): string | null {
-  const solid = paintSignature(object.fill);
-  const gradient = gradientSignature(object.fill) ?? '';
-  const pattern = patternSignature(object.patternSpec) ?? '';
-  if (!solid && !gradient && !pattern) return null;
-  return [
-    `fill:${solid}`,
-    `gradient:${gradient}`,
-    `pattern:${pattern}`,
-    `opacity:${numericSignature(object.opacity, 1)}`,
-    `blend:${normalizeString(object.globalCompositeOperation) ?? 'source-over'}`,
-  ].join('|');
-}
-
-export function strokeAppearanceSignature(object: MatchableObject): string | null {
-  const stroke = paintSignature(object.stroke);
-  if (!stroke) return null;
-  const dash = Array.isArray(object.strokeDashArray)
-    ? object.strokeDashArray.map(Number).filter(Number.isFinite).map((n) => n.toFixed(3)).join(',')
-    : '';
-  return [
-    `stroke:${stroke}`,
-    `strokeWidth:${numericSignature(object.strokeWidth)}`,
-    `dash:${dash}`,
-    `cap:${normalizeString(object.strokeLineCap) ?? 'butt'}`,
-    `join:${normalizeString(object.strokeLineJoin) ?? 'miter'}`,
-  ].join('|');
-}
-
-const TEXT_TYPES = ['i-text', 'text', 'textbox'];
+export const TEXT_TYPES = ['i-text', 'text', 'textbox'];
 const REGISTERED_FONT_FAMILIES = new Set(ALL_FONTS.flatMap((font) => [font.name, font.family.split(',')[0] ?? font.family].map((family) => normalizeString(family))));
 const CSS_PIXELS_PER_INCH = 96;
 const LOW_RESOLUTION_IMAGE_PPI = 150;
 const HIGH_RESOLUTION_IMAGE_PPI = 450;
-const THIN_STROKE_WIDTH = 0.25;
-
-export function textAppearanceSignature(object: MatchableObject): string | null {
-  const type = typeof object.type === 'string' ? object.type : '';
-  if (!TEXT_TYPES.includes(type)) return null;
-  const fontFamily = normalizeString(object.fontFamily);
-  if (!fontFamily) return null;
-  return [
-    `family:${fontFamily}`,
-    `size:${numericSignature(object.fontSize)}`,
-    `weight:${normalizeString(object.fontWeight) ?? 'normal'}`,
-    `style:${normalizeString(object.fontStyle) ?? 'normal'}`,
-    `tracking:${numericSignature(object.charSpacing)}`,
-    `leading:${numericSignature(object.lineHeight, 1)}`,
-  ].join('|');
-}
-
-export function objectPositionSignature(object: MatchableObject): string | null {
-  const left = typeof object.left === 'number' && Number.isFinite(object.left) ? object.left : 0;
-  const top = typeof object.top === 'number' && Number.isFinite(object.top) ? object.top : 0;
-  return `left:${numericSignature(left)}|top:${numericSignature(top)}`;
-}
-
-export function objectXSignature(object: MatchableObject): string | null {
-  const left = typeof object.left === 'number' && Number.isFinite(object.left) ? object.left : 0;
-  return `left:${numericSignature(left)}`;
-}
-
-export function objectYSignature(object: MatchableObject): string | null {
-  const top = typeof object.top === 'number' && Number.isFinite(object.top) ? object.top : 0;
-  return `top:${numericSignature(top)}`;
-}
-
-export function objectRightSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  const left = typeof object.left === 'number' && Number.isFinite(object.left) ? object.left : 0;
-  return `right:${numericSignature(left + size.width)}`;
-}
-
-export function objectBottomSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  const top = typeof object.top === 'number' && Number.isFinite(object.top) ? object.top : 0;
-  return `bottom:${numericSignature(top + size.height)}`;
-}
-
-function scaledSize(object: MatchableObject): { width: number; height: number } | null {
-  const width = typeof object.width === 'number' && Number.isFinite(object.width) ? object.width : null;
-  const height = typeof object.height === 'number' && Number.isFinite(object.height) ? object.height : null;
-  if (!width || !height) return null;
-  const scaleX = typeof object.scaleX === 'number' && Number.isFinite(object.scaleX) ? object.scaleX : 1;
-  const scaleY = typeof object.scaleY === 'number' && Number.isFinite(object.scaleY) ? object.scaleY : 1;
-  const actualWidth = Math.abs(width * scaleX);
-  const actualHeight = Math.abs(height * scaleY);
-  if (actualWidth <= 0 || actualHeight <= 0) return null;
-  return { width: actualWidth, height: actualHeight };
-}
-
-export function objectCenterSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  const left = typeof object.left === 'number' && Number.isFinite(object.left) ? object.left : 0;
-  const top = typeof object.top === 'number' && Number.isFinite(object.top) ? object.top : 0;
-  return `centerX:${numericSignature(left + size.width / 2)}|centerY:${numericSignature(top + size.height / 2)}`;
-}
-
-export function objectCenterXSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  const left = typeof object.left === 'number' && Number.isFinite(object.left) ? object.left : 0;
-  return `centerX:${numericSignature(left + size.width / 2)}`;
-}
-
-export function objectCenterYSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  const top = typeof object.top === 'number' && Number.isFinite(object.top) ? object.top : 0;
-  return `centerY:${numericSignature(top + size.height / 2)}`;
-}
-
-export function objectSizeSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  return `width:${numericSignature(size.width)}|height:${numericSignature(size.height)}`;
-}
-
-export function objectBoundsSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  const left = typeof object.left === 'number' && Number.isFinite(object.left) ? object.left : 0;
-  const top = typeof object.top === 'number' && Number.isFinite(object.top) ? object.top : 0;
-  return `left:${numericSignature(left)}|top:${numericSignature(top)}|right:${numericSignature(left + size.width)}|bottom:${numericSignature(top + size.height)}`;
-}
-
-export function objectWidthSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  return `width:${numericSignature(size.width)}`;
-}
-
-export function objectHeightSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  return `height:${numericSignature(size.height)}`;
-}
-
-export function objectAreaSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  return `area:${numericSignature(size.width * size.height)}`;
-}
-
-export function objectAspectRatioSignature(object: MatchableObject): string | null {
-  const size = scaledSize(object);
-  if (!size) return null;
-  return `aspect:${numericSignature(size.width / size.height)}`;
-}
-
-export function objectScaleSignature(object: MatchableObject): string | null {
-  const scaleX = typeof object.scaleX === 'number' && Number.isFinite(object.scaleX) ? object.scaleX : 1;
-  const scaleY = typeof object.scaleY === 'number' && Number.isFinite(object.scaleY) ? object.scaleY : 1;
-  return `scaleX:${numericSignature(scaleX)}|scaleY:${numericSignature(scaleY)}`;
-}
-
-export function objectSkewSignature(object: MatchableObject): string | null {
-  const skewX = typeof object.skewX === 'number' && Number.isFinite(object.skewX) ? object.skewX : 0;
-  const skewY = typeof object.skewY === 'number' && Number.isFinite(object.skewY) ? object.skewY : 0;
-  return `skewX:${numericSignature(skewX)}|skewY:${numericSignature(skewY)}`;
-}
-
-export function objectRotationSignature(object: MatchableObject): string | null {
-  if (typeof object.angle !== 'number' || !Number.isFinite(object.angle)) return 'angle:0.000';
-  const normalized = ((object.angle % 360) + 360) % 360;
-  return `angle:${numericSignature(normalized)}`;
-}
-
-export function objectTransformSignature(object: MatchableObject): string | null {
-  return [
-    objectScaleSignature(object),
-    objectSkewSignature(object),
-    objectRotationSignature(object),
-  ].join('|');
-}
-
-export function artboardPlacementSignature(object: MatchableObject): string | null {
-  if (typeof object.getBoundingRect !== 'function') return null;
-  const bounds = firstArtboardBounds();
-  if (!bounds) return null;
-  const box = objectBoundingBox(object as unknown as FabricObject);
-  if (!box) return null;
-  if (isOutsideBounds(box, bounds)) return 'outside-artboard';
-  if (isInsideBounds(box, bounds)) return 'inside-artboard';
-  return 'overflowing-artboard';
-}
-
-export function artboardAnyPlacementSignature(object: MatchableObject): string | null {
-  if (typeof object.getBoundingRect !== 'function') return null;
-  const boundsList = artboardBounds();
-  if (boundsList.length === 0) return null;
-  const box = objectBoundingBox(object as unknown as FabricObject);
-  if (!box) return null;
-  if (boundsList.some((bounds) => isInsideBounds(box, bounds))) return 'inside-any-artboard';
-  if (boundsList.some((bounds) => !isOutsideBounds(box, bounds))) return 'overflowing-any-artboard';
-  return 'outside-any-artboard';
-}
-
-export function appearanceSignature(object: MatchableObject): string {
-  const shadow = shadowSignature(object.shadow) ?? '';
-  const pattern = patternSignature(object.patternSpec) ?? '';
-  const gradient = gradientSignature(object.fill) ?? '';
-  const dash = Array.isArray(object.strokeDashArray)
-    ? object.strokeDashArray.map(Number).filter(Number.isFinite).map((n) => n.toFixed(3)).join(',')
-    : '';
-  return [
-    `fill:${paintSignature(object.fill)}`,
-    `stroke:${paintSignature(object.stroke)}`,
-    `strokeWidth:${numericSignature(object.strokeWidth)}`,
-    `opacity:${numericSignature(object.opacity, 1)}`,
-    `blend:${normalizeString(object.globalCompositeOperation) ?? 'source-over'}`,
-    `dash:${dash}`,
-    `cap:${normalizeString(object.strokeLineCap) ?? 'butt'}`,
-    `join:${normalizeString(object.strokeLineJoin) ?? 'miter'}`,
-    `shadow:${shadow}`,
-    `pattern:${pattern}`,
-    `gradient:${gradient}`,
-  ].join('|');
-}
-
-export function selectSameSignature(object: MatchableObject, prop: SelectSameProp): string | number[] | number | null {
-  const value = object[prop];
-  if (prop === 'appearance') return appearanceSignature(object);
-  if (prop === 'fillAppearance') return fillAppearanceSignature(object);
-  if (prop === 'fillStroke') return fillStrokeSignature(object);
-  if (prop === 'strokeAppearance') return strokeAppearanceSignature(object);
-  if (prop === 'textAppearance') return textAppearanceSignature(object);
-  if (prop === 'objectX') return objectXSignature(object);
-  if (prop === 'objectY') return objectYSignature(object);
-  if (prop === 'objectPosition') return objectPositionSignature(object);
-  if (prop === 'objectRight') return objectRightSignature(object);
-  if (prop === 'objectBottom') return objectBottomSignature(object);
-  if (prop === 'objectBounds') return objectBoundsSignature(object);
-  if (prop === 'objectCenterX') return objectCenterXSignature(object);
-  if (prop === 'objectCenterY') return objectCenterYSignature(object);
-  if (prop === 'objectCenter') return objectCenterSignature(object);
-  if (prop === 'objectWidth') return objectWidthSignature(object);
-  if (prop === 'objectHeight') return objectHeightSignature(object);
-  if (prop === 'objectSize') return objectSizeSignature(object);
-  if (prop === 'objectArea') return objectAreaSignature(object);
-  if (prop === 'objectAspectRatio') return objectAspectRatioSignature(object);
-  if (prop === 'objectScale') return objectScaleSignature(object);
-  if (prop === 'objectSkew') return objectSkewSignature(object);
-  if (prop === 'objectRotation') return objectRotationSignature(object);
-  if (prop === 'objectTransform') return objectTransformSignature(object);
-  if (prop === 'artboardPlacement') return artboardPlacementSignature(object);
-  if (prop === 'artboardAnyPlacement') return artboardAnyPlacementSignature(object);
-  if (prop === 'gradientFill') return gradientSignature(object.fill);
-  if (prop === 'overprint') return overprintSignature(object);
-  if (prop === 'printMarkKind') return normalizeString(value);
-  if (prop === 'shadow') return shadowSignature(value);
-  if (prop === 'patternSpec') return patternSignature(value);
-  if (prop === 'symbolId') return normalizeString(value);
-  if (prop === 'clipPath') return value ? 'clipPath' : null;
-  if (prop === 'strokeDashArray') return Array.isArray(value) ? value.map(Number).filter(Number.isFinite) : [];
-  if (prop === 'strokeWidth' || prop === 'opacity' || prop === 'fontSize') return typeof value === 'number' ? value : null;
-  return normalizeString(value);
-}
-
-export function sameSignature(a: string | number[] | number | null, b: string | number[] | number | null): boolean {
-  if (a == null || b == null) return false;
-  if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b)) return false;
-    return a.length === b.length && a.every((n, index) => Math.abs(n - b[index]) < 1e-6);
-  }
-  if (typeof a === 'number' || typeof b === 'number') return typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < 1e-6;
-  return a === b;
-}
+export const THIN_STROKE_WIDTH = 0.25;
 
 /** Remove every object in the active selection and clear the selection. */
 export function deleteSelection(): void {
@@ -443,56 +172,6 @@ export function nudgeSelection(dx: number, dy: number): void {
     canvas.requestRenderAll();
     pushHistory();
   }
-}
-
-/**
- * Select every object whose `fill` (or `stroke`) matches the active object's —
- * Illustrator's Select → Same → Fill / Stroke Color. Only flat string colours
- * match (gradients/patterns are skipped). Returns the count selected.
- */
-export function selectSame(prop: SelectSameProp): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  const ref = canvas.getActiveObject();
-  if (!ref) return 0;
-  const target = selectSameSignature(ref as unknown as MatchableObject, prop);
-  if (target == null) return 0;
-
-  const matches = canvas.getObjects().filter((object) => {
-    if ((object as { excludeFromExport?: boolean }).excludeFromExport) return false;
-    return sameSignature(selectSameSignature(object as unknown as MatchableObject, prop), target);
-  });
-  if (matches.length === 0) return 0;
-  canvas.discardActiveObject();
-  if (matches.length === 1) canvas.setActiveObject(matches[0]);
-  else canvas.setActiveObject(new fabric.ActiveSelection(matches, { canvas }));
-  canvas.requestRenderAll();
-  return matches.length;
-}
-
-/** Select objects sharing a Select Same signature, scoped to the active object's artboard. */
-export function selectSameActiveArtboard(prop: SelectSameProp): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  const ref = canvas.getActiveObject();
-  if (!ref) return 0;
-  const target = selectSameSignature(ref as unknown as MatchableObject, prop);
-  if (target == null) return 0;
-  const bounds = activeArtboardBounds();
-  if (!bounds) return 0;
-
-  const matches = canvas.getObjects().filter((object) => {
-    if (!isSelectableArtwork(object)) return false;
-    if (!sameSignature(selectSameSignature(object as unknown as MatchableObject, prop), target)) return false;
-    const box = objectBoundingBox(object);
-    return box !== null && !isOutsideBounds(box, bounds);
-  });
-  if (matches.length === 0) return 0;
-  canvas.discardActiveObject();
-  if (matches.length === 1) canvas.setActiveObject(matches[0]);
-  else canvas.setActiveObject(new fabric.ActiveSelection(matches, { canvas }));
-  canvas.requestRenderAll();
-  return matches.length;
 }
 
 
@@ -15245,7 +14924,7 @@ function isStrokePainted(object: FabricObject): boolean {
   return !isNoPaint(object.stroke) && ((object.strokeWidth ?? 1) > 0);
 }
 
-function isTruthyOverprintFlag(value: unknown): boolean {
+export function isTruthyOverprintFlag(value: unknown): boolean {
   if (value === true) return true;
   if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
   if (typeof value !== 'string') return false;
@@ -15455,7 +15134,7 @@ function removeMatchingObjects(predicate: (object: FabricObject) => boolean): nu
   return objs.length;
 }
 
-function isSelectableArtwork(object: FabricObject): boolean {
+export function isSelectableArtwork(object: FabricObject): boolean {
   return !(object as { excludeFromExport?: boolean }).excludeFromExport && object.selectable !== false;
 }
 
@@ -15464,7 +15143,7 @@ function hasObjectName(object: FabricObject): boolean {
   return typeof name === 'string' && name.trim().length > 0;
 }
 
-function artboardBounds(): Array<{ left: number; top: number; right: number; bottom: number }> {
+export function artboardBounds(): Array<{ left: number; top: number; right: number; bottom: number }> {
   return useEditor.getState().artboards.map((artboard) => ({
     left: artboard.x,
     top: artboard.y,
@@ -15473,21 +15152,21 @@ function artboardBounds(): Array<{ left: number; top: number; right: number; bot
   }));
 }
 
-function firstArtboardBounds(): { left: number; top: number; right: number; bottom: number } | null {
+export function firstArtboardBounds(): { left: number; top: number; right: number; bottom: number } | null {
   return artboardBounds()[0] ?? null;
 }
 
-function objectBoundingBox(object: FabricObject): { left: number; top: number; right: number; bottom: number } | null {
+export function objectBoundingBox(object: FabricObject): { left: number; top: number; right: number; bottom: number } | null {
   const rect = object.getBoundingRect();
   if (![rect.left, rect.top, rect.width, rect.height].every((value) => typeof value === 'number' && Number.isFinite(value))) return null;
   return { left: rect.left, top: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height };
 }
 
-function isOutsideBounds(box: { left: number; top: number; right: number; bottom: number }, bounds: { left: number; top: number; right: number; bottom: number }): boolean {
+export function isOutsideBounds(box: { left: number; top: number; right: number; bottom: number }, bounds: { left: number; top: number; right: number; bottom: number }): boolean {
   return box.right <= bounds.left || box.left >= bounds.right || box.bottom <= bounds.top || box.top >= bounds.bottom;
 }
 
-function isInsideBounds(box: { left: number; top: number; right: number; bottom: number }, bounds: { left: number; top: number; right: number; bottom: number }): boolean {
+export function isInsideBounds(box: { left: number; top: number; right: number; bottom: number }, bounds: { left: number; top: number; right: number; bottom: number }): boolean {
   return box.left >= bounds.left && box.right <= bounds.right && box.top >= bounds.top && box.bottom <= bounds.bottom;
 }
 
@@ -15669,17 +15348,17 @@ export function fixFullyTransparentActiveArtboardObjects(): number {
   return inActiveArtboard ? removeMatchingObjects((o) => isSelectableArtwork(o) && inActiveArtboard(o) && isFullyTransparentObject(o)) : 0;
 }
 
-function hasTransparencyAppearance(object: FabricObject): boolean {
+export function hasTransparencyAppearance(object: FabricObject): boolean {
   const opacity = typeof object.opacity === 'number' && Number.isFinite(object.opacity) ? object.opacity : 1;
   const blendMode = normalizeString((object as unknown as MatchableObject).globalCompositeOperation) ?? 'source-over';
   return opacity < 1 || (blendMode !== 'source-over' && blendMode !== 'normal');
 }
 
-function hasDashedStroke(object: FabricObject): boolean {
+export function hasDashedStroke(object: FabricObject): boolean {
   return Array.isArray(object.strokeDashArray) && object.strokeDashArray.some((value) => typeof value === 'number' && Number.isFinite(value) && value > 0);
 }
 
-function hasThinStroke(object: FabricObject): boolean {
+export function hasThinStroke(object: FabricObject): boolean {
   return isStrokePainted(object) && typeof object.strokeWidth === 'number' && Number.isFinite(object.strokeWidth) && object.strokeWidth > 0 && object.strokeWidth < THIN_STROKE_WIDTH;
 }
 
@@ -15917,7 +15596,7 @@ function cmykChannel(value: unknown, keys: string[]): number | null {
   return null;
 }
 
-function cmykPaintChannels(value: unknown): { c: number; m: number; y: number; k: number } | null {
+export function cmykPaintChannels(value: unknown): { c: number; m: number; y: number; k: number } | null {
   if (!value || typeof value !== 'object') return null;
   const c = cmykChannel(value, ['c', 'cyan']);
   const m = cmykChannel(value, ['m', 'magenta']);
@@ -15936,7 +15615,7 @@ function labChannel(value: unknown, keys: string[], min: number, max: number): n
   return null;
 }
 
-function labPaintChannels(value: unknown): { l: number; a: number; b: number } | null {
+export function labPaintChannels(value: unknown): { l: number; a: number; b: number } | null {
   if (!value || typeof value !== 'object' || cmykPaintChannels(value) || rgbPaintChannels(value)) return null;
   const record = value as Record<string, unknown>;
   const mode = normalizeString(record.mode) ?? normalizeString(record.type) ?? normalizeString(record.colorType) ?? normalizeString(record.kind);
@@ -15956,7 +15635,7 @@ function grayChannel(value: unknown, keys: string[]): number | null {
   return null;
 }
 
-function grayscalePaintValue(value: unknown): number | null {
+export function grayscalePaintValue(value: unknown): number | null {
   if (!value || typeof value !== 'object' || cmykPaintChannels(value) || rgbPaintChannels(value)) return null;
   const record = value as Record<string, unknown>;
   const mode = normalizeString(record.mode) ?? normalizeString(record.type) ?? normalizeString(record.colorType) ?? normalizeString(record.kind);
@@ -15975,7 +15654,7 @@ function rgbChannel(value: unknown, keys: string[]): number | null {
   return null;
 }
 
-function rgbPaintChannels(value: unknown): { r: number; g: number; b: number } | null {
+export function rgbPaintChannels(value: unknown): { r: number; g: number; b: number } | null {
   if (!value || typeof value !== 'object') return null;
   const r = rgbChannel(value, ['r', 'red']);
   const g = rgbChannel(value, ['g', 'green']);
@@ -15983,7 +15662,7 @@ function rgbPaintChannels(value: unknown): { r: number; g: number; b: number } |
   return r == null || g == null || b == null ? null : { r, g, b };
 }
 
-function parseRgbString(value: string): { r: number; g: number; b: number } | null {
+export function parseRgbString(value: string): { r: number; g: number; b: number } | null {
   const normalized = value.trim().toLowerCase();
   const shortHex = /^#([0-9a-f]{3})$/i.exec(normalized);
   if (shortHex) {
@@ -16017,7 +15696,7 @@ function parseRgbString(value: string): { r: number; g: number; b: number } | nu
   return named[normalized] ?? null;
 }
 
-function paintName(value: unknown): string {
+export function paintName(value: unknown): string {
   if (!value || typeof value !== 'object') return '';
   const record = value as Record<string, unknown>;
   for (const key of ['name', 'spotName', 'swatchName', 'colorName', 'ink']) {
@@ -16027,7 +15706,7 @@ function paintName(value: unknown): string {
   return '';
 }
 
-function isSpotPaint(value: unknown): boolean {
+export function isSpotPaint(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
   if (record.spot === true || record.isSpot === true || record.spotColor === true || record.separation === true || record.isSeparation === true) return true;
@@ -16041,7 +15720,7 @@ function isLabPaint(value: unknown): boolean {
   return labPaintChannels(value) !== null;
 }
 
-function isGrayscalePaint(value: unknown): boolean {
+export function isGrayscalePaint(value: unknown): boolean {
   const gray = grayscalePaintValue(value);
   return gray !== null && gray > 0.001 && gray < 99.999;
 }
@@ -16050,7 +15729,7 @@ function isDefaultRgbEndpoint(channels: { r: number; g: number; b: number }): bo
   return (channels.r <= 0.001 && channels.g <= 0.001 && channels.b <= 0.001) || (channels.r >= 254.999 && channels.g >= 254.999 && channels.b >= 254.999);
 }
 
-function isRgbPaint(value: unknown): boolean {
+export function isRgbPaint(value: unknown): boolean {
   if (typeof value === 'string') {
     const channels = parseRgbString(value);
     return channels !== null && !isDefaultRgbEndpoint(channels);
@@ -16063,7 +15742,7 @@ function isRgbPaint(value: unknown): boolean {
   return mode === 'rgb' || mode === 'srgb' || mode === 'screen';
 }
 
-function isWhitePaint(value: unknown): boolean {
+export function isWhitePaint(value: unknown): boolean {
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase().replace(/\s+/g, '');
     return normalized === '#fff' || normalized === '#ffffff' || normalized === 'white' || normalized === 'rgb(255,255,255)' || normalized === 'rgba(255,255,255,1)';
@@ -16074,7 +15753,7 @@ function isWhitePaint(value: unknown): boolean {
   return name === 'white' || name === 'paper' || name === '[paper]';
 }
 
-function isRegistrationPaint(value: unknown): boolean {
+export function isRegistrationPaint(value: unknown): boolean {
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
     return normalized === 'registration' || normalized === '[registration]' || normalized === 'all' || normalized === '[all]';
@@ -16085,14 +15764,14 @@ function isRegistrationPaint(value: unknown): boolean {
   return name === 'registration' || name === '[registration]' || name === 'all' || name === '[all]';
 }
 
-function isRichBlackPaint(value: unknown): boolean {
+export function isRichBlackPaint(value: unknown): boolean {
   if (isRegistrationPaint(value)) return false;
   const channels = cmykPaintChannels(value);
   if (!channels) return false;
   return channels.k >= 90 && channels.c + channels.m + channels.y >= 30;
 }
 
-function isOverInkLimitPaint(value: unknown, limit = 300): boolean {
+export function isOverInkLimitPaint(value: unknown, limit = 300): boolean {
   if (isRegistrationPaint(value)) return false;
   const channels = cmykPaintChannels(value);
   if (!channels) return false;
@@ -16141,158 +15820,7 @@ function hasWhiteOverprint(object: FabricObject): boolean {
   return (record._objects ?? []).some(hasWhiteOverprint);
 }
 
-const PROCESS_BLACK = { c: 0, m: 0, y: 0, k: 100, name: 'Process Black' };
-
-function cloneProcessBlack(): { c: number; m: number; y: number; k: number; name: string } {
-  return { ...PROCESS_BLACK };
-}
-
-function processPaintFromSpot(value: unknown): { c: number; m: number; y: number; k: number; name: string } | null {
-  if (!isSpotPaint(value)) return null;
-  const channels = cmykPaintChannels(value);
-  if (!channels) return cloneProcessBlack();
-  const sourceName = paintName(value);
-  const processName = sourceName.replace(/^(pantone|pms|spot)\s+/i, '').replace(/\s+spot\b/i, '').trim();
-  return {
-    c: Number(channels.c.toFixed(3)),
-    m: Number(channels.m.toFixed(3)),
-    y: Number(channels.y.toFixed(3)),
-    k: Number(channels.k.toFixed(3)),
-    name: processName ? `Process ${processName}` : 'Process Color',
-  };
-}
-
-function rgbToProcessCmyk(channels: { r: number; g: number; b: number }, name: string): { c: number; m: number; y: number; k: number; name: string } {
-  const r = channels.r / 255;
-  const g = channels.g / 255;
-  const b = channels.b / 255;
-  const k = 1 - Math.max(r, g, b);
-  if (k >= 1) return { c: 0, m: 0, y: 0, k: 100, name };
-  return {
-    c: Number((((1 - r - k) / (1 - k)) * 100).toFixed(3)),
-    m: Number((((1 - g - k) / (1 - k)) * 100).toFixed(3)),
-    y: Number((((1 - b - k) / (1 - k)) * 100).toFixed(3)),
-    k: Number((k * 100).toFixed(3)),
-    name,
-  };
-}
-
-function pivotLab(value: number): number {
-  const cubed = value ** 3;
-  return cubed > 0.008856 ? cubed : (value - 16 / 116) / 7.787;
-}
-
-function labToRgbChannels(channels: { l: number; a: number; b: number }): { r: number; g: number; b: number } {
-  const y = (channels.l + 16) / 116;
-  const x = channels.a / 500 + y;
-  const z = y - channels.b / 200;
-  const xyz = {
-    x: 95.047 * pivotLab(x),
-    y: 100 * pivotLab(y),
-    z: 108.883 * pivotLab(z),
-  };
-  const linear = {
-    r: xyz.x * 0.032406 + xyz.y * -0.015372 + xyz.z * -0.004986,
-    g: xyz.x * -0.009689 + xyz.y * 0.018758 + xyz.z * 0.000415,
-    b: xyz.x * 0.000557 + xyz.y * -0.00204 + xyz.z * 0.01057,
-  };
-  const gamma = (value: number) => {
-    const normalized = Math.max(0, Math.min(1, value));
-    return normalized > 0.0031308 ? 1.055 * normalized ** (1 / 2.4) - 0.055 : 12.92 * normalized;
-  };
-  return {
-    r: Math.round(gamma(linear.r) * 255),
-    g: Math.round(gamma(linear.g) * 255),
-    b: Math.round(gamma(linear.b) * 255),
-  };
-}
-
-function processPaintFromLab(value: unknown): { c: number; m: number; y: number; k: number; name: string } | null {
-  const lab = labPaintChannels(value);
-  return lab ? rgbToProcessCmyk(labToRgbChannels(lab), 'Process Lab') : null;
-}
-
-function processPaintFromGrayscale(value: unknown): { c: number; m: number; y: number; k: number; name: string } | null {
-  if (!isGrayscalePaint(value)) return null;
-  const gray = grayscalePaintValue(value);
-  if (gray == null) return null;
-  return { c: 0, m: 0, y: 0, k: Number(gray.toFixed(3)), name: 'Process Gray' };
-}
-
-function processPaintFromRgb(value: unknown): { c: number; m: number; y: number; k: number; name: string } | null {
-  if (!isRgbPaint(value)) return null;
-  const channels = typeof value === 'string' ? parseRgbString(value) : rgbPaintChannels(value);
-  return channels ? rgbToProcessCmyk(channels, 'Process RGB') : null;
-}
-
-function processPaintFromNonCmyk(value: unknown): { c: number; m: number; y: number; k: number; name: string } | null {
-  return processPaintFromSpot(value) ?? processPaintFromLab(value) ?? processPaintFromGrayscale(value) ?? processPaintFromRgb(value);
-}
-
-function reducedInkPaint(value: unknown, limit = 300): { c: number; m: number; y: number; k: number; name: string } | null {
-  if (!isOverInkLimitPaint(value, limit)) return null;
-  const channels = cmykPaintChannels(value);
-  if (!channels) return null;
-  const cmyTotal = channels.c + channels.m + channels.y;
-  const cmyLimit = Math.max(0, limit - channels.k);
-  const scale = cmyTotal > 0 ? Math.min(1, cmyLimit / cmyTotal) : 1;
-  const next = {
-    c: Number((channels.c * scale).toFixed(3)),
-    m: Number((channels.m * scale).toFixed(3)),
-    y: Number((channels.y * scale).toFixed(3)),
-    k: Number(channels.k.toFixed(3)),
-  };
-  const overflow = next.c + next.m + next.y + next.k - limit;
-  if (overflow > 0) {
-    const key = next.c >= next.m && next.c >= next.y ? 'c' : next.m >= next.y ? 'm' : 'y';
-    next[key] = Number(Math.max(0, next[key] - overflow).toFixed(3));
-  }
-  return { ...next, name: 'Ink Limit 300%' };
-}
-
-function transformPaintMatching(object: FabricObject, transform: (value: unknown) => unknown | null): number {
-  const record = object as unknown as { fill?: unknown; stroke?: unknown; _objects?: FabricObject[]; set?: (key: string, value: unknown) => void };
-  let changed = 0;
-  for (const key of ['fill', 'stroke'] as const) {
-    const next = transform(record[key]);
-    if (!next) continue;
-    if (record.set) record.set(key, next);
-    else record[key] = next;
-    changed += 1;
-  }
-  for (const child of record._objects ?? []) changed += transformPaintMatching(child, transform);
-  return changed;
-}
-
-function fixPaintMatching(object: FabricObject, predicate: (value: unknown) => boolean): number {
-  const record = object as unknown as { fill?: unknown; stroke?: unknown; _objects?: FabricObject[]; set?: (key: string, value: unknown) => void };
-  let changed = 0;
-  for (const key of ['fill', 'stroke'] as const) {
-    if (!predicate(record[key])) continue;
-    if (record.set) record.set(key, cloneProcessBlack());
-    else record[key] = cloneProcessBlack();
-    changed += 1;
-  }
-  for (const child of record._objects ?? []) changed += fixPaintMatching(child, predicate);
-  return changed;
-}
-
-function transformPrepressPaints(transform: (value: unknown) => unknown | null, objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && objectPredicate(object)) changed += transformPaintMatching(object, transform);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
-function activeArtboardObjectPredicate(): ((object: FabricObject) => boolean) | null {
+export function activeArtboardObjectPredicate(): ((object: FabricObject) => boolean) | null {
   const bounds = activeArtboardBounds();
   if (!bounds) return null;
   return (object) => {
@@ -16301,248 +15829,11 @@ function activeArtboardObjectPredicate(): ((object: FabricObject) => boolean) | 
   };
 }
 
-function transformPrepressPaintsOnActiveArtboard(transform: (value: unknown) => unknown | null, objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const inActiveArtboard = activeArtboardObjectPredicate();
-  if (!inActiveArtboard) return 0;
-  return transformPrepressPaints(transform, (object) => inActiveArtboard(object) && objectPredicate(object));
-}
-
-function fixPrepressPaintsOnActiveArtboard(predicate: (value: unknown) => boolean, objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const inActiveArtboard = activeArtboardObjectPredicate();
-  if (!inActiveArtboard) return 0;
-  return fixPrepressPaints(predicate, (object) => inActiveArtboard(object) && objectPredicate(object));
-}
-
-function fixPrepressPaints(predicate: (value: unknown) => boolean, objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && objectPredicate(object)) changed += fixPaintMatching(object, predicate);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
-function fixPrepressPaintsInObject(object: FabricObject): number {
-  let changed = 0;
-  changed += transformPaintMatching(object, (value) => processPaintFromNonCmyk(value));
-  changed += fixPaintMatching(object, isRichBlackPaint);
-  if (!hasPrintMarkKind(object)) changed += fixPaintMatching(object, isRegistrationPaint);
-  changed += transformPaintMatching(object, (value) => reducedInkPaint(value));
-  return changed;
-}
-
-function fixPrepressRisks(objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (!isSelectableArtwork(object) || !objectPredicate(object)) continue;
-    changed += clearOverprintInObject(object);
-    changed += fixTransparencyInObject(object);
-    changed += fixDashedStrokeInObject(object);
-    changed += fixThinStrokeInObject(object);
-    changed += fixPrepressPaintsInObject(object);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
-function clearOverprintRecordFlags(record: Record<string, unknown>): boolean {
-  const directKeys = ['overprint', 'fillOverprint', 'strokeOverprint', 'overprintFill', 'overprintStroke', '__overprint', '__fillOverprint', '__strokeOverprint'];
-  let changed = false;
-  for (const key of directKeys) {
-    if (isTruthyOverprintFlag(record[key])) {
-      record[key] = false;
-      changed = true;
-    }
-  }
-  return changed;
-}
-
-function clearOverprintInObject(object: FabricObject): number {
-  const record = object as unknown as Record<string, unknown> & { _objects?: FabricObject[]; set?: (props: Record<string, unknown>) => void };
-  let changed = 0;
-  const updates: Record<string, unknown> = {};
-  const directKeys = ['overprint', 'fillOverprint', 'strokeOverprint', 'overprintFill', 'overprintStroke', '__overprint', '__fillOverprint', '__strokeOverprint'];
-  for (const key of directKeys) {
-    if (isTruthyOverprintFlag(record[key])) updates[key] = false;
-  }
-
-  if (Object.keys(updates).length > 0) {
-    if (record.set) record.set(updates);
-    else Object.assign(record, updates);
-    changed = 1;
-  }
-
-  for (const key of ['metadata', 'data', 'customData']) {
-    const metadata = record[key];
-    if (metadata && typeof metadata === 'object' && clearOverprintRecordFlags(metadata as Record<string, unknown>)) changed = 1;
-  }
-
-  for (const child of record._objects ?? []) changed += clearOverprintInObject(child);
-  return changed;
-}
-
-function clearOverprints(objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && objectPredicate(object)) changed += clearOverprintInObject(object);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
-function clearWhiteOverprintInObject(object: FabricObject): number {
-  const record = object as unknown as { fill?: unknown; stroke?: unknown; fillOverprint?: boolean; overprintFill?: boolean; strokeOverprint?: boolean; overprintStroke?: boolean; overprint?: boolean; _objects?: FabricObject[]; set?: (props: Record<string, unknown>) => void };
-  const updates: Record<string, unknown> = {};
-  let changed = 0;
-  const fillWhite = isWhitePaint(record.fill);
-  const strokeWhite = isWhitePaint(record.stroke);
-  if (fillWhite && record.fillOverprint === true) { updates.fillOverprint = false; changed += 1; }
-  if (fillWhite && record.overprintFill === true) { updates.overprintFill = false; changed += 1; }
-  if (strokeWhite && record.strokeOverprint === true) { updates.strokeOverprint = false; changed += 1; }
-  if (strokeWhite && record.overprintStroke === true) { updates.overprintStroke = false; changed += 1; }
-  if (record.overprint === true && (fillWhite || strokeWhite)) {
-    updates.overprint = false;
-    if (!fillWhite && record.fill != null) updates.fillOverprint = true;
-    if (!strokeWhite && record.stroke != null) updates.strokeOverprint = true;
-    changed += 1;
-  }
-  if (Object.keys(updates).length > 0) {
-    if (record.set) record.set(updates);
-    else Object.assign(record, updates);
-  }
-  for (const child of record._objects ?? []) changed += clearWhiteOverprintInObject(child);
-  return changed;
-}
-
-function clearWhiteOverprints(objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && objectPredicate(object)) changed += clearWhiteOverprintInObject(object);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
-function clearWhiteOverprintsOnActiveArtboard(): number {
-  const inActiveArtboard = activeArtboardObjectPredicate();
-  return inActiveArtboard ? clearWhiteOverprints(inActiveArtboard) : 0;
-}
-
-function fixDashedStrokeInObject(object: FabricObject): number {
-  const record = object as unknown as { strokeDashArray?: unknown; _objects?: FabricObject[]; set?: (key: string, value: unknown) => void };
-  let changed = 0;
-  if (hasDashedStroke(object)) {
-    if (record.set) record.set('strokeDashArray', null);
-    else record.strokeDashArray = null;
-    changed += 1;
-  }
-  for (const child of record._objects ?? []) changed += fixDashedStrokeInObject(child);
-  return changed;
-}
-
-function fixTransparencyInObject(object: FabricObject): number {
-  const record = object as unknown as { opacity?: number; globalCompositeOperation?: string; _objects?: FabricObject[]; set?: (key: string, value: unknown) => void };
-  let changed = 0;
-  if (hasTransparencyAppearance(object)) {
-    if (record.set) {
-      record.set('opacity', 1);
-      record.set('globalCompositeOperation', 'source-over');
-    } else {
-      record.opacity = 1;
-      record.globalCompositeOperation = 'source-over';
-    }
-    changed += 1;
-  }
-  for (const child of record._objects ?? []) changed += fixTransparencyInObject(child);
-  return changed;
-}
-
-function fixTransparencyAppearance(objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && objectPredicate(object)) changed += fixTransparencyInObject(object);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
-function fixDashedStrokes(objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && objectPredicate(object)) changed += fixDashedStrokeInObject(object);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
-function fixThinStrokeInObject(object: FabricObject): number {
-  const record = object as unknown as { strokeWidth?: number; _objects?: FabricObject[]; set?: (key: string, value: unknown) => void };
-  let changed = 0;
-  if (hasThinStroke(object)) {
-    if (record.set) record.set('strokeWidth', THIN_STROKE_WIDTH);
-    else record.strokeWidth = THIN_STROKE_WIDTH;
-    changed += 1;
-  }
-  for (const child of record._objects ?? []) changed += fixThinStrokeInObject(child);
-  return changed;
-}
-
-function fixThinStrokes(objectPredicate: (object: FabricObject) => boolean = () => true): number {
-  const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && objectPredicate(object)) changed += fixThinStrokeInObject(object);
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
-}
-
 function hasRegistrationPaint(object: FabricObject): boolean {
   return hasPaintMatching(object, isRegistrationPaint);
 }
 
-function hasPrintMarkKind(object: FabricObject): boolean {
+export function hasPrintMarkKind(object: FabricObject): boolean {
   return typeof (object as unknown as { printMarkKind?: unknown }).printMarkKind === 'string';
 }
 
@@ -16616,7 +15907,7 @@ export function selectRegistrationColorActiveArtboardObjects(): number {
   return selectObjectsByActiveArtboard((box, bounds) => !isOutsideBounds(box, bounds), (o) => hasRegistrationPaint(o));
 }
 
-function activeArtboardBounds(): { left: number; top: number; right: number; bottom: number } | null {
+export function activeArtboardBounds(): { left: number; top: number; right: number; bottom: number } | null {
   const canvas = getCanvas();
   if (!canvas) return null;
   const ref = canvas.getActiveObject();
