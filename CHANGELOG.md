@@ -29,6 +29,11 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - **selectionOps decomposition, phase 1**: the select-same and appearance-apply families moved verbatim to `src/lib/selection/` (16,941 → 16,232 lines) with the public surface preserved; next target identified — the template-generated imageHandoff family is 77% of what remains.
 - **Interactive Width tool (`Shift+W`)**: hover a stroked path for station handles, drag perpendicular to set local width with a live outline preview, Alt+click deletes a station — monotone-Hermite interpolation, one undo per gesture, committed outlines stay re-editable in place and profile-menu outputs are editable too. 35 tests.
 - **imageHandoff extraction (selectionOps phase 2)**: the 13,024-line template-generated package/handoff report family moved to its own lazy chunk (671 kB, dynamic-imported by its 662 menu/palette handlers). selectionOps.ts is down to 3,241 lines; the eager canvasEngine chunk drops 726 → 96 kB (−72 kB gzip eager).
+- **Color separations workflow** (`Document > Separations…`): inventories every spot/process paint in the document, live-isolates any plate on the canvas non-destructively, and exports plates as SVG or 2× PNG — a capability no other web vector tool in our survey ships. 11 tests.
+- **Viewport broadcast gating**: overlay canvases (rulers, grid, artboards, guides, cut paths, measure) now repaint only on real zoom/pan changes instead of every rendered frame (audit finding — biggest runtime win per line).
+- **In-app help for the whole wave**: Help Center grows 63 → 74 topics covering every new tool and workflow, every statement verified against the code (en/zh).
+- **Width-tool metadata now persists** through project files, undo snapshots, and the clipboard via Fabric's customProperties allow-list, with fail-soft normalization of corrupted records. 9 tests.
+- **Tauri Rust side compile-verified**: `cargo check` green on the shipped serial/epson Rust code.
 
 ## [0.12.1] — 2026-06-10
 
