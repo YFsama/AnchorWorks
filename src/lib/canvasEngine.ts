@@ -130,7 +130,20 @@ export function initCanvas(el: HTMLCanvasElement) {
   canvas.on('selection:updated', updateSelection);
   canvas.on('selection:cleared', clearSelection);
 
-  canvas.on('after:render', () => emitViewport());
+  // Overlays only care about zoom/pan, but after:render fires for every
+  // repaint (selection drags, object edits, tool previews). Gate the
+  // broadcast on an actual viewportTransform change so the overlay
+  // canvases (rulers, grid, artboards, guides, cut paths, measure) don't
+  // synchronously full-repaint on every rendered frame.
+  lastViewportKey = '';
+  canvas.on('after:render', () => {
+    const vt = canvas!.viewportTransform;
+    if (!vt) return;
+    const key = vt.join(',');
+    if (key === lastViewportKey) return;
+    lastViewportKey = key;
+    emitViewport();
+  });
 
   // Drawing handlers
   canvas.on('mouse:down', onMouseDown);
@@ -175,6 +188,7 @@ export function disposeCanvas() {
   resetIsolationModeForCanvasDisposal();
   if (hudHideTimer) { clearTimeout(hudHideTimer); hudHideTimer = null; }
   dragOrigin = null;
+  lastViewportKey = '';
   canvas?.dispose();
   canvas = null;
   history = null;
@@ -258,6 +272,9 @@ let dragOrigin: { left: number; top: number } | null = null;
 
 /** Auto-hide timer for the live transform HUD (set on mouse:up). */
 let hudHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Last viewportTransform signature broadcast to overlays (frame gate). */
+let lastViewportKey = '';
 
 /** Publish the live transform readout and cancel any pending auto-hide. */
 function showTransformHud(hud: { kind: 'scale'; w: number; h: number } | { kind: 'rotate'; angle: number }): void {
