@@ -2136,6 +2136,313 @@ function buildTopics(t: (k: string) => string): Topic[] {
         </>
       ),
     },
+
+    // ------------- Tools (latest wave) -------------
+    {
+      id: 'tool-knife',
+      category: t('Tools'),
+      title: t('Knife tool'),
+      keywords: 'slice cut split freehand kerf divide carve',
+      body: () => (
+        <>
+          <P>
+            The <strong>Knife</strong> (<Kbd>K</Kbd>) slices objects along a
+            freehand line. Press and drag a dashed polyline across the artwork;
+            on release every crossed object is split along that corridor. The
+            sliver inside the corridor is discarded as kerf, so the surviving
+            pieces carry a visible hairline gap — what a real blade leaves.
+          </P>
+          <H>What gets cut</H>
+          <P>
+            The active selection when one exists, otherwise every top-level
+            object — the same targeting rule as the eraser. A graze that doesn't
+            fully divide an object leaves it untouched. Press <Kbd>Esc</Kbd>
+            mid-drag to cancel; each cut is a single undo entry.
+          </P>
+          <H>Straight cuts</H>
+          <P>
+            For axis-aligned splits use <em>Document → Path → Knife Split
+            Horizontal / Vertical</em>: every selected closed shape is halved
+            through its centre.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'tool-shape-builder',
+      category: t('Tools'),
+      title: t('Shape Builder'),
+      keywords: 'merge weld erase regions paint pathfinder combine',
+      body: () => (
+        <>
+          <P>
+            The <strong>Shape Builder</strong> (<Kbd>Shift</Kbd><Kbd>M</Kbd>)
+            merges or erases overlapping regions by painting over them. Give it
+            two to eight objects — the selection when it holds two or more,
+            otherwise all top-level shapes — and their overlaps are divided into
+            regions live: two overlapping squares yield three (A-only, B-only,
+            and the overlap).
+          </P>
+          <H>Drag to merge, Alt-drag to erase</H>
+          <P>
+            Drag across regions to sweep them; they highlight as you go. Release
+            and every source that contributed a swept region unites into one
+            path — dragging only the overlap of two shapes fuses both, exactly
+            like Illustrator. Hold <Kbd>Alt</Kbd> when starting the drag to
+            erase instead: swept regions are deleted, and partial remainders
+            rebuild as separate styled paths.
+          </P>
+          <Note>
+            <Kbd>Esc</Kbd> mid-drag cancels; untouched sources keep their object
+            identity; one gesture = one undo entry.
+          </Note>
+        </>
+      ),
+    },
+    {
+      id: 'tool-width',
+      category: t('Tools'),
+      title: t('Width tool'),
+      keywords: 'taper variable stroke thickness broaden narrow calligraphy',
+      body: () => (
+        <>
+          <P>
+            The <strong>Width tool</strong> (<Kbd>Shift</Kbd><Kbd>W</Kbd>) tapers
+            a stroked path by hand. Hover one and its width stations appear — a
+            diamond on the centreline with a bar spanning the local width. Drag
+            a station across the stroke to widen or narrow it there; press on a
+            bare stretch of path to insert a station at the nearest point, then
+            drag it. <Kbd>Alt</Kbd>-click a station to delete it (the two
+            endpoints stay).
+          </P>
+          <P>
+            Between stations the width follows a monotone Hermite curve — smooth
+            tapering with no overshoot. On release the stroke expands into a
+            filled outline; hover that outline later to re-edit the same
+            stations in place. The Width profile presets in Properties (taper,
+            bulge, hourglass) produce outlines the tool can re-edit too.
+          </P>
+          <Note>
+            Station metadata is session-only — it does not survive a save and
+            reload.
+          </Note>
+        </>
+      ),
+    },
+
+    // ------------- Drawing & paths (latest wave) -------------
+    {
+      id: 'envelope-distort',
+      category: t('Drawing & paths'),
+      title: t('Envelope Distort'),
+      keywords: 'warp fit top object arch badge banner reshape distort',
+      body: () => (
+        <>
+          <P>
+            <strong>Envelope Distort — Make with Top Object</strong>
+            (<em>Document → Distort &amp; Transform</em>) reshapes selected
+            artwork to fill a vector shape stacked on top of it — the sign-shop
+            staple for arching text into banners and badges.
+          </P>
+          <H>How it works</H>
+          <P>
+            Select the artwork plus one vector shape on top (two or more
+            objects), then run the command. Every selected object except the
+            top-most is remapped row by row into the top shape's outline; the
+            top object itself is consumed, as in Illustrator. Text targets are
+            traced into outline paths first, so any font works; raster images
+            are skipped and counted in the toast.
+          </P>
+          <P>
+            A rectangle envelope behaves as a plain resize; circles, arcs and
+            custom banner shapes curve the artwork correctly.
+          </P>
+        </>
+      ),
+    },
+
+    // ------------- Assets (latest wave) -------------
+    {
+      id: 'pdf-import',
+      category: t('Assets'),
+      title: t('PDF vector import'),
+      keywords: 'pdf import vector drop file page text outlines',
+      body: () => (
+        <>
+          <P>
+            Import vector artwork straight from a PDF with
+            <em> File → Import PDF…</em>, or drop a <code>.pdf</code> anywhere
+            on the canvas. Each page's drawing operations are walked and
+            rebuilt as native, fully editable paths — the same pipeline as an
+            SVG import — honouring transform stacks, RGB / CMYK / gray fills,
+            stroke widths and fill rules. Every page of a multi-page file is
+            imported.
+          </P>
+          <H>What's skipped</H>
+          <P>
+            Text is not traced: every text run is skipped and counted, and a
+            warning toast tells you to convert text to outlines in the source
+            app. Embedded images and PDF gradients are skipped as well; a file
+            with no drawable vector content reports a clear error.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'trace-presets',
+      category: t('Assets'),
+      title: t('Trace presets'),
+      keywords: 'image trace kmeans colour logo photo cut line art raster',
+      body: () => (
+        <>
+          <P>
+            The <strong>Trace</strong> tab of the Cut Contour dialog turns a
+            raster image into cut paths. Quick presets set the whole parameter
+            tuple at once — <em>Logo</em>, <em>Dark art</em>, <em>Photo high
+            contrast</em>, <em>Transparent PNG</em>, <em>Noisy scan</em> — plus
+            three named recipes: <em>Black &amp; White logo</em>, <em>Line art /
+            sketch</em> and <em>Photo cut (multi-pass)</em>.
+          </P>
+          <H>Multi-colour trace</H>
+          <P>
+            Switch to <em>Multi</em> (the photo-cut recipe does this for you)
+            and pick <strong>2–8 colours</strong>. A seeded k-means pass
+            quantizes the image, then each colour region is traced separately
+            with live progress — every band becomes its own cut path, ready for
+            layered vinyl. Large images are downscaled first to keep the walk
+            snappy.
+          </P>
+        </>
+      ),
+    },
+
+    // ------------- Plotter & cutter (latest wave) -------------
+    {
+      id: 'cut-simulation',
+      category: t('Plotter & cutter'),
+      title: t('Cut simulation'),
+      keywords: 'simulate replay animate feed rate preview plotter toggle',
+      body: () => (
+        <>
+          <P>
+            The Plotter dialog's preview toolbar has a <strong>Simulate</strong>
+            toggle (beside <em>Show print</em> and <em>Cut order</em>). With it
+            on, the preview animates the job: a cutter-head marker travels each
+            path paced by your configured feed and travel rates, so the replay
+            runs at true cutting speed; pen-up hops render as faint dashes.
+            Multi-pass paths play every pass, and the replay follows the same
+            travel optimisation the output uses.
+          </P>
+          <P>
+            Play / pause / restart, run at 0.5×, 1×, 2× or 4× speed, and watch
+            the progress and elapsed-versus-total job-time readouts — handy for
+            spotting a blade-down travel or a wrong start point before any
+            vinyl is cut. The Code view adds a statement-level machine-code
+            replay with its own scrub bar.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'nesting',
+      category: t('Plotter & cutter'),
+      title: t('Rotation-aware nesting'),
+      keywords: 'nest pack skyline material vinyl arrange rotate 90 sheet',
+      body: () => (
+        <>
+          <P>
+            <em>Document → Nest (rotation-aware)</em>, next to Auto-arrange,
+            packs two or more selected objects onto a sheet the width of your
+            first artboard (or the document) and minimises the consumed height —
+            every millimetre saved is uncut material kept.
+          </P>
+          <H>Skyline packing with 90° turns</H>
+          <P>
+            Later items drop into the gaps left above shorter earlier items
+            instead of wasting the rest of a row, and each item is tried both
+            ways up — it's rotated 90° when that slots it lower (upright wins
+            ties, so shapes stay as-drawn unless turning pays). A 5 mm kerf gap
+            separates pieces.
+          </P>
+          <P>
+            The toast reports how many objects were arranged, how many turned,
+            and the material utilisation percentage. Items wider than the sheet
+            in both orientations overhang rather than vanish.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'plotter-console',
+      category: t('Plotter & cutter'),
+      title: t('Plotter debug console'),
+      keywords: 'console serial baud jog machine profile saved history tx rx',
+      body: () => (
+        <>
+          <P>
+            The Plotter dialog's <strong>connection &amp; debug console</strong>
+            is a serial terminal for your cutter. The link persists while the
+            dialog is in use and survives a close / reopen, so the connection,
+            its traffic log and the jog state carry over.
+          </P>
+          <H>The essentials</H>
+          <UL>
+            <li><strong>Baud</strong> — most HP-GL vinyl cutters use 9600; grbl pen plotters usually 115200. Flow control: none / hardware RTS-CTS / software XON-XOFF.</li>
+            <li><strong>Jog pad</strong> — step the carriage by 1 / 5 / 10 / 25 / 50 units; arrow keys jog while the console is open, <Kbd>Shift</Kbd>+arrow nudges by 1.</li>
+            <li><strong>Machine profiles</strong> — brand-specific connect init and force / speed commands; <strong>saved machines</strong> snapshot the whole cutter setup for one-click recall.</li>
+            <li><strong>Job history</strong> plus a TX / RX traffic log you can copy or download.</li>
+          </UL>
+        </>
+      ),
+    },
+
+    // ------------- Text (latest wave) -------------
+    {
+      id: 'csv-merge',
+      category: t('Text'),
+      title: t('CSV data merge'),
+      keywords: 'variable data csv mail merge token records grid badge',
+      body: () => (
+        <>
+          <P>
+            The <strong>Variable Data</strong> dialog's <em>CSV</em> tab is a
+            mail merge for the canvas. Paste CSV text or load a
+            <code> .csv</code> / <code>.txt</code> file, and say whether the
+            first row is a header. Each column binds to a <em>named</em> text
+            object — name objects first with <em>Rename Selection…</em> (Edit
+            menu or right-click).
+          </P>
+          <H>Tokens</H>
+          <P>
+            Template text uses <code>{'{{Column}}'}</code> tokens, matched
+            case-insensitively; unknown columns keep their token visible so
+            typos stand out. A run of <code>#</code> still substitutes serial
+            numbers. Generate lays every record out on a grid you control
+            (columns, gaps, row- or column-major fill), with a live preview of
+            the first record.
+          </P>
+        </>
+      ),
+    },
+
+    // ------------- Getting started (latest wave) -------------
+    {
+      id: 'canvas-operability',
+      category: t('Getting started'),
+      title: t('Canvas operability'),
+      keywords: 'hud axis lock wheel pan zoom preference alt duplicate middle drag',
+      body: () => (
+        <>
+          <P>A quick reference for how the canvas feels while you work.</P>
+          <UL>
+            <li><strong>Transform HUD</strong> — while scaling or rotating, a pill near the bottom shows live W × H or the angle in your document unit; the final value lingers ~650 ms after you let go.</li>
+            <li><strong>Axis lock</strong> — hold <Kbd>Shift</Kbd> while dragging to lock the move to its dominant axis; the lock wins over smart guides.</li>
+            <li><strong>Wheel &amp; pan</strong> — <Kbd>Shift</Kbd>+wheel always pans sideways; middle-mouse drag pans from any tool. Whether the plain wheel pans (Figma-style, default) or zooms at the cursor (Illustrator-style) is set in <em>Preferences → Editor</em> and applies immediately.</li>
+            <li><strong>Alt modifiers</strong> — Alt-drag a selected object to duplicate it; hold <Kbd>Alt</Kbd> while drawing a shape to draw from the centre outwards.</li>
+          </UL>
+        </>
+      ),
+    },
   ];
 }
 
