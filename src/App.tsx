@@ -41,6 +41,7 @@ const OutlineEffectDialog = lazy(() => import('./components/OutlineEffectDialog'
 const RecolorDialog = lazy(() => import('./components/RecolorDialog').then(m => ({ default: m.RecolorDialog })));
 const VariableDataDialog = lazy(() => import('./components/VariableDataDialog').then(m => ({ default: m.VariableDataDialog })));
 const RhinestoneDialog = lazy(() => import('./components/RhinestoneDialog').then(m => ({ default: m.RhinestoneDialog })));
+const SeparationsDialog = lazy(() => import('./components/SeparationsDialog').then(m => ({ default: m.SeparationsDialog })));
 const SimplifyDialog = lazy(() => import('./components/SimplifyDialog').then(m => ({ default: m.SimplifyDialog })));
 const TransformDialog = lazy(() => import('./components/TransformDialog').then(m => ({ default: m.TransformDialog })));
 const RoundCornersDialog = lazy(() => import('./components/RoundCornersDialog').then(m => ({ default: m.RoundCornersDialog })));
@@ -769,6 +770,7 @@ export default function App() {
   const showWarp = useEditor(s => s.showWarp);
   const showGrommets = useEditor(s => s.showGrommets);
   const showMarginGuides = useEditor(s => s.showMarginGuides);
+  const showSeparations = useEditor(s => s.showSeparations);
   const showPreferences = useEditor(s => s.showPreferences);
   const showKeymapEditor = useEditor(s => s.showKeymapEditor);
   const showCommandPalette = useEditor(s => s.showCommandPalette);
@@ -1574,6 +1576,11 @@ export default function App() {
       {showMarginGuides && (
         <Suspense fallback={null}>
           <MarginGuidesDialog />
+        </Suspense>
+      )}
+      {showSeparations && (
+        <Suspense fallback={null}>
+          <SeparationsDialog />
         </Suspense>
       )}
       {showPreferences && (

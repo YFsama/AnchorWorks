@@ -1574,6 +1574,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // offset, bitmap trace, and registration marks. Lives under
         // Document because cut paths are document-level metadata.
         { label: t('Cut Contour…'), onClick: () => openWithSelection('showCutContour'), kbd: getBinding('window.cutContour') },
+        // Separations — per-plate spot/process colour inventory, isolation
+        // preview, and per-plate export. Print-production colour workflow.
+        { label: t('Separations…'), onClick: () => setModal('showSeparations', true) },
         { label: t('Add positioning marks'), onClick: () => addPlotterRegistrationMarks(t) },
         { label: t('Weed border'), onClick: () => addPlotterWeedBorder(t) },
         { label: t('Bridge presets'), sub: [
