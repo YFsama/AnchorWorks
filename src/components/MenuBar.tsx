@@ -22,27 +22,21 @@ import { adjustFontSize, adjustLeading, adjustTracking, changeCaseSelection } fr
 import { smartPunctuationSelection } from '../lib/smartPunctuation';
 import { applyTextOnArc } from '../lib/textPath';
 import { addMeasureProofManifest, addMeasureProofRevisionHistory, addMeasureProofApprovalAudit, addMeasureProofPackageCover, addMeasureProofDeliveryChecklist, addMeasureProofReleaseStamp, addMeasureProofPackageIndex, addMeasureProofDeliveryContact, addMeasureProofDeliverySchedule, addMeasureProofDeliveryRoute, addMeasureProofFulfillmentHandoff, addMeasureProofInstallHandoff, addMeasureProofSiteReadiness, addMeasureProofInstallPunchList, addMeasureProofClientAcceptance, addMeasureProofWarrantyInfo, addMeasureProofCareInstructions, addMeasureProofAssetArchive, addMeasureProofFileVerification, addSelectionAreaLabel, addSelectionCenterMark, addSelectionCornerMarks, addSelectionDimensions, addSelectionInsetFrame, addSelectionMarginFrame, addSelectionProductionMarks, addPrintMarksFromMeasureAnnotations, addCutContourFromMeasureAnnotations, addBridgedCutContourFromMeasureAnnotations, addRegistrationMarksFromMeasureAnnotations, addWeedBorderFromMeasureAnnotations, addGrommetsFromMeasureAnnotations, addRhinestonesFromMeasureAnnotations, preparePrintAndCutFromMeasureAnnotations, prepareBannerFinishingFromMeasureAnnotations, prepareStencilCutFromMeasureAnnotations, prepareRhinestoneTemplateFromMeasureAnnotations, prepareProofPageFromMeasureAnnotations, prepareProofPagesFromMeasureAnnotations, bringMeasureAnnotationsToFront, clearMeasureAnnotations, clearMeasureProofSheetObjects, commitDimension, setMeasureProofApprovalStatus, setMeasureProofJobInfo, setMeasureProofSignoff, setMeasureProofDeliveryContact, setMeasureProofDeliverySchedule, setMeasureProofDeliveryRoute, setMeasureProofFulfillmentHandoff, setMeasureProofInstallHandoff, setMeasureProofSiteReadiness, setMeasureProofInstallPunchList, setMeasureProofClientAcceptance, setMeasureProofWarrantyInfo, setMeasureProofCareInstructions, setMeasureProofAssetArchive, setMeasureProofFileVerification, duplicateMeasureAnnotationsToSelection, editMeasureAnnotations, hideMeasureAnnotations, lockMeasureAnnotations, makeArtboardFromMeasureAnnotations, makeCenterGuidesFromMeasureAnnotations, makeFullGuidesFromMeasureAnnotations, makeGuidesFromMeasureAnnotations, makeMarginArtboardFromMeasureAnnotations, makeMarginFullGuidesFromMeasureAnnotations, makeMarginGuidesFromMeasureAnnotations, proofMeasureAnnotations, resizeArtboardToMeasureAnnotations, selectMeasureAnnotations, selectMeasureProofObjectsByStatus, selectMeasureProofDeliveryBlockers, showMeasureAnnotations, unlockMeasureAnnotations } from '../lib/tools/measureTool';
-import { exportSelectionSVG, exportSelectionPNG, copySelectionSVG } from '../lib/exportSelection';
 import { createArtboardFromSelection, deleteActiveArtboard, duplicateActiveArtboard, duplicateActiveArtboardFrame, exportActiveArtboardAsPNG, exportActiveArtboardAsSVG, exportAllArtboardsAsFiles, exportAllArtboardsAsPNG, promptExportArtboardRangeAsPNG, promptExportArtboardRangeAsSVG, promptRearrangeArtboards, promptRenameActiveArtboard, renumberArtboardsByPosition, reorderActiveArtboard, sortArtboardsByPosition } from '../lib/artboards';
 import { booleanOp, divideSelection, trimSelection, cropSelection, mergeSelection, mergeSameFillSelection } from '../lib/booleanOps';
-import { rasterizeSelection } from '../lib/rasterize';
-import { invertColorsSelection, grayscaleColorsSelection } from '../lib/colorAdjust';
 import { applyClipMask, releaseClipMask, expandClippingMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
 import { importImageFile, pasteFromSystemClipboard, traceSelectedImage } from '../lib/io3';
 import { copySelection, cutSelection, pasteFromClipboard } from '../lib/clipboard';
-import { getFormat } from '../lib/formats';
 import { resetOnboarding } from '../lib/onboarding';
 import { useT, useI18n, LANGUAGES, t as tStatic, type Lang } from '../lib/i18n';
 import { Logo } from './Logo';
 import { showConfirm } from '../lib/confirm';
-import { openProjectFromFile, openRecentFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { isTauri, isMac, getOSLabel, platformInfo, ariaKeyshortcuts, type NativePlatformInfo } from '../lib/runtime';
 import { getAutoSaveStatus, subscribeAutoSaveStatus, type AutoSaveStatus } from '../lib/autosave';
 import { setOutlineMode } from '../lib/outlineView';
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
 import { envelopeSelection } from '../lib/envelope';
-import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, savePlotterTestCut } from '../lib/cutPrepActions';
 import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
 import { applyStrokeAlign } from '../lib/strokeAlign';
 import { applyBlendModeToSelection, applyOverprintToSelection, applyPatternFill, applyShadowToSelection, applyStrokeStyleToSelection, clearGradientFillSelection, clearPatternFillSelection, expandAppearanceSelection, expandDropShadowSelection, expandPatternFillSelection, flattenTransparencySelection, toggleUniformStroke } from '../lib/effects';
@@ -141,13 +135,13 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
     const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
     // Both branches route through the format registry — the SVG handler now
     // does the smart preprocessing + warning toast that used to live here.
-    if (ext === 'svg') await getFormat('svg')?.import?.(f);
-    else if (ext === 'json') await getFormat('json')?.import?.(f);
+    if (ext === 'svg') await (await import('../lib/formats')).getFormat('svg')?.import?.(f);
+    else if (ext === 'json') await (await import('../lib/formats')).getFormat('json')?.import?.(f);
     e.target.value = '';
   };
   const onJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    await getFormat('json')?.import?.(f);
+    await (await import('../lib/formats')).getFormat('json')?.import?.(f);
     e.target.value = '';
   };
   const onImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,7 +155,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   const onPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     try {
-      await getFormat('pdf')?.import?.(f);
+      await (await import('../lib/formats')).getFormat('pdf')?.import?.(f);
     } catch {
       /* toasts surfaced by the importer */
     }
@@ -287,9 +281,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
 
       <div role="menubar" aria-label={t('Application menu')} className="flex items-center gap-2">
       <Dropdown label={t('File')} width="w-64" items={[
-        { label: t('Save Project'), onClick: () => { void saveProjectQuick(); }, kbd: getBinding('file.saveProject') },
-        { label: t('Save Project As…'), onClick: () => { void saveProjectToFile(); }, kbd: getBinding('file.saveProjectAs') },
-        { label: t('Open Project…'), onClick: () => { void openProjectFromFile(); }, kbd: getBinding('file.openProject') },
+        { label: t('Save Project'), onClick: async () => { void (await import('../lib/projectFile')).saveProjectQuick(); }, kbd: getBinding('file.saveProject') },
+        { label: t('Save Project As…'), onClick: async () => { void (await import('../lib/projectFile')).saveProjectToFile(); }, kbd: getBinding('file.saveProjectAs') },
+        { label: t('Open Project…'), onClick: async () => { void (await import('../lib/projectFile')).openProjectFromFile(); }, kbd: getBinding('file.openProject') },
         { sep: true },
         { label: t('New'), onClick: async () => { if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) location.reload(); }, kbd: getBinding('file.new') },
         { label: t('New from Template…'), onClick: () => setModal('showTemplates', true), kbd: getBinding('file.newFromTemplate') },
@@ -304,13 +298,13 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // single source of truth. `exportPDFReal` (vector PDF) doesn't have a
         // registry entry yet; its options story is heavier and migrates in a
         // later cycle.
-        { label: t('Export SVG'), onClick: () => { void getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
-        { label: t('Export PNG (2×)'), onClick: () => { void getFormat('png')?.export?.(); } },
-        { label: t('Export JPG (2×)'), onClick: () => { void getFormat('jpg')?.export?.(); } },
-        { label: t('Export PDF'), onClick: () => { void getFormat('pdf')?.export?.(); } },
-        { label: t('Export PDF (Vector)'), onClick: () => { void getFormat('pdf-vector')?.export?.(); } },
-        { label: t('Export DXF (paths)'), onClick: () => { void getFormat('dxf')?.export?.(); } },
-        { label: t('Export JSON'), onClick: () => { void getFormat('json')?.export?.(); } },
+        { label: t('Export SVG'), onClick: async () => { void (await import('../lib/formats')).getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
+        { label: t('Export PNG (2×)'), onClick: async () => { void (await import('../lib/formats')).getFormat('png')?.export?.(); } },
+        { label: t('Export JPG (2×)'), onClick: async () => { void (await import('../lib/formats')).getFormat('jpg')?.export?.(); } },
+        { label: t('Export PDF'), onClick: async () => { void (await import('../lib/formats')).getFormat('pdf')?.export?.(); } },
+        { label: t('Export PDF (Vector)'), onClick: async () => { void (await import('../lib/formats')).getFormat('pdf-vector')?.export?.(); } },
+        { label: t('Export DXF (paths)'), onClick: async () => { void (await import('../lib/formats')).getFormat('dxf')?.export?.(); } },
+        { label: t('Export JSON'), onClick: async () => { void (await import('../lib/formats')).getFormat('json')?.export?.(); } },
         { sep: true },
         { label: t('Export Active Artboard (SVG)'), onClick: () => { void exportActiveArtboardAsSVG().then(ok => { if (ok) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); }); } },
         { label: t('Export Active Artboard (PNG)'), onClick: () => { if (exportActiveArtboardAsPNG()) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); } },
@@ -318,9 +312,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Export All Artboards (PNG)'), onClick: () => { const n = exportAllArtboardsAsPNG(); if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
         { label: t('Export Artboard Range (SVG)…'), onClick: () => { void promptExportArtboardRangeAsSVG(t('Artboard range'), '1').then(n => { if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }); } },
         { label: t('Export Artboard Range (PNG)…'), onClick: () => { const n = promptExportArtboardRangeAsPNG(t('Artboard range'), '1'); if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
-        { label: t('Export Selection as SVG'), onClick: () => { void exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
-        { label: t('Export Selection as PNG'), onClick: () => { void exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
-        { label: t('Copy as SVG'), onClick: () => { void copySelectionSVG().then(r => { if (r === 'ok') toast.success(t('SVG copied to clipboard')); else if (r === 'empty') toast.warn(t('Select something first.')); else toast.warn(t('Clipboard unavailable.')); }); } },
+        { label: t('Export Selection as SVG'), onClick: async () => { void (await import('../lib/exportSelection')).exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+        { label: t('Export Selection as PNG'), onClick: async () => { void (await import('../lib/exportSelection')).exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+        { label: t('Copy as SVG'), onClick: async () => { void (await import('../lib/exportSelection')).copySelectionSVG().then(r => { if (r === 'ok') toast.success(t('SVG copied to clipboard')); else if (r === 'empty') toast.warn(t('Select something first.')); else toast.warn(t('Clipboard unavailable.')); }); } },
         { sep: true },
         { label: t('Print…'), onClick: () => setModal('showPrint', true), kbd: getBinding('file.print') },
         { label: t('Print Prep…'), onClick: openPrintPrep },
@@ -329,38 +323,38 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true), kbd: getBinding('file.tilePrint') },
         { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
         { label: t('Nest (rotation-aware)'), onClick: runRotationNest },
-        { label: t('Add positioning marks'), onClick: () => addPlotterRegistrationMarks(t) },
+        { label: t('Add positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
         {
           label: t('Weed border'),
           sub: [
-            { label: t('Border only'), onClick: () => addPlotterWeedBorder(t) },
-            { label: t('Weed rows'), onClick: () => addPlotterWeedBorder(t, 2, 0) },
-            { label: t('Weed columns'), onClick: () => addPlotterWeedBorder(t, 0, 2) },
-            { label: t('2×2'), onClick: () => addPlotterWeedBorder(t, 2, 2) },
-            { label: t('3×2'), onClick: () => addPlotterWeedBorder(t, 3, 2) },
+            { label: t('Border only'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t) },
+            { label: t('Weed rows'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 2, 0) },
+            { label: t('Weed columns'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 0, 2) },
+            { label: t('2×2'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 2, 2) },
+            { label: t('3×2'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 3, 2) },
           ],
         },
         {
           label: t('Bridges'),
           sub: [
-            { label: t('Light'), onClick: () => addPlotterBridges(t, 2, 0.6) },
-            { label: t('Standard'), onClick: () => addPlotterBridges(t, 4, 1) },
-            { label: t('Heavy'), onClick: () => addPlotterBridges(t, 6, 1.5) },
+            { label: t('Light'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 2, 0.6) },
+            { label: t('Standard'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1) },
+            { label: t('Heavy'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 6, 1.5) },
           ],
         },
         {
           label: t('Banner Grommet presets'),
           sub: [
-            { label: t('Small banner'), onClick: () => addPlotterGrommets(t, 15, 300, 8) },
-            { label: t('Standard banner'), onClick: () => addPlotterGrommets(t, 20, 500, 10) },
-            { label: t('Large banner'), onClick: () => addPlotterGrommets(t, 25, 750, 12) },
+            { label: t('Small banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 15, 300, 8) },
+            { label: t('Standard banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 20, 500, 10) },
+            { label: t('Large banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 25, 750, 12) },
             { label: t('Custom…'), onClick: () => openWithSelection('showGrommets') },
           ],
         },
-        { label: t('Save Test Cut File'), onClick: () => savePlotterTestCut(t) },
-        { label: t('Clear positioning marks'), onClick: () => clearPlotterRegistrationMarks(t) },
-        { label: t('Clear weed borders'), onClick: () => clearPlotterWeedBorders(t) },
-        { label: t('Clear bridges'), onClick: () => clearPlotterBridges(t) },
+        { label: t('Save Test Cut File'), onClick: async () => (await import('../lib/cutPrepActions')).savePlotterTestCut(t) },
+        { label: t('Clear positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterRegistrationMarks(t) },
+        { label: t('Clear weed borders'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterWeedBorders(t) },
+        { label: t('Clear bridges'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterBridges(t) },
         { label: t('Clear cut paths'), onClick: () => clearCutJob(), disabled: cutPathCount === 0 },
         { label: t('Send to Plotter…'), onClick: () => setModal('showPlotter', true), kbd: getBinding('window.plotter') },
         { label: t('Epson maintenance…'), onClick: () => setModal('showEpsonMaint', true) },
@@ -1577,20 +1571,20 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // Separations — per-plate spot/process colour inventory, isolation
         // preview, and per-plate export. Print-production colour workflow.
         { label: t('Separations…'), onClick: () => setModal('showSeparations', true) },
-        { label: t('Add positioning marks'), onClick: () => addPlotterRegistrationMarks(t) },
-        { label: t('Weed border'), onClick: () => addPlotterWeedBorder(t) },
+        { label: t('Add positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
+        { label: t('Weed border'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t) },
         { label: t('Bridge presets'), sub: [
-          { label: t('Light'), onClick: () => addPlotterBridges(t, 2, 0.6) },
-          { label: t('Standard'), onClick: () => addPlotterBridges(t, 4, 1) },
-          { label: t('Heavy'), onClick: () => addPlotterBridges(t, 6, 1.5) },
+          { label: t('Light'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 2, 0.6) },
+          { label: t('Standard'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1) },
+          { label: t('Heavy'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 6, 1.5) },
         ] },
         { label: t('Banner Grommets…'), onClick: () => openWithSelection('showGrommets') },
-        { label: `${t('Banner Grommets')} — ${t('Small banner')}`, onClick: () => addPlotterGrommets(t, 15, 300, 8) },
-        { label: `${t('Banner Grommets')} — ${t('Standard banner')}`, onClick: () => addPlotterGrommets(t, 20, 500, 10) },
-        { label: `${t('Banner Grommets')} — ${t('Large banner')}`, onClick: () => addPlotterGrommets(t, 25, 750, 12) },
-        { label: t('Clear positioning marks'), onClick: () => clearPlotterRegistrationMarks(t) },
-        { label: t('Clear weed borders'), onClick: () => clearPlotterWeedBorders(t) },
-        { label: t('Clear bridges'), onClick: () => clearPlotterBridges(t) },
+        { label: `${t('Banner Grommets')} — ${t('Small banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 15, 300, 8) },
+        { label: `${t('Banner Grommets')} — ${t('Standard banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 20, 500, 10) },
+        { label: `${t('Banner Grommets')} — ${t('Large banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 25, 750, 12) },
+        { label: t('Clear positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterRegistrationMarks(t) },
+        { label: t('Clear weed borders'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterWeedBorders(t) },
+        { label: t('Clear bridges'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterBridges(t) },
         { label: t('Clear contour'), onClick: () => clearCutKind('outline'), disabled: contourCutCount === 0 },
         { label: t('Clear trace'), onClick: () => clearCutKind('trace'), disabled: traceCutCount === 0 },
         { label: t('Clear regmarks'), onClick: () => clearCutKind('regmark'), disabled: regmarkCutCount === 0 },
@@ -1641,7 +1635,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
           { label: t('Select Cleanup Objects'), onClick: () => { const n = selectCleanupObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.success(t('Nothing to clean up.')); } },
           { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
-          { label: t('Rasterize'), onClick: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
+          { label: t('Rasterize'), onClick: async () => { void (await import('../lib/rasterize')).rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
         ] },
         { label: t('Distort & Transform'), sub: [
           { label: t('Roughen…'), onClick: () => openWithSelection('showRoughen') },
@@ -1839,15 +1833,15 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Edit Colors'), sub: [
           { label: t('Recolor Artwork…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showRecolor', true); } },
           { label: t('Freeform Gradient…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showFreeformGradient', true); } },
-          { label: t('Invert Colors'), onClick: () => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-          { label: t('Convert to Grayscale'), onClick: () => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Invert Colors'), onClick: async () => { const n = (await import('../lib/colorAdjust')).invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Convert to Grayscale'), onClick: async () => { const n = (await import('../lib/colorAdjust')).grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
           { label: t('Saturate…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showSaturate', true); } },
           { label: t('Adjust Hue…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showHue', true); } },
           { label: t('Adjust Brightness…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showBrightness', true); } },
         ] },
         { label: t('Image'), sub: [
           { label: t('Trace Image'), onClick: () => { void traceSelectedImage().then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }); } },
-          { label: t('Rasterize'), onClick: () => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
+          { label: t('Rasterize'), onClick: async () => { void (await import('../lib/rasterize')).rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
           { sep: true },
           { label: t('Image Filters'), sub: [
             { label: t('Blur'), onClick: () => applyBlur(0.08) },
@@ -1865,9 +1859,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Multi-outline…'), onClick: () => openWithSelection('showOutline') },
           { label: t('Rhinestone Template…'), onClick: () => openWithSelection('showRhinestone') },
           { label: t('Rhinestone presets'), sub: [
-            { label: t('Fine stones'), onClick: () => addPlotterRhinestones(t, 2, 3) },
-            { label: t('Standard stones'), onClick: () => addPlotterRhinestones(t, 2.8, 4) },
-            { label: t('Bold stones'), onClick: () => addPlotterRhinestones(t, 4.7, 6) },
+            { label: t('Fine stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 2, 3) },
+            { label: t('Standard stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 2.8, 4) },
+            { label: t('Bold stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 4.7, 6) },
             { label: t('Custom…'), onClick: () => openWithSelection('showRhinestone') },
           ] },
           { label: t('Banner Grommets…'), onClick: () => openWithSelection('showGrommets') },
@@ -1991,16 +1985,16 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Cut Contour…')} (${getBinding('window.cutContour')})`} aria-label={t('Cut Contour…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('window.cutContour'))} onClick={() => openWithSelection('showCutContour')}>
             <Target size={12} aria-hidden="true" />{t('Contour')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Add positioning marks')} aria-label={t('Add positioning marks')} onClick={() => addPlotterRegistrationMarks(t)}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Add positioning marks')} aria-label={t('Add positioning marks')} onClick={async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t)}>
             <Target size={12} aria-hidden="true" />{t('Reg')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Weed border')} aria-label={t('Weed border')} onClick={() => addPlotterWeedBorder(t)}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Weed border')} aria-label={t('Weed border')} onClick={async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t)}>
             <Grid3X3 size={12} aria-hidden="true" />{t('Weed')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Bridges')} — ${t('Standard')}`} aria-label={`${t('Bridges')} — ${t('Standard')}`} onClick={() => { addPlotterBridges(t, 4, 1); }}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Bridges')} — ${t('Standard')}`} aria-label={`${t('Bridges')} — ${t('Standard')}`} onClick={async () => { (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1); }}>
             <Grid3X3 size={12} aria-hidden="true" />{t('Bridge')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Clear bridges')} aria-label={t('Clear bridges')} onClick={() => { clearPlotterBridges(t); }}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Clear bridges')} aria-label={t('Clear bridges')} onClick={async () => { (await import('../lib/cutPrepActions')).clearPlotterBridges(t); }}>
             <Grid3X3 size={12} aria-hidden="true" />{t('Clear')}
           </button>
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Banner Grommets…')} aria-label={t('Banner Grommets…')} onClick={() => openWithSelection('showGrommets')}>
@@ -2012,7 +2006,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Variable Data…')} (${getBinding('text.variableData')})`} aria-label={t('Variable Data…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('text.variableData'))} onClick={() => openWithSelection('showVariableData')}>
             <Hash size={12} aria-hidden="true" />{t('Data')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Save Test Cut File')} aria-label={t('Save Test Cut File')} onClick={() => savePlotterTestCut(t)}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Save Test Cut File')} aria-label={t('Save Test Cut File')} onClick={async () => (await import('../lib/cutPrepActions')).savePlotterTestCut(t)}>
             <Send size={12} aria-hidden="true" />{t('Test')}
           </button>
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Auto-arrange (Nest)')} aria-label={t('Auto-arrange (Nest)')} onClick={runAutoNest}>
@@ -2027,7 +2021,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Tile Print…')} (${getBinding('file.tilePrint')})`} aria-label={t('Tile Print…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.tilePrint'))} onClick={() => setModal('showTilePrint', true)}>
             <Sheet size={12} aria-hidden="true" />{t('Tile')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Export SVG')} (${getBinding('file.exportSvg')})`} aria-label={t('Export SVG')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.exportSvg'))} onClick={() => { void getFormat('svg')?.export?.(); }}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Export SVG')} (${getBinding('file.exportSvg')})`} aria-label={t('Export SVG')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.exportSvg'))} onClick={async () => { void (await import('../lib/formats')).getFormat('svg')?.export?.(); }}>
             <FileImage size={12} aria-hidden="true" />{t('Export')}
           </button>
           <button type="button" data-topbar-action className="btn flex items-center justify-center w-7 h-7 p-0" title={t('Document Settings…')} aria-label={t('Document Settings…')} onClick={() => setModal('showDocSettings', true)}>
@@ -2193,7 +2187,7 @@ function buildRecentFilesItems(recent: RecentFile[]): MenuItem[] {
     items.push({
       node: (
         <button
-          onClick={() => { void openRecentFile(f.name); }}
+          onClick={async () => { void (await import('../lib/projectFile')).openRecentFile(f.name); }}
           role="menuitem"
           aria-label={`${tStatic('Open recent')}: ${f.name}`}
           title={f.name}
@@ -2374,7 +2368,7 @@ function SaveIndicator() {
     <button
       type="button"
       className="btn-ghost flex items-center gap-1.5"
-      onClick={() => { void saveProjectQuick(); }}
+      onClick={async () => { void (await import('../lib/projectFile')).saveProjectQuick(); }}
       // Title carries the action hint ("Save now"); the visible span + aria-
       // label both surface the *status* ("Saved 3m ago" / "Unsaved changes")
       // — splitting these gives the tooltip a job beyond echoing what the
