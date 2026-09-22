@@ -4174,4 +4174,12 @@ export const zhDict: Record<string, string> = {
   "Width Tool: hover a stroked path to see its width stations; drag a station across the stroke to taper it. Alt-click a station to remove it.": "宽度工具：将光标悬停在描边路径上即可显示宽度站点；垂直于路径拖动站点即可调整局部宽度。按住 Alt 单击站点可将其删除。",
   "Endpoint stations cannot be deleted.": "端点站点无法删除。",
   "Width station removed.": "已删除宽度站点。",
+  "Knife tool": "刻刀工具",
+  "Width tool": "宽度工具",
+  "PDF vector import": "PDF 矢量导入",
+  "Cut simulation": "切割模拟",
+  "Rotation-aware nesting": "旋转感知排料",
+  "CSV data merge": "CSV 数据合并",
+  "Plotter debug console": "绘图仪调试控制台",
+  "Canvas operability": "画布操作速查",
 };

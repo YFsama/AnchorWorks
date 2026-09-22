@@ -32,6 +32,7 @@ import { t } from './i18n';
 import { toast } from './toast';
 import { addRecent } from './recentFiles';
 import { isTauri, callNative } from './runtime';
+import { restoreVariableWidthOnCanvas } from './variableWidth';
 
 export interface ProjectFile {
   kind: 'anchorworks-project';
@@ -129,6 +130,11 @@ function pickerTypes() {
 export function buildProject(): ProjectFile {
   const canvas = getCanvas();
   const state = useEditor.getState();
+  // Width-tool re-edit metadata (stations / centreline / base width) rides
+  // inside each object record automatically: `variableWidth.ts` registers
+  // its key in Fabric's static `customProperties` allow-list, so
+  // `canvas.toJSON()` serialises it with no extra pass here. Importing
+  // `./variableWidth` above is what pins that side effect into this module.
   const canvasJSON: object = canvas ? (canvas.toJSON() as object) : {};
   return {
     kind: 'anchorworks-project',
@@ -183,8 +189,14 @@ export async function applyProject(p: ProjectFile): Promise<void> {
   }
 
   // 2) Canvas contents — clear, then loadFromJSON. We swallow Fabric's
-  // resolution into a render call at the end.
+  // resolution into a render call at the end. Fabric's revive path assigns
+  // unknown record props back onto each instance, so variableWidth
+  // metadata is already re-attached here — but the file may be hand-edited
+  // or foreign, so run the fail-soft validator over every restored object
+  // (groups recursed): clean records are normalised, garbage is dropped,
+  // and the outline itself is never touched.
   await canvas.loadFromJSON(p.canvas);
+  restoreVariableWidthOnCanvas(canvas);
   canvas.requestRenderAll();
 
   // 3) Artboards — replace in Zustand and mirror to localStorage so

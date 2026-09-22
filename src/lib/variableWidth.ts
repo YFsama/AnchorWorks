@@ -121,9 +121,11 @@ export function applyWidthProfileToSelection(profile: WidthProfile): number {
  * The outline carries a `variableWidth` metadata record (stations +
  * centreline + base width) so the tool can re-edit its own output; the
  * centreline is stored in raw path-command space, which stays correct
- * after the outline is moved / scaled / rotated. Like `patternSpec` and
- * the other custom props, the metadata is session-only — it does not
- * survive a save / reload (canvas.toJSON() serialises stock props only).
+ * after the outline is moved / scaled / rotated. Unlike `patternSpec`,
+ * the metadata round-trips through serialisation: the key is registered
+ * in Fabric's static `customProperties` allow-list (see the persistence
+ * section at the bottom of this file), so every `toObject()` / `toJSON()`
+ * consumer — project files, undo snapshots, clipboard — carries it.
  * ====================================================================== */
 
 /** One width station: `t` ∈ [0,1] arc-length position, `width` in px. */
@@ -420,4 +422,116 @@ export function applyWidthStationsToObject(
   object.setCoords();
   canvas.add(path);
   return path;
+}
+
+/* ----------------------------- persistence ----------------------------- */
+
+/** Key under which the re-edit record rides in Fabric JSON output. */
+const VARIABLE_WIDTH_KEY = 'variableWidth';
+
+// Fabric v6 keeps a static allow-list of extra property names that every
+// `toObject()` / `toJSON()` call serialises — no per-call
+// `propertiesToInclude` plumbing needed at any call site. Registering our
+// key here is the entire save-side mechanism: project files
+// (`projectFile.buildProject` → `canvas.toJSON()`), undo/redo snapshots
+// (`history.ts` → `canvas.toJSON()`), clipboard, and symbols all carry the
+// record for free. The revive side is equally automatic: `loadFromJSON`
+// routes each record through the class constructor's `setOptions`, which
+// assigns unknown props (ours included) back onto the instance verbatim —
+// which is why `applyProject` still runs a fail-soft validation pass after
+// loading (files can be hand-edited or written by other tools).
+if (!fabric.FabricObject.customProperties.includes(VARIABLE_WIDTH_KEY)) {
+  fabric.FabricObject.customProperties.push(VARIABLE_WIDTH_KEY);
+}
+
+/** Plain, JSON-safe deep copy of the object's re-edit record — the shape
+ *  that lands in the serialised envelope. Undefined when the object is not
+ *  Width-tool output. */
+export function serializeVariableWidth(object: fabric.FabricObject): VariableWidthMeta | undefined {
+  const meta = readVariableWidthMeta(object);
+  if (!meta) return undefined;
+  return {
+    stations: meta.stations.map(s => ({ t: s.t, width: s.width })),
+    centerline: meta.centerline.map(p => [p[0], p[1]] as Pt),
+    baseWidth: meta.baseWidth,
+  };
+}
+
+/** Strictly parse an untrusted station list: every entry must be a finite
+ *  `{t, width}` pair, else the whole record is rejected (mixed garbage
+ *  usually means schema drift, not a salvageable station set). */
+function parseStations(value: unknown): WidthStation[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const out: WidthStation[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+    const t = (entry as Record<string, unknown>).t;
+    const width = (entry as Record<string, unknown>).width;
+    if (typeof t !== 'number' || !Number.isFinite(t)) return null;
+    if (typeof width !== 'number' || !Number.isFinite(width)) return null;
+    out.push({ t, width });
+  }
+  return normalizeStations(out);
+}
+
+/** Strictly parse an untrusted centreline: ≥2 `[number, number]` pairs. */
+function parseCenterline(value: unknown): Pt[] | null {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const pts: Pt[] = [];
+  for (const p of value) {
+    if (!Array.isArray(p) || p.length !== 2) return null;
+    const [x, y] = p;
+    if (typeof x !== 'number' || !Number.isFinite(x)) return null;
+    if (typeof y !== 'number' || !Number.isFinite(y)) return null;
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+/**
+ * Validate untrusted `variableWidth` data and attach it to `object` as a
+ * clean, normalised record (deep-cloned — never shares references with the
+ * parsed file). Corrupted or partial metadata — missing/empty stations,
+ * wrong entry types, a malformed centreline, a non-positive base width —
+ * fails soft: the property is dropped and false is returned, but the
+ * outline itself is left untouched as a plain filled path. Never throws.
+ */
+export function restoreVariableWidth(object: fabric.FabricObject, data: unknown): boolean {
+  const carrier = object as MetaCarrier;
+  const record = data && typeof data === 'object' && !Array.isArray(data)
+    ? data as Record<string, unknown>
+    : null;
+  const stations = record ? parseStations(record.stations) : null;
+  const centerline = record ? parseCenterline(record.centerline) : null;
+  const baseWidth = record ? record.baseWidth : undefined;
+  if (
+    !stations || !centerline ||
+    typeof baseWidth !== 'number' || !Number.isFinite(baseWidth) || baseWidth <= 0
+  ) {
+    delete carrier.variableWidth;
+    return false;
+  }
+  carrier.variableWidth = { stations, centerline, baseWidth };
+  return true;
+}
+
+/**
+ * Post-load sanitiser for a whole canvas: `loadFromJSON` has already
+ * re-attached every `variableWidth` record found in the file verbatim, so
+ * this walks the restored tree (groups included) and validates each one —
+ * clean records are normalised in place, garbage is dropped. Returns the
+ * number of usable records kept.
+ */
+export function restoreVariableWidthOnCanvas(canvas: { getObjects(): fabric.FabricObject[] }): number {
+  let restored = 0;
+  const walk = (objects: fabric.FabricObject[]): void => {
+    for (const object of objects) {
+      if (object instanceof fabric.Group) walk(object.getObjects());
+      const raw = (object as MetaCarrier).variableWidth;
+      if (raw === undefined) continue;
+      if (restoreVariableWidth(object, raw)) restored++;
+    }
+  };
+  walk(canvas.getObjects());
+  return restored;
 }
