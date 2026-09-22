@@ -5,6 +5,10 @@ import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { getBinding, subscribeKeymap } from '../lib/keymap';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
+import { SearchableListActions } from './ui/SearchableListActions';
 
 interface Shortcut {
   keys?: string;
@@ -106,9 +110,9 @@ export function ShortcutsDialog() {
   const setModal = useEditor(s => s.setModal);
   const [query, setQuery] = useState('');
   const [reviewIndex, setReviewIndex] = useState(0);
-  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
-  const [reviewedRecipeAction, setReviewedRecipeAction] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedSearchAction, setReviewedSearchAction] = useReviewedAction();
+  const [reviewedRecipeAction, setReviewedRecipeAction] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const [, setKeymapTick] = useState(0);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const firstShortcutRef = useRef<HTMLDivElement | null>(null);
@@ -161,44 +165,29 @@ export function ShortcutsDialog() {
         : Math.max(0, Math.min(lastIndex, activeIndex + (event.key === 'ArrowDown' ? 1 : -1)));
     focusShortcutCard(nextIndex);
   };
-  const handleSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-shortcut-search-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const nextAction = actions[nextIndex];
-    setReviewedSearchAction(nextAction?.dataset.shortcutSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleSearchActionKeys = makeRovingKeys({
+    selector: '[data-shortcut-search-action]',
+    reviewKey: actionReviewKey('data-shortcut-search-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    wrap: true,
+    setReview: setReviewedSearchAction,
+  });
 
-  const handleRecipeActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-shortcut-recipe-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    const recipeIndex = Number(nextAction?.dataset.recipeIndex);
-    const recipe = Number.isInteger(recipeIndex) ? SHORTCUT_SEARCH_RECIPES[recipeIndex] : undefined;
-    if (recipe) setQuery(recipe.query);
-    setReviewedRecipeAction(nextAction?.dataset.shortcutRecipeActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleRecipeActionKeys = makeRovingKeys({
+    selector: '[data-shortcut-recipe-action]',
+    reviewKey: 'shortcutRecipeActionReview',
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedRecipeAction,
+    onNavigate: (button) => {
+      const recipeIndex = Number(button?.dataset.recipeIndex);
+      const recipe = Number.isInteger(recipeIndex) ? SHORTCUT_SEARCH_RECIPES[recipeIndex] : undefined;
+      if (recipe) setQuery(recipe.query);
+    },
+  });
   const editFirstShortcut = useCallback(() => {
     if (visibleShortcuts === 0) return;
     if (normalizedQuery && typeof window !== 'undefined') {
@@ -208,20 +197,12 @@ export function ShortcutsDialog() {
     openKeymapEditor();
   }, [normalizedQuery, openKeymapEditor, query, visibleShortcuts]);
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-shortcut-footer-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.shortcutFooterActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-shortcut-footer-action]',
+    reviewKey: actionReviewKey('data-shortcut-footer-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
   // Escape close — capture phase mirrors HelpCenter/AIPanel pattern so it works
   // even if focus lands inside an interactive child.
@@ -263,37 +244,32 @@ export function ShortcutsDialog() {
         <div className="px-4 py-2 border-b border-border bg-panel2/40">
           <div className="flex flex-wrap items-center gap-2">
             <span className="field-label !mb-0">{t('Shortcut search recipes')}</span>
-            <div
+            <PresetRow
+              statusId="shortcut-recipe-action-review-status"
               className="flex flex-wrap items-center gap-1"
-              role="toolbar"
-              aria-label={t('Shortcut search recipe actions')}
-              aria-describedby="shortcut-recipe-action-review-status"
+              statusAs="span"
+              label={t('Shortcut search recipe actions')}
               title={t('Use arrow keys to review shortcut search recipes')}
               onKeyDown={handleRecipeActionKeys}
-            >
-              <span id="shortcut-recipe-action-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedRecipeAction || t('Shortcut search recipe actions')}`}
-              </span>
-              {SHORTCUT_SEARCH_RECIPES.map((recipe, index) => {
+              reviewingLabel={t('Reviewing')}
+              reviewed={reviewedRecipeAction}
+              fallback={t('Shortcut search recipe actions')}
+              actionAttr="data-shortcut-recipe-action"
+              setReviewed={setReviewedRecipeAction}
+              items={SHORTCUT_SEARCH_RECIPES.map((recipe, index) => {
                 const active = query === recipe.query;
-                return (
-                  <button
-                    key={recipe.label}
-                    type="button"
-                    data-shortcut-recipe-action
-                    data-shortcut-recipe-action-review={`${t(recipe.label)} · ${t(recipe.title)}`}
-                    data-recipe-index={index}
-                    className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                    onClick={() => { setReviewIndex(0); setQuery(recipe.query); searchRef.current?.focus(); }}
-                    onFocus={(event) => setReviewedRecipeAction(event.currentTarget.dataset.shortcutRecipeActionReview ?? '')}
-                    aria-pressed={active}
-                    title={t(recipe.title)}
-                  >
-                    {t(recipe.label)}
-                  </button>
-                );
+                return {
+                  key: recipe.label,
+                  className: `btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                  pressed: active,
+                  onClick: () => { setReviewIndex(0); setQuery(recipe.query); searchRef.current?.focus(); },
+                  title: t(recipe.title),
+                  focusReviewKey: 'shortcutRecipeActionReview',
+                  data: { 'shortcut-recipe-action-review': `${t(recipe.label)} · ${t(recipe.title)}`, 'recipe-index': index },
+                  children: t(recipe.label),
+                };
               })}
-            </div>
+            />
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-2 border-b border-border bg-panel2/60">
@@ -330,46 +306,37 @@ export function ShortcutsDialog() {
           <div className="flex items-center justify-between sm:justify-end gap-2 text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">
             <span>{normalizedQuery ? `${visibleShortcuts} / ${totalShortcuts} ${t('matches')}` : `${totalShortcuts} ${t('shortcuts')}`}</span>
             {query && (
-              <div
+              <SearchableListActions
+                statusId="shortcut-search-action-review-status"
                 className="flex items-center gap-2"
-                role="toolbar"
-                aria-label={t('Shortcut search actions')}
-                aria-describedby="shortcut-search-action-review-status"
+                label={t('Shortcut search actions')}
                 title={t('Use arrow keys to review shortcut search actions')}
                 onKeyDown={handleSearchActionKeys}
-              >
-                <span id="shortcut-search-action-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedSearchAction || t('Shortcut search actions')}`}
-                </span>
-                {visibleShortcuts > 0 && (
-                  <button
-                    type="button"
-                    className="hover:text-ink underline-offset-2 hover:underline transition-colors"
-                    data-shortcut-search-action
-                    data-shortcut-search-action-review={t('Edit first search result')}
-                    onFocus={() => setReviewedSearchAction(t('Edit first search result'))}
-                    onClick={editFirstShortcut}
-                    title={t('Edit first search result')}
-                  >
-                    {t('Edit First')}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="hover:text-ink underline-offset-2 hover:underline transition-colors"
-                  data-shortcut-search-action
-                  data-shortcut-search-action-review={t('Clear search')}
-                  onFocus={() => setReviewedSearchAction(t('Clear search'))}
-                  onClick={() => {
+                reviewingLabel={t('Reviewing')}
+                reviewed={reviewedSearchAction}
+                fallback={t('Shortcut search actions')}
+                actionAttr="data-shortcut-search-action"
+                setReviewed={setReviewedSearchAction}
+                first={{
+                  label: t('Edit First'),
+                  review: t('Edit first search result'),
+                  title: t('Edit first search result'),
+                  className: 'hover:text-ink underline-offset-2 hover:underline transition-colors',
+                  onActivate: editFirstShortcut,
+                  hidden: !(visibleShortcuts > 0),
+                }}
+                clear={{
+                  label: t('Clear search'),
+                  review: t('Clear search'),
+                  title: t('Clear search'),
+                  className: 'hover:text-ink underline-offset-2 hover:underline transition-colors',
+                  onActivate: () => {
                     setReviewIndex(0);
                     setQuery('');
                     searchRef.current?.focus();
-                  }}
-                  title={t('Clear search')}
-                >
-                  {t('Clear search')}
-                </button>
-              </div>
+                  },
+                }}
+              />
             )}
           </div>
         </div>
@@ -413,37 +380,21 @@ export function ShortcutsDialog() {
           <span className="text-center sm:text-left">
             {t('Press')} <kbd className="kbd-inline">?</kbd> {t('anytime to open this dialog.')}
           </span>
-          <div
-            role="toolbar"
-            aria-label={t('Keyboard Shortcuts actions')}
-            aria-describedby="shortcut-footer-action-review-status"
+          <ReviewedFooter
+            statusId="shortcut-footer-action-review-status"
+            label={t('Keyboard Shortcuts actions')}
             title={t('Use arrow keys to review dialog actions')}
             onKeyDown={handleFooterActionKeys}
-          >
-            <span id="shortcut-footer-action-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedFooterAction || t('Keyboard Shortcuts actions')}`}
-            </span>
-            <button
-              type="button"
-              data-shortcut-footer-action
-              data-shortcut-footer-action-review={t('Close')}
-              className="btn !py-1 !px-2 !text-[10px]"
-              onFocus={() => setReviewedFooterAction(t('Close'))}
-              onClick={close}
-            >
-              {t('Close')}
-            </button>
-            <button
-              type="button"
-              data-shortcut-footer-action
-              data-shortcut-footer-action-review={t('Customize Shortcuts…')}
-              className="btn !py-1 !px-2 !text-[10px]"
-              onFocus={() => setReviewedFooterAction(t('Customize Shortcuts…'))}
-              onClick={openKeymapEditor}
-            >
-              {t('Customize Shortcuts…')}
-            </button>
-          </div>
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedFooterAction}
+            fallback={t('Keyboard Shortcuts actions')}
+            actionAttr="data-shortcut-footer-action"
+            setReviewed={setReviewedFooterAction}
+            actions={[
+              { children: t('Close'), review: t('Close'), className: 'btn !py-1 !px-2 !text-[10px]', onClick: close },
+              { children: t('Customize Shortcuts…'), review: t('Customize Shortcuts…'), className: 'btn !py-1 !px-2 !text-[10px]', onClick: openKeymapEditor },
+            ]}
+          />
         </div>
       </div>
     </div>

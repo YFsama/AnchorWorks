@@ -8,6 +8,10 @@ import { PrintPreview } from './PrintPreview';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, makeSegmentKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
+import { SearchableListActions } from './ui/SearchableListActions';
 
 const PAGE_SIZES: PrintOptions['pageSize'][] = ['A4', 'A3', 'Letter', 'Legal'];
 const MARGIN_PRESETS_MM = [0, 3, 5, 10, 15, 25];
@@ -34,12 +38,12 @@ export function PrintDialog() {
   const [prep, setPrep] = useState<PrintPrep>(defaultPrintPrep);
   const [prepOpen, setPrepOpen] = useState(false);
   const [pageQuery, setPageQuery] = useState('');
-  const [reviewedPageSearchAction, setReviewedPageSearchAction] = useState('');
-  const [reviewedPrintJobPreset, setReviewedPrintJobPreset] = useState('');
-  const [reviewedPrepPreset, setReviewedPrepPreset] = useState('');
-  const [reviewedMarginPreset, setReviewedMarginPreset] = useState('');
-  const [reviewedBleedPreset, setReviewedBleedPreset] = useState('');
-  const [reviewedOutputAction, setReviewedOutputAction] = useState('');
+  const [reviewedPageSearchAction, setReviewedPageSearchAction] = useReviewedAction();
+  const [reviewedPrintJobPreset, setReviewedPrintJobPreset] = useReviewedAction();
+  const [reviewedPrepPreset, setReviewedPrepPreset] = useReviewedAction();
+  const [reviewedMarginPreset, setReviewedMarginPreset] = useReviewedAction();
+  const [reviewedBleedPreset, setReviewedBleedPreset] = useReviewedAction();
+  const [reviewedOutputAction, setReviewedOutputAction] = useReviewedAction();
   const firstPageSizeRef = useRef<HTMLButtonElement>(null);
   if (open && openPrep && !prepOpen) {
     setPrepOpen(true);
@@ -80,38 +84,45 @@ export function PrintDialog() {
     setPrepOpen(false);
     setReviewedOutputAction(t('Reset print settings'));
   };
-  const handleSegmentKeys = <T extends string>(event: React.KeyboardEvent<HTMLDivElement>, values: readonly T[], current: T, apply: (next: T) => void, onReview?: (button?: HTMLButtonElement | null) => void) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const index = values.indexOf(current);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? values[0]
-      : event.key === 'End'
-        ? values[values.length - 1]
-      : values[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
-    apply(next);
-    requestAnimationFrame(() => {
-      const button = event.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next}"]`);
-      onReview?.(button);
-      button?.focus();
-    });
-  };
-  const handlePrintJobPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-print-job-preset]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = PRINT_JOB_PRESETS[Number(actions[nextIndex]?.dataset.printJobPresetIndex ?? -1)];
-    if (preset) setOpts(preset.opts);
-    setReviewedPrintJobPreset(actions[nextIndex]?.dataset.review ?? '');
-    actions[nextIndex]?.focus();
-  };
+  const handlePrintJobPresetKeys = makeRovingKeys({
+    selector: '[data-print-job-preset]',
+    setReview: setReviewedPrintJobPreset,
+    onNavigate: (button) => {
+      const preset = PRINT_JOB_PRESETS[Number(button?.dataset.printJobPresetIndex ?? -1)];
+      if (preset) setOpts(preset.opts);
+    },
+  });
+  const orientationKeys = makeSegmentKeys({
+    values: ['portrait', 'landscape'] as const,
+    current: opts.orientation,
+    apply: (next) => setOpts({ ...opts, orientation: next }),
+  });
+  const scalingKeys = makeSegmentKeys({
+    values: ['actual', 'fit', 'fill'] as const,
+    current: opts.fit,
+    apply: (next) => setOpts({ ...opts, fit: next }),
+  });
+  const marginPresetKeys = makeSegmentKeys({
+    values: MARGIN_PRESETS_MM.map(String),
+    current: `${opts.marginMm}`,
+    apply: (next) => setOpts({ ...opts, marginMm: Number(next) }),
+    onReview: (button) => setReviewedMarginPreset(button?.dataset.review ?? ''),
+  });
+  const prepPresetKeys = makeSegmentKeys({
+    values: PRINT_PREP_PRESETS.map(preset => preset.label),
+    current: PRINT_PREP_PRESETS.find((preset) => prep.bleedMm === preset.prep.bleedMm && prep.cropMarks === preset.prep.cropMarks && prep.registrationMarks === preset.prep.registrationMarks && prep.pageInfo === preset.prep.pageInfo)?.label ?? '',
+    apply: (next) => {
+      const preset = PRINT_PREP_PRESETS.find((item) => item.label === next);
+      if (preset) setPrep(preset.prep);
+    },
+    onReview: (button) => setReviewedPrepPreset(button?.dataset.review ?? ''),
+  });
+  const bleedPresetKeys = makeSegmentKeys({
+    values: BLEED_PRESETS_MM.map(String),
+    current: `${prep.bleedMm}`,
+    apply: (next) => setPrep({ ...prep, bleedMm: Number(next) }),
+    onReview: (button) => setReviewedBleedPreset(button?.dataset.review ?? ''),
+  });
   const handlePageSizeKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
     const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-page-size-option]'));
@@ -161,41 +172,24 @@ export function PrintDialog() {
     return `${t(preset.label)} · ${marks || t('No prep')}`;
   };
 
-  const handlePageSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-page-search-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const nextAction = actions[nextIndex];
-    setReviewedPageSearchAction(nextAction?.dataset.pageSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handlePageSearchActionKeys = makeRovingKeys({
+    selector: '[data-page-search-action]',
+    reviewKey: actionReviewKey('data-page-search-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    wrap: true,
+    setReview: setReviewedPageSearchAction,
+  });
 
-  const handleOutputActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-print-output-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedOutputAction(nextAction?.dataset.printOutputActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleOutputActionKeys = makeRovingKeys({
+    selector: '[data-print-output-action]',
+    reviewKey: actionReviewKey('data-print-output-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedOutputAction,
+  });
 
   return (
     <div
@@ -214,41 +208,33 @@ export function PrintDialog() {
         <div className="w-[320px] shrink-0">
         <div className="mb-2">
           <div className="field-label">{t('Print job presets')}</div>
-          <div
+          <PresetRow
+            statusId="print-job-preset-review-status"
             className="grid grid-cols-2 gap-1"
-            role="toolbar"
-            aria-label={t('Print job preset actions')}
-            aria-describedby="print-job-preset-review-status"
+            label={t('Print job preset actions')}
             title={t('Use arrow keys to review print job presets')}
             onKeyDown={handlePrintJobPresetKeys}
-          >
-            <div id="print-job-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedPrintJobPreset || printSummaryLabel}`}
-            </div>
-            {PRINT_JOB_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedPrintJobPreset}
+            fallback={printSummaryLabel}
+            actionAttr="data-print-job-preset"
+            setReviewed={setReviewedPrintJobPreset}
+            items={PRINT_JOB_PRESETS.map((preset) => {
               const active = opts.pageSize === preset.opts.pageSize
                 && opts.orientation === preset.opts.orientation
                 && opts.fit === preset.opts.fit
                 && Math.abs(opts.marginMm - preset.opts.marginMm) < 0.001;
-              const review = formatJobPresetReview(preset);
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  data-print-job-preset
-                  data-print-job-preset-index={PRINT_JOB_PRESETS.indexOf(preset)}
-                  data-review={review}
-                  className={`rounded-md border px-2 py-1 text-[10px] transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                  onFocus={(event) => setReviewedPrintJobPreset(event.currentTarget.dataset.review ?? '')}
-                  onClick={() => setOpts(preset.opts)}
-                  aria-pressed={active}
-                  title={t(`${preset.label} settings`)}
-                >
-                  {t(preset.label)}
-                </button>
-              );
+              return {
+                key: preset.label,
+                className: `rounded-md border px-2 py-1 text-[10px] transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`,
+                pressed: active,
+                onClick: () => setOpts(preset.opts),
+                title: t(`${preset.label} settings`),
+                data: { 'print-job-preset-index': PRINT_JOB_PRESETS.indexOf(preset), review: formatJobPresetReview(preset) },
+                children: t(preset.label),
+              };
             })}
-          </div>
+          />
         </div>
         <Field label={t('Page size')}>
           <div className="space-y-1">
@@ -282,41 +268,33 @@ export function PrintDialog() {
                 {normalizedPageQuery ? `${filteredPageSizes.length} / ${PAGE_SIZES.length} ${t('matches')}` : `${PAGE_SIZES.length} ${t('sizes')}`}
               </span>
               {pageQuery && (
-                <div
+                <SearchableListActions
+                  statusId="print-page-search-action-review-status"
                   className="flex items-center gap-1.5 shrink-0"
-                  role="toolbar"
-                  aria-label={t('Page size search actions')}
-                  aria-describedby="print-page-search-action-review-status"
+                  label={t('Page size search actions')}
                   title={t('Use arrow keys to review page size search actions')}
                   onKeyDown={handlePageSearchActionKeys}
-                >
-                  <span id="print-page-search-action-review-status" className="sr-only" aria-live="polite">
-                    {`${t('Reviewing')} ${reviewedPageSearchAction || t('Page size search actions')}`}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-[10px] text-accent2 hover:text-accent disabled:opacity-40"
-                    data-page-search-action
-                    data-page-search-action-review={t('Use first search result')}
-                    onFocus={() => setReviewedPageSearchAction(t('Use first search result'))}
-                    onClick={() => { if (filteredPageSizes[0]) setOpts({ ...opts, pageSize: filteredPageSizes[0] }); }}
-                    disabled={filteredPageSizes.length === 0}
-                    title={t('Use first search result')}
-                  >
-                    {t('Use First')}
-                  </button>
-                  <button
-                    type="button"
-                    className="text-[10px] text-accent2 hover:text-accent"
-                    data-page-search-action
-                    data-page-search-action-review={t('Clear search')}
-                    onFocus={() => setReviewedPageSearchAction(t('Clear search'))}
-                    onClick={() => setPageQuery('')}
-                    title={t('Clear search')}
-                  >
-                    {t('Clear search')}
-                  </button>
-                </div>
+                  reviewingLabel={t('Reviewing')}
+                  reviewed={reviewedPageSearchAction}
+                  fallback={t('Page size search actions')}
+                  actionAttr="data-page-search-action"
+                  setReviewed={setReviewedPageSearchAction}
+                  first={{
+                    label: t('Use First'),
+                    review: t('Use first search result'),
+                    title: t('Use first search result'),
+                    className: 'text-[10px] text-accent2 hover:text-accent disabled:opacity-40',
+                    onActivate: () => { if (filteredPageSizes[0]) setOpts({ ...opts, pageSize: filteredPageSizes[0] }); },
+                    disabled: filteredPageSizes.length === 0,
+                  }}
+                  clear={{
+                    label: t('Clear search'),
+                    review: t('Clear search'),
+                    title: t('Clear search'),
+                    className: 'text-[10px] text-accent2 hover:text-accent',
+                    onActivate: () => setPageQuery(''),
+                  }}
+                />
               )}
             </div>
             <div id="print-page-size-review-status" className="sr-only" aria-live="polite">
@@ -336,7 +314,7 @@ export function PrintDialog() {
                 const [width, height] = PAGE_DIMS_MM[size];
                 const active = opts.pageSize === size;
                 return (
-	                  <button
+		                  <button
 	                    key={size}
 	                    ref={size === filteredPageSizes[0] ? firstPageSizeRef : undefined}
 	                    type="button"
@@ -373,7 +351,7 @@ export function PrintDialog() {
             className="grid grid-cols-2 gap-1"
             role="group"
             aria-label={t('Orientation')}
-            onKeyDown={(event) => handleSegmentKeys(event, ['portrait', 'landscape'] as const, opts.orientation, (next) => setOpts({ ...opts, orientation: next }))}
+            onKeyDown={orientationKeys}
             title={t('Use Left/Right arrows to switch options')}
           >
             {(['portrait', 'landscape'] as const).map((mode) => {
@@ -399,7 +377,7 @@ export function PrintDialog() {
             className="grid grid-cols-3 gap-1"
             role="group"
             aria-label={t('Scaling')}
-            onKeyDown={(event) => handleSegmentKeys(event, ['actual', 'fit', 'fill'] as const, opts.fit, (next) => setOpts({ ...opts, fit: next }))}
+            onKeyDown={scalingKeys}
             title={t('Use Left/Right arrows to switch options')}
           >
             {(['actual', 'fit', 'fill'] as const).map((mode) => {
@@ -423,37 +401,30 @@ export function PrintDialog() {
         <Field label={t('Margin (mm)')}>
           <div className="space-y-1">
             <input type="number" className="input-num" value={opts.marginMm} onChange={(e) => setOpts({ ...opts, marginMm: +e.target.value })} />
-            <div
+            <PresetRow
+              statusId="print-margin-preset-review-status"
               className="grid grid-cols-6 gap-1"
               role="group"
-              aria-label={t('Margin presets')}
-              aria-describedby="print-margin-preset-review-status"
+              label={t('Margin presets')}
               title={t('Use Left/Right arrows to switch options')}
-              onKeyDown={(event) => handleSegmentKeys(event, MARGIN_PRESETS_MM.map(String), `${opts.marginMm}`, (next) => setOpts({ ...opts, marginMm: Number(next) }), (button) => setReviewedMarginPreset(button?.dataset.review ?? ''))}
-            >
-              <div id="print-margin-preset-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedMarginPreset || `${t('Margin')} ${opts.marginMm} mm`}`}
-              </div>
-              {MARGIN_PRESETS_MM.map((margin) => {
+              onKeyDown={marginPresetKeys}
+              reviewingLabel={t('Reviewing')}
+              reviewed={reviewedMarginPreset}
+              fallback={`${t('Margin')} ${opts.marginMm} mm`}
+              setReviewed={setReviewedMarginPreset}
+              items={MARGIN_PRESETS_MM.map((margin) => {
                 const active = Math.abs(opts.marginMm - margin) < 0.001;
-                const review = `${t('Margin')} ${margin} mm`;
-                return (
-                  <button
-                    key={margin}
-                    type="button"
-                    data-value={`${margin}`}
-                    data-review={review}
-                    aria-pressed={active}
-                    className={`h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                    onFocus={(event) => setReviewedMarginPreset(event.currentTarget.dataset.review ?? '')}
-                    onClick={() => setOpts({ ...opts, marginMm: margin })}
-                    title={`${t('Set margin to')} ${margin} mm`}
-                  >
-                    {margin}
-                  </button>
-                );
+                return {
+                  key: margin,
+                  className: `h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+                  pressed: active,
+                  onClick: () => setOpts({ ...opts, marginMm: margin }),
+                  title: `${t('Set margin to')} ${margin} mm`,
+                  data: { value: `${margin}`, review: `${t('Margin')} ${margin} mm` },
+                  children: margin,
+                };
               })}
-            </div>
+            />
           </div>
         </Field>
 
@@ -475,40 +446,30 @@ export function PrintDialog() {
             <div id="print-prep-body" className="mt-2 space-y-2">
               <div>
                 <div className="field-label">{t('Print Prep presets')}</div>
-                <div
+                <PresetRow
+                  statusId="print-prep-preset-review-status"
                   className="grid grid-cols-4 gap-1"
                   role="group"
-                  aria-label={t('Print Prep presets')}
-                  aria-describedby="print-prep-preset-review-status"
+                  label={t('Print Prep presets')}
                   title={t('Use Left/Right arrows to switch options')}
-                  onKeyDown={(event) => handleSegmentKeys(event, PRINT_PREP_PRESETS.map(preset => preset.label), PRINT_PREP_PRESETS.find((preset) => prep.bleedMm === preset.prep.bleedMm && prep.cropMarks === preset.prep.cropMarks && prep.registrationMarks === preset.prep.registrationMarks && prep.pageInfo === preset.prep.pageInfo)?.label ?? '', (next) => {
-                    const preset = PRINT_PREP_PRESETS.find((item) => item.label === next);
-                    if (preset) setPrep(preset.prep);
-                  }, (button) => setReviewedPrepPreset(button?.dataset.review ?? ''))}
-                >
-                  <div id="print-prep-preset-review-status" className="sr-only" aria-live="polite">
-                    {`${t('Reviewing')} ${reviewedPrepPreset || prepSummaryLabel}`}
-                  </div>
-                  {PRINT_PREP_PRESETS.map((preset) => {
+                  onKeyDown={prepPresetKeys}
+                  reviewingLabel={t('Reviewing')}
+                  reviewed={reviewedPrepPreset}
+                  fallback={prepSummaryLabel}
+                  setReviewed={setReviewedPrepPreset}
+                  items={PRINT_PREP_PRESETS.map((preset) => {
                     const active = prep.bleedMm === preset.prep.bleedMm && prep.cropMarks === preset.prep.cropMarks && prep.registrationMarks === preset.prep.registrationMarks && prep.pageInfo === preset.prep.pageInfo;
-                    const review = formatPrepPresetReview(preset);
-                    return (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        data-value={preset.label}
-                        data-review={review}
-                        className={`rounded-md border px-2 py-1 text-[10px] transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                        onFocus={(event) => setReviewedPrepPreset(event.currentTarget.dataset.review ?? '')}
-                        onClick={() => setPrep(preset.prep)}
-                        aria-pressed={active}
-                        title={t(`${preset.label} settings`)}
-                      >
-                        {t(preset.label)}
-                      </button>
-                    );
+                    return {
+                      key: preset.label,
+                      className: `rounded-md border px-2 py-1 text-[10px] transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`,
+                      pressed: active,
+                      onClick: () => setPrep(preset.prep),
+                      title: t(`${preset.label} settings`),
+                      data: { value: preset.label, review: formatPrepPresetReview(preset) },
+                      children: t(preset.label),
+                    };
                   })}
-                </div>
+                />
               </div>
               <Field label={t('Bleed (mm)')}>
                 <div className="space-y-1">
@@ -524,37 +485,30 @@ export function PrintDialog() {
                       setPrep({ ...prep, bleedMm: v });
                     }}
                   />
-                  <div
+                  <PresetRow
+                    statusId="print-bleed-preset-review-status"
                     className="grid grid-cols-6 gap-1"
                     role="group"
-                    aria-label={t('Bleed presets')}
-                    aria-describedby="print-bleed-preset-review-status"
+                    label={t('Bleed presets')}
                     title={t('Use Left/Right arrows to switch options')}
-                    onKeyDown={(event) => handleSegmentKeys(event, BLEED_PRESETS_MM.map(String), `${prep.bleedMm}`, (next) => setPrep({ ...prep, bleedMm: Number(next) }), (button) => setReviewedBleedPreset(button?.dataset.review ?? ''))}
-                  >
-                    <div id="print-bleed-preset-review-status" className="sr-only" aria-live="polite">
-                      {`${t('Reviewing')} ${reviewedBleedPreset || `${t('Bleed')} ${prep.bleedMm} mm`}`}
-                    </div>
-                    {BLEED_PRESETS_MM.map((bleed) => {
+                    onKeyDown={bleedPresetKeys}
+                    reviewingLabel={t('Reviewing')}
+                    reviewed={reviewedBleedPreset}
+                    fallback={`${t('Bleed')} ${prep.bleedMm} mm`}
+                    setReviewed={setReviewedBleedPreset}
+                    items={BLEED_PRESETS_MM.map((bleed) => {
                       const active = Math.abs(prep.bleedMm - bleed) < 0.001;
-                      const review = `${t('Bleed')} ${bleed} mm`;
-                      return (
-                        <button
-                          key={bleed}
-                          type="button"
-                          data-value={`${bleed}`}
-                          data-review={review}
-                          aria-pressed={active}
-                          className={`h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                          onFocus={(event) => setReviewedBleedPreset(event.currentTarget.dataset.review ?? '')}
-                          onClick={() => setPrep({ ...prep, bleedMm: bleed })}
-                          title={`${t('Set bleed to')} ${bleed} mm`}
-                        >
-                          {bleed}
-                        </button>
-                      );
+                      return {
+                        key: bleed,
+                        className: `h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+                        pressed: active,
+                        onClick: () => setPrep({ ...prep, bleedMm: bleed }),
+                        title: `${t('Set bleed to')} ${bleed} mm`,
+                        data: { value: `${bleed}`, review: `${t('Bleed')} ${bleed} mm` },
+                        children: bleed,
+                      };
                     })}
-                  </div>
+                  />
                 </div>
               </Field>
               <ToggleRow
@@ -582,56 +536,24 @@ export function PrintDialog() {
           <span>{printSummaryLabel}</span>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="print-output-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Print output actions')}
-          aria-describedby="print-output-action-review-status"
+          label={t('Print output actions')}
           title={t('Use Left/Right arrows to switch options')}
           onKeyDown={handleOutputActionKeys}
-        >
-          <span id="print-output-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedOutputAction || t('Print output actions')}`}
-          </span>
-          <button
-            type="button"
-            data-print-output-action
-            data-print-output-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedOutputAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-print-output-action
-            data-print-output-action-review={t('Reset print settings')}
-            className="btn"
-            onClick={resetPrintSettings}
-            onFocus={() => setReviewedOutputAction(t('Reset print settings'))}
-            title={t('Reset print settings')}
-          >
-            {t('Reset')}
-          </button>
-          <button
-            type="button"
-            data-print-output-action
-            data-print-output-action-review="PDF"
-            className="btn flex items-center gap-1"
-            onClick={handlePDF}
-            onFocus={() => setReviewedOutputAction('PDF')}
-            title={t('Save as vector PDF (skips the system print dialog)')}
-          ><FileText size={12} aria-hidden="true" /> PDF</button>
-          <button
-            type="button"
-            data-print-output-action
-            data-print-output-action-review={t('Print')}
-            className="btn-primary flex items-center gap-1"
-            onClick={handlePrint}
-            onFocus={() => setReviewedOutputAction(t('Print'))}
-          ><Printer size={12} aria-hidden="true" /> {t('Print')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedOutputAction}
+          fallback={t('Print output actions')}
+          actionAttr="data-print-output-action"
+          setReviewed={setReviewedOutputAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset print settings'), className: 'btn', onClick: resetPrintSettings, title: t('Reset print settings') },
+            { children: <><FileText size={12} aria-hidden="true" /> PDF</>, review: 'PDF', className: 'btn flex items-center gap-1', onClick: handlePDF, title: t('Save as vector PDF (skips the system print dialog)') },
+            { children: <><Printer size={12} aria-hidden="true" /> {t('Print')}</>, review: t('Print'), className: 'btn-primary flex items-center gap-1', onClick: handlePrint },
+          ]}
+        />
         </div>
 
         {/* Live WYSIWYG preview of the page, margins, fit + any prep marks. */}

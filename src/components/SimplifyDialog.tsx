@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 /**
  * Simplify Path — reduce a path's anchor count with a Douglas–Peucker tolerance
@@ -19,8 +22,8 @@ export function SimplifyDialog() {
   const open = useEditor(s => s.showSimplify);
   const close = useCallback(() => useEditor.getState().setModal('showSimplify', false), []);
   const [tolerance, setTolerance] = useState(1.5);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -33,38 +36,22 @@ export function SimplifyDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-simplify-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.simplifyActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-simplify-action]',
+    reviewKey: actionReviewKey('data-simplify-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-simplify-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextTolerance = Number(actions[nextIndex]?.dataset.tolerance);
-    if (Number.isFinite(nextTolerance)) setTolerance(nextTolerance);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-simplify-preset-action]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const nextTolerance = Number(button?.dataset.tolerance);
+      if (Number.isFinite(nextTolerance)) setTolerance(nextTolerance);
+    },
+  });
 
   return (
     <div
@@ -97,73 +84,48 @@ export function SimplifyDialog() {
         </label>
         <div className="mb-2">
           <div className="field-label !mb-1">{t('Tolerance presets')}</div>
-          <div
+          <PresetRow
+            statusId="simplify-preset-review-status"
             className="grid grid-cols-6 gap-1"
-            role="toolbar"
-            aria-label={t('Tolerance preset actions')}
-            aria-describedby="simplify-preset-review-status"
+            label={t('Tolerance preset actions')}
             title={t('Use arrow keys to review tolerance presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="simplify-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedPreset || t('Tolerance presets')}`}
-            </div>
-            {SIMPLIFY_PRESETS_PX.map((value) => {
-              const review = `${t('Tolerance (px)')} ${value}`;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  data-simplify-preset-action
-                  data-tolerance={value}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onClick={() => setTolerance(value)}
-                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={tolerance === value}
-                >
-                  {value}
-                </button>
-              );
-            })}
-          </div>
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedPreset}
+            fallback={t('Tolerance presets')}
+            actionAttr="data-simplify-preset-action"
+            setReviewed={setReviewedPreset}
+            items={SIMPLIFY_PRESETS_PX.map((value) => ({
+              key: value,
+              className: `btn !py-1 !px-1 !text-[10px] ${tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+              pressed: tolerance === value,
+              onClick: () => setTolerance(value),
+              data: { tolerance: value, review: `${t('Tolerance (px)')} ${value}` },
+              children: value,
+            }))}
+          />
         </div>
         <p className="text-[10px] text-muted leading-relaxed">
           {t('Higher tolerance removes more anchor points. Curves become straight segments.')}
         </p>
 
-        <div
+        <ReviewedFooter
+          statusId="simplify-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Simplify Path actions')}
-          aria-describedby="simplify-action-review-status"
+          label={t('Simplify Path actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <div id="simplify-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Simplify Path actions')}`}
-          </div>
-          <button
-            type="button"
-            data-simplify-action
-            data-simplify-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-simplify-action
-            data-simplify-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={apply}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Simplify Path actions')}
+          statusAs="div"
+          actionAttr="data-simplify-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

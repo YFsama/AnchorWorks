@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const GROMMET_PRESETS: Array<{ label: string; inset: number; spacing: number; diameter: number }> = [
   { label: 'Small banner', inset: 15, spacing: 300, diameter: 8 },
@@ -25,8 +28,8 @@ export function GrommetsDialog() {
   const [inset, setInset] = useState(20);
   const [spacing, setSpacing] = useState(500);
   const [diameter, setDiameter] = useState(10);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -58,41 +61,24 @@ export function GrommetsDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-grommets-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.grommetsActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-grommets-action]',
+    reviewKey: actionReviewKey('data-grommets-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-grommet-preset-action]'));
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const preset = GROMMET_PRESETS[nextIndex];
-    if (preset) applyPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-grommet-preset-action]',
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (_button, index) => {
+      const preset = GROMMET_PRESETS[index];
+      if (preset) applyPreset(preset);
+    },
+  });
 
   return (
     <div
@@ -127,55 +113,54 @@ export function GrommetsDialog() {
 
         <div className="mt-3">
           <div className="field-label">{t('Banner presets')}</div>
-          <div
+          <PresetRow
+            statusId="grommet-preset-review-status"
             className="grid grid-cols-3 gap-1"
-            role="toolbar"
-            aria-label={t('Banner preset actions')}
-            aria-describedby="grommet-preset-review-status"
+            label={t('Banner preset actions')}
             title={t('Use arrow keys to review banner presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="grommet-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedPreset || `${t('Inset (mm)')} ${inset} · ${t('Max spacing (mm)')} ${spacing} · ${t('Diameter (mm)')} ${diameter}`}`}
-            </div>
-            {GROMMET_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedPreset}
+            fallback={`${t('Inset (mm)')} ${inset} · ${t('Max spacing (mm)')} ${spacing} · ${t('Diameter (mm)')} ${diameter}`}
+            actionAttr="data-grommet-preset-action"
+            setReviewed={setReviewedPreset}
+            items={GROMMET_PRESETS.map((preset) => {
               const active = inset === preset.inset && spacing === preset.spacing && diameter === preset.diameter;
-              const review = `${t(preset.label)} · ${t('Inset (mm)')} ${preset.inset} · ${t('Max spacing (mm)')} ${preset.spacing} · ${t('Diameter (mm)')} ${preset.diameter}`;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  data-grommet-preset-action
-                  data-review={review}
-                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
-                  onClick={() => applyPreset(preset)}
-                  aria-pressed={active}
-                  className={`px-2 py-1 rounded-sm border text-left text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink bg-[#ff2e9a]/10' : 'border-border text-muted hover:text-ink'}`}
-                  title={`${t(preset.label)}: ${preset.inset} / ${preset.spacing} / ${preset.diameter} mm`}
-                >
-                  <span className="block font-medium">{t(preset.label)}</span>
-                  <span className="block tabular-nums">{preset.inset} · {preset.spacing} · Ø{preset.diameter}</span>
-                </button>
-              );
+              return {
+                key: preset.label,
+                className: `px-2 py-1 rounded-sm border text-left text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink bg-[#ff2e9a]/10' : 'border-border text-muted hover:text-ink'}`,
+                pressed: active,
+                onClick: () => applyPreset(preset),
+                title: `${t(preset.label)}: ${preset.inset} / ${preset.spacing} / ${preset.diameter} mm`,
+                data: { review: `${t(preset.label)} · ${t('Inset (mm)')} ${preset.inset} · ${t('Max spacing (mm)')} ${preset.spacing} · ${t('Diameter (mm)')} ${preset.diameter}` },
+                children: (
+                  <>
+                    <span className="block font-medium">{t(preset.label)}</span>
+                    <span className="block tabular-nums">{preset.inset} · {preset.spacing} · Ø{preset.diameter}</span>
+                  </>
+                ),
+              };
             })}
-          </div>
+          />
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="grommets-action-review-status"
           className="flex justify-end gap-2 mt-4"
-          role="toolbar"
-          aria-label={t('Banner Grommets actions')}
-          aria-describedby="grommets-action-review-status"
+          label={t('Banner Grommets actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="grommets-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Banner Grommets actions')}`}
-          </span>
-          <button type="button" data-grommets-action data-grommets-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-grommets-action data-grommets-action-review={t('Reset grommet settings')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset grommet settings'))} onClick={resetGrommetSettings} title={t('Reset grommet settings')}>{t('Reset')}</button>
-          <button type="button" data-grommets-action data-grommets-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={apply}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Banner Grommets actions')}
+          actionAttr="data-grommets-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset grommet settings'), className: 'btn', onClick: resetGrommetSettings, title: t('Reset grommet settings') },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

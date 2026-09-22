@@ -7,6 +7,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const MM_TO_PX = 3.7795;
 const ZERO: FreeDistortCorners = { tl: [0, 0], tr: [0, 0], br: [0, 0], bl: [0, 0] };
@@ -35,8 +38,8 @@ export function FreeDistortDialog() {
   const open = useEditor(s => s.showFreeDistort);
   const close = useCallback(() => { clearFreeDistortPreview(); useEditor.getState().setModal('showFreeDistort', false); }, []);
   const [corners, setCorners] = useState<FreeDistortCorners>(ZERO);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const activePreset = DISTORT_PRESETS.find((preset) => cornersEqual(corners, preset.corners))?.label ?? '';
 
   useEscapeClose(open, close);
@@ -72,42 +75,26 @@ export function FreeDistortDialog() {
     });
   };
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-free-distort-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = DISTORT_PRESETS[Number(actions[nextIndex]?.dataset.freeDistortPresetIndex ?? -1)];
-    if (preset) applyPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
-
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-free-distort-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.freeDistortActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
-
   const applyPreset = (preset: { corners: FreeDistortCorners }) => setCorners(cloneCorners(preset.corners));
+
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-free-distort-preset-action]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const preset = DISTORT_PRESETS[Number(button?.dataset.freeDistortPresetIndex ?? -1)];
+      if (preset) applyPreset(preset);
+    },
+  });
+
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-free-distort-action]',
+    reviewKey: actionReviewKey('data-free-distort-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedFooterAction,
+  });
 
   return (
     <div
@@ -131,38 +118,31 @@ export function FreeDistortDialog() {
 
         <div className="mb-3">
           <div className="field-label !mb-1">{t('Distort presets')}</div>
-          <div
+          <PresetRow
+            statusId="free-distort-preset-review-status"
             className="grid grid-cols-3 gap-1"
-            role="toolbar"
-            aria-label={t('Free Distort preset actions')}
-            aria-describedby="free-distort-preset-review-status"
+            label={t('Free Distort preset actions')}
             title={t('Use arrow keys to review free distort presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="free-distort-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedPreset || t('Distort presets')}`}
-            </div>
-            {DISTORT_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedPreset}
+            fallback={t('Distort presets')}
+            actionAttr="data-free-distort-preset-action"
+            setReviewed={setReviewedPreset}
+            items={DISTORT_PRESETS.map((preset) => {
               const active = activePreset === preset.label;
               const review = `${t(preset.label)}: ${t(preset.title)}`;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  data-free-distort-preset-action
-                  data-free-distort-preset-index={DISTORT_PRESETS.indexOf(preset)}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onClick={() => applyPreset(preset)}
-                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={review}
-                >
-                  {t(preset.label)}
-                </button>
-              );
+              return {
+                key: preset.label,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                pressed: active,
+                onClick: () => applyPreset(preset),
+                title: review,
+                data: { 'free-distort-preset-index': DISTORT_PRESETS.indexOf(preset), review },
+                children: t(preset.label),
+              };
             })}
-          </div>
+          />
         </div>
 
         <div className="grid grid-cols-[48px_1fr_1fr] gap-2 items-center text-xs">
@@ -207,48 +187,23 @@ export function FreeDistortDialog() {
           </button>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="free-distort-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Free Distort actions')}
-          aria-describedby="free-distort-action-review-status"
+          label={t('Free Distort actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="free-distort-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Free Distort actions')}`}
-          </span>
-          <button
-            type="button"
-            data-free-distort-action
-            data-free-distort-action-review={t('Reset')}
-            className="btn"
-            onClick={() => setCorners(ZERO)}
-            onFocus={() => setReviewedFooterAction(t('Reset'))}
-          >
-            {t('Reset')}
-          </button>
-          <button
-            type="button"
-            data-free-distort-action
-            data-free-distort-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-free-distort-action
-            data-free-distort-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={apply}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Free Distort actions')}
+          actionAttr="data-free-distort-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: () => setCorners(ZERO) },
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

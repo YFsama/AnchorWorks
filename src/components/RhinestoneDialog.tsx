@@ -7,6 +7,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 // Common SS (stone size) → mm diameters, as quick presets.
 const SS_PRESETS: Array<{ label: string; mm: number }> = [
@@ -39,10 +42,10 @@ export function RhinestoneDialog() {
   const close = useCallback(() => useEditor.getState().setModal('showRhinestone', false), []);
   const [diameter, setDiameter] = useState(2.8);
   const [spacing, setSpacing] = useState(4);
-  const [reviewedJobPreset, setReviewedJobPreset] = useState('');
-  const [reviewedSizePreset, setReviewedSizePreset] = useState('');
-  const [reviewedSpacingPreset, setReviewedSpacingPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedJobPreset, setReviewedJobPreset] = useReviewedAction();
+  const [reviewedSizePreset, setReviewedSizePreset] = useReviewedAction();
+  const [reviewedSpacingPreset, setReviewedSpacingPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -60,66 +63,53 @@ export function RhinestoneDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-rhinestone-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.rhinestoneActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
-
-  const handleToolbarActionKeys = (event: React.KeyboardEvent<HTMLDivElement>, selector: string, onSelect: (index: number) => void, onReview?: (button?: HTMLButtonElement | null) => void) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector));
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    onSelect(nextIndex);
-    requestAnimationFrame(() => {
-      onReview?.(actions[nextIndex]);
-      actions[nextIndex]?.focus();
-    });
-  };
-
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    handleToolbarActionKeys(event, '[data-rhinestone-preset-action]', (index) => {
-      const preset = SS_PRESETS[index];
-      if (preset) setDiameter(preset.mm);
-    }, (button) => setReviewedSizePreset(button?.dataset.review ?? ''));
-  };
-
-  const handleSpacingActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    handleToolbarActionKeys(event, '[data-rhinestone-spacing-action]', (index) => {
-      const preset = SPACING_PRESETS[index];
-      if (preset) setSpacing(preset.mm);
-    }, (button) => setReviewedSpacingPreset(button?.dataset.review ?? ''));
-  };
-
-  const handleJobPresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    handleToolbarActionKeys(event, '[data-rhinestone-job-action]', (index) => {
-      const preset = JOB_PRESETS[index];
-      if (preset) applyJobPreset(preset);
-    }, (button) => setReviewedJobPreset(button?.dataset.review ?? ''));
-  };
-
-  const applyJobPreset = (preset: { label: string; diameter: number; spacing: number }) => {
+  const applyJobPreset = (preset: { diameter: number; spacing: number }) => {
     setDiameter(preset.diameter);
     setSpacing(preset.spacing);
   };
+
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-rhinestone-action]',
+    reviewKey: actionReviewKey('data-rhinestone-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
+
+  const handleJobPresetActionKeys = makeRovingKeys({
+    selector: '[data-rhinestone-job-action]',
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedJobPreset,
+    onNavigate: (_button, index) => {
+      const preset = JOB_PRESETS[index];
+      if (preset) applyJobPreset(preset);
+    },
+  });
+
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-rhinestone-preset-action]',
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedSizePreset,
+    onNavigate: (_button, index) => {
+      const preset = SS_PRESETS[index];
+      if (preset) setDiameter(preset.mm);
+    },
+  });
+
+  const handleSpacingActionKeys = makeRovingKeys({
+    selector: '[data-rhinestone-spacing-action]',
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedSpacingPreset,
+    onNavigate: (_button, index) => {
+      const preset = SPACING_PRESETS[index];
+      if (preset) setSpacing(preset.mm);
+    },
+  });
 
   const resetRhinestoneSettings = () => {
     const standard = JOB_PRESETS[1];
@@ -158,117 +148,119 @@ export function RhinestoneDialog() {
         </div>
         <div className="mt-2">
           <div className="field-label">{t('Rhinestone job presets')}</div>
-          <div
+          <PresetRow
+            statusId="rhinestone-job-preset-review-status"
             className="grid grid-cols-3 gap-1"
-            role="toolbar"
-            aria-label={t('Rhinestone job preset actions')}
-            aria-describedby="rhinestone-job-preset-review-status"
+            label={t('Rhinestone job preset actions')}
             title={t('Use arrow keys to review rhinestone job presets')}
             onKeyDown={handleJobPresetActionKeys}
-          >
-            <div id="rhinestone-job-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedJobPreset || `${t('Stone Ø (mm)')} ${diameter} · ${t('Spacing (mm)')} ${spacing}`}`}
-            </div>
-            {JOB_PRESETS.map(p => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedJobPreset}
+            fallback={`${t('Stone Ø (mm)')} ${diameter} · ${t('Spacing (mm)')} ${spacing}`}
+            actionAttr="data-rhinestone-job-action"
+            setReviewed={setReviewedJobPreset}
+            items={JOB_PRESETS.map((p) => {
               const active = Math.abs(diameter - p.diameter) < 0.01 && Math.abs(spacing - p.spacing) < 0.01;
-              const review = `${t(p.label)} · ${t('Stone Ø (mm)')} ${p.diameter} · ${t('Spacing (mm)')} ${p.spacing}`;
-              return (
-                <button key={p.label} type="button"
-                  data-rhinestone-job-action
-                  data-review={review}
-                  onFocus={(event) => setReviewedJobPreset(event.currentTarget.dataset.review ?? '')}
-                  onClick={() => applyJobPreset(p)}
-                  aria-pressed={active}
-                  className={`px-2 py-1 rounded-sm border text-left text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink bg-[#ff2e9a]/10' : 'border-border text-muted hover:text-ink'}`}
-                  title={`${t(p.label)}: Ø${p.diameter} / ${p.spacing} mm`}>
-                  <span className="block font-medium">{t(p.label)}</span>
-                  <span className="block tabular-nums">Ø{p.diameter} · {p.spacing} mm</span>
-                </button>
-              );
+              return {
+                key: p.label,
+                className: `px-2 py-1 rounded-sm border text-left text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink bg-[#ff2e9a]/10' : 'border-border text-muted hover:text-ink'}`,
+                pressed: active,
+                onClick: () => applyJobPreset(p),
+                title: `${t(p.label)}: Ø${p.diameter} / ${p.spacing} mm`,
+                data: { review: `${t(p.label)} · ${t('Stone Ø (mm)')} ${p.diameter} · ${t('Spacing (mm)')} ${p.spacing}` },
+                children: (
+                  <>
+                    <span className="block font-medium">{t(p.label)}</span>
+                    <span className="block tabular-nums">Ø{p.diameter} · {p.spacing} mm</span>
+                  </>
+                ),
+              };
             })}
-          </div>
+          />
         </div>
 
         <div className="mt-2">
           <div className="field-label">{t('Stone size presets')}</div>
-          <div
+          <PresetRow
+            statusId="rhinestone-size-preset-review-status"
             className="flex flex-wrap gap-1"
-            role="toolbar"
-            aria-label={t('Stone size preset actions')}
-            aria-describedby="rhinestone-size-preset-review-status"
+            label={t('Stone size preset actions')}
             title={t('Use arrow keys to review stone size presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="rhinestone-size-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedSizePreset || `${t('Stone Ø (mm)')} ${diameter}`}`}
-            </div>
-            {SS_PRESETS.map(p => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedSizePreset}
+            fallback={`${t('Stone Ø (mm)')} ${diameter}`}
+            actionAttr="data-rhinestone-preset-action"
+            setReviewed={setReviewedSizePreset}
+            items={SS_PRESETS.map((p) => {
               const active = Math.abs(diameter - p.mm) < 0.01;
-              const review = `${p.label} · ${t('Stone Ø (mm)')} ${p.mm}`;
-              return (
-                <button key={p.label} type="button"
-                data-rhinestone-preset-action
-                data-review={review}
-                onFocus={(event) => setReviewedSizePreset(event.currentTarget.dataset.review ?? '')}
-                onClick={() => setDiameter(p.mm)}
-                aria-pressed={active}
-                className={`px-2 py-0.5 rounded-sm border text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink' : 'border-border text-muted hover:text-ink'}`}
-                title={`${p.label}: ${p.mm} mm`}>
-                <span className="font-medium">{p.label}</span> <span className="tabular-nums">Ø{p.mm}</span>
-              </button>
-              );
+              return {
+                key: p.label,
+                className: `px-2 py-0.5 rounded-sm border text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink' : 'border-border text-muted hover:text-ink'}`,
+                pressed: active,
+                onClick: () => setDiameter(p.mm),
+                title: `${p.label}: ${p.mm} mm`,
+                data: { review: `${p.label} · ${t('Stone Ø (mm)')} ${p.mm}` },
+                children: (
+                  <>
+                    <span className="font-medium">{p.label}</span> <span className="tabular-nums">Ø{p.mm}</span>
+                  </>
+                ),
+              };
             })}
-          </div>
+          />
         </div>
 
         <div className="mt-2">
           <div className="field-label">{t('Stone spacing presets')}</div>
-          <div
+          <PresetRow
+            statusId="rhinestone-spacing-preset-review-status"
             className="grid grid-cols-3 gap-1"
-            role="toolbar"
-            aria-label={t('Stone spacing preset actions')}
-            aria-describedby="rhinestone-spacing-preset-review-status"
+            label={t('Stone spacing preset actions')}
             title={t('Use arrow keys to review stone spacing presets')}
             onKeyDown={handleSpacingActionKeys}
-          >
-            <div id="rhinestone-spacing-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedSpacingPreset || `${t('Spacing (mm)')} ${spacing}`}`}
-            </div>
-            {SPACING_PRESETS.map(p => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedSpacingPreset}
+            fallback={`${t('Spacing (mm)')} ${spacing}`}
+            actionAttr="data-rhinestone-spacing-action"
+            setReviewed={setReviewedSpacingPreset}
+            items={SPACING_PRESETS.map((p) => {
               const active = Math.abs(spacing - p.mm) < 0.01;
-              const review = `${t(p.label)} · ${t('Spacing (mm)')} ${p.mm}`;
-              return (
-                <button key={p.label} type="button"
-                data-rhinestone-spacing-action
-                data-review={review}
-                onFocus={(event) => setReviewedSpacingPreset(event.currentTarget.dataset.review ?? '')}
-                onClick={() => setSpacing(p.mm)}
-                aria-pressed={active}
-                className={`px-2 py-1 rounded-sm border text-left text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink bg-[#ff2e9a]/10' : 'border-border text-muted hover:text-ink'}`}
-                title={`${t(p.label)}: ${p.mm} mm`}>
-                <span className="block font-medium">{t(p.label)}</span>
-                <span className="block tabular-nums">{p.mm} mm</span>
-              </button>
-              );
+              return {
+                key: p.label,
+                className: `px-2 py-1 rounded-sm border text-left text-[10px] transition-colors ${active ? 'border-[#ff2e9a] text-ink bg-[#ff2e9a]/10' : 'border-border text-muted hover:text-ink'}`,
+                pressed: active,
+                onClick: () => setSpacing(p.mm),
+                title: `${t(p.label)}: ${p.mm} mm`,
+                data: { review: `${t(p.label)} · ${t('Spacing (mm)')} ${p.mm}` },
+                children: (
+                  <>
+                    <span className="block font-medium">{t(p.label)}</span>
+                    <span className="block tabular-nums">{p.mm} mm</span>
+                  </>
+                ),
+              };
             })}
-          </div>
+          />
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="rhinestone-action-review-status"
           className="flex justify-end gap-2 mt-4"
-          role="toolbar"
-          aria-label={t('Rhinestone Template actions')}
-          aria-describedby="rhinestone-action-review-status"
+          label={t('Rhinestone Template actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="rhinestone-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Rhinestone Template actions')}`}
-          </span>
-          <button type="button" data-rhinestone-action data-rhinestone-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-rhinestone-action data-rhinestone-action-review={t('Reset rhinestone settings')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset rhinestone settings'))} onClick={resetRhinestoneSettings} title={t('Reset rhinestone settings')}>{t('Reset')}</button>
-          <button type="button" data-rhinestone-action data-rhinestone-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={apply}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Rhinestone Template actions')}
+          actionAttr="data-rhinestone-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset rhinestone settings'), className: 'btn', onClick: resetRhinestoneSettings, title: t('Reset rhinestone settings') },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );
