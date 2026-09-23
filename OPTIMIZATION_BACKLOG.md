@@ -2,10 +2,10 @@
 
 Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js` 1,143 kB raw / 217 kB gzip; 141 eager sources totaling 2,112 kB of source text. A parallel session is mid-edit on `epson*/plotter*/src-tauri` — those files are measured but excluded from recommendations.
 
-**Status updates (2026-09-22, post-audit waves):**
+**Status updates (2026-09-23, post-audit waves):**
 - **P0-1 DONE** — viewport gate landed (`a3f179e`).
-- **P0-3 PARTIAL / REVISED** — MenuBar's click-only libs lazy-loaded (`f92e4e8`, 59 sites) but the entry is byte-neutral: honest correction, MenuBar is sole eager pinner of only ~19 kB source. The REAL unlock chain is **App.tsx's static imports** (`commitDimension` from measureTool; formats/runtime/projectFile/updater) + CommandPalette's static measureTool proof names + freeDistort's static envelope pin — P0-2 must therefore start at App.tsx, then the P0-3 conversions already in place pay off automatically. A clean measureTool split (measureProof.ts, 140.5 kB) was executed, measured (entry GREW — back-compat re-exports re-link the eager graph), and reverted; redo it only together with the App.tsx/CommandPalette import changes in one coordinated pass.
-- **P0-4 STARTED** — kit landed (`10beae5`): `src/components/ui/` (useRovingActions/ActionToolbar/PresetRow/ReviewedFooter/SearchableListActions, 36 tests incl. 16 DOM-equivalence cases) + 6 pilot dialogs migrated (−233 lines; also fixed a latent PrintDialog rAF/currentTarget crash). Follow-up batches A/B/C in the wave report; ~48 surfaces remain.
+- **P0-2 + P0-3 DONE** — coordinated pass landed (`bc50b78`): measureTool split (36.2 kB eager core / 140.7 kB measureProof on-demand chunk, runtime-verified 0 boot fetches), App commitDimension cached-dynamic, MenuBar+CommandPalette 82 sites each converted, ShortcutsDialog lazy (P1-1 DONE), updater import dynamic (warning gone). Entry 1,147.9 → 1,088.9 kB (gzip −15.1). REMAINING unlock chain for formats/projectFile warnings: `formatRegistration`/`io3` static pins (formats) and `tauriMenu`+mount-effect (projectFile) — those are the next coordinated pass, smaller than this one.
+- **P0-4 PILOT + BATCH A DONE** — kit landed (`10beae5`) + 24 chip-preset dialogs migrated (`11f08a2`, 93 roving handlers → factory calls, 12 new equivalence cases; fixed TilePrint's latent rAF/currentTarget crash). Remaining: 7 in-scope heavy-settings dialogs (DocSettings/FindReplace/Preferences/Recovery/Separations/Templates/VariableData) + panels batch C. Kit gaps to unlock most of them: `disabled` + `aria-label` passthrough on PresetItem/FooterAction, `radiogroup` role, external status region, 2-D listbox nav.
 
 
 ## P0 — highest value / effort
