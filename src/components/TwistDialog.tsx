@@ -7,6 +7,8 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 /**
  * Twist (Illustrator Effect→Distort & Transform→Twist) — swirl the selected
@@ -18,8 +20,8 @@ export function TwistDialog() {
   const open = useEditor(s => s.showTwist);
   const close = useCallback(() => { clearDistortPreview(); useEditor.getState().setModal('showTwist', false); }, []);
   const [angle, setAngle] = useState(45);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   const ANGLE_PRESETS = [-180, -90, -45, 0, 45, 90, 180];
 
@@ -47,38 +49,22 @@ export function TwistDialog() {
     setReviewedFooterAction(t('Reset'));
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-twist-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.twistActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-twist-action]',
+    reviewKey: actionReviewKey('data-twist-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-twist-angle-preset]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAngle = Number(actions[nextIndex]?.dataset.twistAnglePreset);
-    if (Number.isFinite(nextAngle)) setAngle(nextAngle);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-twist-angle-preset]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const nextAngle = Number(button?.dataset.twistAnglePreset);
+      if (Number.isFinite(nextAngle)) setAngle(nextAngle);
+    },
+  });
 
   return (
     <div
@@ -135,48 +121,24 @@ export function TwistDialog() {
           </div>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="twist-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Twist actions')}
-          aria-describedby="twist-action-review-status"
+          label={t('Twist actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <div id="twist-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Twist actions')}`}
-          </div>
-          <button
-            type="button"
-            data-twist-action
-            data-twist-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-twist-action
-            data-twist-action-review={t('Reset')}
-            className="btn"
-            onClick={resetSettings}
-            onFocus={() => setReviewedFooterAction(t('Reset'))}
-          >
-            {t('Reset')}
-          </button>
-          <button
-            type="button"
-            data-twist-action
-            data-twist-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={apply}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Twist actions')}
+          statusAs="div"
+          actionAttr="data-twist-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetSettings },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

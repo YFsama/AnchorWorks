@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const DEFAULT_STOPS: FreeformGradientStop[] = [
   { x: 0.2, y: 0.25, color: '#3d9bff', radius: 0.55 },
@@ -71,8 +74,8 @@ export function FreeformGradientDialog() {
   const [height, setHeight] = useState(320);
   const [stops, setStops] = useState<FreeformGradientStop[]>(DEFAULT_STOPS);
   const [mode, setMode] = useState<FreeformGradientMode>('freeform');
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const activePreset = GRADIENT_PRESETS.find((preset) => width === preset.width && height === preset.height && stopsEqual(stops, preset.stops))?.label ?? '';
 
   useEscapeClose(open, close);
@@ -87,38 +90,22 @@ export function FreeformGradientDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-freeform-gradient-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.freeformGradientActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-freeform-gradient-action]',
+    reviewKey: actionReviewKey('data-freeform-gradient-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-freeform-gradient-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = GRADIENT_PRESETS[Number(actions[nextIndex]?.dataset.freeformGradientPresetIndex ?? -1)];
-    if (preset) applyPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-freeform-gradient-preset-action]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const preset = GRADIENT_PRESETS[Number(button?.dataset.freeformGradientPresetIndex ?? -1)];
+      if (preset) applyPreset(preset);
+    },
+  });
 
   const applyPreset = (preset: { width: number; height: number; stops: FreeformGradientStop[] }) => {
     setWidth(preset.width);
@@ -149,38 +136,31 @@ export function FreeformGradientDialog() {
         </div>
         <div className="mb-3">
           <div className="field-label !mb-1">{t('Freeform gradient presets')}</div>
-          <div
+          <PresetRow
+            statusId="freeform-gradient-preset-review-status"
             className="grid grid-cols-4 gap-1"
-            role="toolbar"
-            aria-label={t('Freeform Gradient preset actions')}
-            aria-describedby="freeform-gradient-preset-review-status"
+            label={t('Freeform Gradient preset actions')}
             title={t('Use arrow keys to review freeform gradient presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="freeform-gradient-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedPreset || t('Freeform gradient presets')}`}
-            </div>
-            {GRADIENT_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedPreset}
+            fallback={t('Freeform gradient presets')}
+            actionAttr="data-freeform-gradient-preset-action"
+            setReviewed={setReviewedPreset}
+            items={GRADIENT_PRESETS.map((preset) => {
               const active = activePreset === preset.label;
               const review = `${t(preset.label)}: ${t(preset.title)} ${preset.width}×${preset.height}, ${preset.stops.length} ${t('stops')}`;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  data-freeform-gradient-preset-action
-                  data-freeform-gradient-preset-index={GRADIENT_PRESETS.indexOf(preset)}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onClick={() => applyPreset(preset)}
-                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={review}
-                >
-                  {t(preset.label)}
-                </button>
-              );
+              return {
+                key: preset.label,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                pressed: active,
+                onClick: () => applyPreset(preset),
+                title: review,
+                data: { 'freeform-gradient-preset-index': GRADIENT_PRESETS.indexOf(preset), review },
+                children: t(preset.label),
+              };
             })}
-          </div>
+          />
         </div>
         <div className="space-y-1 max-h-56 overflow-auto pr-1">
           {stops.map((stop, index) => (
@@ -194,20 +174,22 @@ export function FreeformGradientDialog() {
           ))}
         </div>
         <button type="button" className="btn mt-2 flex items-center gap-1" onClick={() => setStops([...stops, { x: 0.5, y: 0.5, color: '#ffffff', radius: 0.5 }])}><Plus size={12} aria-hidden="true" /> {t('Add stop')}</button>
-        <div
+        <ReviewedFooter
+          statusId="freeform-gradient-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Freeform Gradient actions')}
-          aria-describedby="freeform-gradient-action-review-status"
+          label={t('Freeform Gradient actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="freeform-gradient-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Freeform Gradient actions')}`}
-          </span>
-          <button type="button" data-freeform-gradient-action data-freeform-gradient-action-review={t('Cancel')} onFocus={() => setReviewedFooterAction(t('Cancel'))} className="btn" onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-freeform-gradient-action data-freeform-gradient-action-review={t('Create')} onFocus={() => setReviewedFooterAction(t('Create'))} className="btn-primary" onClick={() => { void apply(); }}>{t('Create')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Freeform Gradient actions')}
+          actionAttr="data-freeform-gradient-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Create'), review: t('Create'), className: 'btn-primary', onClick: () => { void apply(); } },
+          ]}
+        />
       </div>
     </div>
   );

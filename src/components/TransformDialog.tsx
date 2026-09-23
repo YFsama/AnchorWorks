@@ -7,6 +7,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const MOVE_PRESETS = [1, 5, 10, 25] as const;
 const SCALE_PRESETS = [50, 100, 150, 200] as const;
@@ -43,12 +46,12 @@ export function TransformDialog() {
   const unit = useEditor(s => s.dimUnit);
   const setUnit = useEditor(s => s.setDimUnit);
   const k = unit === 'mm' ? 3.7795 : 1;
-  const [reviewedUnit, setReviewedUnit] = useState('');
-  const [reviewedMoveMode, setReviewedMoveMode] = useState('');
-  const [reviewedMovePreset, setReviewedMovePreset] = useState('');
-  const [reviewedScalePreset, setReviewedScalePreset] = useState('');
-  const [reviewedRotatePreset, setReviewedRotatePreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedUnit, setReviewedUnit] = useReviewedAction();
+  const [reviewedMoveMode, setReviewedMoveMode] = useReviewedAction();
+  const [reviewedMovePreset, setReviewedMovePreset] = useReviewedAction();
+  const [reviewedScalePreset, setReviewedScalePreset] = useReviewedAction();
+  const [reviewedRotatePreset, setReviewedRotatePreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -94,111 +97,80 @@ export function TransformDialog() {
     setReviewedFooterAction(t('Reset transform settings'));
   };
 
-  const handleMovePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-transform-move-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const value = Number(actions[nextIndex]?.dataset.value);
-    if (Number.isFinite(value)) applyMovePreset(value);
-    requestAnimationFrame(() => {
-      setReviewedMovePreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleMovePresetKeys = makeRovingKeys({
+    selector: '[data-transform-move-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedMovePreset,
+    onNavigate: (button) => {
+      const value = Number(button?.dataset.value);
+      if (Number.isFinite(value)) applyMovePreset(value);
+    },
+  });
 
-  const handleScalePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-transform-scale-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const value = Number(actions[nextIndex]?.dataset.value);
-    if (Number.isFinite(value)) {
-      setScaleX(value);
-      if (linkScale) setScaleY(value);
-    }
-    requestAnimationFrame(() => {
-      setReviewedScalePreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleScalePresetKeys = makeRovingKeys({
+    selector: '[data-transform-scale-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedScalePreset,
+    onNavigate: (button) => {
+      const value = Number(button?.dataset.value);
+      if (Number.isFinite(value)) {
+        setScaleX(value);
+        if (linkScale) setScaleY(value);
+      }
+    },
+  });
 
-  const handleRotatePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-transform-rotate-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const value = Number(actions[nextIndex]?.dataset.value);
-    if (Number.isFinite(value)) setRotate(value);
-    requestAnimationFrame(() => {
-      setReviewedRotatePreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleRotatePresetKeys = makeRovingKeys({
+    selector: '[data-transform-rotate-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedRotatePreset,
+    onNavigate: (button) => {
+      const value = Number(button?.dataset.value);
+      if (Number.isFinite(value)) setRotate(value);
+    },
+  });
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-transform-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.transformActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-transform-action]',
+    reviewKey: actionReviewKey('data-transform-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handleOptionKeys = (event: React.KeyboardEvent<HTMLDivElement>, selector: string, apply: (button: HTMLButtonElement) => void, review?: (button: HTMLButtonElement) => void) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const button = actions[nextIndex];
-    if (button) apply(button);
-    requestAnimationFrame(() => {
-      if (button) review?.(button);
-      button?.focus();
-    });
-  };
+  const handleUnitKeys = makeRovingKeys({
+    selector: '[data-transform-unit-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedUnit,
+    onNavigate: (button) => {
+      const nextUnit = button?.dataset.unit as 'mm' | 'px' | undefined;
+      if (nextUnit) setUnit(nextUnit);
+    },
+  });
+
+  const handleMoveModeKeys = makeRovingKeys({
+    selector: '[data-transform-move-mode-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedMoveMode,
+    onNavigate: (button) => {
+      const nextMode = button?.dataset.mode as 'xy' | 'polar' | undefined;
+      if (nextMode) setMoveMode(nextMode);
+    },
+  });
 
   return (
     <div
@@ -222,10 +194,7 @@ export function TransformDialog() {
           aria-label={t('Unit')}
           aria-describedby="transform-unit-review-status"
           title={t('Use arrow keys to switch transform units')}
-          onKeyDown={(event) => handleOptionKeys(event, '[data-transform-unit-action]', (button) => {
-            const nextUnit = button.dataset.unit as 'mm' | 'px' | undefined;
-            if (nextUnit) setUnit(nextUnit);
-          }, (button) => setReviewedUnit(button.dataset.review ?? ''))}
+          onKeyDown={handleUnitKeys}
         >
           <div id="transform-unit-review-status" className="sr-only" aria-live="polite">
             {`${t('Reviewing')} ${reviewedUnit || t('Unit')}`}
@@ -240,10 +209,7 @@ export function TransformDialog() {
           aria-label={t('Move mode')}
           aria-describedby="transform-move-mode-review-status"
           title={t('Use arrow keys to switch move mode')}
-          onKeyDown={(event) => handleOptionKeys(event, '[data-transform-move-mode-action]', (button) => {
-            const nextMode = button.dataset.mode as 'xy' | 'polar' | undefined;
-            if (nextMode) setMoveMode(nextMode);
-          }, (button) => setReviewedMoveMode(button.dataset.review ?? ''))}
+          onKeyDown={handleMoveModeKeys}
         >
           <div id="transform-move-mode-review-status" className="sr-only" aria-live="polite">
             {`${t('Reviewing')} ${reviewedMoveMode || t('Move mode')}`}
@@ -254,40 +220,32 @@ export function TransformDialog() {
 
         <div className="mb-2">
           <div className="field-label !mb-1">{t('Move presets')}</div>
-          <div
+          <PresetRow
+            statusId="transform-move-preset-review-status"
             className="grid grid-cols-4 gap-1"
-            role="toolbar"
-            aria-label={t('Transform move preset actions')}
-            aria-describedby="transform-move-preset-review-status"
+            label={t('Transform move preset actions')}
             title={t('Use arrow keys to review transform move presets')}
             onKeyDown={handleMovePresetKeys}
-          >
-            <div id="transform-move-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedMovePreset || t('Move presets')}`}
-            </div>
-            {MOVE_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedMovePreset}
+            fallback={t('Move presets')}
+            actionAttr="data-transform-move-preset-action"
+            setReviewed={setReviewedMovePreset}
+            items={MOVE_PRESETS.map((preset) => {
               const active = moveMode === 'polar' ? dist === preset : dx === preset && dy === 0;
-              const review = moveMode === 'polar'
-                ? `${t('Distance')} ${preset} ${unit}`
-                : `${t('Move')} X ${preset} ${unit} · Y 0 ${unit}`;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  data-transform-move-preset-action
-                  data-value={preset}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                  onClick={() => applyMovePreset(preset)}
-                  onFocus={(event) => setReviewedMovePreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={moveMode === 'polar' ? `${t('Set distance to')} ${preset} ${unit}` : `${t('Set move X to')} ${preset} ${unit}`}
-                >
-                  {preset}{unit}
-                </button>
-              );
+              return {
+                key: preset,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                pressed: active,
+                onClick: () => applyMovePreset(preset),
+                title: moveMode === 'polar' ? `${t('Set distance to')} ${preset} ${unit}` : `${t('Set move X to')} ${preset} ${unit}`,
+                data: { value: preset, review: moveMode === 'polar'
+                  ? `${t('Distance')} ${preset} ${unit}`
+                  : `${t('Move')} X ${preset} ${unit} · Y 0 ${unit}` },
+                children: <>{preset}{unit}</>,
+              };
             })}
-          </div>
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -327,76 +285,60 @@ export function TransformDialog() {
 
         <div className="mt-2">
           <div className="field-label !mb-1">{t('Scale presets')}</div>
-          <div
+          <PresetRow
+            statusId="transform-scale-preset-review-status"
             className="grid grid-cols-4 gap-1"
-            role="toolbar"
-            aria-label={t('Transform scale preset actions')}
-            aria-describedby="transform-scale-preset-review-status"
+            label={t('Transform scale preset actions')}
             title={t('Use arrow keys to review transform scale presets')}
             onKeyDown={handleScalePresetKeys}
-          >
-            <div id="transform-scale-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedScalePreset || t('Scale presets')}`}
-            </div>
-            {SCALE_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedScalePreset}
+            fallback={t('Scale presets')}
+            actionAttr="data-transform-scale-preset-action"
+            setReviewed={setReviewedScalePreset}
+            items={SCALE_PRESETS.map((preset) => {
               const active = scaleX === preset && (!linkScale || scaleY === preset);
-              const review = linkScale
-                ? `${t('Scale')} X ${preset}% · Y ${preset}%`
-                : `${t('Scale')} X ${preset}%`;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  data-transform-scale-preset-action
-                  data-value={preset}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                  onClick={() => { setScaleX(preset); if (linkScale) setScaleY(preset); }}
-                  onFocus={(event) => setReviewedScalePreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={`${t('Set scale to')} ${preset}%`}
-                >
-                  {preset}%
-                </button>
-              );
+              return {
+                key: preset,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                pressed: active,
+                onClick: () => { setScaleX(preset); if (linkScale) setScaleY(preset); },
+                title: `${t('Set scale to')} ${preset}%`,
+                data: { value: preset, review: linkScale
+                  ? `${t('Scale')} X ${preset}% · Y ${preset}%`
+                  : `${t('Scale')} X ${preset}%` },
+                children: <>{preset}%</>,
+              };
             })}
-          </div>
+          />
         </div>
 
         <div className="mt-2">
           <div className="field-label !mb-1">{t('Rotate presets')}</div>
-          <div
+          <PresetRow
+            statusId="transform-rotate-preset-review-status"
             className="grid grid-cols-6 gap-1"
-            role="toolbar"
-            aria-label={t('Transform rotate preset actions')}
-            aria-describedby="transform-rotate-preset-review-status"
+            label={t('Transform rotate preset actions')}
             title={t('Use arrow keys to review transform rotate presets')}
             onKeyDown={handleRotatePresetKeys}
-          >
-            <div id="transform-rotate-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedRotatePreset || t('Rotate presets')}`}
-            </div>
-            {ROTATE_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedRotatePreset}
+            fallback={t('Rotate presets')}
+            actionAttr="data-transform-rotate-preset-action"
+            setReviewed={setReviewedRotatePreset}
+            items={ROTATE_PRESETS.map((preset) => {
               const active = rotate === preset;
-              const review = `${t('Rotate')} ${preset > 0 ? '+' : ''}${preset}°`;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  data-transform-rotate-preset-action
-                  data-value={preset}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                  onClick={() => setRotate(preset)}
-                  onFocus={(event) => setReviewedRotatePreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={`${t('Set rotation to')} ${preset > 0 ? '+' : ''}${preset}°`}
-                >
-                  {preset > 0 ? '+' : ''}{preset}°
-                </button>
-              );
+              return {
+                key: preset,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                pressed: active,
+                onClick: () => setRotate(preset),
+                title: `${t('Set rotation to')} ${preset > 0 ? '+' : ''}${preset}°`,
+                data: { value: preset, review: `${t('Rotate')} ${preset > 0 ? '+' : ''}${preset}°` },
+                children: <>{preset > 0 ? '+' : ''}{preset}°</>,
+              };
             })}
-          </div>
+          />
         </div>
 
         <label className="flex items-center gap-2 mt-2 text-xs cursor-pointer">
@@ -412,21 +354,23 @@ export function TransformDialog() {
           {t('Scale Strokes & Effects')}
         </label>
 
-        <div
+        <ReviewedFooter
+          statusId="transform-action-review-status"
           className="flex justify-end gap-2 mt-4"
-          role="toolbar"
-          aria-label={t('Transform actions')}
-          aria-describedby="transform-action-review-status"
+          label={t('Transform actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="transform-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Transform actions')}`}
-          </span>
-          <button type="button" data-transform-action data-transform-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-transform-action data-transform-action-review={t('Reset transform settings')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset transform settings'))} onClick={resetTransformSettings} title={t('Reset transform settings')}>{t('Reset')}</button>
-          <button type="button" data-transform-action data-transform-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={() => { void apply(); }}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Transform actions')}
+          actionAttr="data-transform-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset transform settings'), className: 'btn', onClick: resetTransformSettings, title: t('Reset transform settings') },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: () => { void apply(); } },
+          ]}
+        />
       </div>
     </div>
   );

@@ -6,6 +6,8 @@ import { toast } from '../lib/toast';
 import { repeatGrid, repeatRadial, repeatMirror } from '../lib/repeat';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
 
 type Tab = 'grid' | 'radial' | 'mirror';
 type MirrorAxis = 'horizontal' | 'vertical' | 'both';
@@ -67,10 +69,10 @@ export function RepeatDialog() {
 
   // Mirror params
   const [axis, setAxis] = useState<MirrorAxis>('horizontal');
-  const [reviewedGridPreset, setReviewedGridPreset] = useState('');
-  const [reviewedRadialPreset, setReviewedRadialPreset] = useState('');
-  const [reviewedMirrorPreset, setReviewedMirrorPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedGridPreset, setReviewedGridPreset] = useReviewedAction();
+  const [reviewedRadialPreset, setReviewedRadialPreset] = useReviewedAction();
+  const [reviewedMirrorPreset, setReviewedMirrorPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   const [busy, setBusy] = useState(false);
 
@@ -134,27 +136,18 @@ export function RepeatDialog() {
     setReviewedFooterAction(t('Reset'));
   };
 
-  const handleGridPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-grid-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const preset = GRID_REPEAT_PRESETS.find((item) => item.id === actions[nextIndex]?.dataset.value);
-    if (preset) applyGridPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedGridPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleGridPresetKeys = makeRovingKeys({
+    selector: '[data-repeat-grid-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedGridPreset,
+    onNavigate: (button) => {
+      const preset = GRID_REPEAT_PRESETS.find((item) => item.id === button?.dataset.value);
+      if (preset) applyGridPreset(preset);
+    },
+  });
 
   const applyRadialPreset = (preset: (typeof RADIAL_REPEAT_PRESETS)[number]) => {
     setCount(preset.count);
@@ -164,66 +157,40 @@ export function RepeatDialog() {
     setRotateInstances(preset.rotateInstances);
   };
 
-  const handleRadialPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-radial-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const preset = RADIAL_REPEAT_PRESETS.find((item) => item.id === actions[nextIndex]?.dataset.value);
-    if (preset) applyRadialPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedRadialPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleRadialPresetKeys = makeRovingKeys({
+    selector: '[data-repeat-radial-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedRadialPreset,
+    onNavigate: (button) => {
+      const preset = RADIAL_REPEAT_PRESETS.find((item) => item.id === button?.dataset.value);
+      if (preset) applyRadialPreset(preset);
+    },
+  });
 
-  const handleMirrorPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-mirror-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const nextAxis = actions[nextIndex]?.dataset.value as MirrorAxis | undefined;
-    if (nextAxis) setAxis(nextAxis);
-    requestAnimationFrame(() => {
-      setReviewedMirrorPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleMirrorPresetKeys = makeRovingKeys({
+    selector: '[data-repeat-mirror-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedMirrorPreset,
+    onNavigate: (button) => {
+      const nextAxis = button?.dataset.value as MirrorAxis | undefined;
+      if (nextAxis) setAxis(nextAxis);
+    },
+  });
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-repeat-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.repeatActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-repeat-action]',
+    reviewKey: actionReviewKey('data-repeat-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedFooterAction,
+  });
 
   return (
     <div
@@ -283,38 +250,30 @@ export function RepeatDialog() {
               <div className="space-y-3 text-xs">
                 <div>
                   <div className="field-label !mb-1">{t('Repeat grid presets')}</div>
-                  <div
+                  <PresetRow
+                    statusId="repeat-grid-preset-review-status"
                     className="grid grid-cols-4 gap-1"
-                    role="toolbar"
-                    aria-label={t('Repeat grid preset actions')}
-                    aria-describedby="repeat-grid-preset-review-status"
+                    label={t('Repeat grid preset actions')}
                     title={t('Use arrow keys to review repeat grid presets')}
                     onKeyDown={handleGridPresetKeys}
-                  >
-                    <div id="repeat-grid-preset-review-status" className="sr-only" aria-live="polite">
-                      {`${t('Reviewing')} ${reviewedGridPreset || t('Repeat grid presets')}`}
-                    </div>
-                    {GRID_REPEAT_PRESETS.map((preset) => {
+                    reviewingLabel={t('Reviewing')}
+                    reviewed={reviewedGridPreset}
+                    fallback={t('Repeat grid presets')}
+                    actionAttr="data-repeat-grid-preset-action"
+                    setReviewed={setReviewedGridPreset}
+                    items={GRID_REPEAT_PRESETS.map((preset) => {
                       const active = cols === preset.cols && rows === preset.rows;
-                      const review = `${t(preset.label)} · ${t('Cols')} ${preset.cols} · ${t('Rows')} ${preset.rows}`;
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          data-repeat-grid-preset-action
-                          data-value={preset.id}
-                          data-review={review}
-                          className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                          onClick={() => applyGridPreset(preset)}
-                          onFocus={(event) => setReviewedGridPreset(event.currentTarget.dataset.review ?? '')}
-                          aria-pressed={active}
-                          title={`${t(preset.label)} · ${preset.cols}×${preset.rows}`}
-                        >
-                          {t(preset.label)}
-                        </button>
-                      );
+                      return {
+                        key: preset.id,
+                        className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                        pressed: active,
+                        onClick: () => applyGridPreset(preset),
+                        title: `${t(preset.label)} · ${preset.cols}×${preset.rows}`,
+                        data: { value: preset.id, review: `${t(preset.label)} · ${t('Cols')} ${preset.cols} · ${t('Rows')} ${preset.rows}` },
+                        children: t(preset.label),
+                      };
                     })}
-                  </div>
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <NumField label={t('Cols')} value={cols} min={1} max={50} step={1} onChange={setCols} />
@@ -331,42 +290,34 @@ export function RepeatDialog() {
               <div className="space-y-3 text-xs">
                 <div>
                   <div className="field-label !mb-1">{t('Repeat radial presets')}</div>
-                  <div
+                  <PresetRow
+                    statusId="repeat-radial-preset-review-status"
                     className="grid grid-cols-3 gap-1"
-                    role="toolbar"
-                    aria-label={t('Repeat radial preset actions')}
-                    aria-describedby="repeat-radial-preset-review-status"
+                    label={t('Repeat radial preset actions')}
                     title={t('Use arrow keys to review repeat radial presets')}
                     onKeyDown={handleRadialPresetKeys}
-                  >
-                    <div id="repeat-radial-preset-review-status" className="sr-only" aria-live="polite">
-                      {`${t('Reviewing')} ${reviewedRadialPreset || t('Repeat radial presets')}`}
-                    </div>
-                    {RADIAL_REPEAT_PRESETS.map((preset) => {
+                    reviewingLabel={t('Reviewing')}
+                    reviewed={reviewedRadialPreset}
+                    fallback={t('Repeat radial presets')}
+                    actionAttr="data-repeat-radial-preset-action"
+                    setReviewed={setReviewedRadialPreset}
+                    items={RADIAL_REPEAT_PRESETS.map((preset) => {
                       const active = count === preset.count
                         && radius === preset.radius
                         && startAngle === preset.startAngle
                         && endAngle === preset.endAngle
                         && rotateInstances === preset.rotateInstances;
-                      const review = `${t(preset.label)} · ${t('Count')} ${preset.count} · ${t('Radius (px)')} ${preset.radius} · ${preset.rotateInstances ? t('Rotate instances') : t('No rotation')}`;
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          data-repeat-radial-preset-action
-                          data-value={preset.id}
-                          data-review={review}
-                          className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                          onClick={() => applyRadialPreset(preset)}
-                          onFocus={(event) => setReviewedRadialPreset(event.currentTarget.dataset.review ?? '')}
-                          aria-pressed={active}
-                          title={`${t(preset.label)} · ${preset.count} ${t('copies')} · ${preset.radius}px`}
-                        >
-                          {t(preset.label)}
-                        </button>
-                      );
+                      return {
+                        key: preset.id,
+                        className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                        pressed: active,
+                        onClick: () => applyRadialPreset(preset),
+                        title: `${t(preset.label)} · ${preset.count} ${t('copies')} · ${preset.radius}px`,
+                        data: { value: preset.id, review: `${t(preset.label)} · ${t('Count')} ${preset.count} · ${t('Radius (px)')} ${preset.radius} · ${preset.rotateInstances ? t('Rotate instances') : t('No rotation')}` },
+                        children: t(preset.label),
+                      };
                     })}
-                  </div>
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <NumField label={t('Count')} value={count} min={2} max={64} step={1} onChange={setCount} />
@@ -387,38 +338,30 @@ export function RepeatDialog() {
             {tab === 'mirror' && (
               <div className="space-y-2 text-xs">
                 <div className="field-label !mb-1">{t('Mirror axis presets')}</div>
-                <div
+                <PresetRow
+                  statusId="repeat-mirror-preset-review-status"
                   className="grid grid-cols-3 gap-1"
-                  role="toolbar"
-                  aria-label={t('Repeat mirror preset actions')}
-                  aria-describedby="repeat-mirror-preset-review-status"
+                  label={t('Repeat mirror preset actions')}
                   title={t('Use arrow keys to review repeat mirror presets')}
                   onKeyDown={handleMirrorPresetKeys}
-                >
-                  <div id="repeat-mirror-preset-review-status" className="sr-only" aria-live="polite">
-                    {`${t('Reviewing')} ${reviewedMirrorPreset || t('Mirror axis presets')}`}
-                  </div>
-                  {MIRROR_AXIS_PRESETS.map((preset) => {
+                  reviewingLabel={t('Reviewing')}
+                  reviewed={reviewedMirrorPreset}
+                  fallback={t('Mirror axis presets')}
+                  actionAttr="data-repeat-mirror-preset-action"
+                  setReviewed={setReviewedMirrorPreset}
+                  items={MIRROR_AXIS_PRESETS.map((preset) => {
                     const active = axis === preset.value;
-                    const review = `${t('Mirror')} · ${t(preset.label)}`;
-                    return (
-                      <button
-                        key={preset.value}
-                        type="button"
-                        data-repeat-mirror-preset-action
-                        data-value={preset.value}
-                        data-review={review}
-                        className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                        onClick={() => setAxis(preset.value)}
-                        onFocus={(event) => setReviewedMirrorPreset(event.currentTarget.dataset.review ?? '')}
-                        aria-pressed={active}
-                        title={t(preset.label)}
-                      >
-                        {t(preset.label)}
-                      </button>
-                    );
+                    return {
+                      key: preset.value,
+                      className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                      pressed: active,
+                      onClick: () => setAxis(preset.value),
+                      title: t(preset.label),
+                      data: { value: preset.value, review: `${t('Mirror')} · ${t(preset.label)}` },
+                      children: t(preset.label),
+                    };
                   })}
-                </div>
+                />
               </div>
             )}
           </div>

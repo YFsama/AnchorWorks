@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 /**
  * Round Corners (Illustrator Effect→Stylize→Round Corners) — fillet the selected
@@ -18,8 +21,8 @@ export function RoundCornersDialog() {
   const open = useEditor(s => s.showRoundCorners);
   const close = useCallback(() => useEditor.getState().setModal('showRoundCorners', false), []);
   const [radius, setRadius] = useState(3);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -32,38 +35,22 @@ export function RoundCornersDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-round-corners-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.roundCornersActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-round-corners-action]',
+    reviewKey: actionReviewKey('data-round-corners-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-round-corners-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextRadius = Number(actions[nextIndex]?.dataset.radius);
-    if (Number.isFinite(nextRadius)) setRadius(nextRadius);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-round-corners-preset-action]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const nextRadius = Number(button?.dataset.radius);
+      if (Number.isFinite(nextRadius)) setRadius(nextRadius);
+    },
+  });
 
   return (
     <div
@@ -96,70 +83,45 @@ export function RoundCornersDialog() {
         </label>
         <div className="mb-2">
           <div className="field-label !mb-1">{t('Radius presets')}</div>
-          <div
+          <PresetRow
+            statusId="round-corners-preset-review-status"
             className="grid grid-cols-6 gap-1"
-            role="toolbar"
-            aria-label={t('Radius preset actions')}
-            aria-describedby="round-corners-preset-review-status"
+            label={t('Radius preset actions')}
             title={t('Use arrow keys to review radius presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="round-corners-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedPreset || t('Radius presets')}`}
-            </div>
-            {RADIUS_PRESETS_MM.map((value) => {
-              const review = `${t('Radius (mm)')} ${value}`;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  data-round-corners-preset-action
-                  data-radius={value}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${radius === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onClick={() => setRadius(value)}
-                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={radius === value}
-                >
-                  {value}
-                </button>
-              );
-            })}
-          </div>
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedPreset}
+            fallback={t('Radius presets')}
+            actionAttr="data-round-corners-preset-action"
+            setReviewed={setReviewedPreset}
+            items={RADIUS_PRESETS_MM.map((value) => ({
+              key: value,
+              className: `btn !py-1 !px-1 !text-[10px] ${radius === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+              pressed: radius === value,
+              onClick: () => setRadius(value),
+              data: { radius: value, review: `${t('Radius (mm)')} ${value}` },
+              children: value,
+            }))}
+          />
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="round-corners-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Round Corners actions')}
-          aria-describedby="round-corners-action-review-status"
+          label={t('Round Corners actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <div id="round-corners-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Round Corners actions')}`}
-          </div>
-          <button
-            type="button"
-            data-round-corners-action
-            data-round-corners-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-round-corners-action
-            data-round-corners-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={apply}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Round Corners actions')}
+          statusAs="div"
+          actionAttr="data-round-corners-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

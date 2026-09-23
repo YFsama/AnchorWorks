@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const SCALE_PRESETS = [
   { label: 'Half size', factor: 0.5 },
@@ -35,9 +38,9 @@ export function ResizeDialog() {
   const [w, setW] = useState(() => initialSize ? initialSize.w.toFixed(1) : '');
   const [h, setH] = useState(() => initialSize ? initialSize.h.toFixed(1) : '');
   const [lock, setLock] = useState(true);
-  const [reviewedSizeRecipe, setReviewedSizeRecipe] = useState('');
-  const [reviewedScalePreset, setReviewedScalePreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedSizeRecipe, setReviewedSizeRecipe] = useReviewedAction();
+  const [reviewedScalePreset, setReviewedScalePreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -73,63 +76,37 @@ export function ResizeDialog() {
     setReviewedFooterAction(t('Reset'));
   };
 
-  const handleScalePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-resize-scale-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const factor = Number(actions[nextIndex]?.dataset.factor);
-    if (Number.isFinite(factor)) applyScalePreset(factor);
-    requestAnimationFrame(() => {
-      setReviewedScalePreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleScalePresetKeys = makeRovingKeys({
+    selector: '[data-resize-scale-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedScalePreset,
+    onNavigate: (button) => {
+      const factor = Number(button?.dataset.factor);
+      if (Number.isFinite(factor)) applyScalePreset(factor);
+    },
+  });
 
-  const handleSizeRecipeKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-resize-size-recipe-action]'));
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const recipe = SIZE_RECIPES.find((entry) => entry.label === actions[nextIndex]?.dataset.recipe);
-    if (recipe) applySizeRecipe(recipe);
-    requestAnimationFrame(() => {
-      setReviewedSizeRecipe(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleSizeRecipeKeys = makeRovingKeys({
+    selector: '[data-resize-size-recipe-action]',
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedSizeRecipe,
+    onNavigate: (button) => {
+      const recipe = SIZE_RECIPES.find((entry) => entry.label === button?.dataset.recipe);
+      if (recipe) applySizeRecipe(recipe);
+    },
+  });
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-resize-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.resizeActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-resize-action]',
+    reviewKey: actionReviewKey('data-resize-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
   // With lock on, editing one field previews the other from the current ratio.
   const ratio = initialSize && initialSize.h > 0 ? initialSize.w / initialSize.h : 1;
@@ -164,40 +141,32 @@ export function ResizeDialog() {
         </div>
         <div className="mt-3">
           <div className="field-label !mb-1">{t('Size recipes')}</div>
-          <div
+          <PresetRow
+            statusId="resize-size-recipe-review-status"
             className="grid grid-cols-2 gap-1"
-            role="toolbar"
-            aria-label={t('Resize size recipe actions')}
-            aria-describedby="resize-size-recipe-review-status"
+            label={t('Resize size recipe actions')}
             title={t('Use arrow keys to review resize size recipes')}
             onKeyDown={handleSizeRecipeKeys}
-          >
-            <div id="resize-size-recipe-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedSizeRecipe || t('Size recipes')}`}
-            </div>
-            {SIZE_RECIPES.map((recipe) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedSizeRecipe}
+            fallback={t('Size recipes')}
+            actionAttr="data-resize-size-recipe-action"
+            setReviewed={setReviewedSizeRecipe}
+            items={SIZE_RECIPES.map((recipe) => {
               const targetW = recipe.w.toFixed(1);
               const targetH = recipe.h.toFixed(1);
               const active = w === targetW && h === targetH;
-              const review = `${t(recipe.label)} · ${t('Width (mm)')} ${targetW} · ${t('Height (mm)')} ${targetH}`;
-              return (
-                <button
-                  key={recipe.label}
-                  type="button"
-                  data-resize-size-recipe-action
-                  data-recipe={recipe.label}
-                  data-review={review}
-                  className={`btn !py-1 !px-1.5 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                  onClick={() => applySizeRecipe(recipe)}
-                  onFocus={(event) => setReviewedSizeRecipe(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={`${t(recipe.title)} · ${targetW} × ${targetH} mm`}
-                >
-                  {t(recipe.label)}
-                </button>
-              );
+              return {
+                key: recipe.label,
+                className: `btn !py-1 !px-1.5 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                pressed: active,
+                onClick: () => applySizeRecipe(recipe),
+                title: `${t(recipe.title)} · ${targetW} × ${targetH} mm`,
+                data: { recipe: recipe.label, review: `${t(recipe.label)} · ${t('Width (mm)')} ${targetW} · ${t('Height (mm)')} ${targetH}` },
+                children: t(recipe.label),
+              };
             })}
-          </div>
+          />
         </div>
 
         <div className="mt-3">
@@ -246,21 +215,23 @@ export function ResizeDialog() {
           <span>{t('Lock aspect ratio')}</span>
         </label>
 
-        <div
+        <ReviewedFooter
+          statusId="resize-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Resize actions')}
-          aria-describedby="resize-action-review-status"
+          label={t('Resize actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="resize-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Resize actions')}`}
-          </span>
-          <button type="button" data-resize-action data-resize-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-resize-action data-resize-action-review={t('Reset')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset'))} onClick={resetFields}>{t('Reset')}</button>
-          <button type="button" data-resize-action data-resize-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={apply}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Resize actions')}
+          actionAttr="data-resize-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetFields },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

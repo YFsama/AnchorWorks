@@ -7,6 +7,8 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 // Sensible starting palette: inner → outer.
 const DEFAULT_COLORS = ['#000000', '#ffffff', '#e11d48', '#ffd400'];
@@ -23,8 +25,8 @@ export function OutlineEffectDialog() {
   const [count, setCount] = useState(1);
   const [widthMm, setWidthMm] = useState(2);
   const [colors, setColors] = useState<string[]>(DEFAULT_COLORS);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   const OUTLINE_PRESETS = [
     { id: 'shadow', label: t('Shadow'), count: 1, widthMm: 2, colors: ['#000000', '#ffffff', '#e11d48', '#ffd400'] },
@@ -48,38 +50,22 @@ export function OutlineEffectDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-outline-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.outlineActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-outline-action]',
+    reviewKey: actionReviewKey('data-outline-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-outline-preset]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = OUTLINE_PRESETS[Number(actions[nextIndex]?.dataset.outlinePresetIndex ?? -1)];
-    if (preset) applyPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-outline-preset]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const preset = OUTLINE_PRESETS[Number(button?.dataset.outlinePresetIndex ?? -1)];
+      if (preset) applyPreset(preset);
+    },
+  });
 
   const applyPreset = (preset: typeof OUTLINE_PRESETS[number]) => {
     setCount(preset.count);
@@ -166,38 +152,23 @@ export function OutlineEffectDialog() {
           ))}
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="outline-action-review-status"
           className="flex justify-end gap-2 mt-4"
-          role="toolbar"
-          aria-label={t('Multi-outline actions')}
-          aria-describedby="outline-action-review-status"
+          label={t('Multi-outline actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <div id="outline-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Multi-outline actions')}`}
-          </div>
-          <button
-            type="button"
-            data-outline-action
-            data-outline-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-outline-action
-            data-outline-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={() => { void apply(); }}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Multi-outline actions')}
+          statusAs="div"
+          actionAttr="data-outline-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: () => { void apply(); } },
+          ]}
+        />
       </div>
     </div>
   );

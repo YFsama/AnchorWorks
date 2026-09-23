@@ -6,6 +6,8 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 /**
  * Arc Warp (Illustrator Effect→Warp→Arc) — bend the selection into an arc/banner.
@@ -17,8 +19,8 @@ export function WarpDialog() {
   const close = useCallback(() => useEditor.getState().setModal('showWarp', false), []);
   const [bend, setBend] = useState(40);
   const [style, setStyle] = useState<WarpStyle>('arc');
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   const BEND_PRESETS = [-75, -50, -25, 0, 25, 50, 75];
 
@@ -47,38 +49,22 @@ export function WarpDialog() {
     setReviewedFooterAction(t('Reset'));
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-warp-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.warpActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-warp-action]',
+    reviewKey: actionReviewKey('data-warp-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-warp-bend-preset]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextBend = Number(actions[nextIndex]?.dataset.warpBendPreset);
-    if (Number.isFinite(nextBend)) setBend(nextBend);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-warp-bend-preset]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const nextBend = Number(button?.dataset.warpBendPreset);
+      if (Number.isFinite(nextBend)) setBend(nextBend);
+    },
+  });
 
   return (
     <div
@@ -141,21 +127,23 @@ export function WarpDialog() {
           </div>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="warp-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Arc Warp actions')}
-          aria-describedby="warp-action-review-status"
+          label={t('Arc Warp actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="warp-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Arc Warp actions')}`}
-          </span>
-          <button type="button" data-warp-action data-warp-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-warp-action data-warp-action-review={t('Reset')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset'))} onClick={resetSettings}>{t('Reset')}</button>
-          <button type="button" data-warp-action data-warp-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={apply}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Arc Warp actions')}
+          actionAttr="data-warp-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetSettings },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

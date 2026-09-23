@@ -7,6 +7,8 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 /**
  * Roughen (Illustrator Effect→Distort→Roughen) — jitter the selected path/shape
@@ -19,8 +21,8 @@ export function RoughenDialog() {
   const close = useCallback(() => { clearDistortPreview(); useEditor.getState().setModal('showRoughen', false); }, []);
   const [size, setSize] = useState(1);
   const [detail, setDetail] = useState(3);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   const ROUGHEN_PRESETS = [
     { id: 'smooth', label: t('Smooth'), size: 0.5, detail: 6 },
@@ -54,39 +56,22 @@ export function RoughenDialog() {
     setReviewedFooterAction(t('Reset'));
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-roughen-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.roughenActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-roughen-action]',
+    reviewKey: actionReviewKey('data-roughen-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-roughen-preset]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextPresetId = actions[nextIndex]?.dataset.roughenPreset;
-    const nextPreset = ROUGHEN_PRESETS.find((preset) => preset.id === nextPresetId);
-    if (nextPreset) applyPreset(nextPreset);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-roughen-preset]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const nextPreset = ROUGHEN_PRESETS.find((preset) => preset.id === button?.dataset.roughenPreset);
+      if (nextPreset) applyPreset(nextPreset);
+    },
+  });
 
   const applyPreset = (preset: typeof ROUGHEN_PRESETS[number]) => {
     setSize(preset.size);
@@ -155,48 +140,24 @@ export function RoughenDialog() {
           </div>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="roughen-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Roughen actions')}
-          aria-describedby="roughen-action-review-status"
+          label={t('Roughen actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <div id="roughen-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Roughen actions')}`}
-          </div>
-          <button
-            type="button"
-            data-roughen-action
-            data-roughen-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-roughen-action
-            data-roughen-action-review={t('Reset')}
-            className="btn"
-            onClick={resetSettings}
-            onFocus={() => setReviewedFooterAction(t('Reset'))}
-          >
-            {t('Reset')}
-          </button>
-          <button
-            type="button"
-            data-roughen-action
-            data-roughen-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={apply}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Roughen actions')}
+          statusAs="div"
+          actionAttr="data-roughen-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetSettings },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

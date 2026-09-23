@@ -8,6 +8,10 @@ import { PAGE_DIMS_MM, type PrintOptions } from '../lib/printer';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, makeSegmentKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
+import { SearchableListActions } from './ui/SearchableListActions';
 
 const MM_TO_PX = 3.7795; // 96dpi
 const PAGE_SIZES: PrintOptions['pageSize'][] = ['A4', 'A3', 'Letter', 'Legal'];
@@ -49,12 +53,12 @@ export function TilePrintDialog() {
   const [marginMm, setMarginMm] = useState(5);
   const [sourceMode, setSourceMode] = useState<TileSourceMode>('auto');
   const [pageQuery, setPageQuery] = useState('');
-  const [reviewedPageSearchAction, setReviewedPageSearchAction] = useState('');
-  const [reviewedTileJobPreset, setReviewedTileJobPreset] = useState('');
-  const [reviewedGridPreset, setReviewedGridPreset] = useState('');
-  const [reviewedOverlapPreset, setReviewedOverlapPreset] = useState('');
-  const [reviewedMarginPreset, setReviewedMarginPreset] = useState('');
-  const [reviewedOutputAction, setReviewedOutputAction] = useState('');
+  const [reviewedPageSearchAction, setReviewedPageSearchAction] = useReviewedAction();
+  const [reviewedTileJobPreset, setReviewedTileJobPreset] = useReviewedAction();
+  const [reviewedGridPreset, setReviewedGridPreset] = useReviewedAction();
+  const [reviewedOverlapPreset, setReviewedOverlapPreset] = useReviewedAction();
+  const [reviewedMarginPreset, setReviewedMarginPreset] = useReviewedAction();
+  const [reviewedOutputAction, setReviewedOutputAction] = useReviewedAction();
   const firstPageSizeRef = useRef<HTMLButtonElement>(null);
 
   useEscapeClose(open, close);
@@ -193,37 +197,25 @@ export function TilePrintDialog() {
     setAutoGrid(false);
     setManualRowsState(next);
   };
-  const handleOrientationKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const values = ['portrait', 'landscape'] as const;
-    const index = values.indexOf(orientation);
-    const next = event.key === 'Home'
-      ? values[0]
-      : event.key === 'End'
-        ? values[values.length - 1]
-        : values[(index + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
-    setOrientation(next);
-    requestAnimationFrame(() => event.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus());
-  };
+  const handleOrientationKeys = makeSegmentKeys({
+    values: ['portrait', 'landscape'] as const,
+    current: orientation,
+    apply: setOrientation,
+  });
 
-  const handlePresetKeys = <T extends string>(event: React.KeyboardEvent<HTMLDivElement>, values: readonly T[], current: T, apply: (next: T) => void, onReview?: (button?: HTMLButtonElement | null) => void) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const index = values.indexOf(current);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? values[0]
-      : event.key === 'End'
-        ? values[values.length - 1]
-      : values[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
-    apply(next);
-    requestAnimationFrame(() => {
-      const button = event.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next}"]`);
-      onReview?.(button);
-      button?.focus();
-    });
-  };
+  const handleOverlapKeys = makeSegmentKeys({
+    values: OVERLAP_PRESETS_MM.map(String),
+    current: `${overlapMm}`,
+    apply: (next) => setOverlapMm(Number(next)),
+    onReview: (button) => setReviewedOverlapPreset(button?.dataset.review ?? ''),
+  });
+
+  const handleMarginKeys = makeSegmentKeys({
+    values: TILE_MARGIN_PRESETS_MM.map(String),
+    current: `${marginMm}`,
+    apply: (next) => setMarginMm(Number(next)),
+    onReview: (button) => setReviewedMarginPreset(button?.dataset.review ?? ''),
+  });
 
   const handlePageSizeKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
@@ -244,101 +236,64 @@ export function TilePrintDialog() {
     setPageSize(nextSize);
     requestAnimationFrame(() => buttons[nextIndex]?.focus());
   };
-  const handleSourceKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-tile-source-option]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (buttons.length === 0) return;
-    const activeIndex = Math.max(0, buttons.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % buttons.length
-          : (activeIndex - 1 + buttons.length) % buttons.length;
-    event.preventDefault();
-    const next = buttons[nextIndex]?.dataset.value as TileSourceMode | undefined;
-    if (next) setSourceMode(next);
-    requestAnimationFrame(() => buttons[nextIndex]?.focus());
-  };
+  const handleSourceKeys = makeRovingKeys({
+    selector: '[data-tile-source-option]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: () => undefined,
+    onNavigate: (button) => {
+      const next = button?.dataset.value as TileSourceMode | undefined;
+      if (next) setSourceMode(next);
+    },
+  });
 
-  const handleTileJobPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-tile-job-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const preset = TILE_JOB_PRESETS.find((item) => item.id === actions[nextIndex]?.dataset.value);
-    if (preset) applyTileJobPreset(preset);
-    setReviewedTileJobPreset(actions[nextIndex]?.dataset.review ?? '');
-    requestAnimationFrame(() => actions[nextIndex]?.focus());
-  };
+  const handleTileJobPresetKeys = makeRovingKeys({
+    selector: '[data-tile-job-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedTileJobPreset,
+    onNavigate: (button) => {
+      const preset = TILE_JOB_PRESETS.find((item) => item.id === button?.dataset.value);
+      if (preset) applyTileJobPreset(preset);
+    },
+  });
 
-  const handlePageSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-tile-page-search-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const nextAction = actions[nextIndex];
-    setReviewedPageSearchAction(nextAction?.dataset.tilePageSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handlePageSearchActionKeys = makeRovingKeys({
+    selector: '[data-tile-page-search-action]',
+    reviewKey: actionReviewKey('data-tile-page-search-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    setReview: setReviewedPageSearchAction,
+  });
 
-  const handleGridPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-tile-grid-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const next = actions[nextIndex]?.dataset.value;
-    if (next === 'auto') applyAutoGrid();
-    else if (next) applyGridPreset(next);
-    setReviewedGridPreset(actions[nextIndex]?.dataset.review ?? '');
-    requestAnimationFrame(() => actions[nextIndex]?.focus());
-  };
+  const handleGridPresetKeys = makeRovingKeys({
+    selector: '[data-tile-grid-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedGridPreset,
+    onNavigate: (button) => {
+      const next = button?.dataset.value;
+      if (next === 'auto') applyAutoGrid();
+      else if (next) applyGridPreset(next);
+    },
+  });
 
-  const handleOutputActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-tile-output-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedOutputAction(nextAction?.dataset.tileOutputActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleOutputActionKeys = makeRovingKeys({
+    selector: '[data-tile-output-action]',
+    reviewKey: actionReviewKey('data-tile-output-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedOutputAction,
+  });
 
   const applyTileJobPreset = (preset: (typeof TILE_JOB_PRESETS)[number]) => {
     setAutoGrid(false);
@@ -417,41 +372,33 @@ export function TilePrintDialog() {
                     {normalizedPageQuery ? `${filteredPageSizes.length} / ${PAGE_SIZES.length} ${t('matches')}` : `${PAGE_SIZES.length} ${t('sizes')}`}
                   </span>
                   {pageQuery && (
-                    <div
+                    <SearchableListActions
+                      statusId="tile-page-search-action-review-status"
                       className="flex items-center gap-1.5 shrink-0"
-                      role="toolbar"
-                      aria-label={t('Page size search actions')}
-                      aria-describedby="tile-page-search-action-review-status"
+                      label={t('Page size search actions')}
                       title={t('Use arrow keys to review page size search actions')}
                       onKeyDown={handlePageSearchActionKeys}
-                    >
-                      <span id="tile-page-search-action-review-status" className="sr-only" aria-live="polite">
-                        {`${t('Reviewing')} ${reviewedPageSearchAction || t('Page size search actions')}`}
-                      </span>
-                      <button
-                        type="button"
-                        className="text-[10px] text-accent2 hover:text-accent disabled:opacity-40"
-                        data-tile-page-search-action
-                        data-tile-page-search-action-review={t('Use first search result')}
-                        onFocus={() => setReviewedPageSearchAction(t('Use first search result'))}
-                        onClick={() => { if (filteredPageSizes[0]) setPageSize(filteredPageSizes[0]); }}
-                        disabled={filteredPageSizes.length === 0}
-                        title={t('Use first search result')}
-                      >
-                        {t('Use First')}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-[10px] text-accent2 hover:text-accent"
-                        data-tile-page-search-action
-                        data-tile-page-search-action-review={t('Clear search')}
-                        onFocus={() => setReviewedPageSearchAction(t('Clear search'))}
-                        onClick={() => setPageQuery('')}
-                        title={t('Clear search')}
-                      >
-                        {t('Clear search')}
-                      </button>
-                    </div>
+                      reviewingLabel={t('Reviewing')}
+                      reviewed={reviewedPageSearchAction}
+                      fallback={t('Page size search actions')}
+                      actionAttr="data-tile-page-search-action"
+                      setReviewed={setReviewedPageSearchAction}
+                      first={{
+                        label: t('Use First'),
+                        review: t('Use first search result'),
+                        title: t('Use first search result'),
+                        className: 'text-[10px] text-accent2 hover:text-accent disabled:opacity-40',
+                        onActivate: () => { if (filteredPageSizes[0]) setPageSize(filteredPageSizes[0]); },
+                        disabled: filteredPageSizes.length === 0,
+                      }}
+                      clear={{
+                        label: t('Clear search'),
+                        review: t('Clear search'),
+                        title: t('Clear search'),
+                        className: 'text-[10px] text-accent2 hover:text-accent',
+                        onActivate: () => setPageQuery(''),
+                      }}
+                    />
                   )}
                 </div>
                 <div id="tile-page-size-review-status" className="sr-only" aria-live="polite">
@@ -583,42 +530,34 @@ export function TilePrintDialog() {
               </Field>
             </div>
             <div className="field-label !mt-1 !mb-1">{t('Tile job presets')}</div>
-            <div
+            <PresetRow
+              statusId="tile-job-preset-review-status"
               className="grid grid-cols-3 gap-1 mb-2"
-              role="toolbar"
-              aria-label={t('Tile job preset actions')}
-              aria-describedby="tile-job-preset-review-status"
+              label={t('Tile job preset actions')}
               title={t('Use arrow keys to review tile job presets')}
               onKeyDown={handleTileJobPresetKeys}
-            >
-              <div id="tile-job-preset-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedTileJobPreset || tileSummaryLabel}`}
-              </div>
-              {TILE_JOB_PRESETS.map((preset) => {
+              reviewingLabel={t('Reviewing')}
+              reviewed={reviewedTileJobPreset}
+              fallback={tileSummaryLabel}
+              actionAttr="data-tile-job-preset-action"
+              setReviewed={setReviewedTileJobPreset}
+              items={TILE_JOB_PRESETS.map((preset) => {
                 const active = !autoGrid
                   && cols === preset.cols
                   && rows === preset.rows
                   && Math.abs(overlapMm - preset.overlapMm) < 0.001
                   && Math.abs(marginMm - preset.marginMm) < 0.001;
-                const review = formatTileJobPresetReview(preset);
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    data-value={preset.id}
-                    data-tile-job-preset-action
-                    data-review={review}
-                    className={`rounded-md border px-2 py-1 text-[10px] transition-colors ${active ? 'bg-accent2/20 border-accent2 text-accent2' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                    onFocus={(event) => setReviewedTileJobPreset(event.currentTarget.dataset.review ?? '')}
-                    onClick={() => applyTileJobPreset(preset)}
-                    title={`${t(preset.label)} · ${preset.cols}×${preset.rows} · ${t('Overlap')} ${preset.overlapMm} mm · ${t('Margin')} ${preset.marginMm} mm`}
-                    aria-pressed={active}
-                  >
-                    {t(preset.label)}
-                  </button>
-                );
+                return {
+                  key: preset.id,
+                  className: `rounded-md border px-2 py-1 text-[10px] transition-colors ${active ? 'bg-accent2/20 border-accent2 text-accent2' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+                  pressed: active,
+                  onClick: () => applyTileJobPreset(preset),
+                  title: `${t(preset.label)} · ${preset.cols}×${preset.rows} · ${t('Overlap')} ${preset.overlapMm} mm · ${t('Margin')} ${preset.marginMm} mm`,
+                  data: { value: preset.id, review: formatTileJobPresetReview(preset) },
+                  children: t(preset.label),
+                };
               })}
-            </div>
+            />
             <div
               className="mb-2"
               role="toolbar"
@@ -682,71 +621,51 @@ export function TilePrintDialog() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="field-label !mt-1 !mb-1">{t('Overlap presets')}</div>
-                <div
+                <PresetRow
+                  statusId="tile-overlap-preset-review-status"
                   className="grid grid-cols-5 gap-1"
                   role="group"
-                  aria-label={t('Overlap presets')}
-                  aria-describedby="tile-overlap-preset-review-status"
+                  label={t('Overlap presets')}
                   title={t('Use Left/Right arrows to switch options')}
-                  onKeyDown={(event) => handlePresetKeys(event, OVERLAP_PRESETS_MM.map(String), `${overlapMm}`, (next) => setOverlapMm(Number(next)), (button) => setReviewedOverlapPreset(button?.dataset.review ?? ''))}
-                >
-                  <div id="tile-overlap-preset-review-status" className="sr-only" aria-live="polite">
-                    {`${t('Reviewing')} ${reviewedOverlapPreset || `${t('Overlap')} ${overlapMm} mm`}`}
-                  </div>
-                  {OVERLAP_PRESETS_MM.map((preset) => {
-                    const active = Math.abs(overlapMm - preset) < 0.001;
-                    const review = `${t('Overlap')} ${preset} mm`;
-                    return (
-                      <button
-                        key={preset}
-                        type="button"
-                        data-value={`${preset}`}
-                        data-review={review}
-                        className={`h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                        onFocus={(event) => setReviewedOverlapPreset(event.currentTarget.dataset.review ?? '')}
-                        onClick={() => setOverlapMm(preset)}
-                        title={`${t('Set overlap to')} ${preset} mm`}
-                        aria-pressed={active}
-                      >
-                        {preset}
-                      </button>
-                    );
-                  })}
-                </div>
+                  onKeyDown={handleOverlapKeys}
+                  reviewingLabel={t('Reviewing')}
+                  reviewed={reviewedOverlapPreset}
+                  fallback={`${t('Overlap')} ${overlapMm} mm`}
+                  setReviewed={setReviewedOverlapPreset}
+                  items={OVERLAP_PRESETS_MM.map((preset) => ({
+                    key: preset,
+                    className: `h-6 rounded border text-[10px] transition-colors ${Math.abs(overlapMm - preset) < 0.001 ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+                    pressed: Math.abs(overlapMm - preset) < 0.001,
+                    onClick: () => setOverlapMm(preset),
+                    title: `${t('Set overlap to')} ${preset} mm`,
+                    data: { value: `${preset}`, review: `${t('Overlap')} ${preset} mm` },
+                    children: preset,
+                  }))}
+                />
               </div>
               <div>
                 <div className="field-label !mt-1 !mb-1">{t('Margin presets')}</div>
-                <div
+                <PresetRow
+                  statusId="tile-margin-preset-review-status"
                   className="grid grid-cols-5 gap-1"
                   role="group"
-                  aria-label={t('Margin presets')}
-                  aria-describedby="tile-margin-preset-review-status"
+                  label={t('Margin presets')}
                   title={t('Use Left/Right arrows to switch options')}
-                  onKeyDown={(event) => handlePresetKeys(event, TILE_MARGIN_PRESETS_MM.map(String), `${marginMm}`, (next) => setMarginMm(Number(next)), (button) => setReviewedMarginPreset(button?.dataset.review ?? ''))}
-                >
-                  <div id="tile-margin-preset-review-status" className="sr-only" aria-live="polite">
-                    {`${t('Reviewing')} ${reviewedMarginPreset || `${t('Margin')} ${marginMm} mm`}`}
-                  </div>
-                  {TILE_MARGIN_PRESETS_MM.map((preset) => {
-                    const active = Math.abs(marginMm - preset) < 0.001;
-                    const review = `${t('Margin')} ${preset} mm`;
-                    return (
-                      <button
-                        key={preset}
-                        type="button"
-                        data-value={`${preset}`}
-                        data-review={review}
-                        className={`h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                        onFocus={(event) => setReviewedMarginPreset(event.currentTarget.dataset.review ?? '')}
-                        onClick={() => setMarginMm(preset)}
-                        title={`${t('Set margin to')} ${preset} mm`}
-                        aria-pressed={active}
-                      >
-                        {preset}
-                      </button>
-                    );
-                  })}
-                </div>
+                  onKeyDown={handleMarginKeys}
+                  reviewingLabel={t('Reviewing')}
+                  reviewed={reviewedMarginPreset}
+                  fallback={`${t('Margin')} ${marginMm} mm`}
+                  setReviewed={setReviewedMarginPreset}
+                  items={TILE_MARGIN_PRESETS_MM.map((preset) => ({
+                    key: preset,
+                    className: `h-6 rounded border text-[10px] transition-colors ${Math.abs(marginMm - preset) < 0.001 ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+                    pressed: Math.abs(marginMm - preset) < 0.001,
+                    onClick: () => setMarginMm(preset),
+                    title: `${t('Set margin to')} ${preset} mm`,
+                    data: { value: `${preset}`, review: `${t('Margin')} ${preset} mm` },
+                    children: preset,
+                  }))}
+                />
               </div>
             </div>
             <div className="rounded border border-border bg-panel2/70 px-2 py-1.5 text-[10px] text-muted mt-1 tabular-nums leading-relaxed">
@@ -826,49 +745,23 @@ export function TilePrintDialog() {
             <div className="font-medium text-accent2">{t('Ready to tile print')}</div>
             <div className="mt-0.5 text-muted tabular-nums">{tileSummaryLabel}</div>
           </div>
-          <div
+          <ReviewedFooter
+            statusId="tile-print-output-action-review-status"
             className="flex justify-end gap-2"
-            role="toolbar"
-            aria-label={t('Tile Print output actions')}
-            aria-describedby="tile-print-output-action-review-status"
+            label={t('Tile Print output actions')}
             title={t('Use Left/Right arrows to switch options')}
             onKeyDown={handleOutputActionKeys}
-          >
-            <span id="tile-print-output-action-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedOutputAction || t('Tile Print output actions')}`}
-            </span>
-            <button
-              type="button"
-              data-tile-output-action
-              data-tile-output-action-review={t('Cancel')}
-              className="btn"
-              onClick={close}
-              onFocus={() => setReviewedOutputAction(t('Cancel'))}
-            >
-              {t('Cancel')}
-            </button>
-            <button
-              type="button"
-              data-tile-output-action
-              data-tile-output-action-review={t('Reset tile print settings')}
-              className="btn flex items-center gap-1"
-              onClick={resetTilePrintSettings}
-              onFocus={() => setReviewedOutputAction(t('Reset tile print settings'))}
-              title={t('Reset tile print settings')}
-            >
-              <RotateCcw size={12} aria-hidden="true" /> {t('Reset')}
-            </button>
-            <button
-              type="button"
-              data-tile-output-action
-              data-tile-output-action-review={t('Print')}
-              className="btn-primary flex items-center gap-1"
-              onClick={doPrint}
-              onFocus={() => setReviewedOutputAction(t('Print'))}
-            >
-              <Printer size={12} aria-hidden="true" /> {t('Print')}
-            </button>
-          </div>
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedOutputAction}
+            fallback={t('Tile Print output actions')}
+            actionAttr="data-tile-output-action"
+            setReviewed={setReviewedOutputAction}
+            actions={[
+              { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+              { children: <><RotateCcw size={12} aria-hidden="true" /> {t('Reset')}</>, review: t('Reset tile print settings'), className: 'btn flex items-center gap-1', onClick: resetTilePrintSettings, title: t('Reset tile print settings') },
+              { children: <><Printer size={12} aria-hidden="true" /> {t('Print')}</>, review: t('Print'), className: 'btn-primary flex items-center gap-1', onClick: doPrint },
+            ]}
+          />
         </div>
       </div>
     </div>

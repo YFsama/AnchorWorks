@@ -7,6 +7,8 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const BLEND_STEP_PRESETS = [3, 5, 10, 20] as const;
 
@@ -23,8 +25,8 @@ export function BlendDialog() {
   const [distancePx, setDistancePx] = useState(24);
   const [orientation, setOrientation] = useState<BlendOrientation>('page');
   const [reverse, setReverse] = useState(false);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   const selectedEndpoints = useMemo(() => (open ? (getCanvas()?.getActiveObjects() ?? []).map(object => object as unknown as BlendEndpoint) : []), [open]);
   const estimatedSteps = useMemo(() => estimateBlendStepCount(selectedEndpoints, steps, { reverse, spacingMode, distancePx, orientation }), [distancePx, orientation, reverse, selectedEndpoints, spacingMode, steps]);
@@ -57,42 +59,25 @@ export function BlendDialog() {
     setReviewedFooterAction(t('Reset'));
   };
 
-  const handleStepPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-blend-step-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const value = Number(actions[nextIndex]?.dataset.value);
-    if (Number.isFinite(value)) setSteps(value);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleStepPresetKeys = makeRovingKeys({
+    selector: '[data-blend-step-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const value = Number(button?.dataset.value);
+      if (Number.isFinite(value)) setSteps(value);
+    },
+  });
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-blend-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.blendActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-blend-action]',
+    reviewKey: actionReviewKey('data-blend-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
   return (
     <div
@@ -222,58 +207,25 @@ export function BlendDialog() {
           </span>
         </label>
 
-        <div
+        <ReviewedFooter
+          statusId="blend-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Blend actions')}
-          aria-describedby="blend-action-review-status"
+          label={t('Blend actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <div id="blend-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Blend actions')}`}
-          </div>
-          <button
-            type="button"
-            data-blend-action
-            data-blend-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-blend-action
-            data-blend-action-review={t('Reset')}
-            className="btn"
-            onClick={resetSettings}
-            onFocus={() => setReviewedFooterAction(t('Reset'))}
-          >
-            {t('Reset')}
-          </button>
-          <button
-            type="button"
-            data-blend-action
-            data-blend-action-review={t('Apply Blend Options')}
-            className="btn"
-            onClick={() => { void applyOptions(); }}
-            onFocus={() => setReviewedFooterAction(t('Apply Blend Options'))}
-          >
-            {t('Apply Options')}
-          </button>
-          <button
-            type="button"
-            data-blend-action
-            data-blend-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={() => { void apply(); }}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Blend actions')}
+          statusAs="div"
+          actionAttr="data-blend-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetSettings },
+            { children: t('Apply Options'), review: t('Apply Blend Options'), className: 'btn', onClick: () => { void applyOptions(); } },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: () => { void apply(); } },
+          ]}
+        />
       </div>
     </div>
   );

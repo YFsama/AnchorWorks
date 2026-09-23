@@ -18,26 +18,13 @@ import {
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { toast } from '../lib/toast';
 import { CutPreview } from './CutPreview';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
 
 const MM_TO_PX = 3.7795; // 96dpi convention used everywhere else
 
 type Tab = 'contour' | 'trace' | 'regmark';
 const TABS: Tab[] = ['contour', 'trace', 'regmark'];
-
-function handlePresetToolbarKeys(event: React.KeyboardEvent<HTMLDivElement>, onReview?: (label: string) => void) {
-  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  event.preventDefault();
-  const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-cut-preset-action]'));
-  const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-  const nextIndex = event.key === 'Home'
-    ? 0
-    : event.key === 'End'
-      ? actions.length - 1
-      : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-  actions[nextIndex]?.click();
-  onReview?.(actions[nextIndex]?.dataset.cutPresetReview ?? '');
-  actions[nextIndex]?.focus();
-}
 
 export function CutContourDialog() {
   const t = useT();
@@ -74,8 +61,8 @@ export function CutContourDialog() {
   const [regArm, setRegArm] = useState(10);
   const [regInsetX, setRegInsetX] = useState(5);
   const [regInsetY, setRegInsetY] = useState(5);
-  const [reviewedCleanupAction, setReviewedCleanupAction] = useState('');
-  const [reviewedOutputAction, setReviewedOutputAction] = useState('');
+  const [reviewedCleanupAction, setReviewedCleanupAction] = useReviewedAction();
+  const [reviewedOutputAction, setReviewedOutputAction] = useReviewedAction();
   // When set, the next "Place" call uses the selected image's bbox
   // instead of the first artboard. Lets users contour-cut around a
   // specific printed item even when the artboard is the full sheet.
@@ -93,39 +80,23 @@ export function CutContourDialog() {
   }), [cutPaths]);
 
 
-  const handleCutActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-cut-contour-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedCleanupAction(nextAction?.dataset.cutContourActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleCutActionKeys = makeRovingKeys({
+    selector: '[data-cut-contour-action]',
+    reviewKey: actionReviewKey('data-cut-contour-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedCleanupAction,
+  });
 
-  const handleOutputActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-cut-output-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedOutputAction(nextAction?.dataset.cutOutputActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleOutputActionKeys = makeRovingKeys({
+    selector: '[data-cut-output-action]',
+    reviewKey: actionReviewKey('data-cut-output-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedOutputAction,
+  });
 
   const contourPreview = useMemo(() => {
     void selectionKey;
@@ -724,7 +695,7 @@ function ContourPane(props: {
   onRun: () => void;
 }) {
   const t = useT();
-  const [reviewPreset, setReviewPreset] = useState('');
+  const [reviewPreset, setReviewPreset] = useReviewedAction();
   const presets = [
     { label: t('Kiss-cut'), offset: 0, passes: 1 },
     { label: t('Sticker bleed'), offset: 2, passes: 1 },
@@ -733,6 +704,12 @@ function ContourPane(props: {
     { label: t('Heavy material'), offset: 2, passes: 2 },
   ];
   const currentPreset = reviewPreset || `${presets[0].label}: ${presets[0].offset} mm / ${presets[0].passes} ${t('pass(es)')}`;
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-cut-preset-action]',
+    reviewKey: 'cutPresetReview',
+    setReview: setReviewPreset,
+    onNavigate: (button) => button?.click(),
+  });
   return (
     <div className="space-y-3">
       <p className="text-muted leading-relaxed">
@@ -756,38 +733,37 @@ function ContourPane(props: {
       </div>
       <div>
         <div className="field-label">{t('Contour presets')}</div>
-        <div
+        <PresetRow
+          statusId="contour-preset-review-status"
           className="grid grid-cols-5 gap-1"
-          role="toolbar"
-          aria-label={t('Contour preset actions')}
-          aria-describedby="contour-preset-review-status"
+          label={t('Contour preset actions')}
           title={t('Use arrow keys to review presets')}
-          onKeyDown={(event) => handlePresetToolbarKeys(event, setReviewPreset)}
-        >
-          <div id="contour-preset-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${currentPreset}`}
-          </div>
-          {presets.map((preset) => {
+          onKeyDown={handlePresetKeys}
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewPreset}
+          fallback={currentPreset}
+          actionAttr="data-cut-preset-action"
+          setReviewed={setReviewPreset}
+          items={presets.map((preset) => {
             const active = Math.abs(props.offsetMm - preset.offset) < 0.001 && props.passes === preset.passes;
             const review = `${preset.label}: ${preset.offset} mm / ${preset.passes} ${t('pass(es)')}`;
-            return (
-              <button
-                key={`${preset.offset}-${preset.passes}`}
-                type="button"
-                data-cut-preset-action
-                data-cut-preset-review={review}
-                className={`min-h-10 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                onFocus={(event) => setReviewPreset(event.currentTarget.dataset.cutPresetReview ?? '')}
-                onClick={() => { props.setOffsetMm(preset.offset); props.setPasses(preset.passes); }}
-                title={review}
-                aria-pressed={active}
-              >
-                <span className="block font-medium">{preset.label}</span>
-                <span className="block text-muted tabular-nums">{preset.offset} mm · {preset.passes}×</span>
-              </button>
-            );
+            return {
+              key: `${preset.offset}-${preset.passes}`,
+              className: `min-h-10 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+              pressed: active,
+              onClick: () => { props.setOffsetMm(preset.offset); props.setPasses(preset.passes); },
+              title: review,
+              focusReviewKey: 'cutPresetReview',
+              data: { 'cut-preset-review': review },
+              children: (
+                <>
+                  <span className="block font-medium">{preset.label}</span>
+                  <span className="block text-muted tabular-nums">{preset.offset} mm · {preset.passes}×</span>
+                </>
+              ),
+            };
           })}
-        </div>
+        />
       </div>
       <label className="flex items-center gap-2 cursor-pointer text-[11px]">
         <input
@@ -824,7 +800,7 @@ function TracePane(props: {
   onRunMulti: () => void;
 }) {
   const t = useT();
-  const [reviewPreset, setReviewPreset] = useState('');
+  const [reviewPreset, setReviewPreset] = useReviewedAction();
   const presets = [
     { label: t('Logo'), threshold: 128, simplify: 1, useAlpha: false },
     { label: t('Dark art'), threshold: 96, simplify: 0.5, useAlpha: false },
@@ -839,7 +815,19 @@ function TracePane(props: {
   // sets the k-means colour count.
   const describeRecipe = (recipe: (typeof TRACE_PRESETS)[number]) =>
     `${t(recipe.label)}: ${recipe.options.threshold ?? '—'} / ${recipe.options.simplifyTolerance ?? '—'}px${recipe.colorCount ? ` · ${recipe.colorCount} ${t('Colors')}` : ''}`;
-  const [reviewRecipe, setReviewRecipe] = useState('');
+  const [reviewRecipe, setReviewRecipe] = useReviewedAction();
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-cut-preset-action]',
+    reviewKey: 'cutPresetReview',
+    setReview: setReviewPreset,
+    onNavigate: (button) => button?.click(),
+  });
+  const handleRecipeKeys = makeRovingKeys({
+    selector: '[data-cut-preset-action]',
+    reviewKey: 'cutPresetReview',
+    setReview: setReviewRecipe,
+    onNavigate: (button) => button?.click(),
+  });
   return (
     <div className="space-y-3">
       <p className="text-muted leading-relaxed">
@@ -847,43 +835,42 @@ function TracePane(props: {
       </p>
       <div>
         <div className="field-label">{t('Presets')}</div>
-        <div
+        <PresetRow
+          statusId="trace-recipe-review-status"
           className="grid grid-cols-3 gap-1"
-          role="toolbar"
-          aria-label={t('Trace preset recipes')}
-          aria-describedby="trace-recipe-review-status"
+          label={t('Trace preset recipes')}
           title={t('Use arrow keys to review presets')}
-          onKeyDown={(event) => handlePresetToolbarKeys(event, setReviewRecipe)}
-        >
-          <div id="trace-recipe-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewRecipe || describeRecipe(TRACE_PRESETS[0])}`}
-          </div>
-          {TRACE_PRESETS.map((recipe) => {
+          onKeyDown={handleRecipeKeys}
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewRecipe}
+          fallback={describeRecipe(TRACE_PRESETS[0])}
+          actionAttr="data-cut-preset-action"
+          setReviewed={setReviewRecipe}
+          items={TRACE_PRESETS.map((recipe) => {
             const review = describeRecipe(recipe);
             const active = props.threshold === recipe.options.threshold
               && Math.abs(props.simplify - (recipe.options.simplifyTolerance ?? 0)) < 0.001
               && Math.abs(props.minSize - (recipe.options.minSizeMm ?? 0)) < 0.001
               && props.mode === (recipe.colorCount ? 'multi' : 'single');
-            return (
-              <button
-                key={recipe.id}
-                type="button"
-                data-cut-preset-action
-                data-cut-preset-review={review}
-                className={`min-h-11 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                onFocus={(event) => setReviewRecipe(event.currentTarget.dataset.cutPresetReview ?? '')}
-                onClick={() => props.onApplyPreset(recipe.id)}
-                title={review}
-                aria-pressed={active}
-              >
-                <span className="block font-medium">{t(recipe.label)}</span>
-                <span className="block text-muted tabular-nums">
-                  {recipe.options.threshold} · {recipe.options.simplifyTolerance}px{recipe.colorCount ? ` · ${recipe.colorCount} ${t('Colors')}` : ''}
-                </span>
-              </button>
-            );
+            return {
+              key: recipe.id,
+              className: `min-h-11 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+              pressed: active,
+              onClick: () => props.onApplyPreset(recipe.id),
+              title: review,
+              focusReviewKey: 'cutPresetReview',
+              data: { 'cut-preset-review': review },
+              children: (
+                <>
+                  <span className="block font-medium">{t(recipe.label)}</span>
+                  <span className="block text-muted tabular-nums">
+                    {recipe.options.threshold} · {recipe.options.simplifyTolerance}px{recipe.colorCount ? ` · ${recipe.colorCount} ${t('Colors')}` : ''}
+                  </span>
+                </>
+              ),
+            };
           })}
-        </div>
+        />
       </div>
       {/* Mode toggle — single contour (blade line) vs multi-colour (filled
           colour regions per vinyl layer). Radio semantics via aria-pressed
@@ -954,42 +941,41 @@ function TracePane(props: {
       </div>
       <div>
         <div className="field-label">{t('Trace presets')}</div>
-        <div
+        <PresetRow
+          statusId="trace-preset-review-status"
           className="grid grid-cols-5 gap-1"
-          role="toolbar"
-          aria-label={t('Trace preset actions')}
-          aria-describedby="trace-preset-review-status"
+          label={t('Trace preset actions')}
           title={t('Use arrow keys to review presets')}
-          onKeyDown={(event) => handlePresetToolbarKeys(event, setReviewPreset)}
-        >
-          <div id="trace-preset-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${currentPreset}`}
-          </div>
-          {presets.map((preset) => {
+          onKeyDown={handlePresetKeys}
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewPreset}
+          fallback={currentPreset}
+          actionAttr="data-cut-preset-action"
+          setReviewed={setReviewPreset}
+          items={presets.map((preset) => {
             const active = props.threshold === preset.threshold && Math.abs(props.simplify - preset.simplify) < 0.001 && props.useAlpha === preset.useAlpha;
             const review = describePreset(preset);
-            return (
-              <button
-                key={preset.label}
-                type="button"
-                data-cut-preset-action
-                data-cut-preset-review={review}
-                className={`min-h-10 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                onFocus={(event) => setReviewPreset(event.currentTarget.dataset.cutPresetReview ?? '')}
-                onClick={() => {
-                  props.setThreshold(preset.threshold);
-                  props.setSimplify(preset.simplify);
-                  props.setUseAlpha(preset.useAlpha);
-                }}
-                title={review}
-                aria-pressed={active}
-              >
-                <span className="block font-medium">{preset.label}</span>
-                <span className="block text-muted tabular-nums">{preset.threshold} · {preset.simplify}px{preset.useAlpha ? ' · A' : ''}</span>
-              </button>
-            );
+            return {
+              key: preset.label,
+              className: `min-h-10 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+              pressed: active,
+              onClick: () => {
+                props.setThreshold(preset.threshold);
+                props.setSimplify(preset.simplify);
+                props.setUseAlpha(preset.useAlpha);
+              },
+              title: review,
+              focusReviewKey: 'cutPresetReview',
+              data: { 'cut-preset-review': review },
+              children: (
+                <>
+                  <span className="block font-medium">{preset.label}</span>
+                  <span className="block text-muted tabular-nums">{preset.threshold} · {preset.simplify}px{preset.useAlpha ? ' · A' : ''}</span>
+                </>
+              ),
+            };
           })}
-        </div>
+        />
       </div>
       {props.mode === 'single' && (
         <label className="flex items-center gap-2 cursor-pointer text-[11px]">
@@ -1031,7 +1017,7 @@ function RegMarkPane(props: {
   onRun: () => void;
 }) {
   const t = useT();
-  const [reviewPreset, setReviewPreset] = useState('');
+  const [reviewPreset, setReviewPreset] = useReviewedAction();
   const presets = [
     { label: t('Roland standard'), arm: 10, insetX: 5, insetY: 5 },
     { label: t('Graphtec scan'), arm: 12, insetX: 8, insetY: 8 },
@@ -1041,6 +1027,12 @@ function RegMarkPane(props: {
   ];
   const describePreset = (preset: (typeof presets)[number]) => `${preset.label}: ${preset.arm} / ${preset.insetX} / ${preset.insetY} mm`;
   const currentPreset = reviewPreset || describePreset(presets[0]);
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-cut-preset-action]',
+    reviewKey: 'cutPresetReview',
+    setReview: setReviewPreset,
+    onNavigate: (button) => button?.click(),
+  });
   return (
     <div className="space-y-3">
       <p className="text-muted leading-relaxed">
@@ -1071,42 +1063,41 @@ function RegMarkPane(props: {
       </div>
       <div>
         <div className="field-label">{t('Reg mark presets')}</div>
-        <div
+        <PresetRow
+          statusId="regmark-preset-review-status"
           className="grid grid-cols-5 gap-1"
-          role="toolbar"
-          aria-label={t('Reg mark preset actions')}
-          aria-describedby="regmark-preset-review-status"
+          label={t('Reg mark preset actions')}
           title={t('Use arrow keys to review presets')}
-          onKeyDown={(event) => handlePresetToolbarKeys(event, setReviewPreset)}
-        >
-          <div id="regmark-preset-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${currentPreset}`}
-          </div>
-          {presets.map((preset) => {
+          onKeyDown={handlePresetKeys}
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewPreset}
+          fallback={currentPreset}
+          actionAttr="data-cut-preset-action"
+          setReviewed={setReviewPreset}
+          items={presets.map((preset) => {
             const active = Math.abs(props.arm - preset.arm) < 0.001 && Math.abs(props.insetX - preset.insetX) < 0.001 && Math.abs(props.insetY - preset.insetY) < 0.001;
             const review = describePreset(preset);
-            return (
-              <button
-                key={preset.label}
-                type="button"
-                data-cut-preset-action
-                data-cut-preset-review={review}
-                className={`min-h-10 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                onFocus={(event) => setReviewPreset(event.currentTarget.dataset.cutPresetReview ?? '')}
-                onClick={() => {
-                  props.setArm(preset.arm);
-                  props.setInsetX(preset.insetX);
-                  props.setInsetY(preset.insetY);
-                }}
-                title={review}
-                aria-pressed={active}
-              >
-                <span className="block font-medium">{preset.label}</span>
-                <span className="block text-muted tabular-nums">{preset.arm} · {preset.insetX}/{preset.insetY}</span>
-              </button>
-            );
+            return {
+              key: preset.label,
+              className: `min-h-10 rounded border px-1.5 py-1 text-[10px] leading-tight transition-colors ${active ? 'bg-[#ff2e9a]/15 border-[#ff2e9a] text-ink' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+              pressed: active,
+              onClick: () => {
+                props.setArm(preset.arm);
+                props.setInsetX(preset.insetX);
+                props.setInsetY(preset.insetY);
+              },
+              title: review,
+              focusReviewKey: 'cutPresetReview',
+              data: { 'cut-preset-review': review },
+              children: (
+                <>
+                  <span className="block font-medium">{preset.label}</span>
+                  <span className="block text-muted tabular-nums">{preset.arm} · {preset.insetX}/{preset.insetY}</span>
+                </>
+              ),
+            };
           })}
-        </div>
+        />
       </div>
       <label className="flex items-center gap-2 cursor-pointer text-[11px]">
         <input

@@ -7,6 +7,8 @@ import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { buildSortedRecolorTargets } from '../lib/recolorSort';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
 
 const RECOLOR_PALETTE_PRESETS: Array<{ label: string; colors: string[]; title: string }> = [
   { label: 'Vinyl primary', colors: ['#ff2b2b', '#ffd600', '#0057ff', '#111111', '#ffffff'], title: 'Map artwork to common red, yellow, blue, black, and white vinyl colors.' },
@@ -31,8 +33,8 @@ export function RecolorDialog() {
   const [prevOpen, setPrevOpen] = useState(open);
   const [sources, setSources] = useState<string[]>([]);
   const [targets, setTargets] = useState<Record<string, string>>({});
-  const [reviewedPalettePreset, setReviewedPalettePreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPalettePreset, setReviewedPalettePreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
@@ -77,40 +79,24 @@ export function RecolorDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-recolor-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.recolorActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-recolor-action]',
+    reviewKey: actionReviewKey('data-recolor-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePalettePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-recolor-palette-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = RECOLOR_PALETTE_PRESETS[Number(actions[nextIndex]?.dataset.recolorPalettePresetIndex ?? -1)];
-    if (preset) applyPalettePreset(preset.colors);
-    requestAnimationFrame(() => {
-      setReviewedPalettePreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePalettePresetActionKeys = makeRovingKeys({
+    selector: '[data-recolor-palette-preset-action]',
+    defer: true,
+    setReview: setReviewedPalettePreset,
+    onNavigate: (button) => {
+      const preset = RECOLOR_PALETTE_PRESETS[Number(button?.dataset.recolorPalettePresetIndex ?? -1)];
+      if (preset) applyPalettePreset(preset.colors);
+    },
+  });
 
   return (
     <div
@@ -200,38 +186,31 @@ export function RecolorDialog() {
             </div>
             <div className="mb-3">
               <div className="field-label !mb-1">{t('Recolor palette recipes')}</div>
-              <div
+              <PresetRow
+                statusId="recolor-palette-recipe-review-status"
                 className="grid grid-cols-2 gap-1"
-                role="toolbar"
-                aria-label={t('Recolor palette recipe actions')}
-                aria-describedby="recolor-palette-recipe-review-status"
+                label={t('Recolor palette recipe actions')}
                 title={t('Use arrow keys to review recolor palette recipes')}
                 onKeyDown={handlePalettePresetActionKeys}
-              >
-                <div id="recolor-palette-recipe-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedPalettePreset || t('Recolor palette recipes')}`}
-                </div>
-                {RECOLOR_PALETTE_PRESETS.map((preset) => {
+                reviewingLabel={t('Reviewing')}
+                reviewed={reviewedPalettePreset}
+                fallback={t('Recolor palette recipes')}
+                actionAttr="data-recolor-palette-preset-action"
+                setReviewed={setReviewedPalettePreset}
+                items={RECOLOR_PALETTE_PRESETS.map((preset) => {
                   const active = sources.every((src, index) => targets[src] === preset.colors[index % preset.colors.length]);
                   const review = `${t(preset.label)}: ${t(preset.title)} ${preset.colors.length} ${t('Color')}`;
-                  return (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      data-recolor-palette-preset-action
-                      data-recolor-palette-preset-index={RECOLOR_PALETTE_PRESETS.indexOf(preset)}
-                      data-review={review}
-                      className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                      onClick={() => applyPalettePreset(preset.colors)}
-                      onFocus={(event) => setReviewedPalettePreset(event.currentTarget.dataset.review ?? '')}
-                      aria-pressed={active}
-                      title={review}
-                    >
-                      {t(preset.label)}
-                    </button>
-                  );
+                  return {
+                    key: preset.label,
+                    className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                    pressed: active,
+                    onClick: () => applyPalettePreset(preset.colors),
+                    title: review,
+                    data: { 'recolor-palette-preset-index': RECOLOR_PALETTE_PRESETS.indexOf(preset), review },
+                    children: t(preset.label),
+                  };
                 })}
-              </div>
+              />
             </div>
             <div className="space-y-1.5 max-h-72 overflow-auto pr-1">
               {sources.map((src) => (

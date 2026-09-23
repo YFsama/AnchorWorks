@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const SHAPE_PRESETS: Array<{ label: string; mode: 'star' | 'polygon'; points: number; ratio?: number }> = [
   { label: '5-point star', mode: 'star', points: 5, ratio: 0.45 },
@@ -33,9 +36,9 @@ export function StarDialog() {
   const [ratio, setRatio] = useState(0.45);
   const [turns, setTurns] = useState(3);
   const [decay, setDecay] = useState(0.8);
-  const [reviewedShapePreset, setReviewedShapePreset] = useState('');
-  const [reviewedSpiralPreset, setReviewedSpiralPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedShapePreset, setReviewedShapePreset] = useReviewedAction();
+  const [reviewedSpiralPreset, setReviewedSpiralPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -49,20 +52,12 @@ export function StarDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-star-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.starActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-star-action]',
+    reviewKey: actionReviewKey('data-star-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
   const focusMode = (nextMode: typeof mode) => {
     setMode(nextMode);
@@ -82,23 +77,15 @@ export function StarDialog() {
     focusMode(modes[nextIndex]);
   };
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-star-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = SHAPE_PRESETS[Number(actions[nextIndex]?.dataset.starPresetIndex ?? -1)];
-    if (preset) applyPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedShapePreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-star-preset-action]',
+    defer: true,
+    setReview: setReviewedShapePreset,
+    onNavigate: (button) => {
+      const preset = SHAPE_PRESETS[Number(button?.dataset.starPresetIndex ?? -1)];
+      if (preset) applyPreset(preset);
+    },
+  });
 
   const applyPreset = (preset: (typeof SHAPE_PRESETS)[number]) => {
     setMode(preset.mode);
@@ -106,23 +93,15 @@ export function StarDialog() {
     if (typeof preset.ratio === 'number') setRatio(preset.ratio);
   };
 
-  const handleSpiralPresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-spiral-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = SPIRAL_PRESETS[Number(actions[nextIndex]?.dataset.spiralPresetIndex ?? -1)];
-    if (preset) applySpiralPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedSpiralPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleSpiralPresetActionKeys = makeRovingKeys({
+    selector: '[data-spiral-preset-action]',
+    defer: true,
+    setReview: setReviewedSpiralPreset,
+    onNavigate: (button) => {
+      const preset = SPIRAL_PRESETS[Number(button?.dataset.spiralPresetIndex ?? -1)];
+      if (preset) applySpiralPreset(preset);
+    },
+  });
 
   const applySpiralPreset = (preset: (typeof SPIRAL_PRESETS)[number]) => {
     setMode('spiral');
@@ -168,40 +147,32 @@ export function StarDialog() {
 
         <div className="mb-3">
           <div className="field-label !mb-1">{t('Shape presets')}</div>
-          <div
+          <PresetRow
+            statusId="star-shape-preset-review-status"
             className="grid grid-cols-4 gap-1"
-            role="toolbar"
-            aria-label={t('Shape preset actions')}
-            aria-describedby="star-shape-preset-review-status"
+            label={t('Shape preset actions')}
             title={t('Use arrow keys to review shape presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="star-shape-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedShapePreset || `${t(mode === 'star' ? 'Star' : mode === 'polygon' ? 'Polygon' : 'Spiral')} · ${mode === 'star' ? `${points} ${t('Points')} · ${Math.round(ratio * 100)}%` : mode === 'polygon' ? `${points} ${t('Sides')}` : `${turns} ${t('Winds')} · ${Math.round(decay * 100)}%`}`}`}
-            </div>
-            {SHAPE_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedShapePreset}
+            fallback={`${t(mode === 'star' ? 'Star' : mode === 'polygon' ? 'Polygon' : 'Spiral')} · ${mode === 'star' ? `${points} ${t('Points')} · ${Math.round(ratio * 100)}%` : mode === 'polygon' ? `${points} ${t('Sides')}` : `${turns} ${t('Winds')} · ${Math.round(decay * 100)}%`}`}
+            actionAttr="data-star-preset-action"
+            setReviewed={setReviewedShapePreset}
+            items={SHAPE_PRESETS.map((preset) => {
               const active = mode === preset.mode && points === preset.points && (preset.mode === 'polygon' || Math.abs(ratio - (preset.ratio ?? ratio)) < 0.001);
-              const review = preset.mode === 'star'
-                ? `${t(preset.label)} · ${preset.points} ${t('Points')} · ${Math.round((preset.ratio ?? 0) * 100)}%`
-                : `${t(preset.label)} · ${preset.points} ${t('Sides')}`;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  data-star-preset-action
-                  data-star-preset-index={SHAPE_PRESETS.indexOf(preset)}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onFocus={(event) => setReviewedShapePreset(event.currentTarget.dataset.review ?? '')}
-                  onClick={() => applyPreset(preset)}
-                  aria-pressed={active}
-                  title={preset.mode === 'star' ? `${t(preset.label)}: ${preset.points} ${t('Points')} / ${Math.round((preset.ratio ?? 0) * 100)}%` : `${t(preset.label)}: ${preset.points} ${t('Sides')}`}
-                >
-                  {t(preset.label)}
-                </button>
-              );
+              return {
+                key: preset.label,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                pressed: active,
+                onClick: () => applyPreset(preset),
+                title: preset.mode === 'star' ? `${t(preset.label)}: ${preset.points} ${t('Points')} / ${Math.round((preset.ratio ?? 0) * 100)}%` : `${t(preset.label)}: ${preset.points} ${t('Sides')}`,
+                data: { 'star-preset-index': SHAPE_PRESETS.indexOf(preset), review: preset.mode === 'star'
+                  ? `${t(preset.label)} · ${preset.points} ${t('Points')} · ${Math.round((preset.ratio ?? 0) * 100)}%`
+                  : `${t(preset.label)} · ${preset.points} ${t('Sides')}` },
+                children: t(preset.label),
+              };
             })}
-          </div>
+          />
         </div>
 
         {mode !== 'spiral' && (
@@ -232,57 +203,51 @@ export function StarDialog() {
             </div>
             <div className="mt-2">
               <div className="field-label !mb-1">{t('Spiral presets')}</div>
-              <div
+              <PresetRow
+                statusId="star-spiral-preset-review-status"
                 className="grid grid-cols-3 gap-1"
-                role="toolbar"
-                aria-label={t('Spiral preset actions')}
-                aria-describedby="star-spiral-preset-review-status"
+                label={t('Spiral preset actions')}
                 title={t('Use arrow keys to review spiral presets')}
                 onKeyDown={handleSpiralPresetActionKeys}
-              >
-                <div id="star-spiral-preset-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedSpiralPreset || `${turns} ${t('Winds')} · ${Math.round(decay * 100)}%`}`}
-                </div>
-                {SPIRAL_PRESETS.map((preset) => {
+                reviewingLabel={t('Reviewing')}
+                reviewed={reviewedSpiralPreset}
+                fallback={`${turns} ${t('Winds')} · ${Math.round(decay * 100)}%`}
+                actionAttr="data-spiral-preset-action"
+                setReviewed={setReviewedSpiralPreset}
+                items={SPIRAL_PRESETS.map((preset) => {
                   const active = turns === preset.turns && Math.abs(decay - preset.decay) < 0.001;
-                  const review = `${t(preset.label)} · ${preset.turns} ${t('Winds')} · ${Math.round(preset.decay * 100)}%`;
-                  return (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      data-spiral-preset-action
-                      data-spiral-preset-index={SPIRAL_PRESETS.indexOf(preset)}
-                      data-review={review}
-                      className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                      onFocus={(event) => setReviewedSpiralPreset(event.currentTarget.dataset.review ?? '')}
-                      onClick={() => applySpiralPreset(preset)}
-                      aria-pressed={active}
-                      title={`${t(preset.label)}: ${preset.turns} ${t('Winds')} / ${Math.round(preset.decay * 100)}%`}
-                    >
-                      {t(preset.label)}
-                    </button>
-                  );
+                  return {
+                    key: preset.label,
+                    className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                    pressed: active,
+                    onClick: () => applySpiralPreset(preset),
+                    title: `${t(preset.label)}: ${preset.turns} ${t('Winds')} / ${Math.round(preset.decay * 100)}%`,
+                    data: { 'spiral-preset-index': SPIRAL_PRESETS.indexOf(preset), review: `${t(preset.label)} · ${preset.turns} ${t('Winds')} · ${Math.round(preset.decay * 100)}%` },
+                    children: t(preset.label),
+                  };
                 })}
-              </div>
+              />
             </div>
           </>
         )}
 
-        <div
+        <ReviewedFooter
+          statusId="star-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Star / Polygon actions')}
-          aria-describedby="star-action-review-status"
+          label={t('Star / Polygon actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="star-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Star / Polygon actions')}`}
-          </span>
-          <button type="button" data-star-action data-star-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-star-action data-star-action-review={t('Reset shape settings')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset shape settings'))} onClick={resetShapeSettings} title={t('Reset shape settings')}>{t('Reset')}</button>
-          <button type="button" data-star-action data-star-action-review={t('Insert')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Insert'))} onClick={apply}>{t('Insert')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Star / Polygon actions')}
+          actionAttr="data-star-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset shape settings'), className: 'btn', onClick: resetShapeSettings, title: t('Reset shape settings') },
+            { children: t('Insert'), review: t('Insert'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

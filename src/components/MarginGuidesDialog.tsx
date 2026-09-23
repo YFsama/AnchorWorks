@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const MARGIN_PRESETS_MM = [0, 3, 5, 10, 15, 25];
 const MARGIN_JOB_PRESETS: Array<{ label: string; margin: number; title: string }> = [
@@ -24,9 +27,9 @@ export function MarginGuidesDialog() {
   const open = useEditor(s => s.showMarginGuides);
   const close = useCallback(() => useEditor.getState().setModal('showMarginGuides', false), []);
   const [margin, setMargin] = useState(10);
-  const [reviewedJobPreset, setReviewedJobPreset] = useState('');
-  const [reviewedMarginPreset, setReviewedMarginPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedJobPreset, setReviewedJobPreset] = useReviewedAction();
+  const [reviewedMarginPreset, setReviewedMarginPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const activeJobPreset = MARGIN_JOB_PRESETS.find((preset) => Math.abs(margin - preset.margin) < 0.001)?.label ?? '';
 
   useEscapeClose(open, close);
@@ -48,56 +51,32 @@ export function MarginGuidesDialog() {
     setReviewedFooterAction(t('Reset margin guide settings'));
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-margin-guides-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.marginGuidesActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-margin-guides-action]',
+    reviewKey: actionReviewKey('data-margin-guides-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-margin-guides-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextMargin = Number(actions[nextIndex]?.dataset.margin);
-    if (Number.isFinite(nextMargin)) setMargin(nextMargin);
-    requestAnimationFrame(() => {
-      setReviewedMarginPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-margin-guides-preset-action]',
+    defer: true,
+    setReview: setReviewedMarginPreset,
+    onNavigate: (button) => {
+      const nextMargin = Number(button?.dataset.margin);
+      if (Number.isFinite(nextMargin)) setMargin(nextMargin);
+    },
+  });
 
-  const handleJobPresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-margin-guides-job-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextMargin = Number(actions[nextIndex]?.dataset.margin);
-    if (Number.isFinite(nextMargin)) setMargin(nextMargin);
-    requestAnimationFrame(() => {
-      setReviewedJobPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleJobPresetActionKeys = makeRovingKeys({
+    selector: '[data-margin-guides-job-preset-action]',
+    defer: true,
+    setReview: setReviewedJobPreset,
+    onNavigate: (button) => {
+      const nextMargin = Number(button?.dataset.margin);
+      if (Number.isFinite(nextMargin)) setMargin(nextMargin);
+    },
+  });
 
   return (
     <div
@@ -121,90 +100,78 @@ export function MarginGuidesDialog() {
         </label>
         <div className="mt-2">
           <div className="field-label !mb-1">{t('Margin guide recipes')}</div>
-          <div
+          <PresetRow
+            statusId="margin-guides-job-preset-review-status"
             className="grid grid-cols-2 gap-1"
-            role="toolbar"
-            aria-label={t('Margin guide recipe actions')}
-            aria-describedby="margin-guides-job-preset-review-status"
+            label={t('Margin guide recipe actions')}
             title={t('Use arrow keys to review margin guide recipes')}
             onKeyDown={handleJobPresetActionKeys}
-          >
-            <div id="margin-guides-job-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedJobPreset || t('Margin guide recipes')}`}
-            </div>
-            {MARGIN_JOB_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedJobPreset}
+            fallback={t('Margin guide recipes')}
+            actionAttr="data-margin-guides-job-preset-action"
+            setReviewed={setReviewedJobPreset}
+            items={MARGIN_JOB_PRESETS.map((preset) => {
               const active = activeJobPreset === preset.label;
               const review = `${t(preset.label)}: ${t(preset.title)} ${preset.margin} mm`;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  data-margin-guides-job-preset-action
-                  data-margin={preset.margin}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onClick={() => setMargin(preset.margin)}
-                  onFocus={(event) => setReviewedJobPreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={review}
-                >
-                  {t(preset.label)}
-                </button>
-              );
+              return {
+                key: preset.label,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                pressed: active,
+                onClick: () => setMargin(preset.margin),
+                title: review,
+                data: { margin: preset.margin, review },
+                children: t(preset.label),
+              };
             })}
-          </div>
+          />
         </div>
         <div className="mt-2">
           <div className="field-label !mb-1">{t('Margin presets')}</div>
-          <div
+          <PresetRow
+            statusId="margin-guides-preset-review-status"
             className="grid grid-cols-6 gap-1"
-            role="toolbar"
-            aria-label={t('Margin preset actions')}
-            aria-describedby="margin-guides-preset-review-status"
+            label={t('Margin preset actions')}
             title={t('Use arrow keys to review margin presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="margin-guides-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedMarginPreset || t('Margin presets')}`}
-            </div>
-            {MARGIN_PRESETS_MM.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedMarginPreset}
+            fallback={t('Margin presets')}
+            actionAttr="data-margin-guides-preset-action"
+            setReviewed={setReviewedMarginPreset}
+            items={MARGIN_PRESETS_MM.map((preset) => {
               const active = Math.abs(margin - preset) < 0.001;
               const review = `${t('Set margin to')} ${preset} mm`;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  data-margin-guides-preset-action
-                  data-margin={preset}
-                  data-review={review}
-                  className={`h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`}
-                  onClick={() => setMargin(preset)}
-                  onFocus={(event) => setReviewedMarginPreset(event.currentTarget.dataset.review ?? '')}
-                  title={review}
-                  aria-pressed={active}
-                >
-                  {preset}
-                </button>
-              );
+              return {
+                key: preset,
+                className: `h-6 rounded border text-[10px] transition-colors ${active ? 'bg-accent/20 border-accent text-accent' : 'bg-panel2 border-border hover:bg-panel3 text-ink'}`,
+                pressed: active,
+                onClick: () => setMargin(preset),
+                title: review,
+                data: { margin: preset, review },
+                children: preset,
+              };
             })}
-          </div>
+          />
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="margin-guides-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Margin Guides actions')}
-          aria-describedby="margin-guides-action-review-status"
+          label={t('Margin Guides actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="margin-guides-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Margin Guides actions')}`}
-          </span>
-          <button type="button" data-margin-guides-action data-margin-guides-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-margin-guides-action data-margin-guides-action-review={t('Reset margin guide settings')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset margin guide settings'))} onClick={resetMarginGuideSettings} title={t('Reset margin guide settings')}>{t('Reset')}</button>
-          <button type="button" data-margin-guides-action data-margin-guides-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={apply}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Margin Guides actions')}
+          actionAttr="data-margin-guides-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset margin guide settings'), className: 'btn', onClick: resetMarginGuideSettings, title: t('Reset margin guide settings') },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

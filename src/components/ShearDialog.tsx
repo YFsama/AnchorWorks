@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const SHEAR_ANGLE_PRESETS = [-30, -15, 0, 15, 30] as const;
 
@@ -19,9 +22,9 @@ export function ShearDialog() {
   const close = useCallback(() => useEditor.getState().setModal('showShear', false), []);
   const [angle, setAngle] = useState(15);
   const [axis, setAxis] = useState<'horizontal' | 'vertical'>('horizontal');
-  const [reviewedAnglePreset, setReviewedAnglePreset] = useState('');
-  const [reviewedAxis, setReviewedAxis] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedAnglePreset, setReviewedAnglePreset] = useReviewedAction();
+  const [reviewedAxis, setReviewedAxis] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -41,64 +44,38 @@ export function ShearDialog() {
     setReviewedFooterAction(t('Reset shear settings'));
   };
 
-  const handleAnglePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-shear-angle-preset-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const nextAngle = Number(actions[nextIndex]?.dataset.angle);
-    if (Number.isFinite(nextAngle)) setAngle(nextAngle);
-    requestAnimationFrame(() => {
-      setReviewedAnglePreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleAnglePresetKeys = makeRovingKeys({
+    selector: '[data-shear-angle-preset-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedAnglePreset,
+    onNavigate: (button) => {
+      const nextAngle = Number(button?.dataset.angle);
+      if (Number.isFinite(nextAngle)) setAngle(nextAngle);
+    },
+  });
 
-  const handleAxisKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-shear-axis-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    const nextAxis = actions[nextIndex]?.dataset.axis as 'horizontal' | 'vertical' | undefined;
-    if (nextAxis) setAxis(nextAxis);
-    requestAnimationFrame(() => {
-      setReviewedAxis(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handleAxisKeys = makeRovingKeys({
+    selector: '[data-shear-axis-action]',
+    skipDisabled: true,
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedAxis,
+    onNavigate: (button) => {
+      const nextAxis = button?.dataset.axis as 'horizontal' | 'vertical' | undefined;
+      if (nextAxis) setAxis(nextAxis);
+    },
+  });
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-shear-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.shearActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-shear-action]',
+    reviewKey: actionReviewKey('data-shear-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
   return (
     <div
@@ -123,38 +100,27 @@ export function ShearDialog() {
 
         <div className="mt-3">
           <div className="field-label !mb-1">{t('Shear angle presets')}</div>
-          <div
+          <PresetRow
+            statusId="shear-angle-preset-review-status"
             className="grid grid-cols-5 gap-1"
-            role="toolbar"
-            aria-label={t('Shear angle preset actions')}
-            aria-describedby="shear-angle-preset-review-status"
+            label={t('Shear angle preset actions')}
             title={t('Use arrow keys to review shear angle presets')}
             onKeyDown={handleAnglePresetKeys}
-          >
-            <div id="shear-angle-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedAnglePreset || t('Shear angle presets')}`}
-            </div>
-            {SHEAR_ANGLE_PRESETS.map((preset) => {
-              const active = angle === preset;
-              const review = `${t('Shear angle')} ${preset > 0 ? '+' : ''}${preset}°`;
-              return (
-                <button
-                  key={preset}
-                  type="button"
-                  data-shear-angle-preset-action
-                  data-angle={preset}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
-                  onClick={() => setAngle(preset)}
-                  onFocus={(event) => setReviewedAnglePreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={`${t('Set shear angle to')} ${preset > 0 ? '+' : ''}${preset}°`}
-                >
-                  {preset > 0 ? '+' : ''}{preset}°
-                </button>
-              );
-            })}
-          </div>
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedAnglePreset}
+            fallback={t('Shear angle presets')}
+            actionAttr="data-shear-angle-preset-action"
+            setReviewed={setReviewedAnglePreset}
+            items={SHEAR_ANGLE_PRESETS.map((preset) => ({
+              key: preset,
+              className: `btn !py-1 !px-1 !text-[10px] ${angle === preset ? 'ring-1 ring-accent' : ''}`,
+              pressed: angle === preset,
+              onClick: () => setAngle(preset),
+              title: `${t('Set shear angle to')} ${preset > 0 ? '+' : ''}${preset}°`,
+              data: { angle: preset, review: `${t('Shear angle')} ${preset > 0 ? '+' : ''}${preset}°` },
+              children: <>{preset > 0 ? '+' : ''}{preset}°</>,
+            }))}
+          />
         </div>
 
         <div
@@ -172,21 +138,23 @@ export function ShearDialog() {
           <button type="button" data-shear-axis-action data-axis="vertical" data-review={`${t('Axis')} · ${t('Vertical')}`} role="radio" aria-checked={axis === 'vertical'} className={axis === 'vertical' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setAxis('vertical')} onFocus={(event) => setReviewedAxis(event.currentTarget.dataset.review ?? '')}>{t('Vertical')}</button>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="shear-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Shear actions')}
-          aria-describedby="shear-action-review-status"
+          label={t('Shear actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="shear-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Shear actions')}`}
-          </span>
-          <button type="button" data-shear-action data-shear-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-shear-action data-shear-action-review={t('Reset shear settings')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset shear settings'))} onClick={resetShearSettings} title={t('Reset shear settings')}>{t('Reset')}</button>
-          <button type="button" data-shear-action data-shear-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={apply}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Shear actions')}
+          actionAttr="data-shear-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset shear settings'), className: 'btn', onClick: resetShearSettings, title: t('Reset shear settings') },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

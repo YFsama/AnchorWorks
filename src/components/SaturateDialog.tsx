@@ -6,6 +6,8 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 /**
  * Saturate (Illustrator Edit→Edit Colors→Saturate) — scale the saturation of
@@ -16,8 +18,8 @@ export function SaturateDialog() {
   const open = useEditor(s => s.showSaturate);
   const close = useCallback(() => useEditor.getState().setModal('showSaturate', false), []);
   const [amount, setAmount] = useState(0);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   const SATURATION_PRESETS = [-100, -50, 0, 50, 100];
 
@@ -38,38 +40,22 @@ export function SaturateDialog() {
     setReviewedFooterAction(t('Reset'));
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-saturate-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.saturateActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-saturate-action]',
+    reviewKey: actionReviewKey('data-saturate-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-saturation-preset]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAmount = Number(actions[nextIndex]?.dataset.saturationPreset);
-    if (Number.isFinite(nextAmount)) setAmount(nextAmount);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-saturation-preset]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const nextAmount = Number(button?.dataset.saturationPreset);
+      if (Number.isFinite(nextAmount)) setAmount(nextAmount);
+    },
+  });
 
   return (
     <div
@@ -108,66 +94,42 @@ export function SaturateDialog() {
             {SATURATION_PRESETS.map((preset) => {
               const review = `${t('Set saturation to')} ${preset > 0 ? '+' : ''}${preset}%`;
               return (
-              <button
-                key={preset}
-                type="button"
-                data-saturation-preset={preset}
-                data-review={review}
-                className={amount === preset ? 'btn-primary' : 'btn'}
-                onClick={() => setAmount(preset)}
-                onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
-                aria-pressed={amount === preset}
-                aria-label={review}
-              >
-                {preset > 0 ? '+' : ''}{preset}%
-              </button>
+                <button
+                  key={preset}
+                  type="button"
+                  data-saturation-preset={preset}
+                  data-review={review}
+                  className={amount === preset ? 'btn-primary' : 'btn'}
+                  onClick={() => setAmount(preset)}
+                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
+                  aria-pressed={amount === preset}
+                  aria-label={review}
+                >
+                  {preset > 0 ? '+' : ''}{preset}%
+                </button>
               );
             })}
           </div>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="saturate-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Saturate actions')}
-          aria-describedby="saturate-action-review-status"
+          label={t('Saturate actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <div id="saturate-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Saturate actions')}`}
-          </div>
-          <button
-            type="button"
-            data-saturate-action
-            data-saturate-action-review={t('Cancel')}
-            className="btn"
-            onClick={close}
-            onFocus={() => setReviewedFooterAction(t('Cancel'))}
-          >
-            {t('Cancel')}
-          </button>
-          <button
-            type="button"
-            data-saturate-action
-            data-saturate-action-review={t('Reset')}
-            className="btn"
-            onClick={resetSettings}
-            onFocus={() => setReviewedFooterAction(t('Reset'))}
-          >
-            {t('Reset')}
-          </button>
-          <button
-            type="button"
-            data-saturate-action
-            data-saturate-action-review={t('Apply')}
-            className="btn-primary"
-            onClick={apply}
-            onFocus={() => setReviewedFooterAction(t('Apply'))}
-          >
-            {t('Apply')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Saturate actions')}
+          statusAs="div"
+          actionAttr="data-saturate-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetSettings },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );

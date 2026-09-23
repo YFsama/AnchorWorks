@@ -6,6 +6,10 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const SINGLE_LINE_PRESETS: Array<{ label: string; text: string; size: number; tracking: number; title: string }> = [
   { label: 'Engraving', text: 'ANCHOR 123', size: 48, tracking: 6, title: 'Compact engraving label for plates and tags.' },
@@ -21,8 +25,8 @@ export function SingleLineTextDialog() {
   const [text, setText] = useState('ANCHOR 123');
   const [size, setSize] = useState(72);
   const [tracking, setTracking] = useState(8);
-  const [reviewedPreset, setReviewedPreset] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPreset, setReviewedPreset] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const activePreset = SINGLE_LINE_PRESETS.find((preset) => text === preset.text && size === preset.size && tracking === preset.tracking)?.label ?? '';
 
   useEscapeClose(open, close);
@@ -35,39 +39,24 @@ export function SingleLineTextDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-single-line-action]')).filter((button) => !button.disabled);
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.singleLineActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-single-line-action]',
+    reviewKey: actionReviewKey('data-single-line-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handlePresetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-single-line-preset-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const preset = SINGLE_LINE_PRESETS[Number(actions[nextIndex]?.dataset.singleLinePresetIndex ?? -1)];
-    if (preset) applyPreset(preset);
-    requestAnimationFrame(() => {
-      setReviewedPreset(actions[nextIndex]?.dataset.review ?? '');
-      actions[nextIndex]?.focus();
-    });
-  };
+  const handlePresetActionKeys = makeRovingKeys({
+    selector: '[data-single-line-preset-action]',
+    defer: true,
+    setReview: setReviewedPreset,
+    onNavigate: (button) => {
+      const preset = SINGLE_LINE_PRESETS[Number(button?.dataset.singleLinePresetIndex ?? -1)];
+      if (preset) applyPreset(preset);
+    },
+  });
 
   const applyPreset = (preset: { text: string; size: number; tracking: number }) => {
     setText(preset.text);
@@ -94,68 +83,63 @@ export function SingleLineTextDialog() {
         </div>
         <div className="mt-3">
           <div className="field-label !mb-1">{t('Single-line presets')}</div>
-          <div
+          <PresetRow
+            statusId="single-line-preset-review-status"
             className="grid grid-cols-2 gap-1"
-            role="toolbar"
-            aria-label={t('Single-line Text preset actions')}
-            aria-describedby="single-line-preset-review-status"
+            label={t('Single-line Text preset actions')}
             title={t('Use arrow keys to review single-line text presets')}
             onKeyDown={handlePresetActionKeys}
-          >
-            <div id="single-line-preset-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedPreset || t('Single-line presets')}`}
-            </div>
-            {SINGLE_LINE_PRESETS.map((preset) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedPreset}
+            fallback={t('Single-line presets')}
+            actionAttr="data-single-line-preset-action"
+            setReviewed={setReviewedPreset}
+            items={SINGLE_LINE_PRESETS.map((preset) => {
               const active = activePreset === preset.label;
               const review = `${t(preset.label)}: ${t(preset.title)} ${preset.text}, ${preset.size}px, ${preset.tracking} ${t('Tracking')}`;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  data-single-line-preset-action
-                  data-single-line-preset-index={SINGLE_LINE_PRESETS.indexOf(preset)}
-                  data-review={review}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onClick={() => applyPreset(preset)}
-                  onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}
-                  aria-pressed={active}
-                  title={review}
-                >
-                  {t(preset.label)}
-                </button>
-              );
+              return {
+                key: preset.label,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                pressed: active,
+                onClick: () => applyPreset(preset),
+                title: review,
+                data: { 'single-line-preset-index': SINGLE_LINE_PRESETS.indexOf(preset), review },
+                children: t(preset.label),
+              };
             })}
-          </div>
+          />
         </div>
-        <div
+        <ActionToolbar
+          statusId="single-line-field-action-review-status"
           className="grid grid-cols-2 gap-1 mt-3"
-          role="toolbar"
-          aria-label={t('Single-line Text field actions')}
-          aria-describedby="single-line-field-action-review-status"
+          label={t('Single-line Text field actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Single-line Text field actions')}
+          statusAs="span"
         >
-          <span id="single-line-field-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Single-line Text field actions')}`}
-          </span>
           <button type="button" data-single-line-action data-single-line-action-review={t('Reset fields')} onFocus={() => setReviewedFooterAction(t('Reset fields'))} className="btn !py-1 !text-[10px]" onClick={resetFields}>{t('Reset fields')}</button>
           <button type="button" data-single-line-action data-single-line-action-review={t('Clear text')} onFocus={() => setReviewedFooterAction(t('Clear text'))} className="btn !py-1 !text-[10px]" onClick={clearText} disabled={!text}>{t('Clear text')}</button>
-        </div>
+        </ActionToolbar>
         <p className="text-[10px] text-muted leading-relaxed mt-3">{t('Creates open stroke paths for engraving, pen plotters, and V-carve workflows.')}</p>
-        <div
+        <ReviewedFooter
+          statusId="single-line-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Single-line Text actions')}
-          aria-describedby="single-line-action-review-status"
+          label={t('Single-line Text actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="single-line-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Single-line Text actions')}`}
-          </span>
-          <button type="button" data-single-line-action data-single-line-action-review={t('Cancel')} onFocus={() => setReviewedFooterAction(t('Cancel'))} className="btn" onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-single-line-action data-single-line-action-review={t('Create')} onFocus={() => setReviewedFooterAction(t('Create'))} className="btn-primary" onClick={apply}>{t('Create')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Single-line Text actions')}
+          actionAttr="data-single-line-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Create'), review: t('Create'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );
