@@ -11,7 +11,6 @@ import { InspectPanel } from './components/InspectPanel';
 import { AssetsPanel } from './components/AssetsPanel';
 import { StatusBar } from './components/StatusBar';
 import { QuickHelp } from './components/QuickHelp';
-import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { Onboarding } from './components/Onboarding';
 import { hasOnboarded } from './lib/onboarding';
 import { Loading } from './components/Loading';
@@ -23,9 +22,9 @@ import { openProjectFromFile, saveProjectQuick, saveProjectToFile, applyProject,
 import { setNativeWindowTitle } from './lib/runtime';
 import { installNativeMenuListener } from './lib/tauriMenu';
 import { useResizableWidth } from './lib/hooks/useResizableWidth';
-import { initUpdaterOnBoot } from './lib/updater';
 
 // Code-split the heaviest dialogs / panels — they only load when opened.
+const ShortcutsDialog = lazy(() => import('./components/ShortcutsDialog').then(m => ({ default: m.ShortcutsDialog })));
 const AIPanel = lazy(() => import('./components/AIPanel').then(m => ({ default: m.AIPanel })));
 const PlotterDialog = lazy(() => import('./components/PlotterDialog').then(m => ({ default: m.PlotterDialog })));
 const EpsonMaintDialog = lazy(() => import('./components/EpsonMaintDialog'));
@@ -130,7 +129,14 @@ import { splitTextToLetters, splitTextToLines } from './lib/splitText';
 import { applyTextOnArc } from './lib/textPath';
 import { smartPunctuationSelection } from './lib/smartPunctuation';
 import { getKeyboardIncrement } from './lib/preferences';
-import { commitDimension } from './lib/tools/measureTool';
+
+// Measure tool's Enter-pin action — the only measureTool API the shell needs
+// at the keyboard. Cached dynamic import (warmed after boot, see the idle
+// warm-up near the CommandPalette pre-warm) keeps this file from statically
+// pinning the measure module while still making the first Enter instant.
+let commitDimensionCache: typeof import('./lib/tools/measureTool').commitDimension | null = null;
+const loadCommitDimension = (): Promise<void> =>
+  import('./lib/tools/measureTool').then((m) => { commitDimensionCache = m.commitDimension; });
 
 // Register a built-in "Skill" so the AI can call it as a tool.
 registerSkill({
@@ -789,7 +795,9 @@ export default function App() {
 
   // Kick off the in-app updater workflow once per app mount. No-ops in
   // the PWA build (handled inside initUpdaterOnBoot via isTauri()).
-  useEffect(() => { initUpdaterOnBoot(); }, []);
+  // Loaded dynamically — this was the only static import pinning the
+  // updater module into the eager entry chunk.
+  useEffect(() => { void import('./lib/updater').then((m) => m.initUpdaterOnBoot()); }, []);
 
   // Apply high-contrast theme via a data attribute on <html> and persist the
   // choice to localStorage so subsequent loads honour the user's selection
@@ -1156,7 +1164,15 @@ export default function App() {
       }
       // Measure tool: Enter pins the live measurement as a dimension annotation.
       if (e.key === 'Enter' && useEditor.getState().tool === 'measure' && !e.isComposing) {
-        if (commitDimension()) { e.preventDefault(); announce(t('Dimension added')); return; }
+        if (commitDimensionCache) {
+          if (commitDimensionCache()) { e.preventDefault(); announce(t('Dimension added')); return; }
+        } else {
+          // Cold press before the idle warm-up lands — reserve the keypress
+          // and pin the dimension the moment the module resolves.
+          e.preventDefault();
+          void loadCommitDimension().then(() => { if (commitDimensionCache?.()) announce(t('Dimension added')); });
+          return;
+        }
       }
       // Excluded from BINDINGS: Escape has conditional preventDefault so dialog
       // close handlers still see the key when nothing is selected.
@@ -1294,9 +1310,14 @@ export default function App() {
 
   // Warm the command-palette chunk a few seconds after boot (after the
   // critical path has settled) so the first Ctrl+K opens instantly while the
-  // palette code still stays out of the eagerly-parsed entry chunk.
+  // palette code still stays out of the eagerly-parsed entry chunk. The
+  // measure module warms here too so the measure tool's first Enter-pin is
+  // served from the cache above.
   useEffect(() => {
-    const id = window.setTimeout(() => { void import('./components/CommandPalette'); }, 5000);
+    const id = window.setTimeout(() => {
+      void import('./components/CommandPalette');
+      void loadCommitDimension();
+    }, 5000);
     return () => window.clearTimeout(id);
   }, []);
 
@@ -1598,7 +1619,9 @@ export default function App() {
           <RecoveryDialog />
         </Suspense>
       )}
-      <ShortcutsDialog />
+      <Suspense fallback={null}>
+        <ShortcutsDialog />
+      </Suspense>
       <Suspense fallback={useEditor.getState().showHelpCenter ? <Loading overlay label={t('Loading Help Center…')} /> : null}>
         <HelpCenter />
       </Suspense>
