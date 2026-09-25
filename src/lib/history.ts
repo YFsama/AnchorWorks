@@ -28,6 +28,19 @@ export class History {
   private lastLiveCutPaths: CutPath[] | null = null;
   private lastLiveCutPathsLen = -1;
 
+  /**
+   * Seam for the capture-coalescing layer (historyOps). Invoked synchronously
+   * at the top of undo() / redo(), BEFORE the cursor moves and before the
+   * canUndo / canRedo checks, so a pending deferred capture (a burst of
+   * pushHistory calls that hasn't drained yet) lands on the stack first.
+   * Without this, "edit + immediate undo in the same tick" would advance the
+   * cursor past a state that was never recorded (or no-op entirely because
+   * canUndo was still false). historyOps assigns its flushPendingCapture
+   * here on first contact; standalone History instances leave it null and
+   * behave exactly as before.
+   */
+  beforeNavigate: (() => void) | null = null;
+
   constructor(opts: HistoryOptions = {}) {
     this.limit = opts.limit ?? 100;
   }
@@ -94,12 +107,20 @@ export class History {
   canRedo() { return this.cursor < this.stack.length - 1; }
 
   async undo(canvas: fabric.Canvas) {
+    // Flush any pending coalesced capture BEFORE advancing the cursor — an
+    // edit followed synchronously by undo must still become its own step,
+    // and canUndo may only turn true once the flush lands.
+    this.beforeNavigate?.();
     if (!this.canUndo()) return;
     this.cursor--;
     await this.restore(canvas);
   }
 
   async redo(canvas: fabric.Canvas) {
+    // Same ordering as undo: a pending capture landing here represents an
+    // edit, which truncates the redo stack — the subsequent canRedo check
+    // then correctly refuses the redo.
+    this.beforeNavigate?.();
     if (!this.canRedo()) return;
     this.cursor++;
     await this.restore(canvas);

@@ -10,6 +10,11 @@ import { useEditor, type CutPath } from '../../store/editor';
  * These tests pin the optimisations (single snapshot per capture, cheap
  * cutPaths reference+length guard, shared immutable snapshot array) without
  * touching the behavioural coverage in history.test.ts.
+ *
+ * The last block pins the `beforeNavigate` seam ordering that the ops-layer
+ * capture coalescing (see historyCoalesce.test.ts) depends on: undo/redo
+ * must land a pending deferred capture BEFORE they check canUndo/canRedo or
+ * move the cursor.
  */
 
 function makeStubCanvas(initial = 'state-0') {
@@ -168,6 +173,64 @@ describe('History hot-path performance guards', () => {
     // 10 captures → exactly 10 canvas serialisations, no cutPaths clones.
     expect(spy.mock.calls.filter((args) => typeof args[0] === 'string').length).toBe(10);
     expect(spy.mock.calls.filter((args) => Array.isArray(args[0])).length).toBe(0);
+    expect(history.canUndo()).toBe(true);
+  });
+
+  it('undo runs the beforeNavigate seam before the canUndo check — a flush that records state makes undo available', async () => {
+    const { stub, state } = makeStubCanvas('A');
+    history.init(stub);
+    expect(history.canUndo()).toBe(false);
+
+    // Simulate a pending coalesced capture: the seam records the just-edited
+    // state synchronously when undo enters. Without flush-before-check
+    // ordering, undo would no-op here and the edit would never be undoable.
+    history.beforeNavigate = () => {
+      state.value = 'B';
+      history.capture(stub);
+    };
+    await history.undo(stub);
+
+    expect(state.value).toBe('A'); // stepped back over the flushed capture
+    expect(history.canUndo()).toBe(false);
+    expect(history.canRedo()).toBe(true);
+    history.beforeNavigate = null; // classic redo — nothing pending this time
+    await history.redo(stub);
+    expect(state.value).toBe('B'); // the flushed capture is on the redo stack
+  });
+
+  it('undo runs the seam exactly once per call and before the cursor moves', async () => {
+    const { stub, state } = makeStubCanvas('A');
+    history.init(stub);
+    state.value = 'B';
+    history.capture(stub);
+
+    let flushes = 0;
+    history.beforeNavigate = () => { flushes += 1; };
+    await history.undo(stub);
+    expect(flushes).toBe(1);
+    await history.redo(stub);
+    expect(flushes).toBe(2);
+    // Behaviour unchanged: undo/redo still restore across the real steps.
+    expect(state.value).toBe('B');
+  });
+
+  it('redo runs the seam first — a flushed edit truncates the redo stack before canRedo is checked', async () => {
+    const { stub, state } = makeStubCanvas('A');
+    history.init(stub);
+    state.value = 'B';
+    history.capture(stub);
+    await history.undo(stub); // at A, 'B' redoable
+    expect(history.canRedo()).toBe(true);
+
+    // A pending capture landing here is an edit — it must invalidate redo.
+    history.beforeNavigate = () => {
+      state.value = 'C';
+      history.capture(stub);
+    };
+    await history.redo(stub);
+
+    expect(state.value).toBe('C'); // redo refused, edit kept
+    expect(history.canRedo()).toBe(false);
     expect(history.canUndo()).toBe(true);
   });
 });
