@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="140" viewBox="0 0 200 140">
+  <!-- Two disjoint rectangles: fixture for the File > Open SVG e2e spec.
+       Kept minimal and warning-free (plain fills, no <style>, gradients,
+       or currentColor) so the smart importer surfaces no warnings. -->
+  <rect x="10" y="10" width="80" height="50" fill="#e74c3c"/>
+  <rect x="110" y="80" width="80" height="50" fill="#3498db"/>
+</svg>
