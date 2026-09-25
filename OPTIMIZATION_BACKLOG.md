@@ -2,7 +2,14 @@
 
 Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js` 1,143 kB raw / 217 kB gzip; 141 eager sources totaling 2,112 kB of source text. A parallel session is mid-edit on `epson*/plotter*/src-tauri` — those files are measured but excluded from recommendations.
 
-**Status updates (2026-09-23, post-audit waves):**
+**Status updates (2026-09-23, wave 2):**
+- **P1-2 DONE** — capture coalescing landed (`7776fe0`): one flush per macrotask via queueMicrotask + a beforeNavigate seam for same-tick undo ordering; all legacy assertions unmodified; 1,000-object bursts go 1,000 serializations → 1.
+- **P1-3 DONE** — LayersPanel delay-mounted behind a skeleton (`3b7e207`): entry 1,088.9 → 956.2 kB (gzip 177.1); panel+layerOps in their own 120.9 kB chunk.
+- **P1-4 PARTIAL (6/17)** — keymap, pathSimplify, pathJoin, roundCorners, grommets, rhinestone covered (`9348b36`, 110 tests). Remaining candidates: addAnchors, alignDistribute, booleanOps, offsetPath, outlineEffect, pathEdit, pathReverse, rasterize, repeat, roughen, splitText, textToOutline, twist, zigzag, pressureBrush, freeDistort, smartGuides, scaleToSize, zOrder, grouping (pick by blast radius).
+- **P1-5 DONE** — projectRoundTrip.test.ts (v2 envelope through fabric's real class registry) + first file-open e2e (`9348b36`).
+
+**NEW P1-6 (bug found by P1-4 testing, needs dedicated pass):** the outline rebuild pipeline in `contourFromSelection.ts:63-72` emits output coords = input d coords + (obj.left, obj.top) — exact only when a path's d-bbox starts at the origin without stroke padding; with fabric's default strokeWidth:1 every rebuild also carries a ±0.5px shift. Affects pathSimplify/pathJoin/roundCorners (shared pipeline). Tests pin the well-behaved case; fix requires reasoning about the calcTransformMatrix/originX composition shared with booleanOps/cutContour/knife/envelope — high blast radius, do with fresh tests for each consumer.
+
 - **P0-1 DONE** — viewport gate landed (`a3f179e`).
 - **P0-2 + P0-3 DONE** — coordinated pass landed (`bc50b78`): measureTool split (36.2 kB eager core / 140.7 kB measureProof on-demand chunk, runtime-verified 0 boot fetches), App commitDimension cached-dynamic, MenuBar+CommandPalette 82 sites each converted, ShortcutsDialog lazy (P1-1 DONE), updater import dynamic (warning gone). Entry 1,147.9 → 1,088.9 kB (gzip −15.1). REMAINING unlock chain for formats/projectFile warnings: `formatRegistration`/`io3` static pins (formats) and `tauriMenu`+mount-effect (projectFile) — those are the next coordinated pass, smaller than this one.
 - **P0-4 PILOT + BATCH A DONE** — kit landed (`10beae5`) + 24 chip-preset dialogs migrated (`11f08a2`, 93 roving handlers → factory calls, 12 new equivalence cases; fixed TilePrint's latent rAF/currentTarget crash). Remaining: 7 in-scope heavy-settings dialogs (DocSettings/FindReplace/Preferences/Recovery/Separations/Templates/VariableData) + panels batch C. Kit gaps to unlock most of them: `disabled` + `aria-label` passthrough on PresetItem/FooterAction, `radiogroup` role, external status region, 2-D listbox nav.
