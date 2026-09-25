@@ -6,7 +6,6 @@ import { PropertiesPanel } from './components/PropertiesPanel';
 import { AlignPanel } from './components/AlignPanel';
 import { ArtboardsPanel } from './components/ArtboardsPanel';
 import { SymbolsPanel } from './components/SymbolsPanel';
-import { LayersPanel } from './components/LayersPanel';
 import { InspectPanel } from './components/InspectPanel';
 import { AssetsPanel } from './components/AssetsPanel';
 import { StatusBar } from './components/StatusBar';
@@ -25,6 +24,10 @@ import { useResizableWidth } from './lib/hooks/useResizableWidth';
 
 // Code-split the heaviest dialogs / panels — they only load when opened.
 const ShortcutsDialog = lazy(() => import('./components/ShortcutsDialog').then(m => ({ default: m.ShortcutsDialog })));
+// LayersPanel is visible chrome but not needed for first canvas paint — it
+// mounts shortly after boot (see layersMounted) with a skeleton strip, and
+// drags its layerOps dependency into the same on-demand chunk.
+const LayersPanel = lazy(() => import('./components/LayersPanel').then(m => ({ default: m.LayersPanel })));
 const AIPanel = lazy(() => import('./components/AIPanel').then(m => ({ default: m.AIPanel })));
 const PlotterDialog = lazy(() => import('./components/PlotterDialog').then(m => ({ default: m.PlotterDialog })));
 const EpsonMaintDialog = lazy(() => import('./components/EpsonMaintDialog'));
@@ -703,6 +706,28 @@ registerSkill({
   },
 });
 
+/**
+ * Skeleton for the delay-mounted LayersPanel — same header shape as the real
+ * panel (panel-header + count chip) plus pulsing rows, so the swap reads as
+ * continuous fill rather than a late-appearing panel. Decorative only:
+ * aria-hidden because it carries no information (the real panel announces
+ * itself on mount); the global prefers-reduced-motion rule neutralises the
+ * pulse for users who opted out.
+ */
+function LayersSkeleton() {
+  const t = useT();
+  return (
+    <section aria-hidden="true">
+      <div className="panel-header"><h3 className="contents">{t('Layers')}</h3><span className="panel-count">&nbsp;</span></div>
+      <div className="px-2 pb-2 space-y-1.5 animate-pulse">
+        {[12, 16, 10, 14].map((w, i) => (
+          <div key={i} className="h-4 rounded bg-panel3" style={{ width: `${w * 6}%` }} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const t = useT();
   const lang = useI18n((s) => s.lang);
@@ -722,6 +747,9 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => !hasOnboarded());
   // Delay-mount RecoveryDialog so its chunk loads lazily after first paint.
   const [recoveryMounted, setRecoveryMounted] = useState(false);
+  // LayersPanel mounts one beat after boot — first canvas paint stays
+  // unblocked while the panel + layerOps chunk streams in behind a skeleton.
+  const [layersMounted, setLayersMounted] = useState(false);
   const [mobileAsideOpen, setMobileAsideOpen] = useState(false);
 
   // Right sidebar width. Drag the strip on its left edge to widen/narrow;
@@ -1308,6 +1336,13 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, []);
 
+  // LayersPanel mounts after RecoveryDialog — visible chrome, but one beat
+  // later than first paint so canvas boot never waits on the panel chunk.
+  useEffect(() => {
+    const id = window.setTimeout(() => setLayersMounted(true), 400);
+    return () => window.clearTimeout(id);
+  }, []);
+
   // Warm the command-palette chunk a few seconds after boot (after the
   // critical path has settled) so the first Ctrl+K opens instantly while the
   // palette code still stays out of the eagerly-parsed entry chunk. The
@@ -1401,7 +1436,13 @@ export default function App() {
           <AlignPanel />
           <ArtboardsPanel />
           <SymbolsPanel />
-          <LayersPanel />
+          {layersMounted ? (
+            <Suspense fallback={<LayersSkeleton />}>
+              <LayersPanel />
+            </Suspense>
+          ) : (
+            <LayersSkeleton />
+          )}
           <InspectPanel />
           <AssetsPanel />
         </aside>
