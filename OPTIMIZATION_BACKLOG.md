@@ -2,7 +2,12 @@
 
 Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js` 1,143 kB raw / 217 kB gzip; 141 eager sources totaling 2,112 kB of source text. A parallel session is mid-edit on `epson*/plotter*/src-tauri` — those files are measured but excluded from recommendations.
 
-**Status updates (2026-09-23, wave 2):**
+**Status updates (2026-09-23, wave 3):**
+- **P1-6 DONE** — the off-origin outline-shift bug is fixed (`e019415`): d→scene mapping now subtracts `pathOffset` (d-bbox centre) instead of half-width/height, mirroring booleanOps.objectToRings; primitive fallback no longer double-transforms. 8 red→green tests + consumer cases in simplify/join/roundCorners; full suite + e2e green.
+- **P1-4 now 15/17 core libs covered** — batch 2 landed (`cb606f5`, 144 tests): booleanOps/offsetPath/pathEdit/repeat/zOrder/grouping/twist/zigzag/roughen. Next tier candidates: pathReverse, pucker, freeDistort, scaleToSize, splitText, textToOutline, clipboard, selectionApply, smartGuides, svgImport.
+- **NEW P1-7 (found by batch-2 tests):** `booleanOps.ts:236` → `pathOps.ts ringToBezierPathD` — polygon-clipping rings close by repeating the first vertex; the refit doesn't drop the duplicate, emitting a zero-length C whose control points reach ~⅓ of the neighbouring edge OUTSIDE the shape — a visible ~15px hair at every boolean-result seam corner. Fix: drop the duplicate closing vertex before refit (pathOps is the right seam; add a seam-corner case to booleanOps.test.ts).
+- **NEW P1-8 (found by batch-2 tests):** `cutContour.ts offsetPolyline` — an inward offset exceeding the shape's half-extent returns an inverted LARGER ring (span 2·(|d|−halfExtent)) instead of vanishing. Fix: detect the self-intersection/inversion (signed area flip or winding check) and return null. One skip-with-reason test blocks on this.
+
 - **P1-2 DONE** — capture coalescing landed (`7776fe0`): one flush per macrotask via queueMicrotask + a beforeNavigate seam for same-tick undo ordering; all legacy assertions unmodified; 1,000-object bursts go 1,000 serializations → 1.
 - **P1-3 DONE** — LayersPanel delay-mounted behind a skeleton (`3b7e207`): entry 1,088.9 → 956.2 kB (gzip 177.1); panel+layerOps in their own 120.9 kB chunk.
 - **P1-4 PARTIAL (6/17)** — keymap, pathSimplify, pathJoin, roundCorners, grommets, rhinestone covered (`9348b36`, 110 tests). Remaining candidates: addAnchors, alignDistribute, booleanOps, offsetPath, outlineEffect, pathEdit, pathReverse, rasterize, repeat, roughen, splitText, textToOutline, twist, zigzag, pressureBrush, freeDistort, smartGuides, scaleToSize, zOrder, grouping (pick by blast radius).
