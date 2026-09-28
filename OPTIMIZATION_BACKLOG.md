@@ -2,7 +2,12 @@
 
 Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js` 1,143 kB raw / 217 kB gzip; 141 eager sources totaling 2,112 kB of source text. A parallel session is mid-edit on `epson*/plotter*/src-tauri` — those files are measured but excluded from recommendations.
 
-**Status updates (2026-09-23, wave 3):**
+**Status updates (2026-09-23, wave 4):**
+- **P1-7 DONE** — seam hair fixed (`9fbdfd3`): ringToBezierPathD collapses consecutive-duplicate runs incl. the wrap-around pair (the duplicate is a rotated-cycle trailing pair — naive last==first dedup missed it); knife's latent case fixed for free.
+- **P1-8 DONE** — inward-overflow inversion fixed (same commit): returns [] on zero-area collapse | winding flip | miter-closer-than-|d| (red-run disproved the signed-area-only heuristic — convex inversions preserve winding); Cut Contour's existing 'no geometry' toast covers the UX. Red→green for both, zero legacy expectations changed, 12+1 tests.
+- **P1-4 COMPLETE for the effect-lib tier** — batch 3 landed (`5efbed2`, 70 tests): pathReverse/freeDistort/scaleToSize/splitText/textToOutline/outlineEffect/outlineStrokeFill (pucker pre-existed). Deeper IO/UI libs (clipboard/selectionApply/svgImport/svgImport filters/eraserHitTest/scissors/pressureBrush/smartGuides) remain open-ended candidates, not blocking.
+- **splitText data-loss edge fixed** (`5ed0dae`): zero-piece texts are kept instead of silently deleted without undo (found by batch-3 tests).
+
 - **P1-6 DONE** — the off-origin outline-shift bug is fixed (`e019415`): d→scene mapping now subtracts `pathOffset` (d-bbox centre) instead of half-width/height, mirroring booleanOps.objectToRings; primitive fallback no longer double-transforms. 8 red→green tests + consumer cases in simplify/join/roundCorners; full suite + e2e green.
 - **P1-4 now 15/17 core libs covered** — batch 2 landed (`cb606f5`, 144 tests): booleanOps/offsetPath/pathEdit/repeat/zOrder/grouping/twist/zigzag/roughen. Next tier candidates: pathReverse, pucker, freeDistort, scaleToSize, splitText, textToOutline, clipboard, selectionApply, smartGuides, svgImport.
 - **NEW P1-7 (found by batch-2 tests):** `booleanOps.ts:236` → `pathOps.ts ringToBezierPathD` — polygon-clipping rings close by repeating the first vertex; the refit doesn't drop the duplicate, emitting a zero-length C whose control points reach ~⅓ of the neighbouring edge OUTSIDE the shape — a visible ~15px hair at every boolean-result seam corner. Fix: drop the duplicate closing vertex before refit (pathOps is the right seam; add a seam-corner case to booleanOps.test.ts).
