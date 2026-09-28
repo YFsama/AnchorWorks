@@ -58,6 +58,7 @@ export function splitTextToLetters(): number {
     if (!ti.__charBounds) continue; // not measured yet — skip rather than guess
     const fontSize = (t.fontSize ?? 16) * (t.scaleY ?? 1);
     let yOff = 0;
+    let produced = 0;
     for (let i = 0; i < ti.textLines.length; i++) {
       const line = ti.textLines[i];
       const bounds = ti.__charBounds[i] ?? [];
@@ -69,10 +70,13 @@ export function splitTextToLetters(): number {
         if (!cb) continue;
         const { left, top } = place(t, leftPad + cb.left, yOff);
         made.push(new fabric.IText(ch, { left, top, fontSize, ...styleOf(t) }));
+        produced++;
       }
       yOff += ti.getHeightOfLine(i);
     }
-    canvas.remove(t);
+    // Zero pieces (all-blank text) — keep the original instead of deleting
+    // it with nothing to show for the split.
+    if (produced > 0) canvas.remove(t);
   }
   return commit(canvas, made);
 }
@@ -90,16 +94,20 @@ export function splitTextToLines(): number {
     if (ti.textLines.length < 2) continue; // nothing to split
     const fontSize = (t.fontSize ?? 16) * (t.scaleY ?? 1);
     let yOff = 0;
+    let produced = 0;
     for (let i = 0; i < ti.textLines.length; i++) {
       const line = ti.textLines[i];
       if (line.trim() !== '') {
         const leftPad = ti._getLineLeftOffset ? ti._getLineLeftOffset(i) : 0;
         const { left, top } = place(t, leftPad, yOff);
         made.push(new fabric.IText(line, { left, top, fontSize, ...styleOf(t) }));
+        produced++;
       }
       yOff += ti.getHeightOfLine(i);
     }
-    canvas.remove(t);
+    // Zero pieces (all lines blank) — keep the original instead of deleting
+    // it with nothing to show for the split.
+    if (produced > 0) canvas.remove(t);
   }
   return commit(canvas, made);
 }

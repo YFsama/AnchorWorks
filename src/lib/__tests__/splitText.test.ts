@@ -252,3 +252,28 @@ describe('splitTextToLines', () => {
     expect(c.remove).toHaveBeenCalledWith(t);
   });
 });
+
+/* ------------------------- zero-piece data-loss guard ------------------------- */
+
+describe('splitText zero-piece guard (data-loss fix)', () => {
+  it('splitTextToLetters keeps an all-space text instead of silently deleting it', () => {
+    const blank = makeText({
+      textLines: ['   '],
+      __charBounds: [[{ left: 0, width: 5 }, { left: 5, width: 5 }, { left: 10, width: 5 }]],
+    });
+    const { c, history } = makeCanvas([blank]);
+    const n = splitTextToLetters();
+    expect(n).toBe(0);
+    expect(c.remove).not.toHaveBeenCalledWith(blank);
+    expect(history).not.toHaveBeenCalled();
+  });
+
+  it('splitTextToLines keeps an all-blank-lines text instead of silently deleting it', () => {
+    const blankLines = makeText({ textLines: ['', ''], __charBounds: [[], []] });
+    const { c, history } = makeCanvas([blankLines]);
+    const n = splitTextToLines();
+    expect(n).toBe(0);
+    expect(c.remove).not.toHaveBeenCalledWith(blankLines);
+    expect(history).not.toHaveBeenCalled();
+  });
+});
