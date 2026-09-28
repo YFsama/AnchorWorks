@@ -4,7 +4,7 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.13.0] — 2026-09-28
 
 ### Added
 - **Plotter debug console**: the Send to Plotter dialog now has a built-in serial console. Connect once and keep the cutter link alive across dialog reopens, pick the baud rate (most HP-GL vinyl cutters speak 9600, not the previous hard-coded 115200) and flow control (none / RTS-CTS / XON-XOFF), then use one-click machine commands (initialize, pen up, blade tap, HP-GL OE/OH/OA/OS queries, grbl status / unlock / home / pause / resume, immediate force/speed push), a jog pad with set-origin, and a raw-command input with automatic reply decoding. The TX/RX traffic log timestamps every byte with an ASCII/HEX toggle plus copy / download / clear.
