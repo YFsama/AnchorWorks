@@ -34,20 +34,36 @@ type Pt = readonly [number, number];
 /** Take a closed ring of points and return the SVG path data ("d") string
  *  for that ring, with smooth runs emitted as C segments and corners as L. */
 export function ringToBezierPathD(ring: readonly Pt[]): string {
-  if (ring.length < 3) {
-    // Degenerate ring; emit a plain polygon — no curves to recover.
-    if (ring.length === 0) return '';
-    let d = `M ${ring[0][0]} ${ring[0][1]}`;
-    for (let i = 1; i < ring.length; i++) d += ` L ${ring[i][0]} ${ring[i][1]}`;
+  // Rings arrive here closed by repeating a vertex (polygon-clipping
+  // repeats the first vertex; some producers emit a trailing duplicate
+  // pair instead — the cycle is just rotated). Collapse EVERY run of
+  // consecutive duplicates, including the wrap-around pair, before
+  // refitting: a zero-length edge in the input makes the refit emit a
+  // zero-length C whose cardinal-tangent control points reach ~⅓ of the
+  // neighbouring edge length OUTSIDE the shape — a visible hair at every
+  // boolean-result seam corner (P1-7).
+  const uniq: Pt[] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const prev = ring[(i - 1 + ring.length) % ring.length];
+    if (ring[i][0] === prev[0] && ring[i][1] === prev[1]) continue;
+    uniq.push(ring[i]);
+  }
+  const pts = uniq;
+  if (pts.length < 3) {
+    // Degenerate ring (a pure duplicate pair collapses to nothing here);
+    // emit a plain polygon — no curves to recover.
+    if (pts.length === 0) return '';
+    let d = `M ${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 1; i < pts.length; i++) d += ` L ${pts[i][0]} ${pts[i][1]}`;
     return d + ' Z';
   }
 
-  const n = ring.length;
+  const n = pts.length;
   const isCorner = new Array<boolean>(n);
   for (let i = 0; i < n; i++) {
-    const prev = ring[(i - 1 + n) % n];
-    const cur = ring[i];
-    const next = ring[(i + 1) % n];
+    const prev = pts[(i - 1 + n) % n];
+    const cur = pts[i];
+    const next = pts[(i + 1) % n];
     const ax = cur[0] - prev[0], ay = cur[1] - prev[1];
     const bx = next[0] - cur[0], by = next[1] - cur[1];
     const la = Math.hypot(ax, ay);
@@ -73,13 +89,13 @@ export function ringToBezierPathD(ring: readonly Pt[]): string {
   let startIdx = isCorner.indexOf(true);
   if (startIdx === -1) startIdx = 0;
 
-  let d = `M ${ring[startIdx][0]} ${ring[startIdx][1]}`;
+  let d = `M ${pts[startIdx][0]} ${pts[startIdx][1]}`;
   for (let step = 1; step <= n; step++) {
     const i = (startIdx + step) % n;
-    const prev = ring[(i - 1 + n) % n];
-    const cur = ring[i];
-    const next = ring[(i + 1) % n];
-    const prevPrev = ring[(i - 2 + n) % n];
+    const prev = pts[(i - 1 + n) % n];
+    const cur = pts[i];
+    const next = pts[(i + 1) % n];
+    const prevPrev = pts[(i - 2 + n) % n];
 
     if (isCorner[i] || isCorner[(i - 1 + n) % n]) {
       // Either endpoint is a corner — emit a straight L for honesty.

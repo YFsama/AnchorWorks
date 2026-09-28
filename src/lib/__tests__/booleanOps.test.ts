@@ -92,9 +92,10 @@ function ringArea(ring: Array<[number, number]>): number {
 
 /** Flatten a fabric.Path's command array (M/L/C/Q/Z, absolute coords) into
  *  sub-path rings, sampling curves at 24 steps. Segments whose endpoints
- *  coincide are skipped: the boolean refit emits degenerate zero-length C
- *  segments at ring seams (duplicate closing vertex — see the note at the
- *  bottom of this file), and they must not contribute area. */
+ *  coincide are skipped defensively: zero-length segments must never
+ *  contribute area (ringToBezierPathD drops the duplicated closing vertex
+ *  before refit — P1-7 — so these should no longer occur; the skip keeps
+ *  this helper robust regardless). */
 function flattenCommands(path: fabric.Path): Array<Array<[number, number]>> {
   const subs: Array<Array<[number, number]>> = [];
   let cur: Array<[number, number]> = [];
@@ -165,6 +166,31 @@ function pathArea(path: fabric.Path): number {
 
 function pathRingCount(path: fabric.Path): number {
   return flattenCommands(path).length;
+}
+
+/** Count L/C segments whose endpoint coincides with their start point — the
+ *  zero-length "hair" a duplicated ring-seam vertex used to inject (P1-7:
+ *  its cardinal-tangent control points bulged ~⅓ of the neighbouring edge
+ *  outside the shape, visible as a ~15px spike at every seam corner). */
+function zeroLengthSegments(path: fabric.Path): number {
+  let cx = 0;
+  let cy = 0;
+  let count = 0;
+  for (const cmd of path.path as unknown as Cmd[]) {
+    const c = String(cmd[0]).toUpperCase();
+    if (c === 'M') {
+      cx = cmd[1] as number;
+      cy = cmd[2] as number;
+    } else if (c === 'L' || c === 'C') {
+      const isLine = c === 'L';
+      const nx = (isLine ? cmd[1] : cmd[5]) as number;
+      const ny = (isLine ? cmd[2] : cmd[6]) as number;
+      if (Math.abs(nx - cx) < 1e-9 && Math.abs(ny - cy) < 1e-9) count++;
+      cx = nx;
+      cy = ny;
+    }
+  }
+  return count;
 }
 
 /** A 100×100 rect at (x, y). */
@@ -312,6 +338,60 @@ describe('multiPolygonToPathD', () => {
     expect(d).toContain(' C ');
     // And far fewer commands than the raw flattened vertex count.
     expect((d.match(/L /g) ?? []).length).toBeLessThan(rings[0].length / 2);
+  });
+});
+
+/* ------------------- P1-7: seam-corner refit hair ------------------- */
+
+describe('multiPolygonToPathD — duplicated closing vertex is dropped (P1-7)', () => {
+  it('exact batch repro: the union ring of rects (0,0)+(50,0) refits to a clean rectangle', () => {
+    // polygon-clipping closes rings by repeating the first vertex. This is
+    // the ring the union of two 100×100 rects at (0,0) and (50,0) produces;
+    // the refit used to emit `C 0 -33.33 -50 0 0 0` at the seam — a ~15px
+    // hair whose control points sit OUTSIDE the shape.
+    const ring = [[150, 0], [150, 100], [0, 100], [0, 0], [0, 0]];
+    const d = multiPolygonToPathD([[ring] as never]);
+    expect(d).toBe('M 150 0 L 150 100 L 0 100 L 0 0 L 150 0 Z');
+    expect(d.includes('C')).toBe(false);
+  });
+
+  it('closed smooth rings carry no zero-length C at the seam (round stays round AND hairless)', () => {
+    // objectToRings closes its rings with the duplicated first vertex, so
+    // this exercises the seam on a ring that is otherwise entirely smooth —
+    // the duplicate must not become a zero-length C segment.
+    const circle = new fabric.Circle({ left: 0, top: 0, radius: 50, originX: 'left', originY: 'top' });
+    const rings = objectToRings(circle)!;
+    const d = multiPolygonToPathD([rings as never]);
+    expect(d).toContain(' C '); // the refit still curves
+    expect(zeroLengthSegments(new fabric.Path(d, OPTS))).toBe(0);
+  });
+
+  it('skips a pure duplicate-pair ring (<3 unique points) entirely', () => {
+    // A ring that is just [P, P] carries no geometry — after collapsing
+    // the consecutive duplicate there are no unique points left, so no
+    // path part is emitted for it.
+    expect(multiPolygonToPathD([[[[5, 5], [5, 5]]]])).toBe('');
+  });
+});
+
+describe('booleanOp — seam corners carry no refit hair (P1-7)', () => {
+  it.each([
+    'union',
+    'subtract',
+    'intersect',
+    'exclude',
+  ] as const)('%s of two rects yields no zero-length segment and no refit curve', async (op) => {
+    const [a, b] = overlappingPair();
+    const c = makeCanvas([a, b]);
+    mockCanvas(c);
+    const result = await booleanOp(op);
+    expect(result).toBeInstanceOf(fabric.Path);
+    expect(zeroLengthSegments(result!)).toBe(0);
+    // Rectilinear input → rectilinear output: nothing should be refit to C,
+    // so any C command here would be the seam hair.
+    expect(
+      (result!.path as unknown as Cmd[]).some((cmd) => String(cmd[0]).toUpperCase() === 'C'),
+    ).toBe(false);
   });
 });
 
@@ -677,10 +757,11 @@ describe('mergeSameFillSelection', () => {
   });
 });
 
-/* NOTE (measured behaviour, not asserted as "correct"): polygon-clipping
- * rings close by repeating the first vertex, and ringToBezierPathD does not
- * drop that duplicate — so the refit can emit a degenerate zero-length C at
- * the ring seam with control points offset up to ~⅓ of the neighbouring
- * edge length OUTSIDE the shape (observed: `C 0 -33.3 -50 0 0 0` on the seam
- * of a 150×100 union). The area helper below therefore ignores segments
- * whose endpoints coincide; see the batch report for the isolated bug. */
+/* FIXED (P1-7): polygon-clipping rings close by repeating the first vertex,
+ * and ringToBezierPathD used to refit that duplicate as a real vertex —
+ * emitting a degenerate zero-length C at the ring seam with control points
+ * offset up to ~⅓ of the neighbouring edge length OUTSIDE the shape
+ * (observed: `C 0 -33.3 -50 0 0 0` on the seam of a 150×100 union — a
+ * visible ~15px hair at every boolean-result seam corner). ringToBezierPathD
+ * now drops the duplicated closing vertex before the refit; the area helper
+ * above keeps its degenerate-segment skip purely defensively. */

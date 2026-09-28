@@ -21,6 +21,7 @@
 import * as fabric from 'fabric';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canOffsetPath, canOffsetPathObject, offsetPathObject, offsetPathSelection } from '../offsetPath';
+import { offsetPolyline } from '../cutContour';
 import * as canvasEngine from '../canvasEngine';
 
 type Cmd = [string, number?, number?];
@@ -140,13 +141,12 @@ describe('offsetPathObject', () => {
     expect(area(pts)).toBeCloseTo((100 - 2 * d) ** 2, -1);
   });
 
-  it.skip('vanishes (null) when the inward offset exceeds the shape — offsetPolyline inward-overflow bug', () => {
-    // INTENDED behaviour: a −60mm (≈227px) inward offset into a 100px square
-    // has no area to keep, so nothing should be added. Measured today: the
-    // pipeline returns an INVERTED square LARGER than the input (span
-    // 2·(|d| − 50)) instead of collapsing — a cutContour.offsetPolyline
-    // inward-overflow defect (see the batch report). Skip-levelled rather
-    // than pinning the bogus output as correct.
+  it('vanishes (null) when the inward offset exceeds the shape — offsetPolyline inward-overflow bug', () => {
+    // A −60mm (≈227px) inward offset into a 100px square has no area to
+    // keep, so nothing should be added. P1-8 fixed: offsetPolyline used to
+    // return an INVERTED square LARGER than the input (span 2·(|d| − 50))
+    // instead of collapsing; it now detects the orientation flip and
+    // vanishes, so offsetPathObject adds nothing.
     const c = makeCanvas([]);
     expect(offsetPathObject(c as unknown as fabric.Canvas, square(), -60)).toBeNull();
     expect(c.add).not.toHaveBeenCalled();
@@ -288,5 +288,50 @@ describe('offsetPathSelection', () => {
     mockCanvas(c);
     expect(offsetPathSelection(5)).toBe(1);
     expect(c.add).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ---------------- direct offsetPolyline cases (P1-8) ---------------- */
+
+describe('offsetPolyline — inward-overflow inversion (P1-8)', () => {
+  // Convention shared with cutContour.test.ts: a 100-unit square listed
+  // [[0,0],[100,0],[100,100],[0,100]] with +distance = expand. An inward
+  // offset is "overflowing" once |d| exceeds the half-extent (50 here).
+  const SQ: Array<[number, number]> = [[0, 0], [100, 0], [100, 100], [0, 100]];
+
+  function span(ring: Array<[number, number]>): number {
+    const xs = ring.map(([x]) => x);
+    return Math.max(...xs) - Math.min(...xs);
+  }
+
+  it('vanishes (no rings) when the inward offset slightly exceeds the half-extent', () => {
+    // Used to return an INVERTED square with span 2·(|d| − 50) = 20.
+    expect(offsetPolyline(SQ, -60, true)).toEqual([]);
+  });
+
+  it('vanishes (no rings) at the degenerate exactly-half-extent offset (zero-area ring)', () => {
+    // All four miter points collapse onto the centre → zero area → vanish.
+    expect(offsetPolyline(SQ, -50, true)).toEqual([]);
+  });
+
+  it('still returns the correct smaller ring for a normal inward offset', () => {
+    const rings = offsetPolyline(SQ, -10, true);
+    expect(rings).toHaveLength(1);
+    expect(span(rings[0])).toBeCloseTo(80, 6);
+  });
+
+  it('still returns the larger ring for an outward offset', () => {
+    const rings = offsetPolyline(SQ, 10, true);
+    expect(rings).toHaveLength(1);
+    expect(span(rings[0])).toBeCloseTo(120, 6);
+  });
+
+  it('leaves open polylines untouched by the closed-shape overflow guard', () => {
+    // The guard is meaningless for open paths — a sideways shift is always
+    // representable, so the line still offsets to a translated segment.
+    const line: Array<[number, number]> = [[0, 0], [100, 0]];
+    const out = offsetPolyline(line, -60, false);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toHaveLength(2);
   });
 });

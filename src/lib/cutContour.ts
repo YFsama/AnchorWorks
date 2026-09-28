@@ -40,11 +40,57 @@ const DEFAULT_OFFSET: OffsetOptions = {
   closeTolerance: 0.01,
 };
 
+/** A closed result ring with |area| below this (mm² — unit-agnostic, it is
+ *  tiny in px too) has collapsed under its inward offset and counts as
+ *  vanished rather than as a real outline. */
+const VANISHED_AREA_EPS = 1e-6;
+
+/** Slack on the "offset vertex sits at ≥ |distance| from the source
+ *  boundary" test, so floating-point noise on the exact offset distance
+ *  never reads as an overflow. */
+const OFFSET_DIST_EPS = 1e-6;
+
+/** Shoelace signed area of a ring (sign encodes winding/orientation). */
+function ringSignedArea(pts: ReadonlyArray<readonly [number, number]>): number {
+  let area = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    area += pts[i][0] * pts[i + 1][1] - pts[i + 1][0] * pts[i][1];
+  }
+  return area / 2;
+}
+
+/** Minimum distance from a point to a ring's boundary (treated as a closed
+ *  cycle of segments). */
+function pointRingDistance(
+  p: readonly [number, number],
+  ring: ReadonlyArray<readonly [number, number]>,
+): number {
+  let best = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    let t = len2 > 0 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(a[0] + t * dx - p[0], a[1] + t * dy - p[1]);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
 /**
  * Parallel-offset a polyline by `distance` mm. Positive distance walks
  * outward (left of segment direction by the right-hand rule); negative
  * inward. For closed paths the offset is taken outward from the polygon
  * interior — the sign of `distance` then controls expand vs shrink.
+ *
+ * Vanishing (P1-8): an inward offset that exceeds the closed shape's
+ * half-extent has no area left to keep. The raw offset ring inverts in
+ * that case (orientation flips / area collapses to zero); this returns
+ * an EMPTY array — "no rings" — so callers skip the shape instead of
+ * cutting an inverted outline larger than the original.
  *
  * Implementation:
  *  1. Compute outward normals for each segment.
@@ -161,6 +207,34 @@ export function offsetPolyline(
       }
     }
     out.push(out[0]); // close
+
+    // Inward-overflow guard (P1-8): once |distance| exceeds the ring's
+    // half-extent, the offset lines cross past each other and the raw
+    // miter ring turns inside-out (its miters land past the centre,
+    // closer to the FAR edges than |distance|). The polygon-clipping
+    // cleanup below cannot see that — it just re-winds the ring and
+    // would hand back a spurious "outline" larger than the erosion
+    // (observed: span 2·(|d| − halfExtent)). Three signals, any of
+    // which means the inward offset has nothing left to keep:
+    //   1. collapse — every miter fell onto one point (zero area);
+    //   2. winding flip vs the source ring;
+    //   3. a miter vertex closer to the source boundary than |distance|
+    //      (a true inward-offset vertex always sits at ≥ |distance|
+    //      from it — inverted miters violate this against the far edges).
+    // Vanish instead: return no rings and let callers skip the shape
+    // (the Cut Contour dialog already surfaces an "empty contour — try
+    // a smaller offset distance" toast for exactly this case).
+    if (distance < 0) {
+      const absD = -distance;
+      const srcArea = ringSignedArea(pts);
+      const outArea = ringSignedArea(out);
+      const collapsed = Math.abs(outArea) < VANISHED_AREA_EPS;
+      const flipped = Math.abs(srcArea) > 1e-9 && (outArea > 0 !== srcArea > 0);
+      const crossed = out.some((p) => pointRingDistance(p, pts) < absD - OFFSET_DIST_EPS);
+      if (collapsed || flipped || crossed) {
+        return [];
+      }
+    }
   } else {
     // Open polyline: first/last vertices keep their respective offset
     // endpoint; interior vertices get miters.
