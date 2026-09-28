@@ -211,12 +211,11 @@ describe('offsetPathObject', () => {
     expect(area(pts)).toBeCloseTo((100 + 2 * d) ** 2, -1);
   });
 
-  it.skip('hugs an object placed away from the origin (blocked on P1-6 contour fix)', () => {
+  it('hugs an object placed away from the origin', () => {
     // INTENDED behaviour: the offset ring surrounds the object's own on-screen
-    // bounding box wherever it sits. Currently red because
-    // buildOutlineCutPaths subtracts half the object width from already-
-    // absolute SVG/bbox coordinates, doubling the object's position — the
-    // parallel geometry agent owns that fix, so this is skip-levelled.
+    // bounding box wherever it sits. Was skip-levelled on the P1-6 contour
+    // bug (half-width subtracted from absolute coords doubled the position);
+    // un-skipped now that buildOutlineCutPaths subtracts pathOffset.
     const c = makeCanvas([]);
     const moved = new fabric.Rect({ left: 200, top: 100, width: 100, height: 100, fill: '', strokeWidth: 0 });
     const out = offsetPathObject(c as unknown as fabric.Canvas, moved, 5)!;
