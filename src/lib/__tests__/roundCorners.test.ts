@@ -164,6 +164,30 @@ describe('roundCornersObject', () => {
     expect(roundCornersObject(c2 as unknown as fabric.Canvas, poly, 10)).toBeInstanceOf(fabric.Path);
   });
 
+  it('rounds an off-origin square in place (P1-6)', () => {
+    // d-bbox min (20,10), default placement → the square's scene geometry is
+    // exactly its d geometry. The fillets must stay inside that box — the
+    // historical rebuild shifted the whole ring by the bbox minimum, pushing
+    // every anchor to (x+20, y+10).
+    const square = new fabric.Path('M 20 10 L 120 10 L 120 110 L 20 110 Z');
+    const out = roundCornersObject(makeCanvas([]) as unknown as fabric.Canvas, square, 10)!;
+    const { pts, closed } = anchors(out);
+    expect(closed).toBe(true);
+    expect(pts).toHaveLength(4 * 7);
+    for (const [x, y] of pts) {
+      expect(x).toBeGreaterThanOrEqual(20 - 0.05);
+      expect(x).toBeLessThanOrEqual(120.05);
+      expect(y).toBeGreaterThanOrEqual(10 - 0.05);
+      expect(y).toBeLessThanOrEqual(110.05);
+    }
+    // First fillet starts r back from the M corner (20,10) along the closing
+    // edge — i.e. at (20, 10 + r_px).
+    const rPx = 10 * MM_TO_PX;
+    expect(pts[0][0]).toBeCloseTo(20, 1);
+    expect(pts[0][1]).toBeCloseTo(10 + rPx, 1);
+    expect(pts.some(([x, y]) => Math.abs(x - 20) < 0.05 && Math.abs(y - 10) < 0.05)).toBe(false);
+  });
+
   it('returns null for unsupported objects or radius <= 0', () => {
     const c = makeCanvas([]);
     expect(roundCornersObject(c as unknown as fabric.Canvas, new fabric.Circle({ radius: 5 }), 10)).toBeNull();

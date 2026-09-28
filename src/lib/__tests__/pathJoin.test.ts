@@ -18,7 +18,11 @@ import * as canvasEngine from '../canvasEngine';
 
 type Cmd = [string, number?, number?];
 
-/** Pin the object to its d-coordinates (exact absolute-space round trip). */
+/** Pin the object to its d-coordinates (exact absolute-space round trip).
+ *  NOTE: this only holds while the d-bbox starts at the origin — fabric
+ *  honours left/top by moving the bbox min there. For non-origin d use
+ *  default placement (fabric pins the d-bbox centre to the object centre,
+ *  so scene == d exactly). */
 const OPTS = { left: 0, top: 0, fill: '', stroke: '#000', strokeWidth: 0 } as const;
 
 function anchors(p: fabric.Path): { pts: Array<[number, number]>; closed: boolean } {
@@ -42,11 +46,13 @@ function makeCanvas(objects: fabric.FabricObject[]) {
   };
 }
 
-/** Two L-shaped open paths whose nearest endpoints meet at (100,100). */
+/** Two L-shaped open paths whose nearest endpoints meet at (100,100).
+ *  Default placement (no left/top) pins scene == d for both — the shape the
+ *  old {left:0,top:0} OPTS only achieved for origin-bbox d (P1-6). */
 function cornerPair(): [fabric.Path, fabric.Path] {
   return [
-    new fabric.Path('M 0 0 L 100 0 L 100 60', OPTS),
-    new fabric.Path('M 100 100 L 100 160 L 160 160', OPTS),
+    new fabric.Path('M 0 0 L 100 0 L 100 60'),
+    new fabric.Path('M 100 100 L 100 160 L 160 160'),
   ];
 }
 
@@ -123,8 +129,9 @@ describe('joinSelection — two open paths', () => {
   it('reverses the second path when it was drawn from the far end', () => {
     // Same L-shape, but b drawn right-to-left — nearest pair is now a's
     // (100,60) to b's END (100,100), so b must be reversed before concat.
-    const a = new fabric.Path('M 0 0 L 100 0 L 100 60', OPTS);
-    const b = new fabric.Path('M 160 160 L 100 160 L 100 100', OPTS);
+    // (Default placement keeps scene == d for the non-origin b — P1-6.)
+    const a = new fabric.Path('M 0 0 L 100 0 L 100 60');
+    const b = new fabric.Path('M 160 160 L 100 160 L 100 100');
     const c = makeCanvas([a, b]);
     vi.spyOn(canvasEngine, 'getCanvas').mockReturnValue(c as never);
     vi.spyOn(canvasEngine, 'pushHistory').mockImplementation(() => {});
@@ -140,8 +147,9 @@ describe('joinSelection — two open paths', () => {
 
   it('reverses the first path when its start is the nearest endpoint', () => {
     // a drawn end-to-start so its START (100,60) is nearest to b's start.
+    // (Default placement keeps scene == d for the non-origin b — P1-6.)
     const a = new fabric.Path('M 100 60 L 100 0 L 0 0', OPTS);
-    const b = new fabric.Path('M 100 100 L 100 160 L 160 160', OPTS);
+    const b = new fabric.Path('M 100 100 L 100 160 L 160 160');
     const c = makeCanvas([a, b]);
     vi.spyOn(canvasEngine, 'getCanvas').mockReturnValue(c as never);
     vi.spyOn(canvasEngine, 'pushHistory').mockImplementation(() => {});
@@ -208,6 +216,27 @@ describe('joinSelection — single path', () => {
     expect(joinSelection()).toBe(false);
     expect(c.add).not.toHaveBeenCalled();
     expect(c.remove).not.toHaveBeenCalled();
+  });
+
+  it('closes an off-origin path without shifting it (P1-6)', () => {
+    // The d-bbox starts at (0,10) and the object uses fabric's default
+    // placement (scene geometry = d geometry). Closing it must keep every
+    // anchor on the input coordinates — historically the rebuild came back
+    // shifted by the bbox minimum (y≈10 → y≈20).
+    const open = new fabric.Path('M 0 10 L 100 10 L 100 60');
+    const c = makeCanvas([open]);
+    vi.spyOn(canvasEngine, 'getCanvas').mockReturnValue(c as never);
+    vi.spyOn(canvasEngine, 'pushHistory').mockImplementation(() => {});
+
+    expect(joinSelection()).toBe(true);
+    const closedPath = c.add.mock.calls[0][0] as fabric.Path;
+    const { pts, closed } = anchors(closedPath);
+    expect(closed).toBe(true);
+    expect(pts).toHaveLength(3);
+    expect(pts[0][0]).toBeCloseTo(0, 1);
+    expect(pts[0][1]).toBeCloseTo(10, 1);
+    expect(pts[2][0]).toBeCloseTo(100, 1);
+    expect(pts[2][1]).toBeCloseTo(60, 1);
   });
 });
 

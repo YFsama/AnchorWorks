@@ -42,23 +42,39 @@ export function buildOutlineCutPaths(
     if (dMatch) {
       polylines = flattenSvgPath(dMatch[1], 0.5);
     } else {
-      // Primitive (rect/circle/etc.) — derive a bounding box.
-      const r = obj.getBoundingRect();
+      // Primitive (rect/circle/etc.) — trace its own unscaled local
+      // rectangle through the transform below. getBoundingRect() is already
+      // scene-space, so re-transforming it doubled left/top (same P1-6
+      // shift); local w×h coords keep this branch in the same space as the
+      // matrix, mirroring booleanOps.objectToRings' rect handling.
+      const w = obj.width ?? 0;
+      const h = obj.height ?? 0;
       polylines = [{
         points: [
-          [r.left, r.top],
-          [r.left + r.width, r.top],
-          [r.left + r.width, r.top + r.height],
-          [r.left, r.top + r.height],
-          [r.left, r.top],
+          [0, 0],
+          [w, 0],
+          [w, h],
+          [0, h],
+          [0, 0],
         ],
         closed: true,
       }];
     }
     // Apply the object's own transform, then convert px → mm.
+    //
+    // fabric renders path `d` coordinates relative to the object's centre:
+    //   scenePoint = calcTransformMatrix() × (dPoint − pathOffset)
+    // where pathOffset is the centre of the path's own d-bbox (fabric's
+    // Path._calcDimensions / _renderPathCommands — the same composition
+    // booleanOps.objectToRings uses). The old half-width/height guess equals
+    // pathOffset only when the d-bbox starts at the origin; any other path
+    // rebuilt shifted by its own bbox minimum (OPTIMIZATION_BACKLOG P1-6).
+    // `pathOffset` fallback keeps legacy behaviour for d-emitting objects
+    // without one (e.g. partial-arc circles, whose d is already centred).
     const matrix = obj.calcTransformMatrix();
-    const ax = (obj.width ?? 0) / 2;
-    const ay = (obj.height ?? 0) / 2;
+    const po = (obj as fabric.FabricObject & { pathOffset?: { x: number; y: number } }).pathOffset;
+    const ax = po?.x ?? (obj.width ?? 0) / 2;
+    const ay = po?.y ?? (obj.height ?? 0) / 2;
     for (const pl of polylines) {
       const transformed: Array<[number, number]> = [];
       for (const [px, py] of pl.points) {

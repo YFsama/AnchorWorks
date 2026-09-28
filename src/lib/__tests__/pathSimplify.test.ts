@@ -41,10 +41,13 @@ function anchors(p: fabric.Path): { pts: Array<[number, number]>; closed: boolea
 }
 
 /**
- * Shared path options: explicit left/top 0 + strokeWidth 0 pins the object
- * to its d-coordinates, so the mm→px round trip reproduces the source `d`
- * exactly (the pipeline's position-preservation contract — see report note
- * on how offset bboxes/stroke padding perturb it in production).
+ * Shared path options for origin-bbox d: explicit left/top 0 + strokeWidth 0
+ * pins the object to its d-coordinates, so the mm→px round trip reproduces
+ * the source `d` exactly (the pipeline's position-preservation contract).
+ * NOTE: left/top 0 only pins d when the d-bbox starts at the origin — fabric
+ * moves the bbox min to (left, top). For non-origin d use default placement
+ * (fabric pins the d-bbox centre to the object centre, so scene == d exactly);
+ * see the off-origin P1-6 case below.
  */
 const PATH_OPTS = { left: 0, top: 0, fill: '', stroke: '#000', strokeWidth: 0 } as const;
 
@@ -80,7 +83,9 @@ describe('canSimplifyPathObject', () => {
 
 describe('simplifyPathObject', () => {
   it('collapses sub-tolerance wobble to the two chord endpoints', () => {
-    const src = new fabric.Path(WOBBLE, PATH_OPTS);
+    // Default placement (WOBBLE's d-bbox does not start at y=0 — left/top 0
+    // would move it; P1-6): scene == d, so the round trip lands on d exactly.
+    const src = new fabric.Path(WOBBLE, { fill: '', stroke: '#000', strokeWidth: 0 });
     const c = fakeCanvas([]);
     const out = simplifyPathObject(c as unknown as fabric.Canvas, src, 1.5);
     expect(out).toBeInstanceOf(fabric.Path);
@@ -157,6 +162,21 @@ describe('simplifyPathObject', () => {
     expect(cmds.filter(c => c === 'M')).toHaveLength(2);
     // Each subpath simplified to its own chord (2 anchors × 2 subpaths).
     expect(anchors(out).pts).toHaveLength(4);
+  });
+
+  it('rebuilds a non-origin-bbox path at its scene coordinates (P1-6)', () => {
+    // Default construction places the d-bbox centre at the object centre, so
+    // the scene geometry IS the d geometry — but the d-bbox starts at
+    // (0,10), the exact shape that used to rebuild shifted by its bbox
+    // minimum (y≈10 → y≈20). The round trip must land back on the input.
+    const src = new fabric.Path('M 0 10 L 30 10.5 L 70 10.5 L 100 10');
+    const out = simplifyPathObject(fakeCanvas([]) as unknown as fabric.Canvas, src, 1.5)!;
+    const { pts } = anchors(out);
+    expect(pts).toHaveLength(2); // 0.5px wobble collapses under the tolerance
+    expect(pts[0][0]).toBeCloseTo(0, 1);
+    expect(pts[0][1]).toBeCloseTo(10, 1);
+    expect(pts[1][0]).toBeCloseTo(100, 1);
+    expect(pts[1][1]).toBeCloseTo(10, 1);
   });
 
   it('returns null for non-path objects without touching the canvas', () => {
