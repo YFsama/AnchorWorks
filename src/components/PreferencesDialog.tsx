@@ -5,8 +5,13 @@ import { MM_TO_PX } from '../lib/rulerTicks';
 import { useT, useI18n, LANGUAGES, type Lang } from '../lib/i18n';
 import { loadAIConfig, saveAIConfig, type AIConfig } from '../lib/ai';
 import { loadPreferences, savePreferences, type AppPreferences } from '../lib/preferences';
+import { getObjectCachingMode, setObjectCachingMode, type ObjectCachingMode } from '../lib/fabricBootstrap';
+import { refreshObjectCaching } from '../lib/canvasEngine';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 /**
  * Preferences dialog — the canonical, app-level surface for every global
@@ -45,6 +50,11 @@ interface DraftState {
   snapEnabled: boolean;
   smartGuides: boolean;
   anchorSnap: boolean;
+  /** Object caching escape valve (P2-4). Lives on the draft rather than
+   *  AppPreferences because its persistence + policy are owned end-to-end by
+   *  fabricBootstrap.ts (the `vector.prefs` blob sanitizes unknown fields
+   *  away) — same role AIConfig plays on this draft. */
+  objectCaching: ObjectCachingMode;
 }
 
 const PREFERENCE_RECIPES: Array<{ label: string; title: string; patch: Partial<Pick<DraftState, 'themeChoice' | 'highContrast' | 'snapEnabled' | 'smartGuides' | 'anchorSnap'>> }> = [
@@ -76,6 +86,7 @@ function makeDraft(): DraftState {
     snapEnabled: s.snapEnabled,
     smartGuides: s.smartGuidesEnabled,
     anchorSnap: s.anchorSnapEnabled,
+    objectCaching: getObjectCachingMode(),
   };
 }
 
@@ -86,9 +97,9 @@ export function PreferencesDialog() {
 
   const [tab, setTab] = useState<TabId>('general');
   const [prefQuery, setPrefQuery] = useState('');
-  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
-  const [reviewedRecipeAction, setReviewedRecipeAction] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedSearchAction, setReviewedSearchAction] = useReviewedAction();
+  const [reviewedRecipeAction, setReviewedRecipeAction] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const searchRef = useRef<HTMLInputElement | null>(null);
   const [draft, setDraft] = useState<DraftState>(() => makeDraft());
   const [openedDraft, setOpenedDraft] = useState<DraftState>(() => makeDraft());
@@ -124,6 +135,12 @@ export function PreferencesDialog() {
   const apply = () => {
     // 1. App preferences (default canvas, autosave).
     savePreferences(draft.prefs);
+    // 1b. Object caching escape valve (P2-4) — persisted under its own key
+    // by fabricBootstrap, then reconciled against the live canvas right
+    // away so a zoom→off switch drops stale caches without waiting for the
+    // next viewport change.
+    setObjectCachingMode(draft.objectCaching);
+    refreshObjectCaching();
     // 2. AI config — full object roundtrip, mirrors AIPanel's sub-modal.
     saveAIConfig(draft.ai);
     // 3. Language.
@@ -156,60 +173,61 @@ export function PreferencesDialog() {
 
   const recipeActive = (recipePatch: Partial<Pick<DraftState, 'themeChoice' | 'highContrast' | 'snapEnabled' | 'smartGuides' | 'anchorSnap'>>) =>
     (Object.entries(recipePatch) as Array<[keyof typeof recipePatch, unknown]>).every(([key, value]) => draft[key] === value);
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-pref-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.prefActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
 
-  const handleSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-pref-search-action]'));
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const nextAction = actions[nextIndex];
-    setReviewedSearchAction(nextAction?.dataset.prefSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  // Roving keyboard conventions live in ui/useRovingActions. The footer clamps
+  // (no wrap) and announces from data-pref-action-review with a text fallback;
+  // the search toolbar wraps; the recipe toolbar clamps and applies the
+  // reviewed recipe on every move (onNavigate), matching the pre-kit inline
+  // handlers exactly. The tablist handler below completes the set.
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-pref-action]',
+    reviewKey: actionReviewKey('data-pref-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handleRecipeActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-pref-recipe-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    const recipeIndex = Number(nextAction?.dataset.recipeIndex);
-    const recipe = Number.isInteger(recipeIndex) ? PREFERENCE_RECIPES[recipeIndex] : undefined;
-    if (recipe) applyRecipe(recipe.patch);
-    setReviewedRecipeAction(nextAction?.dataset.prefRecipeActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleSearchActionKeys = makeRovingKeys({
+    selector: '[data-pref-search-action]',
+    reviewKey: actionReviewKey('data-pref-search-action'),
+    fallbackToText: true,
+    wrap: true,
+    guardEmpty: true,
+    setReview: setReviewedSearchAction,
+  });
+
+  const handleRecipeActionKeys = makeRovingKeys({
+    selector: '[data-pref-recipe-action]',
+    reviewKey: actionReviewKey('data-pref-recipe-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedRecipeAction,
+    onNavigate: (button) => {
+      const recipeIndex = Number(button?.dataset.recipeIndex);
+      const recipe = Number.isInteger(recipeIndex) ? PREFERENCE_RECIPES[recipeIndex] : undefined;
+      if (recipe) applyRecipe(recipe.patch);
+    },
+  });
+
+  /** WAI-ARIA tabs pattern: the vertical tablist answers ArrowUp/ArrowDown
+   * (wrapping) and Home/End via the kit's vertical roving; selection follows
+   * focus through onNavigate — manual activation is also valid, we use
+   * auto-select for snappier UX since the panels are inexpensive to render.
+   * Tabs carry no review announcement (they announce via aria-selected), so
+   * the review sink is a no-op. */
+  const handleTabKeys = makeRovingKeys({
+    selector: '[role="tab"]',
+    axis: 'vertical',
+    wrap: true,
+    guardEmpty: true,
+    setReview: () => undefined,
+    onNavigate: (button) => {
+      const id = button?.id.slice('pref-tab-'.length);
+      if (id) setTab(id as TabId);
+    },
+  });
 
   // Update a slice of the draft without smashing the rest.
   const patch = useMemo(() => ({
@@ -224,7 +242,7 @@ export function PreferencesDialog() {
   const tabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ size?: number; 'aria-hidden'?: boolean }>; keywords: string[] }> = [
     { id: 'general',   label: t('General'),   icon: Settings, keywords: ['language', 'theme', 'canvas', 'width', 'height', 'background', 'autosave', 'keyboard increment', 'grid size', t('Language'), t('Default theme'), t('Default canvas size'), t('Autosave interval (seconds)'), t('Keyboard increment'), t('Grid size (px)')] },
     { id: 'ai',        label: t('AI'),        icon: Sparkles, keywords: ['api key', 'model', 'base url', 'vision', 'stream', t('API key'), t('Model'), t('Base URL'), t('Vision'), t('Stream responses')] },
-    { id: 'editor',    label: t('Editor'),    icon: PenTool, keywords: ['snap', 'grid', 'smart guides', 'anchor', 'wheel', 'mouse', 'zoom', 'pan', t('Snap to Grid'), t('Smart Guides'), t('Snap to anchor points'), t('Mouse wheel')] },
+    { id: 'editor',    label: t('Editor'),    icon: PenTool, keywords: ['snap', 'grid', 'smart guides', 'anchor', 'wheel', 'mouse', 'zoom', 'pan', 'object caching', 'performance', t('Snap to Grid'), t('Smart Guides'), t('Snap to anchor points'), t('Mouse wheel'), t('Object caching')] },
     { id: 'workspace', label: t('Workspace'), icon: Monitor, keywords: ['theme', 'light', 'dark', 'system', 'contrast', 'accessibility', t('Default theme'), t('Light Theme'), t('Dark Theme'), t('System'), t('High contrast')] },
   ];
   const normalizedPrefQuery = prefQuery.trim().toLowerCase();
@@ -235,25 +253,6 @@ export function PreferencesDialog() {
   const activeTab = activeTabVisible ? tab : visibleTabs[0]?.id;
 
   if (!open) return null;
-
-  /** WAI-ARIA tabs pattern: vertical tablist responds to Up/Down to switch
-   * tabs, Home/End to jump to first/last. The visible focus + selection sync
-   * together (manual activation is also valid; we use auto-select for
-   * snappier UX since the panels are inexpensive to render). */
-  const onTabKeyDown = (e: React.KeyboardEvent) => {
-    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
-    e.preventDefault();
-    if (visibleTabs.length === 0) return;
-    const idx = Math.max(0, visibleTabs.findIndex((tb) => tb.id === activeTab));
-    let next = idx;
-    if (e.key === 'ArrowDown') next = (idx + 1) % visibleTabs.length;
-    else if (e.key === 'ArrowUp') next = (idx - 1 + visibleTabs.length) % visibleTabs.length;
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = visibleTabs.length - 1;
-    if (next === idx) return;
-    setTab(visibleTabs[next].id);
-    document.getElementById(`pref-tab-${visibleTabs[next].id}`)?.focus();
-  };
 
   return (
     <div
@@ -283,37 +282,35 @@ export function PreferencesDialog() {
         <div className="px-4 py-2 border-b border-border bg-panel2/40">
           <div className="flex flex-wrap items-center gap-2">
             <span className="field-label !mb-0">{t('Preference recipes')}</span>
-            <div
+            <PresetRow
+              statusId="preferences-recipe-action-review-status"
               className="flex flex-wrap items-center gap-1"
-              role="toolbar"
-              aria-label={t('Preference recipe actions')}
-              aria-describedby="preferences-recipe-action-review-status"
+              label={t('Preference recipe actions')}
               title={t('Use arrow keys to review preference recipes')}
               onKeyDown={handleRecipeActionKeys}
-            >
-              <span id="preferences-recipe-action-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedRecipeAction || t('Preference recipe actions')}`}
-              </span>
-              {PREFERENCE_RECIPES.map((recipe, index) => {
+              statusAs="span"
+              reviewingLabel={t('Reviewing')}
+              reviewed={reviewedRecipeAction}
+              fallback={t('Preference recipe actions')}
+              actionAttr="data-pref-recipe-action"
+              setReviewed={setReviewedRecipeAction}
+              items={PREFERENCE_RECIPES.map((recipe, index) => {
                 const active = recipeActive(recipe.patch);
-                return (
-                  <button
-                    key={recipe.label}
-                    type="button"
-                    data-pref-recipe-action
-                    data-pref-recipe-action-review={`${t(recipe.label)} · ${t(recipe.title)}`}
-                    data-recipe-index={index}
-                    className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                    onClick={() => applyRecipe(recipe.patch)}
-                    onFocus={(event) => setReviewedRecipeAction(event.currentTarget.dataset.prefRecipeActionReview ?? '')}
-                    title={t(recipe.title)}
-                    aria-pressed={active}
-                  >
-                    {t(recipe.label)}
-                  </button>
-                );
+                return {
+                  key: recipe.label,
+                  className: `btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                  pressed: active,
+                  onClick: () => applyRecipe(recipe.patch),
+                  title: t(recipe.title),
+                  focusReviewKey: actionReviewKey('data-pref-recipe-action'),
+                  data: {
+                    'pref-recipe-action-review': `${t(recipe.label)} · ${t(recipe.title)}`,
+                    'recipe-index': index,
+                  },
+                  children: t(recipe.label),
+                };
               })}
-            </div>
+            />
           </div>
         </div>
         <div className="flex flex-1 min-h-0">
@@ -431,7 +428,7 @@ export function PreferencesDialog() {
               role="tablist"
               aria-label={t('Preferences')}
               aria-orientation="vertical"
-              onKeyDown={onTabKeyDown}
+              onKeyDown={handleTabKeys}
             >
             {visibleTabs.map((tb) => {
               const Icon = tb.icon;
@@ -488,22 +485,24 @@ export function PreferencesDialog() {
         </div>
 
         {/* Footer */}
-        <div
+        <ReviewedFooter
+          statusId="preferences-action-review-status"
           className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border bg-panel2 shrink-0"
-          role="toolbar"
-          aria-label={t('Preferences actions')}
-          aria-describedby="preferences-action-review-status"
+          label={t('Preferences actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="preferences-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Preferences actions')}`}
-          </span>
-          <button type="button" data-pref-action data-pref-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-pref-action data-pref-action-review={t('Reset')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset'))} onClick={onReset}>{t('Reset')}</button>
-          <button type="button" data-pref-action data-pref-action-review={t('Apply')} className="btn" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={onApply}>{t('Apply')}</button>
-          <button type="button" data-pref-action data-pref-action-review={t('Save')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Save'))} onClick={onSave}>{t('Save')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Preferences actions')}
+          actionAttr="data-pref-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: onReset },
+            { children: t('Apply'), review: t('Apply'), className: 'btn', onClick: onApply },
+            { children: t('Save'), review: t('Save'), className: 'btn-primary', onClick: onSave },
+          ]}
+        />
       </div>
     </div>
   );
@@ -728,6 +727,34 @@ function EditorTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
                 onClick={() => patch.prefs({ wheelMode: mode })}
               >
                 {mode === 'pan' ? t('Scroll (Ctrl+wheel zooms)') : t('Zoom (Ctrl+wheel scrolls)')}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {/* Object caching escape valve (P2-4) — same segmented-control shape
+          and a11y contract as the Mouse wheel row above (plain wrapper, not
+          Field, for the same label-vs-button announcement reason). 'off' is
+          the shipped crisp-vector default; 'zoom' caches objects only at
+          4×+ zoom for smoother drags on heavy documents. Applied via
+          setObjectCachingMode + refreshObjectCaching in apply(). */}
+      <div className="block">
+        <div className="field-label">{t('Object caching')}</div>
+        <div className="flex items-center gap-1.5" role="group" aria-label={t('Object caching')}>
+          {(['off', 'zoom'] as const).map((mode) => {
+            const active = draft.objectCaching === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                aria-pressed={active}
+                title={mode === 'off'
+                  ? t('Re-render every path each frame: crisp at any zoom, but heavy documents may drag slowly on low-end machines (default)')
+                  : t('Cache objects as bitmaps at 4× zoom and above so drags stay smooth on heavy documents. Cached objects are bitmap-scaled and may look slightly soft when magnified; zoom below 4× restores crisp vectors.')}
+                onClick={() => patch.top({ objectCaching: mode })}
+              >
+                {mode === 'off' ? t('Off (crisp at any zoom)') : t('On at 4× zoom and above')}
               </button>
             );
           })}

@@ -47,7 +47,9 @@ export function getHistory() { return history; }
 // `objectCaching` to false at module load; `ensureWebGLFilterBackend()` is
 // called at the top of initCanvas. resolveAccent2 was removed in favour of
 // `readToken('--color-accent2', '#5ac8d8')` from src/lib/tokens.ts.
-import { ensureWebGLFilterBackend } from './fabricBootstrap';
+// `syncObjectCaching` is the P2-4 escape valve state machine (see that file
+// for the trade-off documentation) — driven by refreshObjectCaching below.
+import { ensureWebGLFilterBackend, syncObjectCaching } from './fabricBootstrap';
 
 export function initCanvas(el: HTMLCanvasElement) {
   ensureWebGLFilterBackend();
@@ -143,6 +145,10 @@ export function initCanvas(el: HTMLCanvasElement) {
     if (key === lastViewportKey) return;
     lastViewportKey = key;
     emitViewport();
+    // Object-caching regime (P2-4): reconcile on every actual viewport
+    // change. Throttled by the applied-memo inside — the O(n) walk runs
+    // only when the zoom crosses the 4× threshold, never per wheel tick.
+    refreshObjectCaching();
   });
 
   // Drawing handlers
@@ -180,6 +186,10 @@ export function initCanvas(el: HTMLCanvasElement) {
   });
 
   syncObjectCount();
+  // Reconcile the object-caching regime with a fresh canvas (0 objects —
+  // at most resets a prototype default a previous 'zoom'-mode session left
+  // flipped, so newborns start in the shipped crisp-vector state).
+  refreshObjectCaching();
 
   return canvas;
 }
@@ -189,9 +199,33 @@ export function disposeCanvas() {
   if (hudHideTimer) { clearTimeout(hudHideTimer); hudHideTimer = null; }
   dragOrigin = null;
   lastViewportKey = '';
+  objectCachingApplied = null; // regime memo dies with the canvas it described
   canvas?.dispose();
   canvas = null;
   history = null;
+}
+
+/**
+ * Object-caching regime last applied to the live canvas by
+ * refreshObjectCaching (null = none — preference 'off', the default). This
+ * memo is the throttle: it makes the O(n) per-object walk run exactly once
+ * per 4×-threshold crossing (or preference flip) instead of on every
+ * viewport-change event.
+ */
+let objectCachingApplied: boolean | null = null;
+
+/**
+ * Reconcile per-object caching with the Object caching preference at the
+ * canvas's current zoom (P2-4 escape valve — policy + trade-off docs live in
+ * fabricBootstrap.ts). Cheap when nothing changed: one preference read plus
+ * one memo comparison. Wired into the after:render viewport gate above;
+ * exported so PreferencesDialog's Apply can reconcile immediately after
+ * persisting a preference change (otherwise a zoom→off switch at zoom < 4×
+ * would leave stale caches until the next viewport change).
+ */
+export function refreshObjectCaching(): void {
+  const c = canvas;
+  objectCachingApplied = syncObjectCaching(c, c?.getZoom() ?? 1, objectCachingApplied).applied;
 }
 
 export function setTool(t: ToolId) {
