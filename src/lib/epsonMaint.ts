@@ -17,6 +17,7 @@
 
 import { callNative } from './runtime';
 import { EPSON_MODELS, type EpsonModelEntry } from './epsonModels';
+import { toHex } from './hex';
 
 export interface EpsonPrinter {
   name: string;
@@ -60,9 +61,7 @@ export function parseHex(text: string): Uint8Array {
   return out;
 }
 
-export function toHex(bytes: Uint8Array): string {
-  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join(' ');
-}
+export { toHex };
 
 /** Bytes for an ASCII command like "ESC @"-style plain text. */
 export function asciiBytes(text: string): Uint8Array {
@@ -129,9 +128,8 @@ const D4_ENTER = [
   0x40, 0x45, 0x4a, 0x4c, 0x20, 0x0a, 0x1b, 0x40,
 ];
 
-function hexOf(bytes: number[]): string {
-  return bytes.map(b => b.toString(16).padStart(2, '0')).join(' ');
-}
+/** Same rendering as the shared toHex, for the number[] frame builders. */
+const hexOf = (bytes: number[]): string => toHex(Uint8Array.from(bytes));
 
 /** One EPSON-CTRL command block: 2-letter name + LE16 arg count + 1-byte args
  *  (escputil do_remote_cmd wire format). */
@@ -389,6 +387,28 @@ export async function epsonScript(printer: string, steps: EpsonScriptStep[]): Pr
   return (replies ?? []).map(hexOfReply => parseHex(hexOfReply || ''));
 }
 
+/**
+ * One EPSON-CTRL frame over SNMP — the network path epson_print_conf uses
+ * (frame bytes appended as OID arcs under 1.3.6.1.4.1.1248.1.2.2.44.1.1.2.1,
+ * SNMP v1 GET, community "public"). Works on every platform (plain UDP).
+ */
+export async function epsonSnmpCtrl(host: string, frame: number[], readMs = 1500): Promise<Uint8Array> {
+  const hex = frame.map(b => b.toString(16).padStart(2, '0')).join('');
+  const replyHex = await callNative<string>(
+    'epson_snmp_ctrl',
+    { host, frameHex: hex, port: 161, timeoutMs: readMs },
+    async () => { throw new Error('Epson SNMP needs the desktop app.'); },
+  );
+  if (!replyHex) return new Uint8Array(0);
+  return parseHex(replyHex);
+}
+
+/** Pull an IPv4 address out of a spooler port name ("192.168.1.50", "IP_10.0.0.7_1", …). */
+export function hostFromPortName(port: string): string | null {
+  const m = port.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+  return m ? m[1] : null;
+}
+
 /** reinkpy D4Link.CMD_ENTER_D4 — ends with two bare "@EJL\n" lines, no ESC @. */
 const D4_ENTER_FULL = [
   0x00, 0x00, 0x00, 0x1b, 0x01, 0x40, 0x45, 0x4a, 0x4c, 0x20, 0x31, 0x32, 0x38, 0x34, 0x2e, 0x34, 0x0a,
@@ -564,11 +584,28 @@ export function parseRwReply(bytes: Uint8Array): { ok: boolean; text: string } {
 export type EpsonLogFn = (dir: 'tx' | 'rx' | 'info' | 'err', text: string) => void;
 
 /** 'bare' = escputil-style packets straight after the D4 entry (default);
- *  'd4' = full IEEE 1284.4 handshake session for newer firmware. */
-export type EpsonTransport = 'bare' | 'd4';
+ *  'd4' = full IEEE 1284.4 handshake session for newer firmware;
+ *  'snmp' = network path over UDP (needs `host`). */
+export type EpsonTransport = 'bare' | 'd4' | 'snmp';
+
+/** Shared options for every high-level flow. */
+export interface EpsonCtrlOptions {
+  log?: EpsonLogFn;
+  transport?: EpsonTransport;
+  /** IP / hostname — required by (and only used for) the 'snmp' transport. */
+  host?: string;
+}
 
 /** Send EPSON-CTRL frames through the chosen transport, return the combined reply bytes. */
-async function ctrlExchange(printer: string, frames: number[][], transport: EpsonTransport, readMs: number): Promise<Uint8Array> {
+async function ctrlExchange(
+  printer: string, frames: number[][], transport: EpsonTransport, readMs: number, host?: string,
+): Promise<Uint8Array> {
+  if (transport === 'snmp') {
+    if (!host) throw new Error('SNMP transport needs a printer IP address.');
+    const out: number[] = [];
+    for (const f of frames) out.push(...await epsonSnmpCtrl(host, f, Math.max(readMs, 1200)));
+    return new Uint8Array(out);
+  }
   if (transport === 'd4') {
     const replies = await epsonScript(printer, buildD4SessionSteps(frames, readMs));
     return new Uint8Array(extractD4CtrlPayloads(replies));
@@ -598,12 +635,13 @@ export interface WasteReadResult {
  * back onto addresses. No state is modified.
  */
 export async function epsonReadWaste(
-  printer: string, model: EpsonModelEntry, log?: EpsonLogFn, transport: EpsonTransport = 'bare',
+  printer: string, model: EpsonModelEntry, opts: EpsonCtrlOptions = {},
 ): Promise<WasteReadResult> {
+  const { log, transport = 'bare' } = opts;
   const oids = [...new Set([...model.mainWaste.oids, ...(model.borderlessWaste?.oids ?? [])])];
   const frames = oids.map(a => eepromReadFrame(model.readKey, a));
   log?.('tx', `EEPROM read ${oids.length} addresses (${transport}): ${hexOf(frames[0])}${oids.length > 1 ? ' +…' : ''}`);
-  const reply = await ctrlExchange(printer, frames, transport, 1500);
+  const reply = await ctrlExchange(printer, frames, transport, 1500, opts.host);
   log?.('rx', explainEpsonReply(reply));
   const reads = parseEepromReads(reply);
   const values = new Map<number, number>(reads.map(r => [r.addr, r.value]));
@@ -631,13 +669,13 @@ export async function epsonReadWaste(
 export async function epsonResetWastePermanent(
   printer: string,
   model: EpsonModelEntry,
-  log?: EpsonLogFn,
-  transport: EpsonTransport = 'bare',
+  opts: EpsonCtrlOptions = {},
 ): Promise<{ ok: boolean; okCount: number; naCount: number; total: number; reply: Uint8Array }> {
+  const { log, transport = 'bare' } = opts;
   const entries = Object.entries(model.rawReset).map(([a, v]) => ({ addr: parseInt(a, 10), value: v }));
   const frames = entries.map(e => eepromWriteFrame(model.readKey, model.writeKey, e.addr, e.value));
   log?.('tx', `EEPROM write ${entries.length} bytes (${transport}): ${hexOf(frames[0])}${entries.length > 1 ? ' +…' : ''}`);
-  const reply = await ctrlExchange(printer, frames, transport, 1500);
+  const reply = await ctrlExchange(printer, frames, transport, 1500, opts.host);
   log?.('rx', explainEpsonReply(reply));
   const { ok, na } = parseEepromStatus(reply);
   return { ok: entries.length > 0 && ok >= entries.length && na === 0, okCount: ok, naCount: na, total: entries.length, reply };
@@ -651,13 +689,13 @@ export async function epsonResetWastePermanent(
 export async function epsonResetWasteTemporary(
   printer: string,
   serial: string,
-  log?: EpsonLogFn,
-  transport: EpsonTransport = 'bare',
+  opts: EpsonCtrlOptions = {},
 ): Promise<{ ok: boolean; reply: Uint8Array }> {
+  const { log, transport = 'bare' } = opts;
   const digest = await sha1Bytes(serial);
   const frame = rwResetFrame(digest);
   log?.('tx', `rw temporary reset (${transport}): ${hexOf(frame)}`);
-  const reply = await ctrlExchange(printer, [frame], transport, 1200);
+  const reply = await ctrlExchange(printer, [frame], transport, 1200, opts.host);
   log?.('rx', explainEpsonReply(reply));
   const { ok } = parseRwReply(reply);
   return { ok, reply };
@@ -704,7 +742,7 @@ export async function epsonDumpEeprom(
   printer: string,
   model: EpsonModelEntry,
   addresses: number[],
-  opts: { transport?: EpsonTransport; chunk?: number; log?: EpsonLogFn } = {},
+  opts: EpsonCtrlOptions & { chunk?: number } = {},
 ): Promise<{ values: Map<number, number>; answered: number; requested: number }> {
   const transport = opts.transport ?? 'bare';
   const chunk = Math.min(Math.max(opts.chunk ?? 32, 1), 64);
@@ -714,7 +752,7 @@ export async function epsonDumpEeprom(
   for (let i = 0; i < addresses.length; i += chunk) {
     const addrs = addresses.slice(i, i + chunk);
     const frames = addrs.map(a => eepromReadFrame(model.readKey, a));
-    const reply = await ctrlExchange(printer, frames, transport, 1500);
+    const reply = await ctrlExchange(printer, frames, transport, 1500, opts.host);
     for (const r of parseEepromReads(reply)) values.set(r.addr, r.value);
     done += addrs.length;
     opts.log?.('info', `dump ${done}/${total} — ${values.size} answered`);
@@ -731,7 +769,7 @@ export async function epsonRestoreBackup(
   printer: string,
   model: EpsonModelEntry,
   backup: EepromBackup,
-  opts: { transport?: EpsonTransport; chunk?: number; log?: EpsonLogFn } = {},
+  opts: EpsonCtrlOptions & { chunk?: number } = {},
 ): Promise<{ ok: boolean; okCount: number; naCount: number; total: number }> {
   const transport = opts.transport ?? 'bare';
   const chunk = Math.min(Math.max(opts.chunk ?? 16, 1), 32);
@@ -740,7 +778,7 @@ export async function epsonRestoreBackup(
   for (let i = 0; i < entries.length; i += chunk) {
     const part = entries.slice(i, i + chunk);
     const frames = part.map(e => eepromWriteFrame(model.readKey, model.writeKey, e.addr, e.value));
-    const reply = await ctrlExchange(printer, frames, transport, 1500);
+    const reply = await ctrlExchange(printer, frames, transport, 1500, opts.host);
     const { ok, na } = parseEepromStatus(reply);
     okCount += ok; naCount += na;
     opts.log?.('info', `restore ${Math.min(i + chunk, entries.length)}/${entries.length} — OK ${okCount} · NA ${naCount}`);
@@ -771,20 +809,175 @@ export function bigEndianValue(bytes: Array<number | undefined | null>): number 
 export async function epsonReadStats(
   printer: string,
   model: EpsonModelEntry,
-  log?: EpsonLogFn,
-  transport: EpsonTransport = 'bare',
+  opts: EpsonCtrlOptions = {},
 ): Promise<EpsonStatReading[]> {
+  const { log, transport = 'bare' } = opts;
   const stats = model.stats ?? {};
   const allAddrs = [...new Set(Object.values(stats).flat())];
   const frames = allAddrs.map(a => eepromReadFrame(model.readKey, a));
   log?.('tx', `EEPROM read ${allAddrs.length} stat addresses (${transport})`);
-  const reply = await ctrlExchange(printer, frames, transport, 1500);
+  const reply = await ctrlExchange(printer, frames, transport, 1500, opts.host);
   log?.('rx', explainEpsonReply(reply));
   const values = new Map<number, number>(parseEepromReads(reply).map(r => [r.addr, r.value]));
   return Object.entries(stats).map(([name, addrs]) => ({
     name,
     value: bigEndianValue(addrs.map(a => values.get(a))),
   }));
+}
+
+/* ---------------- cartridge chips / firmware / identity --------------- *
+ * The "ii" command reads the cartridge chips, "vi" the firmware version,
+ * "di" the IEEE-1284 device ID — all plain EPSON-CTRL frames that work
+ * over any transport. Reply framing per epson_print_conf
+ * (get_cartridge_information / get_firmware_version / get_device_identification).
+ */
+
+/** "ii" query for one cartridge slot (1–8): 'ii' + LE16 + [1, slot]. */
+export function buildCartridgeQuery(slot: number): number[] {
+  return [0x69, 0x69, 0x02, 0x00, 0x01, slot & 0xff];
+}
+
+/** "vi" firmware version query: 'vi' + LE16 + [0]. */
+export function buildVersionQuery(): number[] {
+  return [0x76, 0x69, 0x01, 0x00, 0x00];
+}
+
+/** "di" device identification query: 'di' + LE16 + [1]. */
+export function buildDeviceIdQuery(): number[] {
+  return [0x64, 0x69, 0x01, 0x00, 0x01];
+}
+
+/** Chip → cartridge colour (epson_print_conf CARTRIDGE_TYPE). */
+const CARTRIDGE_TYPE_IDS: Record<number, string> = {
+  1811: 'Black', 1812: 'Cyan', 1813: 'Magenta', 1814: 'Yellow', // T18xx / 18XL
+  711: 'Black', 712: 'Cyan', 713: 'Magenta', 714: 'Yellow', // T7xx
+  10332: 'Black', 10360: 'Cyan', 10361: 'Magenta', 10362: 'Yellow', // 603XL
+};
+
+export type CartridgeRecord =
+  | {
+    kind: 'cartridge';
+    slot: number;
+    color: string;
+    /** Chip ink quantity in the printer's own units (IQT). */
+    inkQuantity: number;
+    productionYear?: number;
+    productionMonth?: number;
+    /** Chip serial / data field (SID). */
+    data?: string;
+    manufacturer?: string;
+  }
+  | { kind: 'empty' }
+  | { kind: 'unknown'; typeCode: string };
+
+function parseCartridgeSegment(segment: string, slot: number): CartridgeRecord | null {
+  const fields: Record<string, string> = {};
+  for (const part of segment.split(';')) {
+    const at = part.indexOf(':');
+    if (at > 0) fields[part.slice(0, at).trim()] = part.slice(at + 1).trim();
+  }
+  if (fields.II === undefined) return null;
+  if (fields.II === '00') return { kind: 'empty' };
+  if (fields.II !== '03') return { kind: 'unknown', typeCode: fields.II };
+  const ic1 = fields.IC1 !== undefined ? parseInt(fields.IC1, 16) : NaN;
+  const pdy = fields.PDY !== undefined ? parseInt(fields.PDY, 16) : NaN;
+  return {
+    kind: 'cartridge',
+    slot,
+    color: Number.isFinite(ic1)
+      ? CARTRIDGE_TYPE_IDS[ic1] ?? `chip 0x${fields.IC1}`
+      : 'cartridge',
+    inkQuantity: fields.IQT !== undefined && /^[0-9A-Fa-f]+$/.test(fields.IQT) ? parseInt(fields.IQT, 16) : 0,
+    productionYear: Number.isFinite(pdy) ? pdy + (pdy > 80 ? 1900 : 2000) : undefined,
+    productionMonth: fields.PDM !== undefined && /^[0-9A-Fa-f]+$/.test(fields.PDM) ? parseInt(fields.PDM, 16) : undefined,
+    data: fields.SID || undefined,
+    manufacturer: fields.LOG || undefined,
+  };
+}
+
+/** Parse one "@BDC PS\r\n…" cartridge reply (or null when it is not one). */
+export function parseCartridgeReply(bytes: Uint8Array, slot = 1): CartridgeRecord | null {
+  const text = new TextDecoder('latin1').decode(bytes);
+  const at = text.indexOf('@BDC PS\r\n');
+  if (at < 0) return null;
+  return parseCartridgeSegment(text.slice(at + 9).replace(/[\s;]+$/, ''), slot);
+}
+
+/** Parse a stream of concatenated "@BDC PS\r\n…" records into per-slot
+ *  results, numbering slots by position (1, 2, …). No production flow
+ *  feeds it today — epsonReadCartridges exchanges one frame per slot —
+ *  but the wire shape is real: several replies can arrive in one read. */
+export function parseCartridgeReplies(bytes: Uint8Array): CartridgeRecord[] {
+  const text = new TextDecoder('latin1').decode(bytes);
+  const first = text.indexOf('@BDC PS\r\n');
+  if (first < 0) return [];
+  const out: CartridgeRecord[] = [];
+  let slot = 1;
+  for (const segment of text.slice(first).split('@BDC PS\r\n')) {
+    if (segment.trim() === '') continue;
+    const rec = parseCartridgeSegment(segment.replace(/[\s;]+$/, ''), slot++);
+    if (rec) out.push(rec);
+  }
+  return out;
+}
+
+/** "vi" reply → firmware code + build date (epson_print_conf date math). */
+export function parseFirmwareReply(bytes: Uint8Array): { code: string; date: string } | null {
+  const text = new TextDecoder('latin1').decode(bytes);
+  const m = text.match(/vi:00:(.{6})/);
+  if (!m) return null;
+  const f = m[1];
+  const day = parseInt(f.slice(2, 4), 10);
+  const year = f.charCodeAt(4) + 1945;
+  const month = parseInt(f.slice(5), 16);
+  // Out-of-range day/month means the code is not really a date — show the
+  // bare code rather than an impossible date (upstream falls back the same
+  // way when datetime() rejects the tuple).
+  const plausible = Number.isFinite(day) && day >= 1 && day <= 31 && Number.isFinite(month) && month >= 1 && month <= 12;
+  if (!plausible) return { code: f, date: '' };
+  return { code: f, date: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}` };
+}
+
+/** Strip trailing NUL padding without regex control escapes. */
+function trimTrailingNul(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 0) end--;
+  return s.slice(0, end);
+}
+
+/** "di" reply → the IEEE-1284 identification string (MFG/MDL/CLS…). */
+export function parseDeviceIdReply(bytes: Uint8Array): string | null {
+  const text = trimTrailingNul(new TextDecoder('latin1').decode(bytes));
+  const at = text.indexOf('@EJL ID');
+  if (at >= 0) return text.slice(at + 7).replace(/^[\r\n\s]+/, '').trim() || null;
+  if (/MFG:|MDL:|CLS:/.test(text)) return text.trim();
+  return null;
+}
+
+/**
+ * Scan cartridge slots 1..8 sequentially, stopping at the first empty or
+ * unanswered slot. Deliberately more conservative than epson_print_conf's
+ * get_cartridge_information, which keeps scanning past empty and unknown
+ * slots; on desktop-inkjet carriages a gap almost always means "no more
+ * slots", and stopping saves up to seven timeout round-trips.
+ */
+export async function epsonReadCartridges(
+  printer: string,
+  opts: EpsonCtrlOptions = {},
+): Promise<CartridgeRecord[]> {
+  const { log, transport = 'bare' } = opts;
+  const out: CartridgeRecord[] = [];
+  for (let slot = 1; slot <= 8; slot++) {
+    const frame = buildCartridgeQuery(slot);
+    log?.('tx', `ii slot ${slot}`);
+    const reply = await ctrlExchange(printer, [frame], transport, 1000, opts.host);
+    log?.('rx', explainEpsonReply(reply));
+    const rec = parseCartridgeReply(reply, slot);
+    if (!rec || rec.kind === 'empty') break;
+    out.push(rec);
+    if (rec.kind === 'unknown') break;
+  }
+  return out;
 }
 
 /**
@@ -870,6 +1063,30 @@ export const EPSON_ACTIONS: EpsonAction[] = [
     expectsReply: true,
   },
   {
+    id: 'cartridge-chip',
+    label: 'Cartridge chip (ii)',
+    hex: buildD4Command('ii', 1, 1),
+    description: 'EPSON-CTRL "ii" query for slot 1: chip ink quantity, production date and chip data. The card decodes it; empty slots answer II:00.',
+    safety: 'documented',
+    expectsReply: true,
+  },
+  {
+    id: 'firmware',
+    label: 'Firmware version (vi)',
+    hex: buildD4Command('vi', 0),
+    description: 'EPSON-CTRL "vi" query — firmware code plus its build date (date math per epson_print_conf).',
+    safety: 'documented',
+    expectsReply: true,
+  },
+  {
+    id: 'device-id',
+    label: 'Device ID (di)',
+    hex: buildD4Command('di', 1),
+    description: 'EPSON-CTRL "di" query returning the IEEE-1284 identification string (MFG/MDL/CLS) — richer than the raw @EJL probe and it feeds the model guess.',
+    safety: 'documented',
+    expectsReply: true,
+  },
+  {
     id: 'test-text',
     label: 'Test print (text)',
     hex: '1b 40 41 6e 63 68 6f 72 57 6f 72 6b 73 20 74 65 73 74 20 30 31 32 33 34 35 36 37 38 39 20 0c',
@@ -938,8 +1155,11 @@ export interface EpsonPrefs {
   model?: string;
   /** Last known serial (from ST2 or typed) for the rw temporary reset. */
   serial?: string;
-  /** 'bare' (escputil-style) or 'd4' (full 1284.4 handshake). */
+  /** 'bare' (escputil-style), 'd4' (full 1284.4 handshake) or 'snmp'
+   *  (network, needs the `host` field below). */
   transport?: EpsonTransport;
+  /** Printer IP/hostname for the SNMP network transport. */
+  host?: string;
 }
 
 const PREFS_KEY = 'vector.epson.prefs';

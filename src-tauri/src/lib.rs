@@ -302,6 +302,7 @@ pub fn run() {
             epsonprint::epson_list_printers,
             epsonprint::epson_raw_transact,
             epsonprint::epson_raw_script,
+            epsonprint::epson_snmp_ctrl,
             print_native,
         ])
         .run(tauri::generate_context!())

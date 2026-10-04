@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   EPSON_ACTIONS, EPSON_TEMPLATES,
   buildD4Command, buildEjlIdRequest, buildRemoteCommand,
@@ -11,6 +11,9 @@ import {
   guessEpsonModel,
   d4Packet, d4CtrlPacket, parseD4Packets, extractD4CtrlPayloads, buildD4SessionSteps,
   makeEepromBackup, parseEepromBackup, bigEndianValue,
+  buildCartridgeQuery, buildVersionQuery, buildDeviceIdQuery,
+  parseCartridgeReply, parseCartridgeReplies, parseFirmwareReply, parseDeviceIdReply,
+  hostFromPortName, epsonSnmpCtrl, epsonReadCartridges,
 } from '../epsonMaint';
 import { EPSON_MODELS } from '../epsonModels';
 
@@ -395,5 +398,299 @@ describe('bigEndianValue (stats counters)', () => {
   it('returns null when an address went unanswered', () => {
     expect(bigEndianValue([1, undefined])).toBeNull();
     expect(bigEndianValue([null])).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * SNMP transport + cartridge chips / firmware / device identification
+ * (epson_print_conf get_cartridge_information / get_firmware_version /
+ *  get_device_identification, reinkpy transport cross-reference).
+ */
+
+/** Scripted 'epson_snmp_ctrl' bridge for the callNative mock: records every
+ *  (cmd, args) pair and plays back queued hex replies in call order. With
+ *  `useWebFallback` set it delegates to the caller's web branch — what the
+ *  real callNative does whenever isTauri() is false. */
+const snmpBridge = vi.hoisted(() => ({
+  calls: [] as Array<{ cmd: string; args: Record<string, unknown> | undefined }>,
+  replies: [] as Array<string>,
+  useWebFallback: false,
+}));
+
+vi.mock('../runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtime')>();
+  return {
+    ...actual,
+    callNative: async <T>(
+      cmd: string,
+      args: Record<string, unknown> | undefined,
+      webFallback: () => Promise<T> | T,
+    ): Promise<T> => {
+      snmpBridge.calls.push({ cmd, args });
+      if (snmpBridge.useWebFallback) return await webFallback();
+      const reply = snmpBridge.replies.shift();
+      return (reply ?? '') as unknown as T;
+    },
+  };
+});
+
+const resetBridge = (): void => {
+  snmpBridge.calls.length = 0;
+  snmpBridge.replies.length = 0;
+  snmpBridge.useWebFallback = false;
+};
+
+/** ASCII text → contiguous hex (how a scripted native reply would look). */
+const asciiHex = (text: string): string =>
+  [...text].map(ch => ch.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+
+describe('ii/vi/di query builders (epson_print_conf wire format)', () => {
+  it('frames the "ii" cartridge query: name + LE16 arg count + [1, slot]', () => {
+    expect(buildCartridgeQuery(1)).toEqual([0x69, 0x69, 0x02, 0x00, 0x01, 0x01]);
+    expect(buildCartridgeQuery(5)).toEqual([0x69, 0x69, 0x02, 0x00, 0x01, 0x05]);
+    // Slot is an EPSON-CTRL 1-byte arg — masked like every other arg byte.
+    expect(buildCartridgeQuery(0x101)).toEqual([0x69, 0x69, 0x02, 0x00, 0x01, 0x01]);
+  });
+
+  it('frames the "vi" and "di" queries', () => {
+    expect(buildVersionQuery()).toEqual([0x76, 0x69, 0x01, 0x00, 0x00]);
+    expect(buildDeviceIdQuery()).toEqual([0x64, 0x69, 0x01, 0x00, 0x01]);
+  });
+});
+
+describe('parseCartridgeReply / parseCartridgeReplies (@BDC PS records)', () => {
+  const psReply = (body: string): Uint8Array => new TextEncoder().encode(`@BDC PS\r\n${body}\r\n`);
+
+  it('decodes a populated slot: colour, ink quantity, production date, chip data', () => {
+    // Field semantics per epson_print_conf get_cartridge_information:
+    // II record type (03 = chip data present), IC1 chip type, IQT ink
+    // quantity (hex), PDY/PDM production year/month (hex), SID chip serial,
+    // LOG manufacturer.
+    const reply = psReply('II:03;IC1:0713;IQT:40;PDY:16;PDM:0A;SID:4CJK123456;LOG:EPSON;');
+    expect(parseCartridgeReply(reply, 7)).toEqual({
+      kind: 'cartridge',
+      slot: 7,
+      color: 'Black',        // IC1 0x0713 = 1811 → T18xx black
+      inkQuantity: 0x40,     // 64 in the printer's own units
+      productionYear: 2022,  // PDY 0x16 = 22 → 2000 + 22
+      productionMonth: 10,   // PDM 0x0A
+      data: '4CJK123456',
+      manufacturer: 'EPSON',
+    });
+  });
+
+  it('maps the known chip families and surfaces unknown chip codes', () => {
+    // 0x0714 = 1812 → T18xx cyan; 0x02C7 = 711 → T7xx black; 0x285C = 10332 → 603XL black.
+    expect(parseCartridgeReply(psReply('II:03;IC1:0714;IQT:32;')))
+      .toMatchObject({ color: 'Cyan', inkQuantity: 50 });
+    expect(parseCartridgeReply(psReply('II:03;IC1:02C7;'))).toMatchObject({ color: 'Black' });
+    expect(parseCartridgeReply(psReply('II:03;IC1:285C;'))).toMatchObject({ color: 'Black' });
+    // Unmapped chip codes are reported with the raw IC1 field, never guessed.
+    expect(parseCartridgeReply(psReply('II:03;IC1:07FF;'))).toMatchObject({ color: 'chip 0x07FF' });
+  });
+
+  it('treats II:00 as an empty slot and any other II code as unknown', () => {
+    expect(parseCartridgeReply(psReply('II:00;'))).toEqual({ kind: 'empty' });
+    expect(parseCartridgeReply(psReply('II:04;IC1:0713;'))).toEqual({ kind: 'unknown', typeCode: '04' });
+  });
+
+  it('defaults missing optional fields instead of failing the record', () => {
+    // No IC1 → generic label; unparseable IQT → quantity 0; no date fields.
+    expect(parseCartridgeReply(psReply('II:03;IQT:zz;'), 3))
+      .toEqual({ kind: 'cartridge', slot: 3, color: 'cartridge', inkQuantity: 0 });
+  });
+
+  it('returns null for replies that are not @BDC PS cartridge records', () => {
+    expect(parseCartridgeReply(new Uint8Array())).toBeNull();
+    expect(parseCartridgeReply(new TextEncoder().encode('@BDC ST2\r\nII:03;\r\n'))).toBeNull();
+    expect(parseCartridgeReply(new TextEncoder().encode('vi:00:AB15M7;'))).toBeNull();
+  });
+
+  it('splits a back-to-back multi-slot stream and numbers slots from 1', () => {
+    // The bare transport answers several "ii" queries in one read: a run of
+    // back-to-back @BDC PS records, slots numbered from 1.
+    const stream = new TextEncoder().encode(
+      '@BDC PS\r\nII:03;IC1:0713;IQT:40;\r\n'
+      + '@BDC PS\r\nII:03;IC1:0714;IQT:32;\r\n'
+      + '@BDC PS\r\nII:00;\r\n',
+    );
+    expect(parseCartridgeReplies(stream)).toEqual([
+      { kind: 'cartridge', slot: 1, color: 'Black', inkQuantity: 64 },
+      { kind: 'cartridge', slot: 2, color: 'Cyan', inkQuantity: 50 },
+      { kind: 'empty' },
+    ]);
+  });
+
+  it('drops segments without an II field instead of failing the stream', () => {
+    const stream = new TextEncoder().encode('@BDC PS\r\nII:03;IC1:0713;\r\n@BDC PS\r\n:OK;\r\n');
+    expect(parseCartridgeReplies(stream)).toEqual([
+      { kind: 'cartridge', slot: 1, color: 'Black', inkQuantity: 0 },
+    ]);
+  });
+
+  it('skips the NUL preamble without shifting slot numbers', () => {
+    // Replies open with a NUL byte (same wire shape as @BDC ST2); NUL is not
+    // ECMAScript whitespace, so trim() keeps it — it must not consume slot 1.
+    const stream = new TextEncoder().encode(
+      '\0@BDC PS\r\nII:03;IC1:0713;IQT:40;\r\n@BDC PS\r\nII:00;\r\n',
+    );
+    expect(parseCartridgeReplies(stream)).toEqual([
+      { kind: 'cartridge', slot: 1, color: 'Black', inkQuantity: 64 },
+      { kind: 'empty' },
+    ]);
+  });
+});
+
+describe('parseFirmwareReply (vi:00: date math)', () => {
+  it('derives the build date: decimal day, charCode+1945 year, hex month', () => {
+    // Code layout per epson_print_conf get_firmware_version:
+    // [2 family chars][2-digit decimal day][year char][hex month].
+    // 'M' = 77 → 77 + 1945 = 2022; month '7' hex = 7.
+    expect(parseFirmwareReply(new TextEncoder().encode('@BDC PS\r\nvi:00:AB15M7;\r\n')))
+      .toEqual({ code: 'AB15M7', date: '2022-07-15' });
+    // 'O' = 79 → 2024; month 'C' hex = 12; day zero-padded.
+    expect(parseFirmwareReply(new TextEncoder().encode('vi:00:ZZ05OC;')))
+      .toEqual({ code: 'ZZ05OC', date: '2024-12-05' });
+  });
+
+  it('keeps the code but blanks the date when the digits do not parse', () => {
+    expect(parseFirmwareReply(new TextEncoder().encode('vi:00:QQQQQQ;')))
+      .toEqual({ code: 'QQQQQQ', date: '' });
+  });
+
+  it('blanks the date when day/month fall outside their calendar ranges', () => {
+    // Parses fine numerically but 2022-09-99 / month 0x13 are impossible —
+    // upstream falls back to the bare code the same way.
+    expect(parseFirmwareReply(new TextEncoder().encode('vi:00:AB99M9;')))
+      .toEqual({ code: 'AB99M9', date: '' });
+    expect(parseFirmwareReply(new TextEncoder().encode('vi:00:AB15MD;')))
+      .toEqual({ code: 'AB15MD', date: '' }); // month 0x0D = 13
+    expect(parseFirmwareReply(new TextEncoder().encode('vi:00:AB15M0;')))
+      .toEqual({ code: 'AB15M0', date: '' }); // month 0
+  });
+
+  it('returns null when the reply is not a vi:00 firmware answer', () => {
+    expect(parseFirmwareReply(new Uint8Array())).toBeNull();
+    expect(parseFirmwareReply(new TextEncoder().encode('vi:01:AB15M7;'))).toBeNull();
+    expect(parseFirmwareReply(new TextEncoder().encode('@BDC PS\r\nII:03;\r\n'))).toBeNull();
+  });
+});
+
+describe('parseDeviceIdReply (IEEE-1284 identity string)', () => {
+  it('returns the text after @EJL ID with trailing NUL padding stripped', () => {
+    const reply = new TextEncoder().encode(
+      '\0@EJL ID\r\nMFG:EPSON;CMD:ESCPL2;MDL:ET-2850;CLS:PRINTER;DES:EPSON ET-2850 Series;\r\n\0\0',
+    );
+    expect(parseDeviceIdReply(reply))
+      .toBe('MFG:EPSON;CMD:ESCPL2;MDL:ET-2850;CLS:PRINTER;DES:EPSON ET-2850 Series;');
+  });
+
+  it('accepts a bare MFG:/MDL:/CLS: string without the @EJL framing', () => {
+    const bare = new TextEncoder().encode('MFG:EPSON;MDL:L3250;CLS:PRINTER;');
+    expect(parseDeviceIdReply(bare)).toBe('MFG:EPSON;MDL:L3250;CLS:PRINTER;');
+  });
+
+  it('returns null for unidentified noise and an empty @EJL ID body', () => {
+    expect(parseDeviceIdReply(new TextEncoder().encode('hello'))).toBeNull();
+    expect(parseDeviceIdReply(new Uint8Array())).toBeNull();
+    expect(parseDeviceIdReply(new TextEncoder().encode('@EJL ID\r\n'))).toBeNull();
+  });
+});
+
+describe('hostFromPortName', () => {
+  it('pulls the IPv4 address out of spooler port names', () => {
+    expect(hostFromPortName('192.168.1.50')).toBe('192.168.1.50');
+    expect(hostFromPortName('IP_10.0.0.7_1')).toBe('10.0.0.7');
+    expect(hostFromPortName('IP_192.168.1.50')).toBe('192.168.1.50');
+  });
+
+  it('returns null for non-network ports', () => {
+    expect(hostFromPortName('USB001')).toBeNull();
+    expect(hostFromPortName('')).toBeNull();
+  });
+});
+
+describe('epsonSnmpCtrl (native bridge)', () => {
+  beforeEach(resetBridge);
+
+  it('sends the frame as contiguous hex with SNMP port and timeout, and decodes the reply', async () => {
+    snmpBridge.replies.push(asciiHex('@BDC PS'));
+    const reply = await epsonSnmpCtrl('192.168.1.50', buildCartridgeQuery(1));
+    expect(snmpBridge.calls).toEqual([{
+      cmd: 'epson_snmp_ctrl',
+      args: { host: '192.168.1.50', frameHex: '696902000101', port: 161, timeoutMs: 1500 },
+    }]);
+    expect([...reply]).toEqual([0x40, 0x42, 0x44, 0x43, 0x20, 0x50, 0x53]);
+  });
+
+  it('passes a custom read timeout through as timeoutMs', async () => {
+    snmpBridge.replies.push('');
+    await epsonSnmpCtrl('10.0.0.7', buildVersionQuery(), 2500);
+    expect(snmpBridge.calls[0]!.args).toMatchObject({ timeoutMs: 2500, port: 161 });
+  });
+
+  it('returns an empty Uint8Array when the native side reads nothing', async () => {
+    const reply = await epsonSnmpCtrl('192.168.1.50', buildDeviceIdQuery());
+    expect(reply).toBeInstanceOf(Uint8Array);
+    expect(reply.length).toBe(0);
+  });
+
+  it('throws the web-shell error when the native bridge is absent', async () => {
+    snmpBridge.useWebFallback = true;
+    await expect(epsonSnmpCtrl('192.168.1.50', buildVersionQuery()))
+      .rejects.toThrow('Epson SNMP needs the desktop app.');
+  });
+});
+
+describe('epsonReadCartridges (sequential slot scan)', () => {
+  beforeEach(resetBridge);
+
+  it('scans slots in order and stops at the first empty slot', async () => {
+    snmpBridge.replies.push(
+      asciiHex('@BDC PS\r\nII:03;IC1:0713;IQT:40;\r\n'),
+      asciiHex('@BDC PS\r\nII:03;IC1:0714;IQT:32;\r\n'),
+      asciiHex('@BDC PS\r\nII:00;\r\n'),
+    );
+    const out = await epsonReadCartridges('EPSON ET-2850 Series', { transport: 'snmp', host: '192.168.1.50' });
+    expect(out).toEqual([
+      { kind: 'cartridge', slot: 1, color: 'Black', inkQuantity: 64 },
+      { kind: 'cartridge', slot: 2, color: 'Cyan', inkQuantity: 50 },
+    ]);
+    // Exactly three "ii" queries went out — slot 3 answered II:00 and ended the scan.
+    expect(snmpBridge.calls.map(c => c.args?.frameHex)).toEqual([
+      '696902000101', '696902000102', '696902000103',
+    ]);
+    // ctrlExchange raises the 1000 ms read timeout to the 1200 ms SNMP floor.
+    expect(snmpBridge.calls[0]!.args).toMatchObject({ host: '192.168.1.50', port: 161, timeoutMs: 1200 });
+  });
+
+  it('returns [] when slot 1 is already empty', async () => {
+    snmpBridge.replies.push(asciiHex('@BDC PS\r\nII:00;\r\n'));
+    const out = await epsonReadCartridges('EPSON ET-2850 Series', { transport: 'snmp', host: '10.0.0.7' });
+    expect(out).toEqual([]);
+    expect(snmpBridge.calls).toHaveLength(1);
+  });
+
+  it('stops after an unknown II code but keeps the record', async () => {
+    snmpBridge.replies.push(asciiHex('@BDC PS\r\nII:04;\r\n'));
+    const out = await epsonReadCartridges('EPSON ET-2850 Series', { transport: 'snmp', host: '10.0.0.7' });
+    expect(out).toEqual([{ kind: 'unknown', typeCode: '04' }]);
+    expect(snmpBridge.calls).toHaveLength(1);
+  });
+});
+
+describe('EPSON_ACTIONS chip/firmware/identity queries', () => {
+  it('ships the ii/vi/di actions on the D4 transport with reply expected', () => {
+    const chip = EPSON_ACTIONS.find(a => a.id === 'cartridge-chip')!;
+    const fw = EPSON_ACTIONS.find(a => a.id === 'firmware')!;
+    const id = EPSON_ACTIONS.find(a => a.id === 'device-id')!;
+    // buildD4Command('ii', 1, 1) / ('vi', 0) / ('di', 1) tail bytes.
+    expect(chip.hex.endsWith('69 69 02 00 01 01')).toBe(true);
+    expect(fw.hex.endsWith('76 69 01 00 00')).toBe(true);
+    expect(id.hex.endsWith('64 69 01 00 01')).toBe(true);
+    for (const a of [chip, fw, id]) {
+      expect(a.expectsReply).toBe(true);
+      expect(() => parseHex(a.hex)).not.toThrow();
+    }
   });
 });

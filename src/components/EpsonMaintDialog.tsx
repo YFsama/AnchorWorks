@@ -20,13 +20,15 @@ import { toast } from '../lib/toast';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import {
-  EPSON_ACTIONS, EPSON_TEMPLATES, epsonTransact, explainEpsonReply,
+  EPSON_ACTIONS, EPSON_TEMPLATES, epsonTransact, explainEpsonReply, toHex,
   formatSt2Summary, listEpsonPrinters, parseEjlIdReply, parseOldInkReply, parseSt2Status,
-  saveEpsonPrefs, loadEpsonPrefs,
+  saveEpsonPrefs, loadEpsonPrefs, epsonCtrlBytes,
   epsonReadWaste, epsonResetWastePermanent, epsonResetWasteTemporary, guessEpsonModel,
   epsonDumpEeprom, epsonRestoreBackup, epsonReadStats, makeEepromBackup, parseEepromBackup,
-  type EpsonAction, type EpsonPrinter, type EpsonStatReading, type EpsonTransport,
-  type St2Status, type WasteReadResult,
+  hostFromPortName, parseCartridgeReply, parseFirmwareReply, parseDeviceIdReply,
+  buildCartridgeQuery, buildVersionQuery, buildDeviceIdQuery, epsonSnmpCtrl, epsonReadCartridges,
+  type CartridgeRecord, type EpsonAction, type EpsonPrinter, type EpsonStatReading,
+  type EpsonTransport, type St2Status, type WasteReadResult,
 } from '../lib/epsonMaint';
 import { EPSON_MODELS } from '../lib/epsonModels';
 import { download } from '../lib/io';
@@ -40,6 +42,18 @@ interface LogEntry {
 
 let logSeq = 1;
 const nowMs = (): number => Date.now();
+
+/** Actions that are plain EPSON-CTRL frames and can ride the SNMP transport.
+ *  The frames are the BARE ctrl commands — an action's own hex is the
+ *  D4-wrapped spooler version, which SNMP cannot carry (no 1284.4 session,
+ *  no REMOTE1 packet, no print data, no @EJL probe fits a single OID GET). */
+const SNMP_ACTION_FRAMES: Record<string, () => number[]> = {
+  // st 01 00 01 — the Rust-side golden SNMP query frame.
+  'status-st2': () => epsonCtrlBytes('st', 1),
+  'cartridge-chip': () => buildCartridgeQuery(1),
+  firmware: buildVersionQuery,
+  'device-id': buildDeviceIdQuery,
+};
 
 export default function EpsonMaintDialog() {
   const t = useT();
@@ -60,6 +74,8 @@ export default function EpsonMaintDialog() {
   const [waste, setWaste] = useState<WasteReadResult | null>(null);
   const [transport, setTransport] = useState<EpsonTransport>(loadEpsonPrefs().transport ?? 'bare');
   const [stats, setStats] = useState<EpsonStatReading[] | null>(null);
+  const [cartridges, setCartridges] = useState<CartridgeRecord[] | null>(null);
+  const [host, setHost] = useState(loadEpsonPrefs().host ?? '');
   const restoreInputRef = useRef<HTMLInputElement>(null);
   // Structured readouts from the last status/identity action.
   const [st2, setSt2] = useState<St2Status | null>(null);
@@ -90,6 +106,8 @@ export default function EpsonMaintDialog() {
           const g = guessEpsonModel(first.name, identity);
           if (g) setModel(g);
         }
+        const ip = hostFromPortName(first.port);
+        if (ip) setHost(ip);
       }
       if (list.length === 0) push('info', t('No printers found — install the printer driver first.'));
     } catch (e) {
@@ -114,6 +132,7 @@ export default function EpsonMaintDialog() {
   useEffect(() => { saveEpsonPrefs({ model }); }, [model]);
   useEffect(() => { saveEpsonPrefs({ serial: serialText }); }, [serialText]);
   useEffect(() => { saveEpsonPrefs({ transport }); }, [transport]);
+  useEffect(() => { saveEpsonPrefs({ host }); }, [host]);
 
   // Adopt the serial the printer reports in its ST2 status block.
   const adoptSerial = (st: St2Status) => {
@@ -134,6 +153,10 @@ export default function EpsonMaintDialog() {
       const guess = guessEpsonModel(name, identity);
       if (guess) setModel(guess);
     }
+    // Network printers sit on IP ports — prefill the SNMP host from it.
+    const port = printers.find(p => p.name === name)?.port;
+    const ip = port ? hostFromPortName(port) : null;
+    if (ip) setHost(ip);
   };
 
   useEffect(() => {
@@ -147,13 +170,36 @@ export default function EpsonMaintDialog() {
   const run = async (label: string, hex: string, wantsReply: boolean, actionId?: string) => {
     if (!printer) { toast.warn(t('Pick a printer first.'), { title: t('Epson maintenance') }); return; }
     if (!hex.trim()) { toast.warn(t('The command is empty.')); return; }
+    // SNMP mode routes the pure EPSON-CTRL actions over UDP instead of the
+    // spooler. Everything else — D4 sessions, REMOTE1 packets, print data,
+    // @EJL probes and raw workbench hex — has no SNMP representation, so
+    // refuse rather than silently fall back to the local print channel.
+    const snmpFrame = transport === 'snmp' && actionId ? SNMP_ACTION_FRAMES[actionId]?.() : undefined;
+    if (transport === 'snmp' && !snmpFrame) {
+      toast.warn(
+        t('Not available over SNMP — this command needs the local print channel. Switch the transport to Simple or 1284.4.'),
+        { title: t('Epson maintenance') },
+      );
+      return;
+    }
+    if (snmpFrame && !host.trim()) {
+      toast.warn(t('SNMP transport needs a printer IP address.'), { title: t('Epson maintenance') });
+      return;
+    }
     setBusy(true);
     setSt2(null);
     setIdentity('');
     setOldInk(null);
-    push('tx', `${label} · ${hex.replace(/\s+/g, ' ')}`);
+    setCartridges(null);
+    // Log what actually goes on the wire: for SNMP that is the bare
+    // EPSON-CTRL frame, not the D4-wrapped action hex.
+    push('tx', snmpFrame
+      ? `${label} · (snmp) ${toHex(new Uint8Array(snmpFrame))}`
+      : `${label} · ${hex.replace(/\s+/g, ' ')}`);
     try {
-      const reply = await epsonTransact(printer, hex, wantsReply ? 1200 : 250);
+      const reply = snmpFrame
+        ? await epsonSnmpCtrl(host.trim(), snmpFrame, 1500)
+        : await epsonTransact(printer, hex, wantsReply ? 1200 : 250);
       if (reply.length > 0) {
         push('rx', explainEpsonReply(reply));
         // Structured decoding per action: ST2 status card, @EJL identity,
@@ -178,6 +224,22 @@ export default function EpsonMaintDialog() {
           } else {
             push('info', t('No IQ: ink data in the reply — try the ST2 query for newer models.'));
           }
+        } else if (actionId === 'cartridge-chip') {
+          const rec = parseCartridgeReply(reply, 1);
+          if (rec && rec.kind === 'cartridge') {
+            setCartridges([rec]);
+            push('info', `${rec.color} · IQT ${rec.inkQuantity}${rec.productionYear ? ` · ${rec.productionYear}-${String(rec.productionMonth ?? 0).padStart(2, '0')}` : ''}`);
+          } else if (rec) {
+            push('info', t('Cartridge chip reported no ink data (empty or non-ink slot).'));
+          } else {
+            push('info', t('Reply was not an @BDC PS block — this model may not expose cartridge chips.'));
+          }
+        } else if (actionId === 'firmware') {
+          const fw = parseFirmwareReply(reply);
+          if (fw) { setIdentity(`FW ${fw.code}${fw.date ? ` (${fw.date})` : ''}`); push('info', `vi ${fw.code} ${fw.date}`); }
+        } else if (actionId === 'device-id') {
+          const id = parseDeviceIdReply(reply);
+          if (id) { setIdentity(id); adoptModelFromIdentity(id); push('info', id); }
         }
       } else if (wantsReply) {
         push('info', t('No reply (see the warning above about model-specific queries).'));
@@ -191,12 +253,39 @@ export default function EpsonMaintDialog() {
 
   const runAction = (action: EpsonAction) => { void run(action.label, action.hex, action.expectsReply, action.id); };
 
+  // Multi-slot cartridge scan (ii 1..8) — decodes every answered slot into
+  // the readout card. Works on all transports: bare/d4 ride epsonTransact
+  // inside epsonReadCartridges, snmp sends each bare ii frame as one OID GET.
+  const runCartridges = async () => {
+    if (!printer) { toast.warn(t('Pick a printer first.'), { title: t('Epson maintenance') }); return; }
+    if (transport === 'snmp' && !host.trim()) {
+      toast.warn(t('SNMP transport needs a printer IP address.'), { title: t('Epson maintenance') });
+      return;
+    }
+    setBusy(true);
+    setSt2(null);
+    setIdentity('');
+    setOldInk(null);
+    setCartridges(null);
+    try {
+      const recs = await epsonReadCartridges(printer, { log: push, transport, host: host.trim() || undefined });
+      setCartridges(recs);
+      if (recs.length === 0) {
+        push('info', t('Reply was not an @BDC PS block — this model may not expose cartridge chips.'));
+      }
+    } catch (e) {
+      push('err', (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const runWasteRead = async () => {
     if (!printer || !modelEntry) { toast.warn(t('Pick a printer and model first.'), { title: t('Epson maintenance') }); return; }
     setBusy(true);
     setWaste(null);
     try {
-      const result = await epsonReadWaste(printer, modelEntry, push, transport);
+      const result = await epsonReadWaste(printer, modelEntry, { log: push, transport, host: host.trim() || undefined });
       setWaste(result);
       if (result.readings.every(r => r.percent === null)) {
         push('info', t('No EEPROM answers — check the model choice; a wrong read key keeps the printer silent.'));
@@ -218,7 +307,7 @@ export default function EpsonMaintDialog() {
     if (!window.confirm(t('Temporary reset clears the waste-ink error until the printer is power-cycled. Continue?'))) return;
     setBusy(true);
     try {
-      const r = await epsonResetWasteTemporary(printer, serial, push, transport);
+      const r = await epsonResetWasteTemporary(printer, serial, { log: push, transport, host: host.trim() || undefined });
       push(r.ok ? 'info' : 'err', r.ok
         ? t('Temporary reset acknowledged (rw:OK).')
         : t('The printer denied the reset (NA) or stayed silent — wrong serial or unsupported firmware.'));
@@ -239,7 +328,7 @@ export default function EpsonMaintDialog() {
     if (!window.confirm(t('Really write to the EEPROM now?'))) return;
     setBusy(true);
     try {
-      const r = await epsonResetWastePermanent(printer, modelEntry, push, transport);
+      const r = await epsonResetWastePermanent(printer, modelEntry, { log: push, transport, host: host.trim() || undefined });
       push(r.ok ? 'info' : 'err', `${t('Writes acknowledged')}: ${r.okCount}/${r.total}${r.naCount > 0 ? ` · NA ${r.naCount}` : ''}`);
       if (r.ok) toast.success(t('Waste counters reset. Read them back to verify.'));
       else push('err', t('Not every write was acknowledged — verify the model choice and try reading the counters.'));
@@ -255,7 +344,7 @@ export default function EpsonMaintDialog() {
     setBusy(true);
     setStats(null);
     try {
-      const result = await epsonReadStats(printer, modelEntry, push, transport);
+      const result = await epsonReadStats(printer, modelEntry, { log: push, transport, host: host.trim() || undefined });
       setStats(result);
       if (result.every(s => s.value === null)) {
         push('info', t('No EEPROM answers — check the model choice; a wrong read key keeps the printer silent.'));
@@ -277,7 +366,7 @@ export default function EpsonMaintDialog() {
       const addrs = new Set<number>();
       for (let a = 0; a <= 511; a++) addrs.add(a);
       for (const a of modelEntry.serial ?? []) addrs.add(a);
-      const dump = await epsonDumpEeprom(printer, modelEntry, [...addrs], { transport, log: push });
+      const dump = await epsonDumpEeprom(printer, modelEntry, [...addrs], { transport, log: push, host: host.trim() || undefined });
       if (dump.answered === 0) {
         push('info', t('No EEPROM answers — check the model choice; a wrong read key keeps the printer silent.'));
         return;
@@ -306,7 +395,7 @@ export default function EpsonMaintDialog() {
       const n = Object.keys(backup.values).length;
       if (!window.confirm(`${t('Restore writes')} ${n} ${t('EEPROM bytes from the backup. Continue?')} (${backup.savedAt})`)) return;
       setBusy(true);
-      const r = await epsonRestoreBackup(printer, modelEntry, backup, { transport, log: push });
+      const r = await epsonRestoreBackup(printer, modelEntry, backup, { transport, log: push, host: host.trim() || undefined });
       push(r.ok ? 'info' : 'err', `${t('Writes acknowledged')}: ${r.okCount}/${r.total}${r.naCount > 0 ? ` · NA ${r.naCount}` : ''}`);
     } catch (e) {
       push('err', (e as Error).message);
@@ -392,19 +481,36 @@ export default function EpsonMaintDialog() {
           {/* Action grid */}
           <div className="mt-2 field-label">{t('Maintenance actions')}</div>
           <div className="grid grid-cols-2 gap-1">
-            {EPSON_ACTIONS.map(action => (
-              <button
-                key={action.id}
-                type="button"
-                className="btn !justify-start flex items-center gap-1.5 text-left"
-                onClick={() => runAction(action)}
-                disabled={busy || !printer}
-                title={action.description}
-              >
-                <FlaskConical size={12} aria-hidden="true" className={safetyClass(action.safety)} />
-                <span className="truncate">{t(action.label)}</span>
-              </button>
-            ))}
+            {EPSON_ACTIONS.map(action => {
+              // SNMP can only carry bare EPSON-CTRL frames; the wrapped or
+              // print-data actions stay local and are disabled with a reason.
+              const snmpBlocked = transport === 'snmp' && !SNMP_ACTION_FRAMES[action.id];
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  className="btn !justify-start flex items-center gap-1.5 text-left"
+                  onClick={() => runAction(action)}
+                  disabled={busy || !printer || snmpBlocked}
+                  title={snmpBlocked
+                    ? t('Not available over SNMP — this command needs the local print channel. Switch the transport to Simple or 1284.4.')
+                    : action.description}
+                >
+                  <FlaskConical size={12} aria-hidden="true" className={safetyClass(action.safety)} />
+                  <span className="truncate">{t(action.label)}</span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              className="btn !justify-start flex items-center gap-1.5 text-left"
+              onClick={() => { void runCartridges(); }}
+              disabled={busy || !printer}
+              title={t('Queries cartridge slots 1-8 in sequence, stopping at the first empty or unknown slot.')}
+            >
+              <FlaskConical size={12} aria-hidden="true" className="text-success" />
+              <span className="truncate">{t('Scan all cartridge slots')}</span>
+            </button>
           </div>
           <div className="mt-1 text-[10px] text-muted">
             <span className="text-success">●</span> {t('documented')} · <span className="text-warning">●</span> {t('experimental')}
@@ -461,8 +567,25 @@ export default function EpsonMaintDialog() {
               >
                 <option value="bare">{t('Simple transport')}</option>
                 <option value="d4">{t('1284.4 handshake')}</option>
+                <option value="snmp">{t('SNMP network')}</option>
               </select>
             </div>
+            {transport === 'snmp' && (
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  className="input font-mono flex-1"
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  placeholder="192.168.1.50"
+                  aria-label={t('Printer IP address')}
+                  spellCheck={false}
+                />
+                {selected && hostFromPortName(selected.port) && (
+                  <span className="shrink-0 text-[10px] text-muted">{hostFromPortName(selected.port)}</span>
+                )}
+              </div>
+            )}
             <div className="mt-1.5 grid grid-cols-3 gap-1">
               <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runWasteRead(); }}>
                 <HardDriveDownload size={12} aria-hidden="true" className="text-success" />
@@ -539,7 +662,7 @@ export default function EpsonMaintDialog() {
           </div>
 
           {/* Structured readout card — parsed from the last status action. */}
-          {(st2 || identity || oldInk) && (
+          {(st2 || identity || oldInk || (cartridges?.length ?? 0) > 0) && (
             <div className="mt-2 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px]" role="status">
               <div className="field-label !mb-1">{t('Printer readout')}</div>
               {identity && (
@@ -582,6 +705,24 @@ export default function EpsonMaintDialog() {
                         />
                       </div>
                       <span className="w-8 shrink-0 text-right tabular-nums">{ink.level}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {cartridges && cartridges.length > 0 && (
+                <div className="mt-1">
+                  <div className="field-label !mb-1">{t('Cartridge chips')}</div>
+                  {cartridges.map((c, i) => c.kind === 'cartridge' ? (
+                    <div key={`ci${i}`} className="mb-0.5 flex items-baseline justify-between gap-2">
+                      <span className="truncate">
+                        {t('Slot')} {c.slot} · <span className="text-ink/90">{c.color}</span>
+                        {c.productionYear && <span className="text-muted"> · {c.productionYear}-{String(c.productionMonth ?? 0).padStart(2, '0')}</span>}
+                      </span>
+                      <span className="shrink-0 tabular-nums">IQT {c.inkQuantity}</span>
+                    </div>
+                  ) : (
+                    <div key={`ci${i}`} className="mb-0.5 text-muted">
+                      {c.kind === 'empty' ? t('empty slot') : `${t('unknown chip type')} ${c.typeCode}`}
                     </div>
                   ))}
                 </div>
@@ -641,12 +782,20 @@ export default function EpsonMaintDialog() {
               type="button"
               className="btn flex items-center gap-1 shrink-0"
               onClick={() => { void run(t('Custom command'), customHex, expectReply); }}
-              disabled={busy || !printer || !customHex.trim()}
+              disabled={busy || !printer || !customHex.trim() || transport === 'snmp'}
+              title={transport === 'snmp'
+                ? t('Not available over SNMP — this command needs the local print channel. Switch the transport to Simple or 1284.4.')
+                : undefined}
             >
               <Send size={12} aria-hidden="true" />
               {t('Send')}
             </button>
           </div>
+          {transport === 'snmp' && (
+            <div className="mt-1 text-[10px] text-muted">
+              {t('The hex workbench sends raw local print jobs — switch the transport to Simple or 1284.4 to use it.')}
+            </div>
+          )}
 
           {/* Hex console */}
           <div className="mt-3 flex items-center gap-1 text-[10px] text-muted">
