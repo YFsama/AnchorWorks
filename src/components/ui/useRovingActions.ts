@@ -11,7 +11,11 @@ import { useState } from 'react';
  *   reproduce each legacy variant exactly: clamped vs wrapping arrows,
  *   immediate vs requestAnimationFrame-deferred commit, disabled-button
  *   filtering, and footer (action-review attribute + text fallback) vs preset
- *   (`data-review`) announcement sources.
+ *   (`data-review`) announcement sources. `axis: 'vertical'` swaps the arrow
+ *   pair for ArrowUp/ArrowDown (listbox rows, panel lists, tablists).
+ * - `makeGridKeys` — 2-D grid roving: horizontal arrows step ±1, vertical
+ *   arrows step ±`columns`, every move clamps inside the tile list
+ *   (TemplatesDialog/AssetsPanel/SymbolsPanel tile grids).
  * - `makeSegmentKeys` — value-array roving for `role="group"` segment
  *   controls whose buttons carry `data-value={value}` (PrintDialog margin /
  *   bleed / orientation / scaling / prep groups).
@@ -21,8 +25,14 @@ import { useState } from 'react';
  * originals' — no stale-state risk and no hook-order constraints.
  */
 
-/** Keys every roving variant responds to (Home/End jump, arrows step). */
+/** Keys the horizontal roving variants respond to (Home/End jump, arrows step). */
 const ROVING_KEYS = ['ArrowLeft', 'ArrowRight', 'Home', 'End'] as const;
+
+/** Vertical counterpart: ArrowUp/ArrowDown step; Left/Right are ignored. */
+const ROVING_KEYS_VERTICAL = ['ArrowUp', 'ArrowDown', 'Home', 'End'] as const;
+
+/** Keys the 2-D grid variant responds to (arrows step by 1 or by a row). */
+const GRID_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'] as const;
 
 export type RovingEvent = React.KeyboardEvent<HTMLDivElement>;
 
@@ -41,8 +51,28 @@ export interface RovingKeysOptions {
   fallbackToText?: boolean;
   /** Wrap ArrowLeft/ArrowRight at the row ends instead of clamping. */
   wrap?: boolean;
+  /**
+   * Roving axis (default 'horizontal'): 'vertical' answers ArrowUp/ArrowDown
+   * instead of ArrowLeft/ArrowRight (SeparationsDialog plate listbox and the
+   * FontPicker/KeymapEditor/HelpCenter/ArtboardsPanel/PreferencesDialog
+   * vertical lists, which all ignore the perpendicular pair), so ArrowDown
+   * steps forward and ArrowUp steps back while Home/End keep their meaning.
+   */
+  axis?: 'horizontal' | 'vertical';
   /** Skip disabled / aria-disabled buttons entirely. */
   skipDisabled?: boolean;
+  /**
+   * Active-index fallback when focus is on none of the matched buttons
+   * (default 0 = the house `Math.max(0, findIndex)` convention: arrows
+   * start AT the first button). `-1` reproduces the SymbolsPanel naming
+   * toolbar's asymmetric legacy entry: the backward arrow starts at the
+   * first button (wrapping onto the last) while the forward arrow starts
+   * "before" it and lands on the first. Only reachable when focus sits on
+   * a non-button element inside the container — e.g. the auto-focused name
+   * `<input>` bubbling arrow keys into the roving set — and only the
+   * no-focus branch changes; a matched focus index is always used as-is.
+   */
+  fallbackIndex?: 0 | -1;
   /** Bail out (after preventDefault) when no buttons match. */
   guardEmpty?: boolean;
   /** Invoked with the next button before the review/focus commit. */
@@ -64,7 +94,8 @@ export function actionReviewKey(actionAttr: string): string {
  * Roving keydown handler factory. See RovingKeysOptions for the variant
  * flags; the produced handler resolves the buttons synchronously (so the
  * requestAnimationFrame commit can never observe a mutated DOM), mirrors the
- * legacy `Math.max(0, findIndex(activeElement))` active-index fallback, and
+ * legacy `Math.max(0, findIndex(activeElement))` active-index fallback
+ * (overridable to the -1/forward asymmetric entry via `fallbackIndex`), and
  * publishes the review text before moving focus.
  */
 export function makeRovingKeys(options: RovingKeysOptions): (event: RovingEvent) => void {
@@ -75,28 +106,38 @@ export function makeRovingKeys(options: RovingKeysOptions): (event: RovingEvent)
     wrap = false,
     skipDisabled = false,
     guardEmpty = false,
+    axis = 'horizontal',
+    fallbackIndex = 0,
     onNavigate,
     setReview,
     defer = false,
   } = options;
+  const rovingKeys = axis === 'vertical' ? ROVING_KEYS_VERTICAL : ROVING_KEYS;
+  // The arrow that steps forward; vertical roving swaps Left/Right for Up/Down.
+  const forwardKey = axis === 'vertical' ? 'ArrowDown' : 'ArrowRight';
   return (event) => {
-    if (!(ROVING_KEYS as readonly string[]).includes(event.key)) return;
+    if (!(rovingKeys as readonly string[]).includes(event.key)) return;
     event.preventDefault();
     let actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector));
     if (skipDisabled) {
       actions = actions.filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
     }
     if (guardEmpty && actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const focusIndex = actions.findIndex((button) => button === document.activeElement);
+    // Unmatched focus falls back to index 0, or "before the first" (-1) for
+    // the forward arrow under fallbackIndex: -1 — the naming-toolbar entry.
+    const activeIndex = focusIndex >= 0
+      ? focusIndex
+      : fallbackIndex === -1 && event.key === forwardKey ? -1 : 0;
     const nextIndex = event.key === 'Home'
       ? 0
       : event.key === 'End'
         ? actions.length - 1
         : wrap
-          ? event.key === 'ArrowRight'
+          ? event.key === forwardKey
             ? (activeIndex + 1) % actions.length
             : (activeIndex - 1 + actions.length) % actions.length
-          : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
+          : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === forwardKey ? 1 : -1)));
     const nextAction = actions[nextIndex];
     onNavigate?.(nextAction, nextIndex);
     const commit = () => {
@@ -105,6 +146,66 @@ export function makeRovingKeys(options: RovingKeysOptions): (event: RovingEvent)
         : '';
       setReview(review);
       nextAction?.focus();
+    };
+    if (defer) requestAnimationFrame(commit);
+    else commit();
+  };
+}
+
+export interface GridKeysOptions extends Omit<RovingKeysOptions, 'wrap' | 'axis' | 'fallbackIndex'> {
+  /**
+   * Column count of the grid (the `grid-cols-N` value): ArrowDown/ArrowUp
+   * step by one whole row, i.e. ±`columns` indices.
+   */
+  columns: number;
+}
+
+/**
+ * 2-D grid keydown handler factory, aligned move-for-move with the live
+ * TemplatesDialog/AssetsPanel/SymbolsPanel tile-grid contract
+ * (`handleTemplateGridKeys` & co.): ArrowRight/Left step ±1 (crossing row
+ * boundaries freely), ArrowDown/Up step ±`columns`, and every move clamps
+ * to [0, lastIndex] — those grids never wrap. Home/End jump to the absolute
+ * first/last tile, not to the row ends. The focused-tile lookup mirrors the
+ * kit convention (identity match inside the container, index 0 fallback)
+ * which lands on the same index as the legacy `dataset.<name>Index ?? 0`
+ * read because tiles render in index order.
+ */
+export function makeGridKeys(options: GridKeysOptions): (event: RovingEvent) => void {
+  const {
+    selector,
+    columns,
+    reviewKey = 'review',
+    fallbackToText = false,
+    skipDisabled = false,
+    guardEmpty = false,
+    onNavigate,
+    setReview,
+    defer = false,
+  } = options;
+  return (event) => {
+    if (!(GRID_KEYS as readonly string[]).includes(event.key)) return;
+    event.preventDefault();
+    let tiles = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector));
+    if (skipDisabled) {
+      tiles = tiles.filter((tile) => !tile.disabled && tile.getAttribute('aria-disabled') !== 'true');
+    }
+    if (guardEmpty && tiles.length === 0) return;
+    const activeIndex = Math.max(0, tiles.findIndex((tile) => tile === document.activeElement));
+    const lastIndex = tiles.length - 1;
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? lastIndex
+        : Math.max(0, Math.min(lastIndex, activeIndex + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' ? columns : -columns)));
+    const nextTile = tiles[nextIndex];
+    onNavigate?.(nextTile, nextIndex);
+    const commit = () => {
+      const review = nextTile
+        ? nextTile.dataset[reviewKey] ?? (fallbackToText ? nextTile.textContent?.trim() : undefined) ?? ''
+        : '';
+      setReview(review);
+      nextTile?.focus();
     };
     if (defer) requestAnimationFrame(commit);
     else commit();

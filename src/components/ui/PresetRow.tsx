@@ -27,6 +27,30 @@ export interface PresetItem {
   data?: Record<string, string | number | true>;
   /** dataset key read on focus (default 'review'). */
   focusReviewKey?: string;
+  /**
+   * Native disabled attribute, passed through verbatim — the kit injects no
+   * styling of its own: buttons on the shared `btn` classes pick up the
+   * global `.btn:disabled` rules, custom chips keep their own `disabled:`
+   * utilities in `className`. Roving handlers skip it via `skipDisabled`.
+   */
+  disabled?: boolean;
+  /** Accessible name, passed through verbatim (icon-only or rich chips). */
+  'aria-label'?: string;
+  /**
+   * In-progress flag, passed through verbatim — no styling of its own: busy
+   * chips keep the spinner swap and any `disabled:` utilities in
+   * `className`, exactly as they did as handwritten buttons (AIPanel's
+   * send/MCP Test/Refresh precedent).
+   */
+  'aria-busy'?: boolean;
+  /**
+   * Radiogroup member semantics: render role="radio" with
+   * aria-checked={pressed} — the pressed state doubles as the checked
+   * state — and suppress aria-pressed. Pair with a container passing
+   * role="radiogroup" (ActionToolbar/PresetRow already accept it);
+   * group-level ARIA (aria-required and friends) stays consumer-owned.
+   */
+  radio?: boolean;
 }
 
 export interface PresetRowProps extends Omit<ActionToolbarProps, 'children'> {
@@ -46,11 +70,15 @@ export function PresetRow({ actionAttr, items, setReviewed, ...toolbar }: Preset
           type="button"
           {...(actionAttr ? { [actionAttr]: true } : {})}
           {...dataAttributes(item.data)}
+          {...(item.radio ? { role: 'radio' as const, 'aria-checked': item.pressed } : {})}
           className={item.className}
           onClick={item.onClick}
           onFocus={(event) => setReviewed(event.currentTarget.dataset[item.focusReviewKey ?? 'review'] ?? '')}
-          aria-pressed={item.pressed}
+          aria-pressed={item.radio ? undefined : item.pressed}
           title={item.title}
+          aria-label={item['aria-label']}
+          aria-busy={item['aria-busy']}
+          disabled={item.disabled}
         >
           {item.children}
         </button>
