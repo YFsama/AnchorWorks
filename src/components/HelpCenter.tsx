@@ -2006,10 +2006,16 @@ function buildTopics(t: (k: string) => string): Topic[] {
           </P>
           <H>Editor</H>
           <P>
-            Snap-related defaults — turn Grid snap, Smart guide snap, and Anchor
-            snap on or off at the document level. These mirror the segmented control
-            in the menu bar; setting them here makes the default sticky across new
-            documents instead of just the current session.
+            Canvas-input defaults. The three snap toggles — Grid snap, Smart
+            guide snap, and Anchor snap — mirror the segmented control in the
+            menu bar; setting them here makes the default sticky across new
+            documents instead of just the current session. Below them, the
+            <em> Mouse wheel</em> switch picks whether the plain wheel pans
+            (Figma-style) or zooms at the cursor (Illustrator-style), and the
+            <em> Object caching</em> switch trades a little zoomed-in
+            sharpness for smoother drags on heavy documents — see the
+            dedicated <strong>Object caching</strong> topic for how the
+            4×-zoom mode behaves.
           </P>
           <H>Workspace</H>
           <P>
@@ -2440,6 +2446,164 @@ function buildTopics(t: (k: string) => string): Topic[] {
             <li><strong>Wheel &amp; pan</strong> — <Kbd>Shift</Kbd>+wheel always pans sideways; middle-mouse drag pans from any tool. Whether the plain wheel pans (Figma-style, default) or zooms at the cursor (Illustrator-style) is set in <em>Preferences → Editor</em> and applies immediately.</li>
             <li><strong>Alt modifiers</strong> — Alt-drag a selected object to duplicate it; hold <Kbd>Alt</Kbd> while drawing a shape to draw from the centre outwards.</li>
           </UL>
+        </>
+      ),
+    },
+
+    // ------------- Printing & Preferences (0.14 wave) -------------
+    {
+      id: 'epson-snmp-transport',
+      category: t('Printing'),
+      title: t('Epson maintenance: SNMP network transport'),
+      keywords: 'epson maintenance snmp network transport udp 161 oid ip host bare simple 1284.4 d4 spooler remote',
+      body: () => (
+        <>
+          <P>
+            <em>File → Epson maintenance…</em> opens the inkjet maintenance
+            workbench (it needs the Windows desktop app — the banner at the
+            top of the dialog says so). Next to the serial field in the
+            waste-ink section sits a <strong>Transport</strong> dropdown with
+            three ways to reach the printer:
+          </P>
+          <UL>
+            <li><strong>Simple transport</strong> — escputil-style bare EPSON-CTRL packets, sent as one RAW spooler job through the local Windows print channel. The default.</li>
+            <li><strong>1284.4 handshake</strong> — the full IEEE 1284.4 session (enter, open the EPSON-CTRL channel, packet per frame, exit). Newer firmware that stays silent to bare packets often answers this one.</li>
+            <li><strong>SNMP network</strong> — no print job at all: the query rides a plain SNMP v1 GET (community <code>public</code>) over UDP to port 161, with the EPSON-CTRL frame bytes carried as OID arcs under Epson's enterprise OID. This is the network path the open-source epson_print_conf project uses.</li>
+          </UL>
+          <H>The printer IP</H>
+          <P>
+            Choosing SNMP reveals an IP field. It fills itself in whenever the
+            selected printer's spooler port name contains an address (ports
+            like <code>IP_192.168.1.50</code>), and the detected address is
+            echoed next to the field — you can also type any IP or hostname by
+            hand. Running an SNMP action with an empty address is refused with
+            a warning. Your transport and host choice persists between
+            sessions alongside the other Epson preferences.
+          </P>
+          <H>What can and cannot ride SNMP</H>
+          <P>
+            Only queries that reduce to a single bare EPSON-CTRL frame have an
+            SNMP representation: the <strong>ST2 status</strong> query,
+            <strong> cartridge chip (ii)</strong>, <strong>firmware (vi)</strong>,
+            <strong> device ID (di)</strong>, the <em>Scan all cartridge slots</em>
+            button (each slot's frame becomes one OID GET), and the whole
+            waste-ink section — counter read, temporary reset, factory reset,
+            EEPROM backup / restore and statistics all work over the network.
+          </P>
+          <P>
+            Everything else — head cleaning (normal and D4), nozzle check,
+            test print, initialize, the @EJL identify probe and the classic ST
+            ink query — sends D4-wrapped spooler frames, REMOTE1 packets or
+            actual print data that cannot fit a single OID GET. In SNMP mode
+            those buttons are disabled with a tooltip explaining they need the
+            local print channel, and the hex workbench's Send button is
+            disabled for the same reason.
+          </P>
+          <Note>
+            No answer? The console surfaces the driver's advice: check the IP
+            and that SNMP (UDP 161) is enabled — many Epson printers ship
+            with SNMP turned off in their network settings.
+          </Note>
+        </>
+      ),
+    },
+    {
+      id: 'epson-chip-queries',
+      category: t('Printing'),
+      title: t('Epson maintenance: cartridge chips, firmware, device ID'),
+      keywords: 'epson cartridge chip ii vi di firmware version device id iqt production date slot scan bdc ps',
+      body: () => (
+        <>
+          <P>
+            Three query actions in the Epson maintenance grid ask the printer
+            about itself: <strong>Cartridge chip (ii)</strong>,
+            <strong> Firmware version (vi)</strong> and <strong>Device ID (di)</strong>.
+            Each sends one plain EPSON-CTRL frame (they work on every
+            transport, including SNMP), and the decoded answer lands in the
+            <em> Printer readout</em> card while the raw bytes stay in the hex
+            console below.
+          </P>
+          <H>Cartridge chip (ii)</H>
+          <P>
+            The chip on a cartridge answers with an <code>@BDC PS</code> block.
+            The card decodes it into the slot number, the chip's colour name
+            (recognised families include T18xx/18XL, T7xx and 603XL chips),
+            the production date as <code>YYYY-MM</code>, and
+            <strong> IQT</strong> — the ink quantity in the printer's own chip
+            units, not a percentage, so treat it as a relative reading. An
+            empty slot answers <code>II:00</code>; a chip the decoder doesn't
+            know shows up as an unknown chip type instead of a guess.
+          </P>
+          <H>Scan all cartridge slots</H>
+          <P>
+            Below the action grid, this button queries slots 1–8 in sequence
+            and <strong>stops at the first empty or unknown slot</strong>. That
+            stop is deliberate: on desktop inkjets a gap almost always means
+            "no more slots", and stopping there saves up to seven timeout
+            round-trips. Each answered slot gets its own line in the readout
+            card.
+          </P>
+          <H>Firmware (vi) and Device ID (di)</H>
+          <P>
+            <em>vi</em> returns the firmware code plus its build date (the
+            date is computed from the code the same way epson_print_conf does
+            it; an implausible date falls back to the bare code).
+            <em> di</em> returns the IEEE-1284 identification string
+            (<code>MFG:</code> / <code>MDL:</code> / <code>CLS:</code>…),
+            richer than the raw @EJL probe — and it feeds the model guess in
+            the waste-ink section, so running it once can pick the right
+            model for you.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'object-caching',
+      category: t('Preferences'),
+      title: t('Object caching'),
+      keywords: 'object caching performance zoom 4x bitmap cache slow drag lag crisp vector render fabric escape valve',
+      body: () => (
+        <>
+          <P>
+            <em>Preferences → Editor</em> has a two-way <strong>Object
+            caching</strong> switch: <em>Off (crisp at any zoom)</em> — the
+            shipped default — and <em>On at 4× zoom and above</em>.
+          </P>
+          <H>Why it is off by default</H>
+          <P>
+            Fabric.js normally pre-paints every object onto an internal
+            bitmap. Those bitmaps are sized from the object's own scale, not
+            the viewport zoom, so zooming in blit-scales them like raster
+            images — shapes go soft exactly when you lean in to check
+            anchor-level detail or a cut path. AnchorWorks ships caching off:
+            every path is re-painted as vectors each frame, crisp at every
+            zoom level, which is what a vector editor should promise.
+          </P>
+          <H>The trade-off, and what "zoom" does about it</H>
+          <P>
+            Without caches, every frame is proportional to the document's
+            total path complexity. On low-end machines, documents with
+            hundreds or thousands of complex paths can drop frames while you
+            drag and pan. The <em>zoom</em> mode is the escape valve: per-object
+            bitmap caches are enabled only while the viewport is at 4× zoom
+            or higher — deep-inspection territory, where each repaint
+            re-rasterises the whole document for a tiny visible region and
+            stutter hurts most — and disabled again below the threshold.
+          </P>
+          <P>
+            One caveat: a cached bitmap magnified at 4× or more is resampled,
+            so thin strokes and small text can look slightly softer while you
+            are zoomed in. Zoom back below 4× (or flip the preference to
+            <em> Off</em>) and crisp vectors return immediately — handy for
+            side-by-side comparison.
+          </P>
+          <Note>
+            The setting applies immediately when you press Apply and persists
+            under its own localStorage key (<code>vector.objectCaching</code>),
+            separate from the main preferences blob. Caching is a runtime
+            render flag only — it is never serialised, so undo / redo history
+            and project files are unaffected no matter which way it's set.
+          </Note>
         </>
       ),
     },

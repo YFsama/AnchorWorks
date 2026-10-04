@@ -4230,4 +4230,6 @@ export const zhDict: Record<string, string> = {
   "Plate no longer exists — rescan the document.": "该印版已不存在——请重新扫描文档。",
   "Gradients and patterns are process-only.": "渐变与图案仅按印刷色输出。",
   "No objects on this plate.": "该印版上没有对象。",
+  "Epson maintenance: SNMP network transport": "Epson 维护：SNMP 网络传输",
+  "Epson maintenance: cartridge chips, firmware, device ID": "Epson 维护：墨盒芯片/固件/设备 ID",
 };
