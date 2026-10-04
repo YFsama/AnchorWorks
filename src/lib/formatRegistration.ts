@@ -13,16 +13,29 @@
  * (CommandPalette, AI skills, drag-drop dispatch, the future Tauri OS
  * file-open hook) can now discover formats via the registry instead of
  * hard-coding the function list.
+ *
+ * Registration itself stays fully synchronous: only the inline metadata
+ * (id / label / ext / keywords / description) is evaluated at module load,
+ * so `getFormat` / `findFormatByExt` / `listFormats` keep answering
+ * immediately at boot. Every heavyweight dependency — io2 (JPG / JSON /
+ * PDF / DXF, which drags printPrep along), io3's optimized SVG export,
+ * pdfImporter, svgImport, plotter (which drags cutOptimize) and
+ * pltImporter — is imported dynamically *inside* the export/import
+ * closures. All of these only run on explicit user action, so the first
+ * `await import()` hit is imperceptible, and none of them pin the entry
+ * chunk anymore. The dynamic `import()` resolves to the same module
+ * instance the rest of the app uses (e.g. `defaultPlotterOptions` is the
+ * live binding shared with the PlotterDialog), so semantics are
+ * unchanged.
+ *
+ * Kept static on purpose: io.ts (tiny, and `importSVGString` is needed
+ * by two import paths) and cutContour.ts (`detectRegMarks` — still
+ * statically pinned by MenuBar/App/pathSimplify, so making it lazy here
+ * wouldn't move the needle yet).
  */
 
 import { registerFormat } from './formats';
 import { download, downloadDataURL, exportPNG, importSVGString } from './io';
-import { exportDXF, exportJPG, exportJSON, exportPDF, exportPDFReal, importJSON } from './io2';
-import { exportSVGOptimized } from './io3';
-import { importPdfFile } from './pdfImporter';
-import { importSVGSmartFile } from './svgImport';
-import { buildPlotterOutput, defaultPlotterOptions } from './plotter';
-import { parsePlt, polylinesToSvg } from './pltImporter';
 import { detectRegMarks } from './cutContour';
 import { useEditor } from '../store/editor';
 import { toast } from './toast';
@@ -43,7 +56,10 @@ export function registerBuiltInFormats(): void {
     // "Export SVG" command uses — keep the two paths producing identical output
     // so a future migration from CommandPalette's hardcoded handler to the
     // registry's `getFormat('svg').export()` is a no-op.
-    export: () => download('design.svg', exportSVGOptimized(), 'image/svg+xml'),
+    export: async () => {
+      const { exportSVGOptimized } = await import('./io3');
+      download('design.svg', exportSVGOptimized(), 'image/svg+xml');
+    },
     // Smart import: pre-processes <style>/currentColor/gradients before
     // handing to Fabric, then surfaces a toast for anything we had to drop
     // (gradient refs that don't resolve, css vars that don't compute, etc.).
@@ -56,6 +72,7 @@ export function registerBuiltInFormats(): void {
         return;
       }
       try {
+        const { importSVGSmartFile } = await import('./svgImport');
         const res = await importSVGSmartFile(input);
         if (res.warnings.length > 0) {
           const top = res.warnings.slice(0, 3).join(' • ');
@@ -90,7 +107,10 @@ export function registerBuiltInFormats(): void {
     category: 'Raster',
     keywords: 'jpeg raster',
     description: t('Compressed raster — small file, lossy.'),
-    export: () => downloadDataURL('design.jpg', exportJPG(2)),
+    export: async () => {
+      const { exportJPG } = await import('./io2');
+      downloadDataURL('design.jpg', exportJPG(2));
+    },
   });
 
   registerFormat({
@@ -101,9 +121,15 @@ export function registerBuiltInFormats(): void {
     mode: 'both',
     category: 'Project',
     description: t('Fabric canvas state — round-trips objects but loses artboards & symbols.'),
-    export: () => exportJSON(),
+    export: async () => {
+      const { exportJSON } = await import('./io2');
+      exportJSON();
+    },
     import: async (input) => {
-      if (input instanceof File) await importJSON(input);
+      if (input instanceof File) {
+        const { importJSON } = await import('./io2');
+        await importJSON(input);
+      }
     },
   });
 
@@ -120,9 +146,13 @@ export function registerBuiltInFormats(): void {
     category: 'Document',
     keywords: 'import vector acrobat reader',
     description: t('PDF via the browser print dialog (use Print Prep dialog for crop / bleed / registration marks). Imports vector artwork as editable paths.'),
-    export: () => exportPDF(),
+    export: async () => {
+      const { exportPDF } = await import('./io2');
+      exportPDF();
+    },
     import: async (input) => {
       if (typeof input === 'string') return; // PDFs are binary-only — needs a File
+      const { importPdfFile } = await import('./pdfImporter');
       await importPdfFile(input);
     },
   });
@@ -141,7 +171,10 @@ export function registerBuiltInFormats(): void {
     category: 'Document',
     keywords: 'vector pdf real',
     description: t('Real vector PDF — fonts and paths stay editable in PDF readers.'),
-    export: () => exportPDFReal(),
+    export: async () => {
+      const { exportPDFReal } = await import('./io2');
+      await exportPDFReal();
+    },
   });
 
   registerFormat({
@@ -152,7 +185,10 @@ export function registerBuiltInFormats(): void {
     mode: 'export',
     category: 'CAD',
     description: t('AutoCAD DXF — LINE / LWPOLYLINE entities only, curves flattened, no text or hatching.'),
-    export: () => exportDXF(),
+    export: async () => {
+      const { exportDXF } = await import('./io2');
+      exportDXF();
+    },
   });
 
   // PLT / HP-GL — vinyl cutter language. Export uses the dialect set in the
@@ -169,9 +205,17 @@ export function registerBuiltInFormats(): void {
     category: 'CAD',
     keywords: 'hpgl plotter cutter vinyl roland graphtec',
     description: t('HP-GL vinyl-cutter format — exports with the dialect from the Plotter dialog; imports Roland / Graphtec / bare HP-GL.'),
-    export: () => download('design.plt', buildPlotterOutput('hpgl', defaultPlotterOptions), 'application/vnd.hp-hpgl'),
+    export: async () => {
+      // `defaultPlotterOptions` is an `export const` (never reassigned) on
+      // the lazily-resolved module instance — the very object PlotterDialog
+      // reads as its fallback/reset baseline — so the dialect persisted
+      // from the dialog is what gets exported here.
+      const { buildPlotterOutput, defaultPlotterOptions } = await import('./plotter');
+      download('design.plt', buildPlotterOutput('hpgl', defaultPlotterOptions), 'application/vnd.hp-hpgl');
+    },
     import: async (input) => {
       const text = typeof input === 'string' ? input : await input.text();
+      const { parsePlt, polylinesToSvg } = await import('./pltImporter');
       try {
         const res = parsePlt(text);
         if (res.polylines.length === 0) {

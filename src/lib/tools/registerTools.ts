@@ -57,7 +57,12 @@ import {
   shapeDrawUpdate,
   shapeDrawEnd,
 } from './shapeDrawTool';
-import { measureBegin, measureUpdate, measureEnd, measureClear } from './measureTool';
+// Measure pointer callbacks come from the lightweight measureState module —
+// NOT ./measureTool — so the ~36 kB annotation family (measureTool + its
+// grommets/bridges/rhinestone deps) stays out of the entry chunk and loads
+// on demand. Registry dispatch is synchronous, so the callbacks themselves
+// must be statically imported; measureState.ts is ~1 kB with no heavy deps.
+import { measureBegin, measureUpdate, measureEnd, measureClear } from './measureState';
 import { eyedropperActivate, eyedropperPick, eyedropperClear } from './eyedropperTool';
 import { useEditor } from '../../store/editor';
 import { zoomToPoint } from '../viewport';

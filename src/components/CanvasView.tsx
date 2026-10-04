@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { initCanvas, disposeCanvas, setTool, zoomFit } from '../lib/canvasEngine';
-import { attachDragDrop } from '../lib/io3';
 import { loadArtboardsFromStorage } from '../lib/artboards';
 import { getGridSize } from '../lib/preferences';
 import { useEditor } from '../store/editor';
@@ -82,9 +81,27 @@ export function CanvasView() {
 
   useEffect(() => { setTool(tool); }, [tool]);
 
+  // Drag-drop dispatcher (io3) — dynamic import at the top of this mount
+  // effect keeps the ~29 kB io3 module out of the eagerly-parsed entry chunk
+  // while arming drag-drop within milliseconds of boot (same shape as the
+  // tauriMenu effect in App.tsx). StrictMode-safe: if the effect tears down
+  // before the chunk lands, `cancelled` skips attaching (no leaked
+  // listeners); if it already attached, the cleanup detaches as before.
   useEffect(() => {
-    if (!wrapRef.current) return;
-    return attachDragDrop(wrapRef.current);
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    let detach: (() => void) | null = null;
+    let cancelled = false;
+    void import('../lib/io3')
+      .then((m) => {
+        if (cancelled) return;
+        detach = m.attachDragDrop(wrap);
+      })
+      .catch((e) => console.warn('io3 chunk failed to load — drag-drop disabled', e));
+    return () => {
+      cancelled = true;
+      detach?.();
+    };
   }, []);
 
   // Surface a custom event when the user right-clicks anywhere inside the

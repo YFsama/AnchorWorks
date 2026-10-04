@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { MenuBar } from './components/MenuBar';
 import { Toolbar } from './components/Toolbar';
 import { CanvasView } from './components/CanvasView';
 import { PropertiesPanel } from './components/PropertiesPanel';
@@ -17,10 +16,20 @@ import { useEditor } from './store/editor';
 import { useT, useI18n, useI18nReady } from './lib/i18n';
 import { announce, setLiveRegion } from './lib/a11y';
 import { getFormat } from './lib/formats';
-import { openProjectFromFile, saveProjectQuick, saveProjectToFile, applyProject, subscribeCurrentProjectName } from './lib/projectFile';
 import { setNativeWindowTitle } from './lib/runtime';
-import { installNativeMenuListener } from './lib/tauriMenu';
 import { useResizableWidth } from './lib/hooks/useResizableWidth';
+
+// MenuBar is the entry chunk's single largest line item (451 kB minified,
+// 53% of it): it statically drags the whole menu surface with it — the
+// format-registry exporters, artboard ops, the blend/envelope mesh code,
+// cut-prep actions, the About dialog… It is always-visible chrome, so it
+// lazy-loads behind a same-height skeleton (MenuBarSkeleton below) the
+// moment App first renders — no delay timer: the import fires on the first
+// paint, and local/SW cache resolves it in <100 ms, so the swap reads as a
+// recolour of the bar rather than a late-appearing one. Global shortcuts
+// (window keydown below) and the file.open flow live in App itself, so
+// nothing else waits on this chunk.
+const MenuBar = lazy(() => import('./components/MenuBar').then(m => ({ default: m.MenuBar })));
 
 // Code-split the heaviest dialogs / panels — they only load when opened.
 const ShortcutsDialog = lazy(() => import('./components/ShortcutsDialog').then(m => ({ default: m.ShortcutsDialog })));
@@ -121,8 +130,6 @@ import { copySelection, cutSelection, pasteFromClipboard } from './lib/clipboard
 const CommandPalette = lazy(() => import('./components/CommandPalette').then(m => ({ default: m.CommandPalette })));
 import { getBinding as getKeyBinding, comboMatchesEvent } from './lib/keymap';
 import { showConfirm } from './lib/confirm';
-import { importImageFile } from './lib/io3';
-import { importSVGSmart } from './lib/svgImport';
 import { toast, type ToastKind } from './lib/toast';
 import { joinSelection } from './lib/pathJoin';
 import { repeatTransform } from './lib/transformOps';
@@ -140,6 +147,24 @@ import { getKeyboardIncrement } from './lib/preferences';
 let commitDimensionCache: typeof import('./lib/tools/measureTool').commitDimension | null = null;
 const loadCommitDimension = (): Promise<void> =>
   import('./lib/tools/measureTool').then((m) => { commitDimensionCache = m.commitDimension; });
+
+// Project open / save / title subscription — the only projectFile APIs the
+// shell needs. Cached dynamic import (same shape as loadCommitDimension
+// above; warmed as a side effect of the title effect at mount) keeps
+// projectFile.ts itself out of the entry chunk (recentFiles/variableWidth
+// stay eager regardless — the MenuBar chunk and the width tool pin them)
+// and keeps tauriMenu's dynamic import of the same module effective.
+type ProjectFileModule = typeof import('./lib/projectFile');
+let projectFileCache: ProjectFileModule | null = null;
+const loadProjectFile = (): Promise<ProjectFileModule> =>
+  import('./lib/projectFile').then((m) => { projectFileCache = m; return m; });
+/** Invoke a projectFile API, preferring the warmed module cache — every
+ *  caller is fire-and-forget async, so a cold press just waits out the one
+ *  chunk fetch before running. */
+function withProjectFile<T>(invoke: (m: ProjectFileModule) => Promise<T>): Promise<T> {
+  const cached = projectFileCache;
+  return cached ? invoke(cached) : loadProjectFile().then(invoke);
+}
 
 // Register a built-in "Skill" so the AI can call it as a tool.
 registerSkill({
@@ -588,6 +613,10 @@ registerSkill({
   },
   handler: async ({ svg }) => {
     if (typeof svg !== 'string' || !svg.trim()) throw new Error('svg must be a non-empty string');
+    // Dynamic import — svgImport (with its pre-processing pipeline) stays out
+    // of the eagerly-loaded entry chunk; the skill handler is async anyway so
+    // the first call pays a one-time chunk fetch.
+    const { importSVGSmart } = await import('./lib/svgImport');
     const res = await importSVGSmart(svg);
     const warn = res.warnings.length ? ` warnings: ${res.warnings.join(' | ')}` : '';
     return `imported svg (${res.added} object${res.added === 1 ? '' : 's'}).${warn}`;
@@ -725,6 +754,34 @@ function LayersSkeleton() {
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * Skeleton for the lazy MenuBar — same root element and class string as the
+ * real bar (<header class="topbar h-11 flex items-center px-3 gap-2 text-xs">)
+ * so the swap at chunk-load reads as a recolour of the same strip, not a
+ * layout shift: identical height (h-11 = 44px), gradient, and bottom border
+ * come free from .topbar. Placeholder blocks approximate the left cluster
+ * (logo + separator + the six dropdown labels) plus one trailing right-side
+ * chip. Decorative only: aria-hidden, plain divs/spans — no banner landmark,
+ * no buttons or inputs, so nothing joins the tab order or the accessibility
+ * tree while the chunk streams in (same contract as PlotterChipSkeleton /
+ * LayersSkeleton). Exported for the menubarLazy test, which pins the
+ * same-shape contract against the real MenuBar's root classes.
+ */
+export function MenuBarSkeleton() {
+  return (
+    <header className="topbar h-11 flex items-center px-3 gap-2 text-xs" aria-hidden="true">
+      <div className="h-4 w-20 rounded bg-panel3 animate-pulse" />
+      <span className="topbar-sep" />
+      <div className="flex items-center gap-2 animate-pulse">
+        {[22, 22, 30, 28, 54, 28].map((w, i) => (
+          <div key={i} className="h-3 rounded bg-panel3" style={{ width: `${w}px` }} />
+        ))}
+      </div>
+      <div className="ml-auto h-4 w-14 rounded bg-panel3 animate-pulse" />
+    </header>
   );
 }
 
@@ -961,19 +1018,19 @@ export default function App() {
       }
       if (match('file.openProject')) {
         e.preventDefault();
-        void openProjectFromFile();
+        void withProjectFile(m => m.openProjectFromFile());
         announce(t('Open Project…'));
         return;
       }
       if (match('file.saveProject')) {
         e.preventDefault();
-        void saveProjectQuick();
+        void withProjectFile(m => m.saveProjectQuick());
         announce(t('Save Project'));
         return;
       }
       if (match('file.saveProjectAs')) {
         e.preventDefault();
-        void saveProjectToFile();
+        void withProjectFile(m => m.saveProjectToFile());
         announce(t('Save Project As…'));
         return;
       }
@@ -1325,8 +1382,22 @@ export default function App() {
       void setNativeWindowTitle(title);
     };
     const unsubA = subscribeAutoSaveStatus((s) => { dirty = s.dirty; update(); });
-    const unsubB = subscribeCurrentProjectName((n) => { projectName = n; update(); });
-    return () => { unsubA(); unsubB(); };
+    // projectFile lives in a lazy chunk (see loadProjectFile above), so the
+    // subscription lands once that import resolves. StrictMode-safe cleanup:
+    // if the effect tears down before the import lands, `cancelled` skips
+    // subscribing entirely (no leaked listener); if it already subscribed,
+    // `unsubB` detaches it as before.
+    let cancelled = false;
+    let unsubB: (() => void) | null = null;
+    void loadProjectFile().then((m) => {
+      if (cancelled) return;
+      unsubB = m.subscribeCurrentProjectName((n) => { projectName = n; update(); });
+    }).catch((e) => console.warn('projectFile chunk failed to load — document title sync disabled', e));
+    return () => {
+      cancelled = true;
+      unsubA();
+      unsubB?.();
+    };
   }, []);
 
   // Defer mounting the RecoveryDialog so its chunk is fetched after the
@@ -1358,7 +1429,13 @@ export default function App() {
 
   // Under Tauri, hook up the native menu listener so File / Edit / View
   // picks dispatch to the same handlers as the DOM MenuBar. No-op in PWA.
-  useEffect(() => { void installNativeMenuListener(); }, []);
+  // Dynamic import keeps the tauriMenu module (and its canvasEngine /
+  // fabric / outlineView dependencies) out of the PWA entry chunk.
+  useEffect(() => {
+    void import('./lib/tauriMenu')
+      .then(m => m.installNativeMenuListener())
+      .catch((e) => console.warn('tauriMenu chunk failed to load — native menu events disabled', e));
+  }, []);
 
   // Hold first paint (after all hooks) until the locale is renderable.
   if (!i18nReady) {
@@ -1391,11 +1468,16 @@ export default function App() {
         className="sr-only"
       />
 
-      <MenuBar
-        onToggleAI={() => setShowAI(v => !v)}
-        onToggleDebug={() => setShowDebug(v => !v)}
-        onShowOnboarding={() => setShowOnboarding(true)}
-      />
+      {/* MenuBar lazy chunk: the import fires at this first render (see the
+          lazy() declaration at the top) — the skeleton below holds the exact
+          bar shape (same .topbar/.h-11 classes) until it resolves. */}
+      <Suspense fallback={<MenuBarSkeleton />}>
+        <MenuBar
+          onToggleAI={() => setShowAI(v => !v)}
+          onToggleDebug={() => setShowDebug(v => !v)}
+          onShowOnboarding={() => setShowOnboarding(true)}
+        />
+      </Suspense>
       <div className="flex-1 flex overflow-hidden">
         <Toolbar />
         <main className="flex-1 flex flex-col relative" aria-label={t('Canvas workspace')}>
@@ -1718,6 +1800,7 @@ export default function App() {
               const text = await f.text();
               const parsed = JSON.parse(text);
               if (parsed && parsed.kind === 'anchorworks-project') {
+                const { applyProject } = await loadProjectFile();
                 await applyProject(parsed);
                 // Past-tense + filename to match the other Open/Save toasts
                 // (`Opened MyDesign.vstudio.json`). The previous toast echoed
@@ -1742,7 +1825,13 @@ export default function App() {
         hidden
         onChange={async (e) => {
           const f = e.target.files?.[0]; if (!f) return;
-          await importImageFile(f);
+          // io3 (image import + asset registry) lives in a lazy chunk — the
+          // shell's only direct use is this picker, and the module is warmed
+          // at mount by CanvasView's drag-drop effect and AssetsPanel's
+          // registry refresh, so this dynamic import is a cache hit.
+          await import('./lib/io3')
+            .then((m) => m.importImageFile(f))
+            .catch((err) => console.warn(`image import failed: ${f.name}`, err));
           e.target.value = '';
         }}
       />

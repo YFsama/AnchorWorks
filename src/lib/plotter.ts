@@ -6,6 +6,7 @@
 import { exportSVG } from './io';
 import { useEditor } from '../store/editor';
 import { optimizeOrder, mirrorPolys, applyOvercut, reversePolys, sortInsideFirst } from './cutOptimize';
+import { isTauri, callNative } from './runtime';
 
 /**
  * HP-GL dialect selector. Real-world cutter firmwares accept HP-GL with
@@ -667,7 +668,6 @@ export interface NativeSerialPort {
  * Web Serial requestPort() chooser instead of an in-app picker".
  */
 export async function listSerialPorts(): Promise<NativeSerialPort[] | null> {
-  const { isTauri, callNative } = await import('./runtime');
   if (!isTauri()) return null;
   return callNative<NativeSerialPort[]>('serial_list_ports', undefined, async () => []);
 }
@@ -679,8 +679,6 @@ export async function listSerialPorts(): Promise<NativeSerialPort[] | null> {
  * the first USB port if there's exactly one, otherwise throw a clear error.
  */
 export async function sendOverSerial(text: string, baud = 115200, port?: string): Promise<void> {
-  const { isTauri, callNative } = await import('./runtime');
-
   if (isTauri()) {
     let target = port;
     if (!target) {

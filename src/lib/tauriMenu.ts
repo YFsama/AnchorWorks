@@ -16,13 +16,12 @@
  * doesn't add weight to the web bundle.
  */
 
-import { isTauri } from './runtime';
+import { isTauri, callNative } from './runtime';
 import {
   zoomBy, zoomFit, undo, redo, duplicateSelection, groupSelection, ungroupSelection, getCanvas,
 } from './canvasEngine';
 import * as fabric from 'fabric';
 import { isOutlineMode, setOutlineMode } from './outlineView';
-import { saveProjectQuick, saveProjectToFile, openProjectFromFile } from './projectFile';
 import { getFormat } from './formats';
 import { useEditor } from '../store/editor';
 import type { ToolId } from '../types';
@@ -33,10 +32,13 @@ type Handler = () => void | Promise<void>;
  *  Add to both sides at once — a missing handler logs a warning instead of
  *  failing silently so omissions surface during development. */
 const HANDLERS: Record<string, Handler> = {
-  // File
-  'file.save': () => { void saveProjectQuick(); },
-  'file.saveAs': () => { void saveProjectToFile(); },
-  'file.open': () => { void openProjectFromFile(); },
+  // File — projectFile is loaded on demand so this module (itself only ever
+  // dynamically imported, see App.tsx) doesn't statically pin the project
+  // chunk and defeat the split. All three are async fire-and-forget, so the
+  // one-time chunk fetch before the first invocation is invisible.
+  'file.save': () => { void import('./projectFile').then(m => m.saveProjectQuick()); },
+  'file.saveAs': () => { void import('./projectFile').then(m => m.saveProjectToFile()); },
+  'file.open': () => { void import('./projectFile').then(m => m.openProjectFromFile()); },
   'file.new': () => { location.reload(); },
   'file.newFromTemplate': () => useEditor.getState().setModal('showTemplates', true),
   'file.importImage': () => {
@@ -108,7 +110,6 @@ let unsubscribers: Array<() => void> = [];
  *  cold-launch path and the single-instance second-launch forward. */
 async function openFileNative(path: string): Promise<void> {
   try {
-    const { callNative } = await import('./runtime');
     const text = await callNative<string>(
       'fs_read_path',
       { path },
@@ -116,7 +117,6 @@ async function openFileNative(path: string): Promise<void> {
     );
     const lower = path.toLowerCase();
     if (lower.endsWith('.svg')) {
-      const { getFormat } = await import('./formats');
       await getFormat('svg')?.import?.(text);
     } else {
       const { applyProject } = await import('./projectFile');

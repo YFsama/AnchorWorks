@@ -100,9 +100,8 @@ export function toDisplayAscii(bytes: Uint8Array): string {
   return out;
 }
 
-export function toHex(bytes: Uint8Array): string {
-  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join(' ');
-}
+export { toHex } from './hex';
+import { isTauri, callNative } from './runtime';
 
 type Listener = (ev: LinkEvent) => void;
 
@@ -192,7 +191,6 @@ export class PlotterLink {
     this.flowControl = opts.flowControl ?? 'none';
     this.rxBuf = [];
     try {
-      const { isTauri, callNative } = await import('./runtime');
       if (isTauri()) {
         let path = opts.portPath;
         if (!path) {
@@ -361,7 +359,6 @@ export class PlotterLink {
 
   private async writeChunk(chunk: Uint8Array): Promise<void> {
     if (this.nativeId !== undefined) {
-      const { callNative } = await import('./runtime');
       const hex = [...chunk].map(b => b.toString(16).padStart(2, '0')).join('');
       await callNative('serial_write', { id: this.nativeId, hex }, async () => {
         throw new Error('serial_write is only available in the desktop app.');
@@ -387,7 +384,6 @@ export class PlotterLink {
    *  on DTR. Omitted lines are left unchanged. */
   async setSignals(signals: { dtr?: boolean; rts?: boolean }): Promise<void> {
     if (this.nativeId !== undefined) {
-      const { callNative } = await import('./runtime');
       await callNative('serial_set_control', {
         id: this.nativeId, dtr: signals.dtr, rts: signals.rts,
       }, async () => {
@@ -412,7 +408,6 @@ export class PlotterLink {
     const tick = async () => {
       if (this.nativeId !== id || this.status !== 'connected') return;
       try {
-        const { callNative } = await import('./runtime');
         const bytes = await callNative<number[]>('serial_read', { id, timeoutMs: 60, maxBytes: 4096 }, async () => [] as number[]);
         if (bytes && bytes.length > 0) {
           this.rxErrorStreak = 0;
@@ -478,7 +473,6 @@ export class PlotterLink {
     try { await port?.close(); } catch { /* already closed */ }
     if (id !== undefined) {
       try {
-        const { callNative } = await import('./runtime');
         await callNative('serial_close', { id }, async () => undefined);
       } catch { /* registry entry drops with the handle anyway */ }
     }

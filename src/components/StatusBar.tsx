@@ -1,11 +1,21 @@
-import { useState, type KeyboardEvent } from 'react';
-import { MousePointer2, Move, Hash, Magnet, Crosshair, Target, Maximize2, ChevronLeft, ChevronRight, Scissors } from 'lucide-react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { MousePointer2, Move, Hash, Magnet, Crosshair, Target, Maximize2, ChevronLeft, ChevronRight, ChevronUp, Scissors, Usb } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
 import { zoomToArtboard, zoomToPercent } from '../lib/canvasEngine';
 import { getTool } from '../lib/tools/types';
 import { toast } from '../lib/toast';
-import { PlotterStatusChip } from './PlotterStatusChip';
+import { makeRovingKeys, type RovingEvent } from './ui/useRovingActions';
+
+// The plotter chip is always-visible chrome, but its code isn't free: it
+// drags the whole plotter toolchain (plotterLink, plotterDiag,
+// plotterRecords, hpglDebug) with it. Keep that ~90 kB out of the entry
+// chunk by lazy-loading it behind a same-shape skeleton (see
+// PlotterChipSkeleton + plotterMounted below — same delay-mount pattern as
+// LayersPanel in App.tsx). The 250 ms mount timer doubles as the idle-warm:
+// the import fires then, so the chip is live a beat after first paint and
+// the link.subscribe stream starts as early as it usefully can.
+const PlotterStatusChip = lazy(() => import('./PlotterStatusChip').then(m => ({ default: m.PlotterStatusChip })));
 
 export function StatusBar() {
   const t = useT();
@@ -33,6 +43,15 @@ export function StatusBar() {
   // tracks the cycle of the prev/next buttons. Stays stable across re-renders
   // unless the artboards list itself changes length.
   const [activeIdx, setActiveIdxLocal] = useState(0);
+  // PlotterStatusChip mounts one beat after the bar itself (250 ms — the
+  // RecoveryDialog cadence) so the plotter chunk streams in behind the
+  // skeleton instead of blocking the status bar's first paint. Self-contained
+  // timer: cleared on unmount, no App-level coordination.
+  const [plotterMounted, setPlotterMounted] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setPlotterMounted(true), 250);
+    return () => window.clearTimeout(id);
+  }, []);
   const visibleIdx = artboards.length === 0 ? 0 : Math.min(activeIdx, artboards.length - 1);
   const focusArtboard = (idx: number) => {
     if (artboards.length === 0) return;
@@ -42,22 +61,28 @@ export function StatusBar() {
     zoomToArtboard({ x: a.x, y: a.y, width: a.width, height: a.height });
   };
 
-  const handleStatusActionKeys = (event: KeyboardEvent<HTMLDivElement | HTMLSpanElement>) => {
+  // Status-action roving — HEAD semantics (verified against git HEAD):
+  // ArrowLeft/Right/Home/End over the [data-status-action] buttons inside
+  // the listening container (disabled ones skipped), arrows WRAP, Home/End
+  // jump absolutely, focus moves synchronously, and no key outside the
+  // roving set is prevented. makeRovingKeys covers all of that; the wrapper
+  // keeps HEAD's defaultPrevented guard because the artboard-nav span and
+  // the toolbar div BOTH listen for the same bubbled keydown — without the
+  // guard the outer pass would move focus a second time. The bar has no
+  // review announcer, so the kit's required setReview publisher is a no-op
+  // (the PropertiesPanel no-review precedent); guardEmpty is likewise
+  // carried for parity with HEAD's empty-collection bail (unreachable in
+  // practice — both containers always render enabled action buttons).
+  const statusActionKeys = makeRovingKeys({
+    selector: '[data-status-action]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: () => {},
+  });
+  const handleStatusActionKeys = (event: RovingEvent) => {
     if (event.defaultPrevented) return;
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-status-action]'))
-      .filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (buttons.length === 0) return;
-    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : event.key === 'ArrowRight'
-          ? (currentIndex + 1) % buttons.length
-          : (currentIndex - 1 + buttons.length) % buttons.length;
-    event.preventDefault();
-    buttons[nextIndex]?.focus();
+    statusActionKeys(event);
   };
 
   // Tool label + icon flow from the registry descriptor (registerTools.ts)
@@ -196,7 +221,13 @@ export function StatusBar() {
             <span className="tabular-nums">{cutPathCount}</span>
           </button>
         )}
-        <PlotterStatusChip />
+        {plotterMounted ? (
+          <Suspense fallback={<PlotterChipSkeleton />}>
+            <PlotterStatusChip />
+          </Suspense>
+        ) : (
+          <PlotterChipSkeleton />
+        )}
         <Badge active={gridVisible} icon={<Hash size={11} aria-hidden="true" />} label={t('GRID')} onToggle={() => setGridVisible(!gridVisible)} />
         <Badge active={snapEnabled} icon={<Magnet size={11} aria-hidden="true" />} label={t('SNAP')} onToggle={() => setSnapEnabled(!snapEnabled)} />
         <Badge active={smartGuides} icon={<Crosshair size={11} aria-hidden="true" />} label={t('GUIDES')} onToggle={() => setSmartGuidesEnabled(!smartGuides)} />
@@ -219,6 +250,26 @@ export function StatusBar() {
 }
 
 function Sep() { return <span className="statusbar-sep" aria-hidden="true" />; }
+
+/** Skeleton for the delay-mounted PlotterStatusChip — mirrors the real
+ *  chip's idle shape exactly (same wrapper, flex/padding/gap classes, dot +
+ *  USB glyph + label + chevron, all muted) so the swap at mount reads as a
+ *  recolour, not a layout shift. Decorative only: aria-hidden and a plain
+ *  span — no button semantics, no data-status-action, so it never joins the
+ *  toolbar's arrow-key roving focus while the chunk streams in. */
+function PlotterChipSkeleton() {
+  const t = useT();
+  return (
+    <span className="relative" aria-hidden="true">
+      <span className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] tabular-nums">
+        <span className="inline-block h-2 w-2 rounded-full bg-muted" />
+        <Usb size={11} aria-hidden="true" className="text-muted" />
+        <span className="text-muted">{t('Plotter')}</span>
+        <ChevronUp size={10} aria-hidden="true" className="text-muted" />
+      </span>
+    </span>
+  );
+}
 
 /** Click-to-edit zoom percentage — type a number + Enter to jump to that zoom
  *  (Illustrator / SignMaster status-bar zoom field), centred on the viewport. */

@@ -8,6 +8,12 @@
  * Split (2026-09): the ~140 kB proof-sheet builder family moved to
  * ./measureProof.ts (loaded on demand); this file keeps the interaction
  * state, dimension pinning, and annotation operations.
+ *
+ * Split (2026-10): the synchronous pointer callbacks (measureBegin/Update/
+ * End/Clear) and their drag state moved to ./measureState.ts so the registry
+ * can wire them without pinning this ~36 kB module (and its annotation
+ * family deps) into the entry chunk. Re-exported below to keep this module's
+ * export surface unchanged.
  */
 import * as fabric from 'fabric';
 import { useEditor } from '../../store/editor';
@@ -18,6 +24,9 @@ import { generateRegMarks, generateWeedBorder, generateWeedLines } from '../cutC
 import { grommetsFromObjects } from '../grommets';
 import { addBridges } from '../bridges';
 import { rhinestoneFromSelection } from '../rhinestone';
+import { resetMeasureDragging } from './measureState';
+
+export { measureBegin, measureUpdate, measureEnd, measureClear } from './measureState';
 
 export const MM_TO_PX = 3.7795;
 const MEASURE_ANNOTATION_KIND = 'measure-annotation';
@@ -26,32 +35,6 @@ type MeasureAnnotationObject = fabric.FabricObject & { measureAnnotationKind?: s
 function tagMeasureAnnotation<T extends fabric.FabricObject>(object: T): T {
   (object as MeasureAnnotationObject).measureAnnotationKind = MEASURE_ANNOTATION_KIND;
   return object;
-}
-
-
-let dragging = false;
-let startX = 0;
-let startY = 0;
-
-export function measureBegin(x: number, y: number): void {
-  dragging = true;
-  startX = x; startY = y;
-  useEditor.getState().setMeasure({ x1: x, y1: y, x2: x, y2: y });
-}
-
-export function measureUpdate(x: number, y: number): void {
-  if (!dragging) return;
-  useEditor.getState().setMeasure({ x1: startX, y1: startY, x2: x, y2: y });
-}
-
-export function measureEnd(): void {
-  dragging = false; // keep the last segment visible until the tool changes
-}
-
-/** Tool deactivation — drop the segment so it doesn't linger under other tools. */
-export function measureClear(): void {
-  dragging = false;
-  useEditor.getState().setMeasure(null);
 }
 
 /**
@@ -175,7 +158,7 @@ export function commitDimension(): boolean {
   canvas.add(group);
   canvas.setActiveObject(group);
   useEditor.getState().setMeasure(null);
-  dragging = false;
+  resetMeasureDragging();
   canvas.requestRenderAll();
   pushHistory();
   return true;

@@ -26,7 +26,7 @@ import { createArtboardFromSelection, deleteActiveArtboard, duplicateActiveArtbo
 import { booleanOp, divideSelection, trimSelection, cropSelection, mergeSelection, mergeSameFillSelection } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, expandClippingMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
-import { importImageFile, pasteFromSystemClipboard, traceSelectedImage } from '../lib/io3';
+import { getFormat } from '../lib/formats';
 import { copySelection, cutSelection, pasteFromClipboard } from '../lib/clipboard';
 import { resetOnboarding } from '../lib/onboarding';
 import { useT, useI18n, LANGUAGES, t as tStatic, type Lang } from '../lib/i18n';
@@ -35,7 +35,7 @@ import { showConfirm } from '../lib/confirm';
 import { isTauri, isMac, getOSLabel, platformInfo, ariaKeyshortcuts, type NativePlatformInfo } from '../lib/runtime';
 import { getAutoSaveStatus, subscribeAutoSaveStatus, type AutoSaveStatus } from '../lib/autosave';
 import { setOutlineMode } from '../lib/outlineView';
-import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
+import type { RecentFile } from '../lib/recentFiles';
 import { envelopeSelection } from '../lib/envelope';
 import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
 import { applyStrokeAlign } from '../lib/strokeAlign';
@@ -53,6 +53,22 @@ interface Props {
   onToggleAI: () => void;
   onToggleDebug: () => void;
   onShowOnboarding: () => void;
+}
+
+// io3 (system-clipboard paste, image import, trace) is interaction-only.
+// Cached dynamic import (same shape as App.tsx's withProjectFile) keeps the
+// ~29 kB module out of the entry chunk; CanvasView's drag-drop effect and
+// AssetsPanel's registry refresh warm the same module at boot, so these menu
+// actions are synchronous cache hits in practice (a cold click just waits
+// out the one chunk fetch).
+type IO3Module = typeof import('../lib/io3');
+let io3Cache: IO3Module | null = null;
+const loadIO3 = (): Promise<IO3Module> =>
+  import('../lib/io3').then((m) => { io3Cache = m; return m; });
+/** Invoke an io3 API, preferring the warmed module cache. */
+function withIO3<T>(invoke: (m: IO3Module) => Promise<T>): Promise<T> {
+  const cached = io3Cache;
+  return cached ? invoke(cached) : loadIO3().then(invoke);
 }
 
 // Map Rust's `std::env::consts::OS` (lowercase, kebab-free) to the display
@@ -127,26 +143,37 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   const traceCutCount = cutPaths.filter(path => path.kind === 'trace').length;
   const regmarkCutCount = cutPaths.filter(path => path.kind === 'regmark').length;
   // Recent files — subscribed so the menu refreshes after each save / open.
+  // recentFiles is loaded dynamically so it stays out of the entry chunk;
+  // the subscription lands once that import resolves (StrictMode-safe via
+  // the cancelled flag — same shape as App's projectFile title effect).
   const [recent, setRecent] = useState<RecentFile[]>([]);
-  useEffect(() => subscribeRecent(setRecent), []);
+  useEffect(() => {
+    let unsub: (() => void) | null = null;
+    let cancelled = false;
+    void import('../lib/recentFiles').then((m) => {
+      if (cancelled) return;
+      unsub = m.subscribeRecent(setRecent);
+    }).catch((e) => console.warn('recentFiles chunk failed to load — recent menu disabled', e));
+    return () => { cancelled = true; unsub?.(); };
+  }, []);
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     const ext = f.name.split('.').pop()?.toLowerCase() ?? '';
     // Both branches route through the format registry — the SVG handler now
     // does the smart preprocessing + warning toast that used to live here.
-    if (ext === 'svg') await (await import('../lib/formats')).getFormat('svg')?.import?.(f);
-    else if (ext === 'json') await (await import('../lib/formats')).getFormat('json')?.import?.(f);
+    if (ext === 'svg') await getFormat('svg')?.import?.(f);
+    else if (ext === 'json') await getFormat('json')?.import?.(f);
     e.target.value = '';
   };
   const onJSON = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    await (await import('../lib/formats')).getFormat('json')?.import?.(f);
+    await getFormat('json')?.import?.(f);
     e.target.value = '';
   };
   const onImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    await importImageFile(f);
+    await withIO3((m) => m.importImageFile(f)).catch(console.warn);
     e.target.value = '';
   };
   // Vector PDF import routes through the same registry entry drag-drop uses
@@ -155,7 +182,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   const onPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
     try {
-      await (await import('../lib/formats')).getFormat('pdf')?.import?.(f);
+      await getFormat('pdf')?.import?.(f);
     } catch {
       /* toasts surfaced by the importer */
     }
@@ -290,7 +317,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Open SVG / JSON…'), onClick: () => fileRef.current?.click(), kbd: getBinding('file.open') },
         { label: t('Import Image…'), onClick: () => imageRef.current?.click(), kbd: getBinding('file.importImage') },
         { label: t('Import PDF…'), onClick: () => pdfRef.current?.click() },
-        { label: t('Paste from Clipboard'), onClick: () => { void pasteFromSystemClipboard().then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }); } },
+        { label: t('Paste from Clipboard'), onClick: () => { void withIO3((m) => m.pasteFromSystemClipboard()).then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }).catch((e) => console.warn('io3 chunk failed to load — paste disabled', e)); } },
         { sep: true },
         // File-menu exports route through the format registry — same files,
         // filenames, and options as before, but every consumer (CommandPalette,
@@ -298,13 +325,13 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // single source of truth. `exportPDFReal` (vector PDF) doesn't have a
         // registry entry yet; its options story is heavier and migrates in a
         // later cycle.
-        { label: t('Export SVG'), onClick: async () => { void (await import('../lib/formats')).getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
-        { label: t('Export PNG (2×)'), onClick: async () => { void (await import('../lib/formats')).getFormat('png')?.export?.(); } },
-        { label: t('Export JPG (2×)'), onClick: async () => { void (await import('../lib/formats')).getFormat('jpg')?.export?.(); } },
-        { label: t('Export PDF'), onClick: async () => { void (await import('../lib/formats')).getFormat('pdf')?.export?.(); } },
-        { label: t('Export PDF (Vector)'), onClick: async () => { void (await import('../lib/formats')).getFormat('pdf-vector')?.export?.(); } },
-        { label: t('Export DXF (paths)'), onClick: async () => { void (await import('../lib/formats')).getFormat('dxf')?.export?.(); } },
-        { label: t('Export JSON'), onClick: async () => { void (await import('../lib/formats')).getFormat('json')?.export?.(); } },
+        { label: t('Export SVG'), onClick: async () => { void getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
+        { label: t('Export PNG (2×)'), onClick: async () => { void getFormat('png')?.export?.(); } },
+        { label: t('Export JPG (2×)'), onClick: async () => { void getFormat('jpg')?.export?.(); } },
+        { label: t('Export PDF'), onClick: async () => { void getFormat('pdf')?.export?.(); } },
+        { label: t('Export PDF (Vector)'), onClick: async () => { void getFormat('pdf-vector')?.export?.(); } },
+        { label: t('Export DXF (paths)'), onClick: async () => { void getFormat('dxf')?.export?.(); } },
+        { label: t('Export JSON'), onClick: async () => { void getFormat('json')?.export?.(); } },
         { sep: true },
         { label: t('Export Active Artboard (SVG)'), onClick: () => { void exportActiveArtboardAsSVG().then(ok => { if (ok) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); }); } },
         { label: t('Export Active Artboard (PNG)'), onClick: () => { if (exportActiveArtboardAsPNG()) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); } },
@@ -1840,7 +1867,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Adjust Brightness…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showBrightness', true); } },
         ] },
         { label: t('Image'), sub: [
-          { label: t('Trace Image'), onClick: () => { void traceSelectedImage().then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }); } },
+          { label: t('Trace Image'), onClick: () => { void withIO3((m) => m.traceSelectedImage()).then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }).catch((e) => console.warn('io3 chunk failed to load — trace disabled', e)); } },
           { label: t('Rasterize'), onClick: async () => { void (await import('../lib/rasterize')).rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
           { sep: true },
           { label: t('Image Filters'), sub: [
@@ -2021,7 +2048,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Tile Print…')} (${getBinding('file.tilePrint')})`} aria-label={t('Tile Print…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.tilePrint'))} onClick={() => setModal('showTilePrint', true)}>
             <Sheet size={12} aria-hidden="true" />{t('Tile')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Export SVG')} (${getBinding('file.exportSvg')})`} aria-label={t('Export SVG')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.exportSvg'))} onClick={async () => { void (await import('../lib/formats')).getFormat('svg')?.export?.(); }}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Export SVG')} (${getBinding('file.exportSvg')})`} aria-label={t('Export SVG')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.exportSvg'))} onClick={async () => { void getFormat('svg')?.export?.(); }}>
             <FileImage size={12} aria-hidden="true" />{t('Export')}
           </button>
           <button type="button" data-topbar-action className="btn flex items-center justify-center w-7 h-7 p-0" title={t('Document Settings…')} aria-label={t('Document Settings…')} onClick={() => setModal('showDocSettings', true)}>
@@ -2228,7 +2255,7 @@ function buildRecentFilesItems(recent: RecentFile[]): MenuItem[] {
   items.push({
     node: (
       <button
-        onClick={() => clearRecent()}
+        onClick={async () => { void (await import('../lib/recentFiles')).clearRecent(); }}
         role="menuitem"
         aria-label={tStatic('Clear recent files')}
         className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 text-[11px] text-muted hover:text-ink transition-colors"
