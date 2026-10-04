@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getCanvas, subscribeViewport } from '../lib/canvasEngine';
 import { useEditor } from '../store/editor';
+import { readToken as cssVar, readTokenAlpha as cssVarA } from '../lib/tokens';
 
 /**
  * Overlay canvas that visually separates artboard-interior from the
@@ -171,15 +172,6 @@ export function ArtboardLayer() {
     </>
   );
 }
-
-const cssVar = (name: string, fallback: string) => {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v ? `rgb(${v})` : fallback;
-};
-const cssVarA = (name: string, alpha: number, fallback: string) => {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v ? `rgb(${v} / ${alpha})` : fallback;
-};
 
 function roundedRect(
   ctx: CanvasRenderingContext2D,

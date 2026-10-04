@@ -18,6 +18,9 @@ function clamp01(value: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 }
 
+/** Lenient stop-colour normalizer (pads/truncates, never fails) — this is
+ *  deliberately NOT contrast.ts's strict `hexToRgb` parser: stop colours are
+ *  internal picker output, and the render loop must never bail on one. */
 export function hexToRgb(hex: string): Rgb {
   const clean = hex.replace('#', '').trim();
   const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean.padEnd(6, '0').slice(0, 6);
