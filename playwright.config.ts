@@ -30,5 +30,16 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Opt-in Firefox project for the roving/focus divergence audit (Firefox
+    // keeps focus on a button that becomes disabled while focused; Chromium
+    // makes it unfocusable, so the shared kit's active-index fallback is
+    // observable only here). Gated behind RUN_FIREFOX so the default
+    // local/CI invocation (`npx playwright test` / `npm run e2e`) stays
+    // Chromium-only:
+    //   RUN_FIREFOX=1 npx playwright test                        (both)
+    //   RUN_FIREFOX=1 npx playwright test --project=firefox      (Firefox)
+    ...(process.env.RUN_FIREFOX
+      ? [{ name: 'firefox', use: { ...devices['Desktop Firefox'] } }]
+      : []),
   ],
 });
