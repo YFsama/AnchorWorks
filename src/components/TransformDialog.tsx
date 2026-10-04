@@ -188,35 +188,47 @@ export function TransformDialog() {
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
-        <div
+        {/* Radiogroups are kit rows: PresetItem(radio) members inside a
+            role="radiogroup" ActionToolbar. The keydown handler stays the
+            focus-roving makeRovingKeys shape (not makeSegmentKeys): these
+            groups index from the focused button, so arrows still wrap,
+            apply the value, and review it exactly like the hand-rolled
+            version. */}
+        <PresetRow
+          statusId="transform-unit-review-status"
           className="flex gap-1 mb-2"
           role="radiogroup"
-          aria-label={t('Unit')}
-          aria-describedby="transform-unit-review-status"
+          label={t('Unit')}
           title={t('Use arrow keys to switch transform units')}
           onKeyDown={handleUnitKeys}
-        >
-          <div id="transform-unit-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedUnit || t('Unit')}`}
-          </div>
-          <button type="button" data-transform-unit-action data-unit="mm" data-review={`${t('Unit')} · mm`} role="radio" aria-checked={unit === 'mm'} className={unit === 'mm' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setUnit('mm')} onFocus={(event) => setReviewedUnit(event.currentTarget.dataset.review ?? '')}>mm</button>
-          <button type="button" data-transform-unit-action data-unit="px" data-review={`${t('Unit')} · px`} role="radio" aria-checked={unit === 'px'} className={unit === 'px' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setUnit('px')} onFocus={(event) => setReviewedUnit(event.currentTarget.dataset.review ?? '')}>px</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedUnit}
+          fallback={t('Unit')}
+          actionAttr="data-transform-unit-action"
+          setReviewed={setReviewedUnit}
+          items={[
+            { key: 'mm', radio: true, pressed: unit === 'mm', className: unit === 'mm' ? 'btn-primary flex-1' : 'btn flex-1', onClick: () => setUnit('mm'), data: { unit: 'mm', review: `${t('Unit')} · mm` }, children: 'mm' },
+            { key: 'px', radio: true, pressed: unit === 'px', className: unit === 'px' ? 'btn-primary flex-1' : 'btn flex-1', onClick: () => setUnit('px'), data: { unit: 'px', review: `${t('Unit')} · px` }, children: 'px' },
+          ]}
+        />
 
-        <div
+        <PresetRow
+          statusId="transform-move-mode-review-status"
           className="flex gap-1 mb-2"
           role="radiogroup"
-          aria-label={t('Move mode')}
-          aria-describedby="transform-move-mode-review-status"
+          label={t('Move mode')}
           title={t('Use arrow keys to switch move mode')}
           onKeyDown={handleMoveModeKeys}
-        >
-          <div id="transform-move-mode-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedMoveMode || t('Move mode')}`}
-          </div>
-          <button type="button" data-transform-move-mode-action data-mode="xy" data-review={`${t('Move mode')} · ${t('XY')}`} role="radio" aria-checked={moveMode === 'xy'} className={moveMode === 'xy' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setMoveMode('xy')} onFocus={(event) => setReviewedMoveMode(event.currentTarget.dataset.review ?? '')}>{t('XY')}</button>
-          <button type="button" data-transform-move-mode-action data-mode="polar" data-review={`${t('Move mode')} · ${t('Polar')}`} role="radio" aria-checked={moveMode === 'polar'} className={moveMode === 'polar' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setMoveMode('polar')} onFocus={(event) => setReviewedMoveMode(event.currentTarget.dataset.review ?? '')}>{t('Polar')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedMoveMode}
+          fallback={t('Move mode')}
+          actionAttr="data-transform-move-mode-action"
+          setReviewed={setReviewedMoveMode}
+          items={[
+            { key: 'xy', radio: true, pressed: moveMode === 'xy', className: moveMode === 'xy' ? 'btn-primary flex-1' : 'btn flex-1', onClick: () => setMoveMode('xy'), data: { mode: 'xy', review: `${t('Move mode')} · ${t('XY')}` }, children: t('XY') },
+            { key: 'polar', radio: true, pressed: moveMode === 'polar', className: moveMode === 'polar' ? 'btn-primary flex-1' : 'btn flex-1', onClick: () => setMoveMode('polar'), data: { mode: 'polar', review: `${t('Move mode')} · ${t('Polar')}` }, children: t('Polar') },
+          ]}
+        />
 
         <div className="mb-2">
           <div className="field-label !mb-1">{t('Move presets')}</div>

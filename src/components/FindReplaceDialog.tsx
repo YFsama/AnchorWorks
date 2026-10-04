@@ -6,6 +6,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const FIND_REPLACE_RECIPES: Array<{ label: string; find: string; replace: string; matchCase: boolean; title: string }> = [
   { label: 'Double spaces', find: '  ', replace: ' ', matchCase: false, title: 'Collapse accidental double spaces in imported copy.' },
@@ -26,9 +29,11 @@ export function FindReplaceDialog() {
   const [find, setFind] = useState('');
   const [replace, setReplace] = useState('');
   const [matchCase, setMatchCase] = useState(false);
-  const [focusedRecipeIndex, setFocusedRecipeIndex] = useState(0);
-  const [reviewedFieldAction, setReviewedFieldAction] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  // The recipe region announces index-derived composite text, so its review
+  // state carries the focused recipe index (as a string; '' = index 0).
+  const [reviewedRecipeIndex, setReviewedRecipeIndex] = useReviewedAction();
+  const [reviewedFieldAction, setReviewedFieldAction] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const findRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
 
@@ -37,6 +42,8 @@ export function FindReplaceDialog() {
   if (!open) return null;
 
   const matches = find ? countTextMatches(find, matchCase) : 0;
+  const recipeIndex = Number(reviewedRecipeIndex);
+  const focusedRecipeIndex = recipeIndex >= 0 && recipeIndex < FIND_REPLACE_RECIPES.length ? recipeIndex : 0;
   const focusedRecipe = FIND_REPLACE_RECIPES[focusedRecipeIndex] ?? FIND_REPLACE_RECIPES[0];
 
   const clearFields = () => {
@@ -53,7 +60,7 @@ export function FindReplaceDialog() {
     setFind('');
     setReplace('');
     setMatchCase(false);
-    setFocusedRecipeIndex(0);
+    setReviewedRecipeIndex('');
     setReviewedFieldAction('');
     setReviewedFooterAction(t('Reset'));
     findRef.current?.focus();
@@ -73,57 +80,33 @@ export function FindReplaceDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-find-replace-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.findReplaceActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
-  const handleFieldActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-find-replace-field-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const nextAction = actions[nextIndex];
-    setReviewedFieldAction(nextAction?.dataset.findReplaceFieldActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-find-replace-action]',
+    reviewKey: actionReviewKey('data-find-replace-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
-  const handleRecipeActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-find-replace-recipe-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const recipeIndex = Number(actions[nextIndex]?.dataset.recipeIndex);
-    const recipe = Number.isInteger(recipeIndex) ? FIND_REPLACE_RECIPES[recipeIndex] : undefined;
-    if (recipe) {
-      setFocusedRecipeIndex(recipeIndex);
-      applyRecipe(recipe);
-    }
-    actions[nextIndex]?.focus();
-  };
+  const handleFieldActionKeys = makeRovingKeys({
+    selector: '[data-find-replace-field-action]',
+    reviewKey: actionReviewKey('data-find-replace-field-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    wrap: true,
+    setReview: setReviewedFieldAction,
+  });
+
+  const handleRecipeActionKeys = makeRovingKeys({
+    selector: '[data-find-replace-recipe-action]',
+    reviewKey: 'recipeIndex',
+    setReview: setReviewedRecipeIndex,
+    onNavigate: (button) => {
+      const recipeIndex = Number(button?.dataset.recipeIndex);
+      const recipe = Number.isInteger(recipeIndex) ? FIND_REPLACE_RECIPES[recipeIndex] : undefined;
+      if (recipe) applyRecipe(recipe);
+    },
+  });
 
   return (
     <div
@@ -185,72 +168,68 @@ export function FindReplaceDialog() {
 
         <div className="mt-3">
           <div className="field-label !mb-1">{t('Find replace recipes')}</div>
-          <div
+          <PresetRow
+            statusId="find-replace-recipe-review-status"
             className="grid grid-cols-2 gap-1"
-            role="toolbar"
-            aria-label={t('Find replace recipe actions')}
-            aria-describedby="find-replace-recipe-review-status"
+            label={t('Find replace recipe actions')}
             title={t('Use arrow keys to review find replace recipes')}
             onKeyDown={handleRecipeActionKeys}
-          >
-            <div id="find-replace-recipe-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${t(focusedRecipe.label)} ${focusedRecipeIndex + 1} / ${FIND_REPLACE_RECIPES.length}. ${t(focusedRecipe.title)}`}
-            </div>
-            {FIND_REPLACE_RECIPES.map((recipe, index) => {
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedRecipeIndex}
+            fallback={t('Find replace recipes')}
+            statusContent={({ reviewingLabel }) => `${reviewingLabel} ${t(focusedRecipe.label)} ${focusedRecipeIndex + 1} / ${FIND_REPLACE_RECIPES.length}. ${t(focusedRecipe.title)}`}
+            actionAttr="data-find-replace-recipe-action"
+            setReviewed={setReviewedRecipeIndex}
+            items={FIND_REPLACE_RECIPES.map((recipe, index) => {
               const active = find === recipe.find && replace === recipe.replace && matchCase === recipe.matchCase;
-              return (
-                <button
-                  key={recipe.label}
-                  type="button"
-                  data-find-replace-recipe-action
-                  data-recipe-index={index}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                  onFocus={() => setFocusedRecipeIndex(index)}
-                  onClick={() => { setFocusedRecipeIndex(index); applyRecipe(recipe); }}
-                  aria-pressed={active}
-                  title={t(recipe.title)}
-                >
-                  {t(recipe.label)}
-                </button>
-              );
+              return {
+                key: recipe.label,
+                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                pressed: active,
+                onClick: () => { setReviewedRecipeIndex(String(index)); applyRecipe(recipe); },
+                title: t(recipe.title),
+                focusReviewKey: 'recipeIndex',
+                data: { 'recipe-index': index },
+                children: t(recipe.label),
+              };
             })}
-          </div>
+          />
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="find-replace-field-action-review-status"
           className="mt-3 flex flex-wrap items-center gap-2"
-          role="toolbar"
-          aria-label={t('Find & Replace field actions')}
-          aria-describedby="find-replace-field-action-review-status"
+          label={t('Find & Replace field actions')}
           title={t('Use arrow keys to review find and replace field actions')}
           onKeyDown={handleFieldActionKeys}
-        >
-          <span id="find-replace-field-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFieldAction || t('Find & Replace field actions')}`}
-          </span>
-          <button type="button" data-find-replace-field-action data-find-replace-field-action-review={t('Clear fields')} onFocus={() => setReviewedFieldAction(t('Clear fields'))} className="btn flex items-center gap-1" disabled={!find && !replace} onClick={clearFields}>
-            <X size={12} aria-hidden="true" /> {t('Clear fields')}
-          </button>
-          <button type="button" data-find-replace-field-action data-find-replace-field-action-review={t('Swap find/replace')} onFocus={() => setReviewedFieldAction(t('Swap find/replace'))} className="btn flex items-center gap-1" disabled={!find && !replace} onClick={swapFields}>
-            <ArrowUpDown size={12} aria-hidden="true" /> {t('Swap find/replace')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFieldAction}
+          fallback={t('Find & Replace field actions')}
+          actionAttr="data-find-replace-field-action"
+          setReviewed={setReviewedFieldAction}
+          actions={[
+            { children: <><X size={12} aria-hidden="true" /> {t('Clear fields')}</>, review: t('Clear fields'), className: 'btn flex items-center gap-1', onClick: clearFields, disabled: !find && !replace },
+            { children: <><ArrowUpDown size={12} aria-hidden="true" /> {t('Swap find/replace')}</>, review: t('Swap find/replace'), className: 'btn flex items-center gap-1', onClick: swapFields, disabled: !find && !replace },
+          ]}
+        />
 
-        <div
+        <ReviewedFooter
+          statusId="find-replace-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Find & Replace actions')}
-          aria-describedby="find-replace-action-review-status"
+          label={t('Find & Replace actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="find-replace-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Find & Replace actions')}`}
-          </span>
-          <button type="button" data-find-replace-action data-find-replace-action-review={t('Cancel')} onFocus={() => setReviewedFooterAction(t('Cancel'))} className="btn" onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-find-replace-action data-find-replace-action-review={t('Reset')} onFocus={() => setReviewedFooterAction(t('Reset'))} className="btn" onClick={resetFields}>{t('Reset')}</button>
-          <button type="button" data-find-replace-action data-find-replace-action-review={t('Replace All')} onFocus={() => setReviewedFooterAction(t('Replace All'))} className="btn-primary" disabled={!find} onClick={apply}>{t('Replace All')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Find & Replace actions')}
+          actionAttr="data-find-replace-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetFields },
+            { children: t('Replace All'), review: t('Replace All'), className: 'btn-primary', onClick: apply, disabled: !find },
+          ]}
+        />
       </div>
     </div>
   );

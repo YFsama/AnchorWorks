@@ -5,6 +5,10 @@ import { resizeCanvas, setBackground, zoomFit } from '../lib/canvasEngine';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { ActionToolbar } from './ui/ActionToolbar';
+import { ReviewedFooter } from './ui/ReviewedFooter';
+import { SearchableListActions } from './ui/SearchableListActions';
+import { actionReviewKey, makeRovingKeys, makeSegmentKeys, useReviewedAction } from './ui/useRovingActions';
 import {
   PAPER_PRESETS, CATEGORY_LABELS, type PaperCategory,
   presetToPx, matchPreset, pxToMm,
@@ -26,9 +30,9 @@ export function DocSettingsDialog() {
   const [presetId, setPresetId] = useState<string>('custom');
   const [landscape, setLandscape] = useState(false);
   const [presetSearch, setPresetSearch] = useState('');
-  const [reviewedPresetSearchAction, setReviewedPresetSearchAction] = useState('');
-  const [reviewedOrientation, setReviewedOrientation] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPresetSearchAction, setReviewedPresetSearchAction] = useReviewedAction();
+  const [reviewedOrientation, setReviewedOrientation] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const presetSelectRef = useRef<HTMLSelectElement>(null);
   const [initialDoc, setInitialDoc] = useState(() => ({ ...doc }));
 
@@ -87,55 +91,36 @@ export function DocSettingsDialog() {
   const wMm = pxToMm(doc.width, doc.dpi);
   const hMm = pxToMm(doc.height, doc.dpi);
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-doc-settings-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.docSettingsActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
-  const handlePresetSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-doc-preset-search-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const nextAction = actions[nextIndex];
-    setReviewedPresetSearchAction(nextAction?.dataset.docPresetSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-doc-settings-action]',
+    reviewKey: actionReviewKey('data-doc-settings-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
+  const handlePresetSearchActionKeys = makeRovingKeys({
+    selector: '[data-doc-preset-search-action]',
+    reviewKey: actionReviewKey('data-doc-preset-search-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    wrap: true,
+    setReview: setReviewedPresetSearchAction,
+  });
 
-  const focusOrientation = (nextLandscape: boolean) => {
-    applyPreset(presetId, nextLandscape);
-    setReviewedOrientation(nextLandscape ? t('Landscape') : t('Portrait'));
-    requestAnimationFrame(() => document.getElementById(nextLandscape ? 'doc-orientation-landscape' : 'doc-orientation-portrait')?.focus());
-  };
-
-  const handleOrientationKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const nextLandscape = event.key === 'Home'
-      ? false
-      : event.key === 'End'
-        ? true
-        : !landscape;
-    focusOrientation(nextLandscape);
-  };
+  // Orientation is a mutual pair, not a roving row: arrows toggle the value,
+  // Home/End map to portrait/landscape, review publishes synchronously, and
+  // focus follows the new value on the next frame. makeSegmentKeys keeps that
+  // exact contract (PrintDialog's orientation pair) with data-value buttons;
+  // dialogMigrateDocSettings.test.tsx pins the frozen key traces.
+  const handleOrientationKeys = makeSegmentKeys({
+    values: ['portrait', 'landscape'] as const,
+    current: landscape ? 'landscape' : 'portrait',
+    apply: (next) => {
+      const nextLandscape = next === 'landscape';
+      applyPreset(presetId, nextLandscape);
+      setReviewedOrientation(nextLandscape ? t('Landscape') : t('Portrait'));
+    },
+  });
 
   const apply = () => {
     resizeCanvas(doc.width, doc.height);
@@ -202,41 +187,33 @@ export function DocSettingsDialog() {
               {normalizedPresetSearch ? `${filteredPresets.length} / ${PAPER_PRESETS.length} ${t('matches')}` : `${PAPER_PRESETS.length} ${t('presets')}`}
             </span>
             {presetSearch && (
-              <div
+              <SearchableListActions
+                statusId="doc-preset-search-action-review-status"
                 className="flex items-center gap-1.5 shrink-0"
-                role="toolbar"
-                aria-label={t('Document preset search actions')}
-                aria-describedby="doc-preset-search-action-review-status"
+                label={t('Document preset search actions')}
                 title={t('Use arrow keys to review document preset search actions')}
                 onKeyDown={handlePresetSearchActionKeys}
-              >
-                <span id="doc-preset-search-action-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedPresetSearchAction || t('Document preset search actions')}`}
-                </span>
-                <button
-                  type="button"
-                  className="text-[10px] text-muted hover:text-ink underline-offset-2 hover:underline transition-colors shrink-0 disabled:opacity-40 disabled:hover:no-underline"
-                  data-doc-preset-search-action
-                  data-doc-preset-search-action-review={t('Use first search result')}
-                  onClick={() => { if (filteredPresets[0]) applyPreset(filteredPresets[0].id, landscape); }}
-                  onFocus={() => setReviewedPresetSearchAction(t('Use first search result'))}
-                  disabled={filteredPresets.length === 0}
-                  title={t('Use first search result')}
-                >
-                  {t('Use First')}
-                </button>
-                <button
-                  type="button"
-                  className="text-[10px] text-muted hover:text-ink underline-offset-2 hover:underline transition-colors shrink-0"
-                  data-doc-preset-search-action
-                  data-doc-preset-search-action-review={t('Clear search')}
-                  onClick={() => setPresetSearch('')}
-                  onFocus={() => setReviewedPresetSearchAction(t('Clear search'))}
-                  title={t('Clear search')}
-                >
-                  {t('Clear search')}
-                </button>
-              </div>
+                reviewingLabel={t('Reviewing')}
+                reviewed={reviewedPresetSearchAction}
+                fallback={t('Document preset search actions')}
+                actionAttr="data-doc-preset-search-action"
+                setReviewed={setReviewedPresetSearchAction}
+                first={{
+                  label: t('Use First'),
+                  review: t('Use first search result'),
+                  title: t('Use first search result'),
+                  className: 'text-[10px] text-muted hover:text-ink underline-offset-2 hover:underline transition-colors shrink-0 disabled:opacity-40 disabled:hover:no-underline',
+                  onActivate: () => { if (filteredPresets[0]) applyPreset(filteredPresets[0].id, landscape); },
+                  disabled: filteredPresets.length === 0,
+                }}
+                clear={{
+                  label: t('Clear search'),
+                  review: t('Clear search'),
+                  title: t('Clear search'),
+                  className: 'text-[10px] text-muted hover:text-ink underline-offset-2 hover:underline transition-colors shrink-0',
+                  onActivate: () => setPresetSearch(''),
+                }}
+              />
             )}
           </div>
           <select
@@ -276,20 +253,20 @@ export function DocSettingsDialog() {
 
         {/* Orientation — disabled for square / custom where it's a no-op. */}
         <Field label={t('Orientation')}>
-          <div
+          <ActionToolbar
+            statusId="doc-orientation-review-status"
             className="flex gap-1"
-            role="toolbar"
-            aria-label={t('Document orientation')}
-            aria-describedby="doc-orientation-review-status"
+            label={t('Document orientation')}
             title={t('Use arrow keys to switch orientation')}
             onKeyDown={handleOrientationKeys}
+            statusAs="span"
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedOrientation}
+            fallback={t('Document orientation')}
           >
-            <span id="doc-orientation-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedOrientation || t('Document orientation')}`}
-            </span>
-            <OrientBtn id="doc-orientation-portrait" active={!landscape} onClick={() => { applyPreset(presetId, false); setReviewedOrientation(t('Portrait')); }} onFocus={() => setReviewedOrientation(t('Portrait'))} label={t('Portrait')} />
-            <OrientBtn id="doc-orientation-landscape" active={landscape} onClick={() => { applyPreset(presetId, true); setReviewedOrientation(t('Landscape')); }} onFocus={() => setReviewedOrientation(t('Landscape'))} label={t('Landscape')} />
-          </div>
+            <OrientBtn id="doc-orientation-portrait" value="portrait" active={!landscape} onClick={() => { applyPreset(presetId, false); setReviewedOrientation(t('Portrait')); }} onFocus={() => setReviewedOrientation(t('Portrait'))} label={t('Portrait')} />
+            <OrientBtn id="doc-orientation-landscape" value="landscape" active={landscape} onClick={() => { applyPreset(presetId, true); setReviewedOrientation(t('Landscape')); }} onFocus={() => setReviewedOrientation(t('Landscape'))} label={t('Landscape')} />
+          </ActionToolbar>
         </Field>
 
         <div className="grid grid-cols-2 gap-2">
@@ -331,31 +308,34 @@ export function DocSettingsDialog() {
           </Field>
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="doc-settings-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Document Settings actions')}
-          aria-describedby="doc-settings-action-review-status"
+          label={t('Document Settings actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="doc-settings-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Document Settings actions')}`}
-          </span>
-          <button type="button" data-doc-settings-action data-doc-settings-action-review={t('Cancel')} className="btn" onFocus={() => setReviewedFooterAction(t('Cancel'))} onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-doc-settings-action data-doc-settings-action-review={t('Reset')} className="btn" onFocus={() => setReviewedFooterAction(t('Reset'))} onClick={resetSettings}>{t('Reset')}</button>
-          <button type="button" data-doc-settings-action data-doc-settings-action-review={t('Apply')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Apply'))} onClick={apply}>{t('Apply')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Document Settings actions')}
+          actionAttr="data-doc-settings-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Reset'), review: t('Reset'), className: 'btn', onClick: resetSettings },
+            { children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: apply },
+          ]}
+        />
       </div>
     </div>
   );
 }
 
-function OrientBtn({ id, active, onClick, onFocus, label }: { id: string; active: boolean; onClick: () => void; onFocus: () => void; label: string }) {
+function OrientBtn({ id, value, active, onClick, onFocus, label }: { id: string; value: 'portrait' | 'landscape'; active: boolean; onClick: () => void; onFocus: () => void; label: string }) {
   return (
     <button
       id={id}
       type="button"
+      data-value={value}
       onClick={onClick}
       onFocus={onFocus}
       aria-pressed={active}

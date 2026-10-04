@@ -7,6 +7,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 const KIND_BADGE_CLASS: Record<PlateKind, string> = {
   spot: 'border-[#ff2e9a] text-[#ff2e9a]',
@@ -28,9 +31,9 @@ export function SeparationsDialog() {
   const [previewKey, setPreviewKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [format, setFormat] = useState<PlateExportFormat>('svg');
-  const [reviewedPlate, setReviewedPlate] = useState('');
-  const [reviewedFormat, setReviewedFormat] = useState('');
-  const [reviewedFooterAction, setReviewedFooterAction] = useState('');
+  const [reviewedPlate, setReviewedPlate] = useReviewedAction();
+  const [reviewedFormat, setReviewedFormat] = useReviewedAction();
+  const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
 
   useEscapeClose(open, close);
   useFocusRestore(open);
@@ -77,56 +80,36 @@ export function SeparationsDialog() {
     setPreviewKey(previous => previous === plate.key ? null : plate.key);
   };
 
-  const handlePlateKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const rows = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-separations-plate-action]'));
-    if (rows.length === 0) return;
-    const activeIndex = Math.max(0, rows.findIndex((row) => row === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? rows.length - 1
-        : Math.max(0, Math.min(rows.length - 1, activeIndex + (event.key === 'ArrowDown' ? 1 : -1)));
-    const nextRow = rows[nextIndex];
-    setReviewedPlate(nextRow?.dataset.review ?? '');
-    nextRow?.focus();
-  };
+  // Roving keyboard conventions live in ui/useRovingActions. The plate listbox
+  // is vertical (ArrowUp/Down, clamped; Left/Right ignored) with its rich
+  // role="option" rows kept verbatim below — the kit drives only the keys.
+  const handlePlateKeys = makeRovingKeys({
+    selector: '[data-separations-plate-action]',
+    axis: 'vertical',
+    guardEmpty: true,
+    setReview: setReviewedPlate,
+  });
 
-  const handleFormatKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-separations-format-action]'));
-    if (options.length === 0) return;
-    const activeIndex = Math.max(0, options.findIndex((option) => option === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? options.length - 1
-        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + options.length) % options.length;
-    const nextOption = options[nextIndex];
-    const nextFormat = nextOption?.dataset.format as PlateExportFormat | undefined;
-    if (nextFormat === 'svg' || nextFormat === 'png') setFormat(nextFormat);
-    requestAnimationFrame(() => {
-      setReviewedFormat(nextOption?.dataset.review ?? '');
-      nextOption?.focus();
-    });
-  };
+  // Format toolbar: wrapping arrows that apply the next format synchronously
+  // (onNavigate) and defer the review + focus commit to the next frame.
+  const handleFormatKeys = makeRovingKeys({
+    selector: '[data-separations-format-action]',
+    wrap: true,
+    guardEmpty: true,
+    defer: true,
+    setReview: setReviewedFormat,
+    onNavigate: (option) => {
+      const nextFormat = option?.dataset.format as PlateExportFormat | undefined;
+      if (nextFormat === 'svg' || nextFormat === 'png') setFormat(nextFormat);
+    },
+  });
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-separations-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.separationsActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-separations-action]',
+    reviewKey: actionReviewKey('data-separations-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
   const skipReasonText = (reason: PlateSkipReason): string => {
     if (reason === 'not-found') return t('Plate no longer exists — rescan the document.');
@@ -223,17 +206,16 @@ export function SeparationsDialog() {
 
         <div className="mt-2">
           <div className="field-label !mb-1">{t('Export format')}</div>
-          <div
+          <ActionToolbar
+            statusId="separations-format-review-status"
             className="flex gap-1"
-            role="toolbar"
-            aria-label={t('Separations export format')}
-            aria-describedby="separations-format-review-status"
+            label={t('Separations export format')}
             title={t('Use arrow keys to review export formats')}
             onKeyDown={handleFormatKeys}
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedFormat}
+            fallback={format.toUpperCase()}
           >
-            <div id="separations-format-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedFormat || format.toUpperCase()}`}
-            </div>
             {(['svg', 'png'] as const).map((value) => {
               const active = format === value;
               const label = value.toUpperCase();
@@ -250,7 +232,7 @@ export function SeparationsDialog() {
                 </button>
               );
             })}
-          </div>
+          </ActionToolbar>
         </div>
 
         <p className="mt-2 text-[9px] leading-snug text-muted">
@@ -259,21 +241,23 @@ export function SeparationsDialog() {
           {t('Raster images are not separated; they remain in the composite.')}
         </p>
 
-        <div
+        <ReviewedFooter
+          statusId="separations-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Separations actions')}
-          aria-describedby="separations-action-review-status"
+          label={t('Separations actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="separations-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Separations actions')}`}
-          </span>
-          <button type="button" data-separations-action data-separations-action-review={t('Close')} className="btn" onFocus={() => setReviewedFooterAction(t('Close'))} onClick={close}>{t('Close')}</button>
-          <button type="button" data-separations-action data-separations-action-review={t('Export Plate')} className="btn" onFocus={() => setReviewedFooterAction(t('Export Plate'))} onClick={exportCurrentPlate}>{t('Export Plate')}</button>
-          <button type="button" data-separations-action data-separations-action-review={t('Export All Plates')} className="btn-primary" onFocus={() => setReviewedFooterAction(t('Export All Plates'))} onClick={exportAllPlates}>{t('Export All Plates')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Separations actions')}
+          actionAttr="data-separations-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Close'), review: t('Close'), className: 'btn', onClick: close },
+            { children: t('Export Plate'), review: t('Export Plate'), className: 'btn', onClick: exportCurrentPlate },
+            { children: t('Export All Plates'), review: t('Export All Plates'), className: 'btn-primary', onClick: exportAllPlates },
+          ]}
+        />
       </div>
     </div>
   );

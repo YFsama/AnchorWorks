@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Trash2, X, Copy, Download } from 'lucide-react';
 import { clearLog, getLog, subscribeLog } from '../lib/debug';
 import { getCanvas } from '../lib/canvasEngine';
@@ -9,6 +9,8 @@ import { download } from '../lib/io';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { formatHMS } from '../lib/time';
+import { makeRovingKeys } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
 
 interface Props { onClose: () => void; }
 
@@ -88,24 +90,23 @@ export function DebugPanel({ onClose }: Props) {
   const downloadDiagnostics = () =>
     download('anchorworks-diagnostics.json', JSON.stringify(diagnostics(), null, 2), 'application/json');
 
-  const handleDebugActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-debug-action]'))
-      .filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (buttons.length === 0) return;
-    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : event.key === 'ArrowRight'
-          ? (currentIndex + 1) % buttons.length
-          : (currentIndex - 1 + buttons.length) % buttons.length;
-    event.preventDefault();
-    const nextAction = buttons[nextIndex]?.dataset.debugAction as DebugAction | undefined;
-    if (nextAction) setFocusedAction(nextAction);
-    buttons[nextIndex]?.focus();
-  };
+  // Roving keyboard conventions live in ui/useRovingActions: wrapping arrows
+  // and Home/End over the icon-only diagnostics actions, skipping disabled
+  // buttons (none of the four is ever disabled today). onNavigate keeps the
+  // legacy announcement flow — the review live region (rendered by
+  // ActionToolbar below) prints "Reviewing <label>" derived from the
+  // focusedAction state, so the kit's own setReview publisher stays unused.
+  const handleDebugActionKeys = makeRovingKeys({
+    selector: '[data-debug-action]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    onNavigate: (button) => {
+      const nextAction = button?.dataset.debugAction as DebugAction | undefined;
+      if (nextAction) setFocusedAction(nextAction);
+    },
+    setReview: () => {},
+  });
 
   return (
     <div className="h-56 border-t border-border bg-panel text-xs flex flex-col">
@@ -142,22 +143,21 @@ export function DebugPanel({ onClose }: Props) {
             </button>
           ))}
         </div>
-        <div
+        <ActionToolbar
+          statusId="debug-action-review-status"
           className="ml-auto flex items-center gap-1"
-          role="toolbar"
-          aria-label={t('Debug actions')}
-          aria-describedby="debug-action-review-status"
+          label={t('Debug actions')}
           title={t('Use arrow keys to review debug actions')}
           onKeyDown={handleDebugActionKeys}
+          reviewingLabel={t('Reviewing')}
+          reviewed={t(DEBUG_ACTION_LABELS[focusedAction])}
+          fallback={t('Copy diagnostics')}
         >
-          <div id="debug-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${t(DEBUG_ACTION_LABELS[focusedAction])}`}
-          </div>
           <button data-debug-action="copy" onFocus={() => setFocusedAction('copy')} onClick={copyDiagnostics} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Copy diagnostics')} title={t('Copy diagnostics')}><Copy size={12} aria-hidden="true" /></button>
           <button data-debug-action="download" onFocus={() => setFocusedAction('download')} onClick={downloadDiagnostics} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Download diagnostics')} title={t('Download diagnostics')}><Download size={12} aria-hidden="true" /></button>
           <button data-debug-action="clear" onFocus={() => setFocusedAction('clear')} onClick={clearLog} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Clear log')} title={t('Clear log')}><Trash2 size={12} aria-hidden="true" /></button>
           <button data-debug-action="close" onFocus={() => setFocusedAction('close')} onClick={onClose} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Close')}><X size={12} aria-hidden="true" /></button>
-        </div>
+        </ActionToolbar>
       </div>
       <div
         id="debug-tab-panel"

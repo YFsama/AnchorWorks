@@ -29,6 +29,8 @@ import { changeCaseSelection } from '../lib/textCase';
 import { toast } from '../lib/toast';
 import { registerSkill } from '../lib/mcp';
 import { useT } from '../lib/i18n';
+import { makeSegmentKeys, useReviewedAction } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
 
 // Module-level guard so the AI skill is only registered once even if the
 // panel mounts multiple times (e.g. during HMR or hot tab reloads).
@@ -112,11 +114,13 @@ export function CharacterPanel() {
   const selectionSummary = useEditor((s) => s.selectionSummary);
   const idKey = selectionIds.join(',');
   const [props, setProps] = useState<TextProps>(DEFAULT_TEXT_PROPS);
-  const [reviewedSizePreset, setReviewedSizePreset] = useState('');
-  const [reviewedTrackingPreset, setReviewedTrackingPreset] = useState('');
-  const [reviewedLeadingPreset, setReviewedLeadingPreset] = useState('');
-  const [reviewedHScalePreset, setReviewedHScalePreset] = useState('');
-  const [reviewedVScalePreset, setReviewedVScalePreset] = useState('');
+  // Per-group "action review" announcer state (the kit's state machine —
+  // '' announces the group's fallback label until a pill is reviewed).
+  const [reviewedSizePreset, setReviewedSizePreset] = useReviewedAction();
+  const [reviewedTrackingPreset, setReviewedTrackingPreset] = useReviewedAction();
+  const [reviewedLeadingPreset, setReviewedLeadingPreset] = useReviewedAction();
+  const [reviewedHScalePreset, setReviewedHScalePreset] = useReviewedAction();
+  const [reviewedVScalePreset, setReviewedVScalePreset] = useReviewedAction();
 
   // Register the AI skill once on first mount (idempotent across re-mounts).
   useEffect(() => {
@@ -238,6 +242,16 @@ export function CharacterPanel() {
     patchActiveText({ scaleY: v });
   };
 
+  // Preset-group roving — HEAD semantics (verified against git HEAD): the
+  // index resolves from the CURRENT VALUE with an epsilon compare
+  // (|value − current| < 0.001, never from focus), an unmatched value seeds
+  // baseIndex 0 for ArrowLeft and −1 for ArrowRight, arrows wrap,
+  // Home/End jump absolutely, apply runs synchronously, and review + focus
+  // of [data-value] follow on the next animation frame. makeSegmentKeys
+  // owns that exact formula for string values; this thin wrapper (the
+  // PropertiesPanel handleNumberPresetKeys precedent) marshals numbers to
+  // their data-value strings and back, normalizing with the epsilon match
+  // up front so 0.9999 still lands on preset 1 precisely like HEAD.
   const handlePresetKeys = (
     event: React.KeyboardEvent<HTMLDivElement>,
     values: readonly number[],
@@ -245,21 +259,20 @@ export function CharacterPanel() {
     apply: (next: number) => void,
     onReview?: (next: number) => void,
   ) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const index = values.findIndex((value) => Math.abs(value - current) < 0.001);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? values[0]
-      : event.key === 'End'
-        ? values[values.length - 1]
-        : values[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
-    apply(next);
-    requestAnimationFrame(() => {
-      onReview?.(next);
-      group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus();
-    });
+    const labels = values.map(String);
+    const matched = values.findIndex((value) => Math.abs(value - current) < 0.001);
+    let applied: number | undefined;
+    makeSegmentKeys({
+      values: labels,
+      current: matched >= 0 ? labels[matched] : String(current),
+      apply: (next) => {
+        applied = values[labels.indexOf(next)];
+        apply(applied);
+      },
+      onReview: () => {
+        if (applied !== undefined) onReview?.(applied);
+      },
+    })(event);
   };
 
   const tracking = props.charSpacing;
@@ -286,17 +299,18 @@ export function CharacterPanel() {
           />
         </div>
       </div>
-      <div
-        className="flex flex-wrap gap-1 mb-2 pl-[33%]"
+      <ActionToolbar
+        statusAs="span"
         role="group"
-        aria-label={t('Size presets')}
-        aria-describedby="character-size-preset-review-status"
+        className="flex flex-wrap gap-1 mb-2 pl-[33%]"
+        statusId="character-size-preset-review-status"
+        label={t('Size presets')}
         title={t('Use Left/Right arrows to switch options')}
         onKeyDown={(event) => handlePresetKeys(event, SIZE_PRESETS, props.fontSize, setFontSize, (next) => setReviewedSizePreset(`${t('Size')} ${next}px`))}
+        reviewingLabel={t('Reviewing')}
+        reviewed={reviewedSizePreset}
+        fallback={t('Size presets')}
       >
-        <span id="character-size-preset-review-status" className="sr-only" aria-live="polite">
-          {`${t('Reviewing')} ${reviewedSizePreset || t('Size presets')}`}
-        </span>
         {SIZE_PRESETS.map((size) => (
           <PresetPill
             key={size}
@@ -309,7 +323,7 @@ export function CharacterPanel() {
             {size}
           </PresetPill>
         ))}
-      </div>
+      </ActionToolbar>
 
       {/* Weight / style toggles */}
       <div className="grid grid-cols-4 gap-1 mb-2">
@@ -346,22 +360,23 @@ export function CharacterPanel() {
         </div>
       </div>
       {/* Tracking presets */}
-      <div
-        className="flex flex-wrap gap-1 mb-3 pl-[33%]"
+      <ActionToolbar
+        statusAs="span"
         role="group"
-        aria-label={t('Tracking presets')}
-        aria-describedby="character-tracking-preset-review-status"
+        className="flex flex-wrap gap-1 mb-3 pl-[33%]"
+        statusId="character-tracking-preset-review-status"
+        label={t('Tracking presets')}
         title={t('Use Left/Right arrows to switch options')}
         onKeyDown={(event) => handlePresetKeys(event, TRACKING_PRESETS, tracking, setCharSpacing, (next) => setReviewedTrackingPreset(`${t('Tracking')} ${next}`))}
+        reviewingLabel={t('Reviewing')}
+        reviewed={reviewedTrackingPreset}
+        fallback={t('Tracking presets')}
       >
-        <span id="character-tracking-preset-review-status" className="sr-only" aria-live="polite">
-          {`${t('Reviewing')} ${reviewedTrackingPreset || t('Tracking presets')}`}
-        </span>
         <PresetPill label={t('tight')} onClick={() => setCharSpacing(-50)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} -50`)} active={tracking === -50} value={-50}>-50</PresetPill>
         <PresetPill label={t('normal')} onClick={() => setCharSpacing(0)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} 0`)} active={tracking === 0} value={0}>0</PresetPill>
         <PresetPill label={t('loose')} onClick={() => setCharSpacing(50)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} 50`)} active={tracking === 50} value={50}>50</PresetPill>
         <PresetPill label={t('wide')} onClick={() => setCharSpacing(200)} onFocus={() => setReviewedTrackingPreset(`${t('Tracking')} 200`)} active={tracking === 200} value={200}>200</PresetPill>
-      </div>
+      </ActionToolbar>
 
       {/* Leading (lineHeight) */}
       <div className="grid grid-cols-3 items-center gap-2 mb-1">
@@ -389,17 +404,18 @@ export function CharacterPanel() {
           />
         </div>
       </div>
-      <div
-        className="flex flex-wrap gap-1 mb-3 pl-[33%]"
+      <ActionToolbar
+        statusAs="span"
         role="group"
-        aria-label={t('Leading presets')}
-        aria-describedby="character-leading-preset-review-status"
+        className="flex flex-wrap gap-1 mb-3 pl-[33%]"
+        statusId="character-leading-preset-review-status"
+        label={t('Leading presets')}
         title={t('Use Left/Right arrows to switch options')}
         onKeyDown={(event) => handlePresetKeys(event, LEADING_PRESETS, props.lineHeight, setLineHeight, (next) => setReviewedLeadingPreset(`${t('Leading')} ${next}`))}
+        reviewingLabel={t('Reviewing')}
+        reviewed={reviewedLeadingPreset}
+        fallback={t('Leading presets')}
       >
-        <span id="character-leading-preset-review-status" className="sr-only" aria-live="polite">
-          {`${t('Reviewing')} ${reviewedLeadingPreset || t('Leading presets')}`}
-        </span>
         {LEADING_PRESETS.map((leading) => (
           <PresetPill
             key={leading}
@@ -412,7 +428,7 @@ export function CharacterPanel() {
             {leading}
           </PresetPill>
         ))}
-      </div>
+      </ActionToolbar>
 
       {/* Horizontal / vertical scale (condense / extend) */}
       <div className="grid grid-cols-2 gap-2 mb-1">
@@ -446,17 +462,18 @@ export function CharacterPanel() {
         </label>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-3">
-        <div
-          className="flex flex-wrap gap-1"
+        <ActionToolbar
+          statusAs="span"
           role="group"
-          aria-label={t('Horizontal scale presets')}
-          aria-describedby="character-h-scale-preset-review-status"
+          className="flex flex-wrap gap-1"
+          statusId="character-h-scale-preset-review-status"
+          label={t('Horizontal scale presets')}
           title={t('Use Left/Right arrows to switch options')}
           onKeyDown={(event) => handlePresetKeys(event, H_SCALE_PRESETS, Math.round(props.scaleX * 100), setHScale, (next) => setReviewedHScalePreset(`${t('Horizontal Scale')} ${next}%`))}
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedHScalePreset}
+          fallback={t('Horizontal scale presets')}
         >
-          <span id="character-h-scale-preset-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedHScalePreset || t('Horizontal scale presets')}`}
-          </span>
           {H_SCALE_PRESETS.map((scale) => (
             <PresetPill
               key={scale}
@@ -469,18 +486,19 @@ export function CharacterPanel() {
               {scale}%
             </PresetPill>
           ))}
-        </div>
-        <div
-          className="flex flex-wrap gap-1"
+        </ActionToolbar>
+        <ActionToolbar
+          statusAs="span"
           role="group"
-          aria-label={t('Vertical scale presets')}
-          aria-describedby="character-v-scale-preset-review-status"
+          className="flex flex-wrap gap-1"
+          statusId="character-v-scale-preset-review-status"
+          label={t('Vertical scale presets')}
           title={t('Use Left/Right arrows to switch options')}
           onKeyDown={(event) => handlePresetKeys(event, V_SCALE_PRESETS, Math.round(props.scaleY * 100), setVScale, (next) => setReviewedVScalePreset(`${t('Vertical Scale')} ${next}%`))}
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedVScalePreset}
+          fallback={t('Vertical scale presets')}
         >
-          <span id="character-v-scale-preset-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedVScalePreset || t('Vertical scale presets')}`}
-          </span>
           {V_SCALE_PRESETS.map((scale) => (
             <PresetPill
               key={scale}
@@ -493,7 +511,7 @@ export function CharacterPanel() {
               {scale}%
             </PresetPill>
           ))}
-        </div>
+        </ActionToolbar>
       </div>
 
       {/* Text alignment */}

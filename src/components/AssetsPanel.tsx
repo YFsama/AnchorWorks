@@ -1,15 +1,32 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Plus, Trash2, Wand2, Loader2, ChevronDown, ChevronRight, Search } from 'lucide-react';
-import {
-  getStoredAssets,
-  insertAsset,
-  removeAsset,
-  importImageFile,
-  traceSelectedImage,
-  type StoredAsset,
-} from '../lib/io3';
+import type { StoredAsset } from '../lib/io3';
 import { useT } from '../lib/i18n';
 import { toast } from '../lib/toast';
+import { actionReviewKey, makeGridKeys, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
+import { SearchableListActions } from './ui/SearchableListActions';
+
+// io3 hosts the asset localStorage registry, image import, and trace — all
+// interaction-only paths. Cached dynamic import (same shape as App.tsx's
+// withProjectFile) keeps the ~29 kB module out of the entry chunk; the mount
+// effect below fetches it at boot, so every handler below is a synchronous
+// cache hit in practice (a cold press just waits out the one chunk fetch).
+type IO3Module = typeof import('../lib/io3');
+let io3Cache: IO3Module | null = null;
+const loadIO3 = (): Promise<IO3Module> =>
+  import('../lib/io3').then((m) => { io3Cache = m; return m; });
+/** Invoke an io3 API, preferring the warmed module cache. */
+function withIO3<T>(invoke: (m: IO3Module) => Promise<T>): Promise<T> {
+  const cached = io3Cache;
+  return cached ? invoke(cached) : loadIO3().then(invoke);
+}
+// Kick the fetch at module evaluation — entry-parse time in the browser,
+// earlier than any mount effect — so the first refresh below usually finds
+// the cache populated and the asset list renders synchronously. In vitest,
+// loading the module graph drains microtasks before any test mounts, which
+// keeps the byte-exact frozen-DOM suites synchronous.
+void loadIO3().catch((e) => console.warn('io3 chunk failed to load — asset panel degraded', e));
 
 export function AssetsPanel() {
   const t = useT();
@@ -18,12 +35,19 @@ export function AssetsPanel() {
   const [tracing, setTracing] = useState(false);
   const [query, setQuery] = useState('');
   const [reviewIndex, setReviewIndex] = useState(0);
-  const [reviewedAssetAction, setReviewedAssetAction] = useState('');
+  const [reviewedAssetAction, setReviewedAssetAction] = useReviewedAction();
   const inputRef = useRef<HTMLInputElement>(null);
   const firstAssetRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const refresh = () => setAssets(getStoredAssets());
+    // The initial refresh kicks off the io3 chunk fetch at mount; every
+    // later refresh (insert / remove / other-tab storage writes) resolves
+    // from the cache above, so the list repaints a microtask later —
+    // indistinguishable from the previous synchronous read.
+    const refresh = () => {
+      void withIO3(async (m) => { setAssets(m.getStoredAssets()); })
+        .catch((e) => console.warn('io3 chunk failed to load — asset list stale', e));
+    };
     refresh();
     const onChange = () => refresh();
     window.addEventListener('vector:assets-changed', onChange as EventListener);
@@ -37,7 +61,7 @@ export function AssetsPanel() {
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    await importImageFile(f);
+    await withIO3((m) => m.importImageFile(f)).catch(console.warn);
     e.target.value = '';
   };
 
@@ -53,42 +77,32 @@ export function AssetsPanel() {
 
   const currentReviewIndex = Math.min(reviewIndex, Math.max(0, filteredAssets.length - 1));
 
-  const focusAssetTile = (index: number) => {
-    setReviewIndex(index);
-    requestAnimationFrame(() => {
-      document.querySelector<HTMLButtonElement>(`[data-asset-index="${index}"]`)?.focus();
-    });
-  };
+  // Tile-grid roving (grid-cols-3): ±1 freely crossing row boundaries, ±3
+  // vertical rows, every move clamped (never wraps), Home/End absolute —
+  // makeGridKeys in ui/useRovingActions. The review index commits
+  // synchronously (the external live region derives from it) and the focus
+  // move lands on the next animation frame — the legacy focusAssetTile timing.
+  const handleAssetGridKeys = makeGridKeys({
+    selector: '[data-asset-index]',
+    columns: 3,
+    // Announcements derive from reviewIndex in the external region; tiles
+    // carry no per-button review string, so there is nothing to publish.
+    setReview: () => {},
+    onNavigate: (_tile, index) => setReviewIndex(index),
+    defer: true,
+  });
 
-  const handleAssetGridKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const activeIndex = Number((document.activeElement as HTMLElement | null)?.dataset.assetIndex ?? 0);
-    const lastIndex = filteredAssets.length - 1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? lastIndex
-        : Math.max(0, Math.min(lastIndex, activeIndex + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' ? 3 : -3)));
-    focusAssetTile(nextIndex);
-  };
-
-  const handleAssetActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-asset-action]')).filter((button) => !button.disabled);
-    if (buttons.length === 0) return;
-    event.preventDefault();
-    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-    const nextButton = buttons[nextIndex];
-    setReviewedAssetAction(nextButton?.dataset.assetActionReview ?? nextButton?.textContent?.trim() ?? '');
-    nextButton?.focus();
-  };
+  // Action toolbar: wrapping arrows that skip the Trace button while a trace
+  // is running; announcements come from data-asset-action-review.
+  const handleAssetActionKeys = makeRovingKeys({
+    selector: '[data-asset-action]',
+    reviewKey: actionReviewKey('data-asset-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    wrap: true,
+    setReview: setReviewedAssetAction,
+  });
 
   return (
     <div className="panel-section">
@@ -109,17 +123,17 @@ export function AssetsPanel() {
       </h3>
       {open && (
         <div id="assets-panel-body" className="px-2 pb-3">
-          <div
+          <ActionToolbar
+            statusId="asset-action-review-status"
             className="flex items-center gap-1 mb-2"
-            role="toolbar"
-            aria-label={t('Asset actions')}
-            aria-describedby="asset-action-review-status"
+            label={t('Asset actions')}
             title={t('Use arrow keys to review asset actions')}
             onKeyDown={handleAssetActionKeys}
+            statusAs="span"
+            reviewingLabel={t('Reviewing')}
+            reviewed={reviewedAssetAction}
+            fallback={t('Asset actions')}
           >
-            <span id="asset-action-review-status" className="sr-only" aria-live="polite">
-              {`${t('Reviewing')} ${reviewedAssetAction || t('Asset actions')}`}
-            </span>
             <button
               data-asset-action
               data-asset-action-review={t('Import an image into the library')}
@@ -141,7 +155,8 @@ export function AssetsPanel() {
                 void (async () => {
                   setTracing(true);
                   try {
-                    if (await traceSelectedImage()) toast.success(t('Image traced'));
+                    // Chunk-load errors flow through this same toast channel.
+                    if (await withIO3((m) => m.traceSelectedImage())) toast.success(t('Image traced'));
                     else toast.warn(t('Select a raster image first.'));
                   } catch (err) {
                     toast.error(err instanceof Error ? err.message : String(err), { title: t('Trace') });
@@ -160,7 +175,7 @@ export function AssetsPanel() {
                *  and the icon is the only visible state cue. */}
               {' '}{tracing ? t('Tracing…') : t('Trace')}
             </button>
-          </div>
+          </ActionToolbar>
 
           {assets.length > 0 && (
             <LibrarySearch
@@ -168,7 +183,7 @@ export function AssetsPanel() {
               setQuery={(value) => { setReviewIndex(0); setQuery(value); }}
               placeholder={t('Search assets…')}
               countLabel={normalizedQuery ? `${filteredAssets.length} / ${assets.length} ${t('matches')}` : `${assets.length} ${t('assets')}`}
-              onInsertFirst={filteredAssets.length > 0 ? () => { void insertAsset(filteredAssets[0]); } : undefined}
+              onInsertFirst={filteredAssets.length > 0 ? () => { void withIO3((m) => m.insertAsset(filteredAssets[0])); } : undefined}
               onFocusFirst={filteredAssets.length > 0 ? () => { setReviewIndex(0); firstAssetRef.current?.focus(); } : undefined}
             />
           )}
@@ -261,23 +276,18 @@ function LibrarySearch({
   onFocusFirst?: () => void;
 }) {
   const t = useT();
-  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
-  const handleActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-library-search-action]')).filter((button) => !button.disabled);
-    if (buttons.length === 0) return;
-    event.preventDefault();
-    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-    const nextButton = buttons[nextIndex];
-    setReviewedSearchAction(nextButton?.dataset.librarySearchActionReview ?? nextButton?.textContent?.trim() ?? '');
-    nextButton?.focus();
-  };
+  const [reviewedSearchAction, setReviewedSearchAction] = useReviewedAction();
+  // Wrapping arrows over the enabled search actions (Insert First is disabled
+  // at zero matches and skipped entirely).
+  const handleActionKeys = makeRovingKeys({
+    selector: '[data-library-search-action]',
+    reviewKey: actionReviewKey('data-library-search-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    wrap: true,
+    setReview: setReviewedSearchAction,
+  });
   return (
     <div className="flex items-center gap-1.5 mb-2">
       <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
@@ -307,33 +317,33 @@ function LibrarySearch({
         {countLabel}
       </span>
       {query && (
-        <div
+        <SearchableListActions
+          statusId="library-search-action-review-status"
           className="contents"
-          role="toolbar"
-          aria-label={t('Library search actions')}
-          aria-describedby="library-search-action-review-status"
+          label={t('Library search actions')}
           title={t('Use arrow keys to review library actions')}
           onKeyDown={handleActionKeys}
-        >
-          <span id="library-search-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedSearchAction || t('Library search actions')}`}
-          </span>
-          <button
-            type="button"
-            data-library-search-action
-            data-library-search-action-review={t('Insert first search result')}
-            className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
-            onClick={onInsertFirst}
-            onFocus={() => setReviewedSearchAction(t('Insert first search result'))}
-            disabled={!onInsertFirst}
-            title={t('Insert first search result')}
-          >
-            {t('Insert First')}
-          </button>
-          <button type="button" data-library-search-action data-library-search-action-review={t('Clear search')} className="btn !py-1 !px-1.5 !text-[10px] shrink-0" onFocus={() => setReviewedSearchAction(t('Clear search'))} onClick={() => setQuery('')} title={t('Clear search')}>
-            {t('Clear search')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedSearchAction}
+          fallback={t('Library search actions')}
+          actionAttr="data-library-search-action"
+          setReviewed={setReviewedSearchAction}
+          first={{
+            label: t('Insert First'),
+            review: t('Insert first search result'),
+            title: t('Insert first search result'),
+            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            onActivate: () => { onInsertFirst?.(); },
+            disabled: !onInsertFirst,
+          }}
+          clear={{
+            label: t('Clear search'),
+            review: t('Clear search'),
+            title: t('Clear search'),
+            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            onActivate: () => setQuery(''),
+          }}
+        />
       )}
     </div>
   );
@@ -353,7 +363,13 @@ function AssetTile({
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
   const t = useT();
-  const removeThisAsset = () => { removeAsset(asset.id); toast.success(t('Asset removed from library')); };
+  // io3 arrives via the cached dynamic loader (see top of file) — cache-warm
+  // in practice, so removal still fires its change event a microtask later.
+  const removeThisAsset = () => {
+    void withIO3(async (m) => { m.removeAsset(asset.id); })
+      .catch((e) => console.warn('io3 chunk failed to load — asset not removed', e));
+    toast.success(t('Asset removed from library'));
+  };
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
@@ -376,7 +392,7 @@ function AssetTile({
         title={`${asset.name} — ${t('click to insert')} · ${t('Press Delete to remove')}`}
         aria-label={asset.name}
         onFocus={onReview}
-        onClick={() => { void insertAsset(asset); }}
+        onClick={() => { void withIO3((m) => m.insertAsset(asset)); }}
       >
         {asset.thumb ? (
           <img

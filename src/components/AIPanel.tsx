@@ -14,6 +14,8 @@ import { useT } from '../lib/i18n';
 import { toast } from '../lib/toast';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { makeRovingKeys } from './ui/useRovingActions';
+import { ActionButton } from './ui/ReviewedFooter';
 
 interface Props { onClose: () => void; }
 
@@ -100,23 +102,27 @@ export function AIPanel({ onClose }: Props) {
     }
   };
 
+  // Roving keyboard conventions live in ui/useRovingActions: wrapping arrows
+  // and Home/End across every [data-ai-action] button, skipping disabled
+  // ones. The panel-side wrapper keeps the legacy interactive-target guard
+  // (ArtboardsPanel precedent): arrow keys typed inside the prompt textarea
+  // or the MCP server inputs/selects keep their native text-editing meaning.
+  // None of the toolbars has a review live region, so the kit's required
+  // setReview publisher is a no-op. The eight containers stay hand-rolled
+  // (ActionToolbar would mandate an aria-describedby/live region legacy
+  // never had); the async aria-busy buttons render through the kit's
+  // ActionButton instead (ui/ReviewedFooter).
+  const rovingAIActions = makeRovingKeys({
+    selector: '[data-ai-action]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: () => {},
+  });
   const handleAIActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
     if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-ai-action]'))
-      .filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (buttons.length === 0) return;
-    const currentIndex = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : event.key === 'ArrowRight'
-          ? (currentIndex + 1) % buttons.length
-          : (currentIndex - 1 + buttons.length) % buttons.length;
-    event.preventDefault();
-    buttons[nextIndex]?.focus();
+    rovingAIActions(event);
   };
   // Refresh skills when the MCP modal opens — new ones may have been registered.
   // Render-time prev-tracking avoids the setState-in-effect cascade pattern.
@@ -380,9 +386,17 @@ export function AIPanel({ onClose }: Props) {
           aria-label={t('Describe an edit or design…')}
           disabled={busy}
           className="flex-1 bg-panel2 border border-border rounded p-2 text-xs outline-none focus:border-accent2 resize-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors" />
-        <button data-ai-action onClick={send} disabled={busy || !input.trim()} className="btn-primary" title={t('Send message')} aria-label={t('Send message')} aria-busy={busy}>
+        <ActionButton
+          actionAttr="data-ai-action"
+          onClick={send}
+          disabled={busy || !input.trim()}
+          className="btn-primary"
+          title={t('Send message')}
+          aria-label={t('Send message')}
+          aria-busy={busy}
+        >
           {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
-        </button>
+        </ActionButton>
       </div>
 
       {showCfg && (
@@ -483,8 +497,8 @@ export function AIPanel({ onClose }: Props) {
               title={t('Use arrow keys to review AI actions')}
               onKeyDown={handleAIActionKeys}
             >
-              <button
-                data-ai-action
+              <ActionButton
+                actionAttr="data-ai-action"
                 className="btn inline-flex items-center gap-1.5"
                 onClick={refreshMCP}
                 disabled={discovering}
@@ -499,7 +513,7 @@ export function AIPanel({ onClose }: Props) {
                  *  prefers-reduced-motion freezes the Loader2 animation, so the
                  *  text swap is the only visible "still in progress" cue. */}
                 <span>{discovering ? t('Refreshing…') : t('Refresh')}</span>
-              </button>
+              </ActionButton>
               <button data-ai-action className="btn" onClick={addServer}>{t('+ Add')}</button>
             </div>
           </div>
@@ -532,8 +546,8 @@ export function AIPanel({ onClose }: Props) {
               <select className="input-num w-20" value={srv.transport} onChange={(e) => updateServer(i, { transport: e.target.value as 'http' | 'sse' })} aria-label={t('Transport')}>
                 <option value="http">HTTP</option><option value="sse">SSE</option>
               </select>
-              <button
-                data-ai-action
+              <ActionButton
+                actionAttr="data-ai-action"
                 className="btn inline-flex items-center gap-1"
                 disabled={testingIdx.has(i)}
                 aria-busy={testingIdx.has(i)}
@@ -556,7 +570,7 @@ export function AIPanel({ onClose }: Props) {
                 {/* Verb-tense change reinforces in-progress state when the
                  *  spinner freezes under prefers-reduced-motion. */}
                 {testingIdx.has(i) ? t('Testing…') : t('Test')}
-              </button>
+              </ActionButton>
               <button
                 data-ai-action
                 className="p-1.5 rounded text-muted hover:text-danger hover:bg-panel2 transition-colors"

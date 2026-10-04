@@ -25,6 +25,7 @@ import { booleanOp, divideSelection, trimSelection } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
+import { makeSegmentKeys } from './ui/useRovingActions';
 
 export function AlignPanel() {
   const t = useT();
@@ -59,23 +60,28 @@ export function AlignPanel() {
     setSpacing(preset);
     if (direction) distributeSpacing(direction, dimUnit === 'mm' ? preset : preset / MM_TO_PX);
   };
+  // Spacing-preset roving — HEAD semantics (verified against git HEAD): the
+  // index resolves from the CURRENT spacing value with an epsilon compare
+  // (|preset − current| < 0.001, never from focus), an unmatched value seeds
+  // baseIndex 0 for ArrowLeft and −1 for ArrowRight, arrows wrap, Home/End
+  // jump absolutely, applySpacingPreset runs synchronously (setSpacing
+  // always; distributeSpacing only when a direction is passed), and focus
+  // of [data-value] follows on the next animation frame — exactly
+  // makeSegmentKeys' formula, fed through the same number↔string
+  // marshalling shim as PropertiesPanel's handleNumberPresetKeys. These
+  // groups carry no review announcer in HEAD, so there is no onReview.
   const handleSpacingPresetKeys = (
-    event: React.KeyboardEvent<HTMLElement>,
+    event: React.KeyboardEvent<HTMLDivElement>,
     current: number,
     direction?: 'horizontal' | 'vertical',
   ) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const index = spacingPresets.findIndex((preset) => Math.abs(preset - current) < 0.001);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? spacingPresets[0]
-      : event.key === 'End'
-        ? spacingPresets[spacingPresets.length - 1]
-        : spacingPresets[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + spacingPresets.length) % spacingPresets.length];
-    applySpacingPreset(next, direction);
-    requestAnimationFrame(() => group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus());
+    const labels = spacingPresets.map(String);
+    const matched = spacingPresets.findIndex((preset) => Math.abs(preset - current) < 0.001);
+    makeSegmentKeys({
+      values: labels,
+      current: matched >= 0 ? labels[matched] : String(current),
+      apply: (next) => applySpacingPreset(spacingPresets[labels.indexOf(next)], direction),
+    })(event);
   };
 
   return (

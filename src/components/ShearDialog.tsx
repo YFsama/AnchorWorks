@@ -123,20 +123,26 @@ export function ShearDialog() {
           />
         </div>
 
-        <div
+        {/* Radiogroup as a kit row: PresetItem(radio) members inside a
+            role="radiogroup" ActionToolbar; the focus-roving
+            makeRovingKeys handler is kept (see TransformDialog). */}
+        <PresetRow
+          statusId="shear-axis-review-status"
           className="flex gap-1 mt-3"
           role="radiogroup"
-          aria-label={t('Axis')}
-          aria-describedby="shear-axis-review-status"
+          label={t('Axis')}
           title={t('Use arrow keys to switch shear axis')}
           onKeyDown={handleAxisKeys}
-        >
-          <div id="shear-axis-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedAxis || t('Axis')}`}
-          </div>
-          <button type="button" data-shear-axis-action data-axis="horizontal" data-review={`${t('Axis')} · ${t('Horizontal')}`} role="radio" aria-checked={axis === 'horizontal'} className={axis === 'horizontal' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setAxis('horizontal')} onFocus={(event) => setReviewedAxis(event.currentTarget.dataset.review ?? '')}>{t('Horizontal')}</button>
-          <button type="button" data-shear-axis-action data-axis="vertical" data-review={`${t('Axis')} · ${t('Vertical')}`} role="radio" aria-checked={axis === 'vertical'} className={axis === 'vertical' ? 'btn-primary flex-1' : 'btn flex-1'} onClick={() => setAxis('vertical')} onFocus={(event) => setReviewedAxis(event.currentTarget.dataset.review ?? '')}>{t('Vertical')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedAxis}
+          fallback={t('Axis')}
+          actionAttr="data-shear-axis-action"
+          setReviewed={setReviewedAxis}
+          items={[
+            { key: 'horizontal', radio: true, pressed: axis === 'horizontal', className: axis === 'horizontal' ? 'btn-primary flex-1' : 'btn flex-1', onClick: () => setAxis('horizontal'), data: { axis: 'horizontal', review: `${t('Axis')} · ${t('Horizontal')}` }, children: t('Horizontal') },
+            { key: 'vertical', radio: true, pressed: axis === 'vertical', className: axis === 'vertical' ? 'btn-primary flex-1' : 'btn flex-1', onClick: () => setAxis('vertical'), data: { axis: 'vertical', review: `${t('Axis')} · ${t('Vertical')}` }, children: t('Vertical') },
+          ]}
+        />
 
         <ReviewedFooter
           statusId="shear-action-review-status"

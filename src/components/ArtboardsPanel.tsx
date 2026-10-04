@@ -26,7 +26,14 @@ import {
 } from '../lib/artboards';
 import { useEditor } from '../store/editor';
 import { download, downloadDataURL } from '../lib/io';
+import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
+import { SearchableListActions } from './ui/SearchableListActions';
 import type { Artboard } from '../types';
+
+// The artboard list's review announcer follows focus (each row's onFocus),
+// so the kit's setReview hook is a no-op for that region.
+const noopSetReview = () => {};
 
 export function ArtboardsPanel() {
   const t = useT();
@@ -82,21 +89,23 @@ export function ArtboardsPanel() {
     else if (n) toast.success(t('Artboards rearranged'));
     else toast.warn(t('Need at least two artboards.'));
   };
+  // Roving keyboard conventions live in ui/useRovingActions. The artboard
+  // list is vertical (ArrowUp/Down step, Home/End absolute, clamped —
+  // Left/Right ignored) over the rich editor-card rows below, which stay
+  // verbatim (role="list"/listitem cards with embedded inputs; ActionToolbar
+  // cannot express role="list"). The wrapper keeps the interactive-descendant
+  // guard: arrows typed inside a row's inputs/buttons keep their native
+  // meaning instead of being preventDefaulted by the kit handler.
+  const handleArtboardRowsKeys = makeRovingKeys({
+    selector: '[data-artboard-row]',
+    axis: 'vertical',
+    guardEmpty: true,
+    setReview: noopSetReview,
+  });
   const handleArtboardListKeys = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return;
-    const rows = Array.from(event.currentTarget.querySelectorAll<HTMLDivElement>('[data-artboard-row]'));
-    if (rows.length === 0) return;
-    event.preventDefault();
-    const activeIndex = rows.indexOf(document.activeElement as HTMLDivElement);
-    const currentIndex = activeIndex >= 0 ? activeIndex : 0;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? rows.length - 1
-        : Math.min(rows.length - 1, Math.max(0, currentIndex + (event.key === 'ArrowDown' ? 1 : -1)));
-    rows[nextIndex]?.focus();
+    handleArtboardRowsKeys(event);
   };
 
   return (
@@ -300,25 +309,18 @@ function PanelSearch({
   onFocusFirst?: () => void;
 }) {
   const t = useT();
-  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
-  const handleSearchActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-artboard-search-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : event.key === 'ArrowRight'
-          ? (activeIndex + 1) % actions.length
-          : (activeIndex - 1 + actions.length) % actions.length;
-    event.preventDefault();
-    const nextAction = actions[nextIndex];
-    setReviewedSearchAction(nextAction?.dataset.artboardSearchActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
+  const [reviewedSearchAction, setReviewedSearchAction] = useReviewedAction();
+  // Roving keyboard conventions live in ui/useRovingActions: wrapping arrows
+  // with Home/End that skip the disabled Target First action.
+  const handleSearchActionKeys = makeRovingKeys({
+    selector: '[data-artboard-search-action]',
+    reviewKey: actionReviewKey('data-artboard-search-action'),
+    fallbackToText: true,
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    setReview: setReviewedSearchAction,
+  });
   return (
     <div className="flex items-center gap-1.5">
       <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
@@ -352,41 +354,33 @@ function PanelSearch({
         {countLabel}
       </span>
       {query && (
-        <div
+        <SearchableListActions
+          statusId="artboard-search-action-review-status"
           className="flex items-center gap-1.5 shrink-0"
-          role="toolbar"
-          aria-label={t('Artboard search actions')}
-          aria-describedby="artboard-search-action-review-status"
+          label={t('Artboard search actions')}
           title={t('Use arrow keys to review artboard search actions')}
           onKeyDown={handleSearchActionKeys}
-        >
-          <span id="artboard-search-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedSearchAction || t('Artboard search actions')}`}
-          </span>
-          <button
-            type="button"
-            className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
-            data-artboard-search-action
-            data-artboard-search-action-review={t('Zoom to first search result')}
-            onClick={onTargetFirst}
-            onFocus={() => setReviewedSearchAction(t('Zoom to first search result'))}
-            disabled={!onTargetFirst}
-            title={t('Zoom to first search result')}
-          >
-            {t('Target First')}
-          </button>
-          <button
-            type="button"
-            className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
-            data-artboard-search-action
-            data-artboard-search-action-review={t('Clear search')}
-            onClick={() => setQuery('')}
-            onFocus={() => setReviewedSearchAction(t('Clear search'))}
-            title={t('Clear search')}
-          >
-            {t('Clear search')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedSearchAction}
+          fallback={t('Artboard search actions')}
+          actionAttr="data-artboard-search-action"
+          setReviewed={setReviewedSearchAction}
+          first={{
+            label: t('Target First'),
+            review: t('Zoom to first search result'),
+            title: t('Zoom to first search result'),
+            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            onActivate: onTargetFirst ?? (() => {}),
+            disabled: !onTargetFirst,
+          }}
+          clear={{
+            label: t('Clear search'),
+            review: t('Clear search'),
+            title: t('Clear search'),
+            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            onActivate: () => setQuery(''),
+          }}
+        />
       )}
     </div>
   );
@@ -405,7 +399,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
   const [y, setY] = useState(String(artboard.y));
   const [w, setW] = useState(String(artboard.width));
   const [h, setH] = useState(String(artboard.height));
-  const [reviewedRowAction, setReviewedRowAction] = useState('');
+  const [reviewedRowAction, setReviewedRowAction] = useReviewedAction();
 
   // Reflect external changes (e.g. another panel renamed the artboard).
   // Render-time sync against the previous prop reference avoids the
@@ -464,34 +458,30 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
     if (reorderArtboard(artboard.id, direction)) toast.success(t('Artboard order updated'));
     else toast.warn(t('This artboard cannot move further.'));
   };
-  const nextToolbarButton = (event: KeyboardEvent<HTMLDivElement>, selector: string) => {
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(selector));
-    if (buttons.length === 0) return null;
-    event.preventDefault();
-    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-    const nextButton = buttons[nextIndex] ?? null;
-    setReviewedRowAction(nextButton?.dataset.artboardActionReview ?? nextButton?.textContent?.trim() ?? '');
-    nextButton?.focus();
-    return nextButton;
-  };
+  // Roving keyboard conventions live in ui/useRovingActions. The row's three
+  // action toolbars wrap ArrowLeft/ArrowRight (Home/End absolute, no
+  // disabled filtering — none of these buttons is ever disabled) and announce
+  // the landed action into the row's shared review region; the preset
+  // variant additionally applies the landed size preset via onNavigate.
+  const handleActionGroupKeys = makeRovingKeys({
+    selector: '[data-artboard-action]',
+    reviewKey: actionReviewKey('data-artboard-action'),
+    fallbackToText: true,
+    wrap: true,
+    setReview: setReviewedRowAction,
+  });
 
-  const handleActionGroupKeys = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    nextToolbarButton(event, '[data-artboard-action]');
-  };
-
-  const handleSizePresetKeys = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const button = nextToolbarButton(event, '[data-artboard-action]');
-    const preset = ARTBOARD_SIZE_PRESETS.find((item) => item.label === button?.dataset.sizePreset);
-    if (preset) applySizePreset(preset.wMm, preset.hMm);
-  };
+  const handleSizePresetKeys = makeRovingKeys({
+    selector: '[data-artboard-action]',
+    reviewKey: actionReviewKey('data-artboard-action'),
+    fallbackToText: true,
+    wrap: true,
+    setReview: setReviewedRowAction,
+    onNavigate: (button) => {
+      const preset = ARTBOARD_SIZE_PRESETS.find((item) => item.label === button?.dataset.sizePreset);
+      if (preset) applySizePreset(preset.wMm, preset.hMm);
+    },
+  });
   const focusArtboard = () => zoomToArtboard({ x: artboard.x, y: artboard.y, width: artboard.width, height: artboard.height });
   const duplicateThisArtboard = () => {
     void duplicateArtboard(artboard.id).then((ab) => {
@@ -624,13 +614,19 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
 
       <div>
         <div className="field-label !mb-1">{t('Artboard order')}</div>
-        <div
+        {/* The row's three toolbars share ONE review live region, rendered by
+            the presets toolbar below — order/fit opt out of the built-in
+            region via externalStatus and keep pointing aria-describedby at
+            its id. */}
+        <ActionToolbar
+          statusId={`artboard-row-action-review-${artboard.id}`}
+          externalStatus
           className="grid grid-cols-4 gap-1"
-          role="toolbar"
-          aria-label={t('Artboard order')}
-          aria-describedby={`artboard-row-action-review-${artboard.id}`}
+          label={t('Artboard order')}
           title={t('Use arrow keys to review artboard row actions')}
           onKeyDown={handleActionGroupKeys}
+          reviewingLabel={t('Reviewing')}
+          fallback={t('Artboard size presets')}
         >
           <button
             type="button"
@@ -676,22 +672,22 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
           >
             {t('Last')}
           </button>
-        </div>
+        </ActionToolbar>
       </div>
 
       <div>
         <div className="field-label !mb-1">{t('Artboard size presets')}</div>
-        <div
+        <ActionToolbar
+          statusId={`artboard-row-action-review-${artboard.id}`}
           className="flex flex-wrap gap-1"
-          role="toolbar"
-          aria-label={t('Artboard size presets')}
-          aria-describedby={`artboard-row-action-review-${artboard.id}`}
+          label={t('Artboard size presets')}
           title={t('Use arrow keys to review artboard row actions')}
           onKeyDown={handleSizePresetKeys}
+          statusAs="span"
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedRowAction}
+          fallback={t('Artboard size presets')}
         >
-          <span id={`artboard-row-action-review-${artboard.id}`} className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedRowAction || t('Artboard size presets')}`}
-          </span>
           {ARTBOARD_SIZE_PRESETS.map((preset) => (
             <button
               key={preset.label}
@@ -719,18 +715,20 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
           >
             <RotateCw size={10} aria-hidden="true" /> {t('Swap W/H')}
           </button>
-        </div>
+        </ActionToolbar>
       </div>
 
       <div>
         <div className="field-label !mb-1">{t('Fit artboard')}</div>
-        <div
+        <ActionToolbar
+          statusId={`artboard-row-action-review-${artboard.id}`}
+          externalStatus
           className="grid grid-cols-2 gap-1"
-          role="toolbar"
-          aria-label={t('Fit artboard')}
-          aria-describedby={`artboard-row-action-review-${artboard.id}`}
+          label={t('Fit artboard')}
           title={t('Use arrow keys to review artboard row actions')}
           onKeyDown={handleActionGroupKeys}
+          reviewingLabel={t('Reviewing')}
+          fallback={t('Artboard size presets')}
         >
           <button
             type="button"
@@ -754,7 +752,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
           >
             {t('Fit Artwork')}
           </button>
-        </div>
+        </ActionToolbar>
       </div>
 
       <div className="flex gap-1">

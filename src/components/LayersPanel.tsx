@@ -12,6 +12,8 @@ import { useEditor } from '../store/editor';
 import { toast } from '../lib/toast';
 import { showConfirm } from '../lib/confirm';
 import { loadGraphicStyles } from '../lib/graphicStyles';
+import { makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
 import type { FreeDistortCorners } from '../lib/freeDistort';
 import { LAYER_BLEND_MODES, addAnchorsToLayerObjectsById, applyGraphicStyleToLayerObjectsById, changeLayerObjectNameCaseById, cleanLayerObjectNamesById, cleanUpLayerObjectsById, clearLayerObjectAppearanceById, clearLayerObjectGradientFillById, clearLayerObjectImageFiltersById, clearLayerObjectPatternFillById, detachLayerSymbolInstancesById, expandLayerObjectAppearanceById, expandLayerObjectClippingMasksById, blendLayerObjectsById, flattenLayerObjectTransparencyById, freeDistortLayerObjectsById, grommetLayerObjectsById, groupLayerObjectsById, knifeSplitLayerObjectsById, makeLayerCompoundPathById, moveLayerObjectsById, multiOutlineLayerObjectsById, normalizeLayerBlendMode, offsetLayerObjectsById, outlineLayerObjectStrokesById, puckerLayerObjectsById, roughenLayerObjectsById, zigzagLayerObjectsById, twistLayerObjectsById, normalizeLayerBoolean, normalizeLayerDash, normalizeLayerPaint, normalizeLayerStrokeCap, normalizeLayerStrokeJoin, renumberLayerObjectsById, releaseLayerCompoundPathsById, releaseLayerObjectClippingMasksById, replaceLayerObjectNamesById, rhinestoneLayerObjectsById, reverseLayerObjectsById, roundCornersLayerObjectsById, scissorsSplitLayerObjectsById, selectSameLayerAppearanceById, selectSameLayerAssetById, selectSameLayerComplexAppearanceById, selectSameLayerGeometryById, selectSameLayerObjectById, selectSameLayerProductionById, selectSameLayerTextById, setLayerObjectBlendModeById, setLayerObjectDashById, setLayerObjectGeometryById, setLayerObjectGeometryPairById, setLayerObjectMiterLimitById, setLayerObjectOpacityById, setLayerObjectOverprintById, setLayerObjectPaintById, setLayerObjectPrintMarkKindById, setLayerObjectShadowById, setLayerObjectStrokeStyleById, setLayerObjectStrokeUniformById, setLayerObjectStrokeWidthById, setLayerObjectTextStyleById, simplifyLayerObjectsById, smoothLayerObjectsById, splitLayerObjectsIntoGridById, targetLayerObjectsById, ungroupLayerObjectsById, variableWidthLayerObjectsById, warpLayerObjectsById, type LayerGeometryPairSetTarget, type LayerGeometrySetTarget, type LayerNameCaseMode, type LayerOverprintTarget, type LayerPaintTarget, type LayerStackDestination, type LayerSameAppearanceTarget, type LayerSameAssetTarget, type LayerSameComplexAppearanceTarget, type LayerSameGeometryTarget, type LayerSameObjectTarget, type LayerSameProductionTarget, type LayerSameTextTarget, type LayerStrokeStyleTarget, type LayerTextStyleTarget } from '../lib/layerOps';
 
@@ -87,7 +89,7 @@ export function LayersPanel() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropAt, setDropAt] = useState<{ id: string; pos: 'above' | 'below' } | null>(null);
   const [layerQuery, setLayerQuery] = useState('');
-  const [reviewedLayerAction, setReviewedLayerAction] = useState('');
+  const [reviewedLayerAction, setReviewedLayerAction] = useReviewedAction();
   const editInputRef = useRef<HTMLInputElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   // Roving-focus index inside the listbox — null when the panel has never
@@ -1632,22 +1634,29 @@ export function LayersPanel() {
     setEditingValue('');
   };
 
-  const handleActionToolbarKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-layer-action]')).filter((button) => !button.disabled);
-    if (buttons.length === 0) return;
-    event.preventDefault();
-    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-    const nextButton = buttons[nextIndex];
-    setReviewedLayerAction(nextButton?.dataset.layerActionReview ?? nextButton?.textContent?.trim() ?? '');
-    nextButton?.focus();
-  };
+  // Roving conventions for both [data-layer-action] toolbars live in
+  // ui/useRovingActions — HEAD semantics (verified against git HEAD):
+  // horizontal arrows WRAP over the enabled buttons (disabled filtered before
+  // indexing), Home/End jump absolutely, focus + review publish synchronously,
+  // review text comes from data-layer-action-review with the trimmed
+  // text-content fallback, and no key outside the roving set is prevented.
+  // Two HEAD deltas from the kit defaults are unreachable here: the legacy
+  // empty-collection bail ran before preventDefault (both toolbars always
+  // render an enabled button — the quick set is never disabled and the search
+  // set always ends with the enabled Clear search), and the legacy
+  // container-focus fallback ("ArrowRight starts before the first button")
+  // only diverges when the active element is not one of the matched buttons —
+  // both containers hold nothing else focusable (the ArtboardsPanel/StatusBar
+  // precedent for accepting both).
+  const handleActionToolbarKeys = makeRovingKeys({
+    selector: '[data-layer-action]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    reviewKey: 'layerActionReview',
+    fallbackToText: true,
+    setReview: setReviewedLayerAction,
+  });
 
   // ---------- Drag reorder
   // List row index N corresponds to canvas object index (objects.length - 1 - N),
@@ -1717,17 +1726,21 @@ export function LayersPanel() {
   return (
     <div className="panel-section">
       <div className="panel-header"><h3 className="contents">{t('Layers')}</h3><span className="panel-count">{rows.length}</span></div>
-      <div
+      {/* The "Layer quick actions" toolbar owns the panel's ONE review live
+          region (#layer-action-review-status); the search-actions toolbar
+          below shares it via externalStatus — the ArtboardsPanel order/fit
+          precedent. */}
+      <ActionToolbar
+        statusId="layer-action-review-status"
         className="px-2 pb-2 flex flex-wrap gap-1"
-        role="toolbar"
-        aria-label={t('Layer quick actions')}
-        aria-describedby="layer-action-review-status"
+        label={t('Layer quick actions')}
         title={t('Use arrow keys to review layer actions')}
         onKeyDown={handleActionToolbarKeys}
+        statusAs="span"
+        reviewingLabel={t('Reviewing')}
+        reviewed={reviewedLayerAction}
+        fallback={t('Layer quick actions')}
       >
-        <span id="layer-action-review-status" className="sr-only" aria-live="polite">
-          {`${t('Reviewing')} ${reviewedLayerAction || t('Layer quick actions')}`}
-        </span>
         <button type="button" data-layer-action data-layer-action-review={t('Select Visible Objects')} className="btn !py-1 !px-1.5 !text-[10px] flex items-center gap-1" onFocus={() => setReviewedLayerAction(t('Select Visible Objects'))} onClick={selectVisibleFromPanel} title={t('Select Visible Objects')}>
           <MousePointerClick size={11} aria-hidden="true" />{t('Visible')}
         </button>
@@ -1743,7 +1756,7 @@ export function LayersPanel() {
         <button type="button" data-layer-action data-layer-action-review={t('Unlock All')} className="btn !py-1 !px-1.5 !text-[10px] flex items-center gap-1" onFocus={() => setReviewedLayerAction(t('Unlock All'))} onClick={unlockAllFromPanel} title={t('Unlock All')}>
           <Unlock size={11} aria-hidden="true" />{t('Unlock All')}
         </button>
-      </div>
+      </ActionToolbar>
       {rows.length > 0 && (
         <div className="px-2 pb-2 flex items-center gap-1.5">
           <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
@@ -1779,13 +1792,15 @@ export function LayersPanel() {
             {normalizedLayerQuery ? `${filteredRows.length} / ${rows.length} ${t('matches')}` : `${rows.length} ${t('objects')}`}
           </span>
           {layerQuery && (
-            <div
+            <ActionToolbar
+              statusId="layer-action-review-status"
+              externalStatus
               className="contents"
-              role="toolbar"
-              aria-label={t('Layer search actions')}
-              aria-describedby="layer-action-review-status"
+              label={t('Layer search actions')}
               title={t('Use arrow keys to review layer actions')}
               onKeyDown={handleActionToolbarKeys}
+              reviewingLabel={t('Reviewing')}
+              fallback={t('Layer quick actions')}
             >
               <button
                 type="button"
@@ -3558,7 +3573,7 @@ export function LayersPanel() {
               >
                 {t('Clear search')}
               </button>
-            </div>
+            </ActionToolbar>
           )}
         </div>
       )}

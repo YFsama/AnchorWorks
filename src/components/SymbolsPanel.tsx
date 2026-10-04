@@ -13,6 +13,9 @@ import {
 } from '../lib/symbols';
 import type { SymbolEntry } from '../types';
 import { toast } from '../lib/toast';
+import { actionReviewKey, makeGridKeys, makeRovingKeys, useReviewedAction } from './ui/useRovingActions';
+import { ActionToolbar } from './ui/ActionToolbar';
+import { SearchableListActions } from './ui/SearchableListActions';
 
 export function SymbolsPanel() {
   const t = useT();
@@ -20,7 +23,7 @@ export function SymbolsPanel() {
   const [symbols, setSymbols] = useState<SymbolEntry[]>([]);
   const [query, setQuery] = useState('');
   const [reviewIndex, setReviewIndex] = useState(0);
-  const [reviewedSymbolAction, setReviewedSymbolAction] = useState('');
+  const [reviewedSymbolAction, setReviewedSymbolAction] = useReviewedAction();
   // When non-null we're showing the inline "name this symbol" input in place
   // of the Save Selection button.
   const [namingNew, setNamingNew] = useState<string | null>(null);
@@ -77,42 +80,39 @@ export function SymbolsPanel() {
 
   const currentReviewIndex = Math.min(reviewIndex, Math.max(0, filteredSymbols.length - 1));
 
-  const focusSymbolTile = (index: number) => {
-    setReviewIndex(index);
-    requestAnimationFrame(() => {
-      document.querySelector<HTMLButtonElement>(`[data-symbol-index="${index}"]`)?.focus();
-    });
-  };
+  // Tile-grid roving (grid-cols-3): ±1 freely crossing row boundaries, ±3
+  // vertical rows, every move clamped (never wraps), Home/End absolute —
+  // makeGridKeys in ui/useRovingActions. The review index commits
+  // synchronously (the external live region derives from it) and the focus
+  // move lands on the next animation frame — the legacy focusSymbolTile timing.
+  const handleSymbolGridKeys = makeGridKeys({
+    selector: '[data-symbol-index]',
+    columns: 3,
+    // Announcements derive from reviewIndex in the external region; tiles
+    // carry no per-button review string, so there is nothing to publish.
+    setReview: () => {},
+    onNavigate: (_tile, index) => setReviewIndex(index),
+    defer: true,
+  });
 
-  const handleSymbolGridKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const activeIndex = Number((document.activeElement as HTMLElement | null)?.dataset.symbolIndex ?? 0);
-    const lastIndex = filteredSymbols.length - 1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? lastIndex
-        : Math.max(0, Math.min(lastIndex, activeIndex + (event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' ? 3 : -3)));
-    focusSymbolTile(nextIndex);
-  };
-
-  const handleNamingActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-symbol-naming-action]'));
-    if (buttons.length === 0) return;
-    event.preventDefault();
-    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-    const nextButton = buttons[nextIndex];
-    setReviewedSymbolAction(nextButton?.dataset.symbolNamingActionReview ?? nextButton?.getAttribute('aria-label') ?? nextButton?.textContent?.trim() ?? '');
-    nextButton?.focus();
-  };
+  // Naming toolbar: the name <input> lives INSIDE this roving container and
+  // is auto-focused when naming begins, so arrow keydowns bubble from the
+  // input — the one roving container in the codebase whose no-focus fallback
+  // is reachable. fallbackIndex: -1 reproduces the legacy asymmetric entry:
+  // ArrowRight from the input starts "before the first" button and lands on
+  // Save; ArrowLeft starts at the first and wraps onto Cancel. Arrows wrap,
+  // the review reads data-symbol-naming-action-review (both buttons carry
+  // it), and review + focus commit synchronously (makeRovingKeys in
+  // ui/useRovingActions).
+  const handleNamingActionKeys = makeRovingKeys({
+    selector: '[data-symbol-naming-action]',
+    reviewKey: actionReviewKey('data-symbol-naming-action'),
+    fallbackToText: true,
+    fallbackIndex: -1,
+    wrap: true,
+    guardEmpty: true,
+    setReview: setReviewedSymbolAction,
+  });
 
   return (
     <div className="panel-section">
@@ -161,17 +161,17 @@ export function SymbolsPanel() {
               </button>
             </div>
           ) : (
-            <div
+            <ActionToolbar
+              statusId="symbol-action-review-status"
               className="flex items-center gap-1"
-              role="toolbar"
-              aria-label={t('Symbol naming actions')}
-              aria-describedby="symbol-action-review-status"
+              label={t('Symbol naming actions')}
               title={t('Use arrow keys to review symbol actions')}
               onKeyDown={handleNamingActionKeys}
+              statusAs="span"
+              reviewingLabel={t('Reviewing')}
+              reviewed={reviewedSymbolAction}
+              fallback={t('Symbol naming actions')}
             >
-              <span id="symbol-action-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedSymbolAction || t('Symbol naming actions')}`}
-              </span>
               <input
                 ref={newNameRef}
                 type="text"
@@ -210,7 +210,7 @@ export function SymbolsPanel() {
               >
                 <X size={12} aria-hidden="true" />
               </button>
-              </div>
+            </ActionToolbar>
           )}
 
           {symbols.length > 0 && (
@@ -307,23 +307,18 @@ function LibrarySearch({
   onFocusFirst?: () => void;
 }) {
   const t = useT();
-  const [reviewedSearchAction, setReviewedSearchAction] = useState('');
-  const handleActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-library-search-action]')).filter((button) => !button.disabled);
-    if (buttons.length === 0) return;
-    event.preventDefault();
-    const activeIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const currentIndex = activeIndex >= 0 ? activeIndex : event.key === 'ArrowLeft' ? 0 : -1;
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-    const nextButton = buttons[nextIndex];
-    setReviewedSearchAction(nextButton?.dataset.librarySearchActionReview ?? nextButton?.textContent?.trim() ?? '');
-    nextButton?.focus();
-  };
+  const [reviewedSearchAction, setReviewedSearchAction] = useReviewedAction();
+  // Wrapping arrows over the enabled search actions (Insert First is disabled
+  // at zero matches and skipped entirely).
+  const handleActionKeys = makeRovingKeys({
+    selector: '[data-library-search-action]',
+    reviewKey: actionReviewKey('data-library-search-action'),
+    fallbackToText: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    wrap: true,
+    setReview: setReviewedSearchAction,
+  });
   return (
     <div className="flex items-center gap-1.5 mb-2">
       <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
@@ -353,33 +348,33 @@ function LibrarySearch({
         {countLabel}
       </span>
       {query && (
-        <div
+        <SearchableListActions
+          statusId="symbol-library-search-action-review-status"
           className="contents"
-          role="toolbar"
-          aria-label={t('Library search actions')}
-          aria-describedby="symbol-library-search-action-review-status"
+          label={t('Library search actions')}
           title={t('Use arrow keys to review library actions')}
           onKeyDown={handleActionKeys}
-        >
-          <span id="symbol-library-search-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedSearchAction || t('Library search actions')}`}
-          </span>
-          <button
-            type="button"
-            data-library-search-action
-            data-library-search-action-review={t('Insert first search result')}
-            className="btn !py-1 !px-1.5 !text-[10px] shrink-0"
-            onClick={onInsertFirst}
-            onFocus={() => setReviewedSearchAction(t('Insert first search result'))}
-            disabled={!onInsertFirst}
-            title={t('Insert first search result')}
-          >
-            {t('Insert First')}
-          </button>
-          <button type="button" data-library-search-action data-library-search-action-review={t('Clear search')} className="btn !py-1 !px-1.5 !text-[10px] shrink-0" onFocus={() => setReviewedSearchAction(t('Clear search'))} onClick={() => setQuery('')} title={t('Clear search')}>
-            {t('Clear search')}
-          </button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedSearchAction}
+          fallback={t('Library search actions')}
+          actionAttr="data-library-search-action"
+          setReviewed={setReviewedSearchAction}
+          first={{
+            label: t('Insert First'),
+            review: t('Insert first search result'),
+            title: t('Insert first search result'),
+            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            onActivate: () => { onInsertFirst?.(); },
+            disabled: !onInsertFirst,
+          }}
+          clear={{
+            label: t('Clear search'),
+            review: t('Clear search'),
+            title: t('Clear search'),
+            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            onActivate: () => setQuery(''),
+          }}
+        />
       )}
     </div>
   );

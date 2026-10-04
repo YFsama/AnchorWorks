@@ -23,6 +23,9 @@ import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
+import { actionReviewKey, makeRovingKeys, makeSegmentKeys } from './ui/useRovingActions';
+import { PresetRow } from './ui/PresetRow';
+import { ReviewedFooter } from './ui/ReviewedFooter';
 
 
 const SERIAL_PRESETS = [
@@ -136,12 +139,6 @@ export function VariableDataDialog() {
     `${t(preset.label)} · ${t('Start')} ${preset.start}, ${t('Step')} ${preset.step}, ${t('Count')} ${preset.count}, ${t('Pad')} ${preset.pad}, ${t('Columns')} ${preset.cols}`
   );
 
-  const reviewGapPreset = (axis: 'X' | 'Y', value: number) => {
-    const review = `${t('Gap')} ${axis} ${value} mm${linkGaps ? ` · ${t('Link gaps')}` : ''}`;
-    if (axis === 'X') setReviewedGapXPreset(review);
-    else setReviewedGapYPreset(review);
-  };
-
   useEscapeClose(open, close);
   useFocusRestore(open);
   if (!open) return null;
@@ -173,39 +170,6 @@ export function VariableDataDialog() {
     close();
   };
 
-  const handleFooterActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-action]'));
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : Math.max(0, Math.min(actions.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1)));
-    const nextAction = actions[nextIndex];
-    setReviewedFooterAction(nextAction?.dataset.variableDataActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
-
-  const focusMode = (nextMode: typeof mode) => {
-    setMode(nextMode);
-    requestAnimationFrame(() => document.getElementById(`variable-mode-${nextMode}`)?.focus());
-  };
-
-  const handleModeKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const modes: Array<typeof mode> = ['number', 'list', 'csv'];
-    const index = modes.indexOf(mode);
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? modes.length - 1
-        : (index + (event.key === 'ArrowRight' ? 1 : -1) + modes.length) % modes.length;
-    focusMode(modes[nextIndex]);
-  };
-
   /** Load a .csv / .txt file into the paste box (read as UTF-8 text). */
   const onCsvFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -222,98 +186,6 @@ export function VariableDataDialog() {
     } catch {
       toast.warn(t('Clipboard unavailable.'));
     }
-  };
-
-  const handleTokenChipKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const chips = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-token]'));
-    if (chips.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, chips.findIndex((chip) => chip === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? chips.length - 1
-        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + chips.length) % chips.length;
-    const next = chips[nextIndex];
-    setReviewedTokenChip(next?.dataset.review ?? '');
-    next?.focus();
-  };
-
-  const focusFillOrder = (nextOrder: VariableDataFillOrder) => {
-    setFillOrder(nextOrder);
-    requestAnimationFrame(() => document.getElementById(`variable-fill-${nextOrder}`)?.focus());
-  };
-
-  const handleFillOrderKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const orders: VariableDataFillOrder[] = ['rows', 'columns'];
-    const index = orders.indexOf(fillOrder);
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? orders.length - 1
-        : (index + (event.key === 'ArrowRight' ? 1 : -1) + orders.length) % orders.length;
-    focusFillOrder(orders[nextIndex]);
-  };
-
-  const handleColumnPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const presets = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-column-preset]'))
-      .filter((button) => !button.disabled);
-    if (presets.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, presets.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? presets.length - 1
-        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + presets.length) % presets.length;
-    const nextPreset = Number(presets[nextIndex]?.dataset.variableDataColumnPreset);
-    if (Number.isFinite(nextPreset)) {
-      setCols(Math.max(1, Math.min(50, nextPreset)));
-      setReviewedColumnPreset(`${t('Columns')} ${nextPreset}`);
-    }
-    presets[nextIndex]?.focus();
-  };
-
-  const handleGapPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const presets = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-gap-preset]'))
-      .filter((button) => !button.disabled);
-    if (presets.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, presets.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? presets.length - 1
-        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + presets.length) % presets.length;
-    const nextPreset = Number(presets[nextIndex]?.dataset.variableDataGapPreset);
-    if (Number.isFinite(nextPreset)) {
-      const axis = presets[nextIndex]?.dataset.variableDataGapAxis === 'Y' ? 'Y' : 'X';
-      setGapValue(axis, nextPreset);
-      reviewGapPreset(axis, nextPreset);
-    }
-    presets[nextIndex]?.focus();
-  };
-
-  const handleLayoutActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-layout-action]'))
-      .filter((button) => !button.disabled);
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + actions.length) % actions.length;
-    const nextAction = actions[nextIndex];
-    setReviewedListAction(nextAction?.dataset.variableDataListActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
   };
 
   const setGapValue = (axis: 'X' | 'Y', value: number) => {
@@ -346,24 +218,72 @@ export function VariableDataDialog() {
     setCols(preset.cols);
   };
 
-  const handleSerialPresetKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const presets = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-preset]'));
-    const activeIndex = Math.max(0, presets.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? presets.length - 1
-        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + presets.length) % presets.length;
-    const nextPresetId = presets[nextIndex]?.dataset.variableDataPreset;
-    const nextPreset = SERIAL_PRESETS.find((preset) => preset.id === nextPresetId);
-    if (nextPreset) {
-      applySerialPreset(nextPreset);
-      setReviewedSerialPreset(describeSerialPreset(nextPreset));
-    }
-    presets[nextIndex]?.focus();
-  };
+  // Roving keyboard conventions live in ui/useRovingActions; the toolbars are
+  // the shared PresetRow / ReviewedFooter kit. The two tablists use the
+  // segment variant (Seg carries data-value). The layout toolbar keeps its
+  // hand-rolled container on purpose: it has no aria-describedby today and
+  // publishes into the list toolbar's shared review region, which only exists
+  // in list mode — an ActionToolbar would add a dangling describedby.
+  const handleModeKeys = makeSegmentKeys({
+    values: ['number', 'list', 'csv'] as const,
+    current: mode,
+    apply: setMode,
+  });
+  const handleFillOrderKeys = makeSegmentKeys({
+    values: ['rows', 'columns'] as const,
+    current: fillOrder,
+    apply: setFillOrder,
+  });
+  const handleTokenChipKeys = makeRovingKeys({
+    selector: '[data-variable-data-token]',
+    wrap: true,
+    guardEmpty: true,
+    setReview: setReviewedTokenChip,
+  });
+  const handleColumnPresetKeys = makeRovingKeys({
+    selector: '[data-variable-data-column-preset]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    onNavigate: (button) => {
+      const preset = Number(button?.dataset.variableDataColumnPreset);
+      if (Number.isFinite(preset)) setCols(Math.max(1, Math.min(50, preset)));
+    },
+    setReview: setReviewedColumnPreset,
+  });
+  const handleLayoutActionKeys = makeRovingKeys({
+    selector: '[data-variable-data-layout-action]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    reviewKey: actionReviewKey('data-variable-data-list-action'),
+    fallbackToText: true,
+    setReview: setReviewedListAction,
+  });
+  const handleSerialPresetKeys = makeRovingKeys({
+    selector: '[data-variable-data-preset]',
+    wrap: true,
+    onNavigate: (button) => {
+      const preset = SERIAL_PRESETS.find((item) => item.id === button?.dataset.variableDataPreset);
+      if (preset) applySerialPreset(preset);
+    },
+    setReview: setReviewedSerialPreset,
+  });
+  const handleListActionKeys = makeRovingKeys({
+    selector: '[data-variable-data-list-action]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    reviewKey: actionReviewKey('data-variable-data-list-action'),
+    fallbackToText: true,
+    setReview: setReviewedListAction,
+  });
+  const handleFooterActionKeys = makeRovingKeys({
+    selector: '[data-variable-data-action]',
+    reviewKey: actionReviewKey('data-variable-data-action'),
+    fallbackToText: true,
+    setReview: setReviewedFooterAction,
+  });
 
   const getListValues = () => listValues;
 
@@ -374,23 +294,6 @@ export function VariableDataDialog() {
   const sortListValues = () => setListText(sortVariableListValues(getListValues()).join('\n'));
 
   const reverseListValues = () => setListText(reverseVariableListValues(getListValues()).join('\n'));
-
-  const handleListActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-variable-data-list-action]'))
-      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
-    if (actions.length === 0) return;
-    event.preventDefault();
-    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? actions.length - 1
-        : (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + actions.length) % actions.length;
-    const nextAction = actions[nextIndex];
-    setReviewedListAction(nextAction?.dataset.variableDataListActionReview ?? nextAction?.textContent?.trim() ?? '');
-    nextAction?.focus();
-  };
 
   return (
     <div
@@ -422,9 +325,9 @@ export function VariableDataDialog() {
             title={t('Use arrow keys to switch modes')}
             onKeyDown={handleModeKeys}
           >
-            <Seg id="variable-mode-number" active={mode === 'number'} onClick={() => setMode('number')} label={t('Numbers')} />
-            <Seg id="variable-mode-list" active={mode === 'list'} onClick={() => setMode('list')} label={t('List')} />
-            <Seg id="variable-mode-csv" active={mode === 'csv'} onClick={() => setMode('csv')} label={t('CSV')} />
+            <Seg id="variable-mode-number" value="number" active={mode === 'number'} onClick={() => setMode('number')} label={t('Numbers')} />
+            <Seg id="variable-mode-list" value="list" active={mode === 'list'} onClick={() => setMode('list')} label={t('List')} />
+            <Seg id="variable-mode-csv" value="csv" active={mode === 'csv'} onClick={() => setMode('csv')} label={t('CSV')} />
           </div>
         </Field>
 
@@ -471,32 +374,26 @@ export function VariableDataDialog() {
                 <Table2 size={10} aria-hidden="true" />
                 {t('Columns → named objects')}
               </div>
-              <div
+              <PresetRow
+                statusId="variable-data-token-review-status"
                 className="flex flex-wrap gap-1 mb-1.5"
-                role="toolbar"
-                aria-label={t('Column token chips')}
-                aria-describedby="variable-data-token-review-status"
+                label={t('Column token chips')}
                 title={t('Use arrow keys to review token chips')}
                 onKeyDown={handleTokenChipKeys}
-              >
-                <span id="variable-data-token-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedTokenChip || t('Column token chips')}`}
-                </span>
-                {(csv?.columns ?? []).map((column) => (
-                  <button
-                    key={column}
-                    type="button"
-                    data-variable-data-token={column}
-                    data-review={`${t('Insert token')} {{${column}}}`}
-                    className="btn !py-0.5 !px-1.5 !text-[10px] font-mono"
-                    onFocus={(event) => setReviewedTokenChip(event.currentTarget.dataset.review ?? '')}
-                    onClick={() => { void copyToken(column); }}
-                    title={`${t('Copy the {{token}} for this column to the clipboard.')} — {{${column}}}`}
-                  >
-                    {`{{${column}}}`}
-                  </button>
-                ))}
-              </div>
+                statusAs="span"
+                reviewingLabel={t('Reviewing')}
+                reviewed={reviewedTokenChip}
+                fallback={t('Column token chips')}
+                setReviewed={setReviewedTokenChip}
+                items={(csv?.columns ?? []).map((column) => ({
+                  key: column,
+                  children: `{{${column}}}`,
+                  className: 'btn !py-0.5 !px-1.5 !text-[10px] font-mono',
+                  onClick: () => { void copyToken(column); },
+                  title: `${t('Copy the {{token}} for this column to the clipboard.')} — {{${column}}}`,
+                  data: { 'variable-data-token': column, review: `${t('Insert token')} {{${column}}}` },
+                }))}
+              />
               {(csv?.columns ?? []).map((column) => (
                 <div key={column} className="flex items-center gap-1 mb-1">
                   <span className="font-mono text-[10px] text-muted w-24 shrink-0 truncate" title={column}>{column}</span>
@@ -553,32 +450,30 @@ export function VariableDataDialog() {
             </div>
             <div className="mt-2">
               <div className="mb-1 text-[10px] uppercase tracking-wide text-muted">{t('Serial presets')}</div>
-              <div
+              <PresetRow
+                statusId="variable-data-serial-preset-review-status"
                 className="grid grid-cols-4 gap-1"
-                role="toolbar"
-                aria-label={t('Variable Data serial presets')}
-                aria-describedby="variable-data-serial-preset-review-status"
+                label={t('Variable Data serial presets')}
                 title={t('Use arrow keys to review serial presets')}
                 onKeyDown={handleSerialPresetKeys}
-              >
-                <span id="variable-data-serial-preset-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedSerialPreset || t('Serial presets')}`}
-                </span>
-                {SERIAL_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    data-variable-data-preset={preset.id}
-                    className={`btn !py-1 !px-1.5 !text-[10px] ${start === preset.start && step === preset.step && count === preset.count && pad === preset.pad && cols === preset.cols ? 'ring-1 ring-accent' : ''}`}
-                    aria-pressed={start === preset.start && step === preset.step && count === preset.count && pad === preset.pad && cols === preset.cols}
-                    onClick={() => applySerialPreset(preset)}
-                    onFocus={() => setReviewedSerialPreset(describeSerialPreset(preset))}
-                    title={`${t(preset.label)} · ${t('Start')} ${preset.start}, ${t('Step')} ${preset.step}, ${t('Count')} ${preset.count}, ${t('Pad')} ${preset.pad}`}
-                  >
-                    {t(preset.label)}
-                  </button>
-                ))}
-              </div>
+                statusAs="span"
+                reviewingLabel={t('Reviewing')}
+                reviewed={reviewedSerialPreset}
+                fallback={t('Serial presets')}
+                setReviewed={setReviewedSerialPreset}
+                items={SERIAL_PRESETS.map((preset) => {
+                  const active = start === preset.start && step === preset.step && count === preset.count && pad === preset.pad && cols === preset.cols;
+                  return {
+                    key: preset.id,
+                    children: t(preset.label),
+                    className: `btn !py-1 !px-1.5 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                    pressed: active,
+                    onClick: () => applySerialPreset(preset),
+                    title: `${t(preset.label)} · ${t('Start')} ${preset.start}, ${t('Step')} ${preset.step}, ${t('Count')} ${preset.count}, ${t('Pad')} ${preset.pad}`,
+                    data: { 'variable-data-preset': preset.id, review: describeSerialPreset(preset) },
+                  };
+                })}
+              />
             </div>
           </>
         ) : (
@@ -586,24 +481,27 @@ export function VariableDataDialog() {
             <Field label={t('Values (one per line or comma-separated)')}>
               <textarea className="input-num h-24 resize-none font-mono text-[11px]" value={listText} onChange={(e) => setListText(e.target.value)} />
             </Field>
-            <div
+            <PresetRow
+              statusId="variable-data-list-action-review-status"
               className="grid grid-cols-3 gap-1 mt-1 mb-2"
-              role="toolbar"
-              aria-label={t('Variable Data list actions')}
-              aria-describedby="variable-data-list-action-review-status"
+              label={t('Variable Data list actions')}
               title={t('Use arrow keys to review list actions')}
               onKeyDown={handleListActionKeys}
-            >
-              <span id="variable-data-list-action-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedListAction || t('Variable Data list actions')}`}
-              </span>
-              <button type="button" data-variable-data-list-action data-variable-data-list-action-review={t('Sample list')} onFocus={() => setReviewedListAction(t('Sample list'))} className="btn !py-1 !px-1.5 !text-[10px]" onClick={() => setListText(SAMPLE_LIST_VALUES.join('\n'))}>{t('Sample list')}</button>
-              <button type="button" data-variable-data-list-action data-variable-data-list-action-review={t('Clean list')} onFocus={() => setReviewedListAction(t('Clean list'))} className="btn !py-1 !px-1.5 !text-[10px]" disabled={!listText.trim()} onClick={cleanListValues}>{t('Clean list')}</button>
-              <button type="button" data-variable-data-list-action data-variable-data-list-action-review={t('Dedupe')} onFocus={() => setReviewedListAction(t('Dedupe'))} className="btn !py-1 !px-1.5 !text-[10px]" disabled={!listText.trim()} onClick={dedupeListValues}>{t('Dedupe')}</button>
-              <button type="button" data-variable-data-list-action data-variable-data-list-action-review={t('Sort A-Z')} onFocus={() => setReviewedListAction(t('Sort A-Z'))} className="btn !py-1 !px-1.5 !text-[10px]" disabled={!listText.trim()} onClick={sortListValues}>{t('Sort A-Z')}</button>
-              <button type="button" data-variable-data-list-action data-variable-data-list-action-review={t('Reverse')} onFocus={() => setReviewedListAction(t('Reverse'))} className="btn !py-1 !px-1.5 !text-[10px]" disabled={!listText.trim()} onClick={reverseListValues}>{t('Reverse')}</button>
-              <button type="button" data-variable-data-list-action data-variable-data-list-action-review={t('Clear list')} onFocus={() => setReviewedListAction(t('Clear list'))} className="btn !py-1 !px-1.5 !text-[10px]" disabled={!listText.trim()} onClick={() => setListText('')}>{t('Clear list')}</button>
-            </div>
+              statusAs="span"
+              reviewingLabel={t('Reviewing')}
+              reviewed={reviewedListAction}
+              fallback={t('Variable Data list actions')}
+              actionAttr="data-variable-data-list-action"
+              setReviewed={setReviewedListAction}
+              items={[
+                { key: 'sample', children: t('Sample list'), className: 'btn !py-1 !px-1.5 !text-[10px]', onClick: () => setListText(SAMPLE_LIST_VALUES.join('\n')), data: { 'variable-data-list-action-review': t('Sample list') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'clean', children: t('Clean list'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: cleanListValues, data: { 'variable-data-list-action-review': t('Clean list') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'dedupe', children: t('Dedupe'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: dedupeListValues, data: { 'variable-data-list-action-review': t('Dedupe') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'sort', children: t('Sort A-Z'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: sortListValues, data: { 'variable-data-list-action-review': t('Sort A-Z') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'reverse', children: t('Reverse'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: reverseListValues, data: { 'variable-data-list-action-review': t('Reverse') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'clear', children: t('Clear list'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: () => setListText(''), data: { 'variable-data-list-action-review': t('Clear list') }, focusReviewKey: 'variableDataListActionReview' },
+              ]}
+            />
           </>
         )}
 
@@ -656,31 +554,26 @@ export function VariableDataDialog() {
         <div className="grid grid-cols-3 gap-2 mt-1">
           <Field label={t('Columns')}>
             <input type="number" min={1} max={50} className="input-num" value={cols} onChange={(e) => setCols(Math.max(1, Math.min(50, parseInt(e.target.value, 10) || 1)))} />
-            <div
+            <PresetRow
+              statusId="variable-data-column-preset-review-status"
               className="mt-1 grid grid-cols-5 gap-1"
-              role="toolbar"
-              aria-label={t('Variable Data column presets')}
-              aria-describedby="variable-data-column-preset-review-status"
+              label={t('Variable Data column presets')}
               title={t('Use arrow keys to review column presets')}
               onKeyDown={handleColumnPresetKeys}
-            >
-              <span id="variable-data-column-preset-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedColumnPreset || t('Variable Data column presets')}`}
-              </span>
-              {COLUMN_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  data-variable-data-column-preset={preset}
-                  className={`btn !py-0.5 !px-1 !text-[10px] ${cols === preset ? 'ring-1 ring-accent' : ''}`}
-                  aria-pressed={cols === preset}
-                  onClick={() => setCols(preset)}
-                  onFocus={() => setReviewedColumnPreset(`${t('Columns')} ${preset}`)}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
+              statusAs="span"
+              reviewingLabel={t('Reviewing')}
+              reviewed={reviewedColumnPreset}
+              fallback={t('Variable Data column presets')}
+              setReviewed={setReviewedColumnPreset}
+              items={COLUMN_PRESETS.map((preset) => ({
+                key: preset,
+                children: preset,
+                className: `btn !py-0.5 !px-1 !text-[10px] ${cols === preset ? 'ring-1 ring-accent' : ''}`,
+                pressed: cols === preset,
+                onClick: () => setCols(preset),
+                data: { 'variable-data-column-preset': preset, review: `${t('Columns')} ${preset}` },
+              }))}
+            />
           </Field>
           <Field label={t('Fill order')}>
             <div
@@ -690,72 +583,84 @@ export function VariableDataDialog() {
               title={t('Use arrow keys to switch fill order')}
               onKeyDown={handleFillOrderKeys}
             >
-              <Seg id="variable-fill-rows" active={fillOrder === 'rows'} onClick={() => setFillOrder('rows')} label={t('Rows')} />
-              <Seg id="variable-fill-columns" active={fillOrder === 'columns'} onClick={() => setFillOrder('columns')} label={t('Columns short')} />
+              <Seg id="variable-fill-rows" value="rows" active={fillOrder === 'rows'} onClick={() => setFillOrder('rows')} label={t('Rows')} />
+              <Seg id="variable-fill-columns" value="columns" active={fillOrder === 'columns'} onClick={() => setFillOrder('columns')} label={t('Columns short')} />
             </div>
           </Field>
-          <GapField axis="X" value={gapX} linked={linkGaps} reviewedPreset={reviewedGapXPreset} onReview={reviewGapPreset} onChange={(value) => setGapValue('X', value)} onPresetKeys={handleGapPresetKeys} />
-          <GapField axis="Y" value={gapY} linked={linkGaps} reviewedPreset={reviewedGapYPreset} onReview={reviewGapPreset} onChange={(value) => setGapValue('Y', value)} onPresetKeys={handleGapPresetKeys} />
+          <GapField axis="X" value={gapX} linked={linkGaps} reviewedPreset={reviewedGapXPreset} onChange={(value) => setGapValue('X', value)} setReviewedPreset={setReviewedGapXPreset} />
+          <GapField axis="Y" value={gapY} linked={linkGaps} reviewedPreset={reviewedGapYPreset} onChange={(value) => setGapValue('Y', value)} setReviewedPreset={setReviewedGapYPreset} />
         </div>
 
-        <div
+        <ReviewedFooter
+          statusId="variable-data-action-review-status"
           className="flex justify-end gap-2 mt-3"
-          role="toolbar"
-          aria-label={t('Variable Data actions')}
-          aria-describedby="variable-data-action-review-status"
+          label={t('Variable Data actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}
-        >
-          <span id="variable-data-action-review-status" className="sr-only" aria-live="polite">
-            {`${t('Reviewing')} ${reviewedFooterAction || t('Variable Data actions')}`}
-          </span>
-          <button type="button" data-variable-data-action data-variable-data-action-review={t('Cancel')} onFocus={() => setReviewedFooterAction(t('Cancel'))} className="btn" onClick={close}>{t('Cancel')}</button>
-          <button type="button" data-variable-data-action data-variable-data-action-review={t('Generate')} onFocus={() => setReviewedFooterAction(t('Generate'))} className="btn-primary" onClick={() => { void apply(); }}>{t('Generate')}</button>
-        </div>
+          reviewingLabel={t('Reviewing')}
+          reviewed={reviewedFooterAction}
+          fallback={t('Variable Data actions')}
+          actionAttr="data-variable-data-action"
+          setReviewed={setReviewedFooterAction}
+          actions={[
+            { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
+            { children: t('Generate'), review: t('Generate'), className: 'btn-primary', onClick: () => { void apply(); } },
+          ]}
+        />
       </div>
     </div>
   );
 }
 
-function GapField({ axis, value, linked, reviewedPreset, onReview, onChange, onPresetKeys }: { axis: 'X' | 'Y'; value: number; linked: boolean; reviewedPreset: string; onReview: (axis: 'X' | 'Y', value: number) => void; onChange: (value: number) => void; onPresetKeys: (event: React.KeyboardEvent<HTMLDivElement>) => void }) {
+function GapField({ axis, value, linked, reviewedPreset, onChange, setReviewedPreset }: { axis: 'X' | 'Y'; value: number; linked: boolean; reviewedPreset: string; onChange: (value: number) => void; setReviewedPreset: (review: string) => void }) {
   const t = useT();
   const reviewId = `variable-data-gap-${axis.toLowerCase()}-preset-review-status`;
+  // Each axis renders its own roving handler, but preset application still
+  // funnels through the dialog's onChange (setGapValue), so the linked X↔Y
+  // coupling keeps living in exactly one place. data-review carries the same
+  // "Gap X 40 mm[ · Link gaps]" text the legacy handler computed on the fly.
+  const handlePresetKeys = makeRovingKeys({
+    selector: '[data-variable-data-gap-preset]',
+    wrap: true,
+    skipDisabled: true,
+    guardEmpty: true,
+    onNavigate: (button) => {
+      const preset = Number(button?.dataset.variableDataGapPreset);
+      if (Number.isFinite(preset)) onChange(preset);
+    },
+    setReview: setReviewedPreset,
+  });
+  const reviewFor = (preset: number) => `${t('Gap')} ${axis} ${preset} mm${linked ? ` · ${t('Link gaps')}` : ''}`;
   return (
     <Field label={`${t('Gap')} ${axis} (mm)`}>
       <input type="number" className="input-num" value={value} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} />
-      <div
+      <PresetRow
+        statusId={reviewId}
         className="mt-1 grid grid-cols-5 gap-1"
-        role="toolbar"
-        aria-label={t(`Variable Data gap ${axis} presets`)}
-        aria-describedby={reviewId}
+        label={t(`Variable Data gap ${axis} presets`)}
         title={linked ? t('Linked gaps: presets update both axes') : t('Use arrow keys to review gap presets')}
-        onKeyDown={onPresetKeys}
-      >
-        <span id={reviewId} className="sr-only" aria-live="polite">
-          {`${t('Reviewing')} ${reviewedPreset || t(`Variable Data gap ${axis} presets`)}`}
-        </span>
-        {GAP_PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            data-variable-data-gap-preset={preset}
-            data-variable-data-gap-axis={axis}
-            className={`btn !py-0.5 !px-1 !text-[10px] ${value === preset ? 'ring-1 ring-accent' : ''}`}
-            aria-pressed={value === preset}
-            onClick={() => onChange(preset)}
-            onFocus={() => onReview(axis, preset)}
-          >
-            {preset}
-          </button>
-        ))}
-      </div>
+        onKeyDown={handlePresetKeys}
+        statusAs="span"
+        reviewingLabel={t('Reviewing')}
+        reviewed={reviewedPreset}
+        fallback={t(`Variable Data gap ${axis} presets`)}
+        setReviewed={setReviewedPreset}
+        items={GAP_PRESETS.map((preset) => ({
+          key: preset,
+          children: preset,
+          className: `btn !py-0.5 !px-1 !text-[10px] ${value === preset ? 'ring-1 ring-accent' : ''}`,
+          pressed: value === preset,
+          onClick: () => onChange(preset),
+          data: { 'variable-data-gap-preset': preset, 'variable-data-gap-axis': axis, review: reviewFor(preset) },
+        }))}
+      />
     </Field>
   );
 }
 
-function Seg({ id, active, onClick, label }: { id: string; active: boolean; onClick: () => void; label: string }) {
+function Seg({ id, value, active, onClick, label }: { id: string; value: string; active: boolean; onClick: () => void; label: string }) {
   return (
-    <button id={id} type="button" role="tab" onClick={onClick} aria-selected={active}
+    <button id={id} type="button" role="tab" onClick={onClick} aria-selected={active} data-value={value}
       className={`flex-1 px-2 py-1 rounded-sm border text-xs transition-colors ${active ? 'border-[#ff2e9a] text-ink bg-panel2' : 'border-border text-muted hover:text-ink'}`}>
       {label}
     </button>

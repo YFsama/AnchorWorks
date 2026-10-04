@@ -44,6 +44,7 @@ import { CharacterPanel } from './CharacterPanel';
 import { ContrastChecker } from './ContrastChecker';
 import { useColorPickerPopover } from '../lib/useColorPicker';
 import { useT } from '../lib/i18n';
+import { makeRovingKeys, makeSegmentKeys, useReviewedAction } from './ui/useRovingActions';
 
 const DASH_PRESETS: Record<string, number[]> = {
   solid: [],
@@ -56,9 +57,9 @@ const OPACITY_PRESETS = [1, 0.75, 0.5, 0.25];
 const TRANSFORM_SCALE_PRESETS = [25, 50, 75, 100, 150, 200];
 const ROTATION_PRESETS = [0, 90, 180, -90];
 const GRADIENT_ANGLE_PRESETS = [0, 45, 90, 135, 180, 270];
-const FIT_SIZE_ACTIONS = ['fit-width', 'fit-height', 'fit-page'] as const;
-const DOCUMENT_CENTER_ACTIONS = ['center-x', 'center-y', 'center'] as const;
-const OBJECT_NAME_ACTIONS = ['apply-name', 'clear-name'] as const;
+type FitSizeAction = 'fit-width' | 'fit-height' | 'fit-page';
+type DocumentCenterAction = 'center-x' | 'center-y' | 'center';
+type ObjectNameAction = 'apply-name' | 'clear-name';
 const DASH_STYLE_ACTIONS = ['solid', 'dashed', 'dotted'] as const;
 const LINE_CAP_ACTIONS = ['butt', 'round', 'square'] as const;
 const LINE_JOIN_ACTIONS = ['miter', 'round', 'bevel'] as const;
@@ -71,8 +72,6 @@ const SHADOW_PRESETS = [
   { id: 'glow', label: 'Glow', value: { color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 } },
   { id: 'clear', label: 'Clear Shadow', value: null },
 ] as const;
-type ShadowPresetId = typeof SHADOW_PRESETS[number]['id'];
-const SHADOW_PRESET_ACTIONS: ShadowPresetId[] = SHADOW_PRESETS.map((preset) => preset.id);
 const PATTERN_SIZE_PRESETS = [8, 12, 16, 24, 32, 48];
 const FILTER_BLUR_PRESETS = [0, 0.1, 0.2, 0.4];
 const FILTER_TONE_PRESETS = [-0.3, -0.15, 0, 0.15, 0.3];
@@ -161,24 +160,26 @@ export function PropertiesPanel() {
   const [patternColor1, setPatternColor1] = useState('#ffffff');
   const [patternColor2, setPatternColor2] = useState('#000000');
   const [patternSize, setPatternSize] = useState(16);
-  const [reviewedStrokeWidthPreset, setReviewedStrokeWidthPreset] = useState('');
-  const [reviewedOpacityPreset, setReviewedOpacityPreset] = useState('');
-  const [reviewedGradientAnglePreset, setReviewedGradientAnglePreset] = useState('');
-  const [reviewedPatternSizePreset, setReviewedPatternSizePreset] = useState('');
-  const [reviewedBlurPreset, setReviewedBlurPreset] = useState('');
-  const [reviewedBrightnessPreset, setReviewedBrightnessPreset] = useState('');
-  const [reviewedContrastPreset, setReviewedContrastPreset] = useState('');
-  const [reviewedHuePreset, setReviewedHuePreset] = useState('');
-  const [reviewedTransformScalePreset, setReviewedTransformScalePreset] = useState('');
-  const [reviewedFitPreset, setReviewedFitPreset] = useState('');
-  const [reviewedCenterPreset, setReviewedCenterPreset] = useState('');
-  const [reviewedNameAction, setReviewedNameAction] = useState('');
-  const [reviewedRotationPreset, setReviewedRotationPreset] = useState('');
-  const [reviewedDashPreset, setReviewedDashPreset] = useState('');
-  const [reviewedLineCapPreset, setReviewedLineCapPreset] = useState('');
-  const [reviewedLineJoinPreset, setReviewedLineJoinPreset] = useState('');
-  const [reviewedMiterLimitPreset, setReviewedMiterLimitPreset] = useState('');
-  const [reviewedStrokeAlignPreset, setReviewedStrokeAlignPreset] = useState('');
+  // Review announcements for the preset groups — the shared kit's state
+  // machine (a plain useState('') underneath; see useReviewedAction).
+  const [reviewedStrokeWidthPreset, setReviewedStrokeWidthPreset] = useReviewedAction();
+  const [reviewedOpacityPreset, setReviewedOpacityPreset] = useReviewedAction();
+  const [reviewedGradientAnglePreset, setReviewedGradientAnglePreset] = useReviewedAction();
+  const [reviewedPatternSizePreset, setReviewedPatternSizePreset] = useReviewedAction();
+  const [reviewedBlurPreset, setReviewedBlurPreset] = useReviewedAction();
+  const [reviewedBrightnessPreset, setReviewedBrightnessPreset] = useReviewedAction();
+  const [reviewedContrastPreset, setReviewedContrastPreset] = useReviewedAction();
+  const [reviewedHuePreset, setReviewedHuePreset] = useReviewedAction();
+  const [reviewedTransformScalePreset, setReviewedTransformScalePreset] = useReviewedAction();
+  const [reviewedFitPreset, setReviewedFitPreset] = useReviewedAction();
+  const [reviewedCenterPreset, setReviewedCenterPreset] = useReviewedAction();
+  const [reviewedNameAction, setReviewedNameAction] = useReviewedAction();
+  const [reviewedRotationPreset, setReviewedRotationPreset] = useReviewedAction();
+  const [reviewedDashPreset, setReviewedDashPreset] = useReviewedAction();
+  const [reviewedLineCapPreset, setReviewedLineCapPreset] = useReviewedAction();
+  const [reviewedLineJoinPreset, setReviewedLineJoinPreset] = useReviewedAction();
+  const [reviewedMiterLimitPreset, setReviewedMiterLimitPreset] = useReviewedAction();
+  const [reviewedStrokeAlignPreset, setReviewedStrokeAlignPreset] = useReviewedAction();
   const applyPatternPreset = (nextKind: PatternKind, nextSize = patternSize) => {
     setPatternKind(nextKind);
     setPatternSize(nextSize);
@@ -337,7 +338,7 @@ export function PropertiesPanel() {
     setNameDraft(nextName);
     renameSelection(nextName);
   };
-  const applyObjectNameAction = (action: typeof OBJECT_NAME_ACTIONS[number]) => {
+  const applyObjectNameAction = (action: ObjectNameAction) => {
     if (action === 'clear-name') {
       commitNameFromProperties('');
       return;
@@ -349,94 +350,33 @@ export function PropertiesPanel() {
 
   const transformPresetClass = (active: boolean) =>
     `px-2 py-1 rounded border text-[10px] transition-colors ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`;
+  // numberPreset roving — HEAD resolved the index from the CURRENT value with
+  // an epsilon compare (|v − current| < 0.001, never from focus), applied
+  // synchronously, then reviewed + moved focus on the next frame. makeSegmentKeys
+  // owns that exact formula for string values, so this thin wrapper marshals
+  // numbers to their data-value strings and back; the epsilon normalization
+  // keeps 0.9999 matching preset 1 precisely like HEAD.
   const handleNumberPresetKeys = (
-    event: React.KeyboardEvent<HTMLElement>,
+    event: React.KeyboardEvent<HTMLDivElement>,
     values: readonly number[],
     current: number,
     apply: (next: number) => void,
     onReview?: (next: number) => void,
   ) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const index = values.findIndex((value) => Math.abs(value - current) < 0.001);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? values[0]
-      : event.key === 'End'
-        ? values[values.length - 1]
-        : values[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
-    apply(next);
-    requestAnimationFrame(() => {
-      onReview?.(next);
-      group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus();
-    });
-  };
-  const handleToolbarPresetKeys = (
-    event: React.KeyboardEvent<HTMLElement>,
-    values: readonly string[],
-    apply?: (next: string) => void,
-  ) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const activeValue = group.contains(document.activeElement)
-      ? (document.activeElement as HTMLElement | null)?.dataset.value
-      : undefined;
-    const index = activeValue ? values.indexOf(activeValue) : -1;
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? values[0]
-      : event.key === 'End'
-        ? values[values.length - 1]
-        : values[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
-    apply?.(next);
-    requestAnimationFrame(() => group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus());
-  };
-  const handlePatternKindKeys = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const activeValue = group.contains(document.activeElement)
-      ? (document.activeElement as HTMLElement | null)?.dataset.value
-      : undefined;
-    const activeKind = PATTERN_KIND_ACTIONS.find((kind) => kind === activeValue) ?? patternKind;
-    const index = PATTERN_KIND_ACTIONS.indexOf(activeKind);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? PATTERN_KIND_ACTIONS[0]
-      : event.key === 'End'
-        ? PATTERN_KIND_ACTIONS[PATTERN_KIND_ACTIONS.length - 1]
-        : PATTERN_KIND_ACTIONS[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + PATTERN_KIND_ACTIONS.length) % PATTERN_KIND_ACTIONS.length];
-    applyPatternPreset(next);
-    requestAnimationFrame(() => group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus());
-  };
-  const handleStrokeOptionKeys = <T extends string>(
-    event: React.KeyboardEvent<HTMLElement>,
-    values: readonly T[],
-    current: T,
-    apply: (next: T) => void,
-    onReview?: (next: T) => void,
-  ) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const activeValue = group.contains(document.activeElement)
-      ? (document.activeElement as HTMLElement | null)?.dataset.value
-      : undefined;
-    const activeOption = values.find((value) => value === activeValue) ?? current;
-    const index = values.indexOf(activeOption);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? values[0]
-      : event.key === 'End'
-        ? values[values.length - 1]
-        : values[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + values.length) % values.length];
-    apply(next);
-    requestAnimationFrame(() => {
-      onReview?.(next);
-      group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus();
-    });
+    const labels = values.map(String);
+    const matched = values.findIndex((value) => Math.abs(value - current) < 0.001);
+    let applied: number | undefined;
+    makeSegmentKeys({
+      values: labels,
+      current: matched >= 0 ? labels[matched] : String(current),
+      apply: (next) => {
+        applied = values[labels.indexOf(next)];
+        apply(applied);
+      },
+      onReview: () => {
+        if (applied !== undefined) onReview?.(applied);
+      },
+    })(event);
   };
   const applyDashPreset = (key: keyof typeof DASH_PRESETS) => {
     setDashKey(key);
@@ -459,24 +399,6 @@ export function PropertiesPanel() {
     setBlendMode(mode);
     applyBlendModeToSelection(mode);
   };
-  const handleBlendModeKeys = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const activeValue = group.contains(document.activeElement)
-      ? (document.activeElement as HTMLElement | null)?.dataset.value
-      : undefined;
-    const activeMode = QUICK_BLEND_MODES.find((mode) => mode === activeValue) ?? blendMode;
-    const index = QUICK_BLEND_MODES.indexOf(activeMode as typeof QUICK_BLEND_MODES[number]);
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? QUICK_BLEND_MODES[0]
-      : event.key === 'End'
-        ? QUICK_BLEND_MODES[QUICK_BLEND_MODES.length - 1]
-        : QUICK_BLEND_MODES[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + QUICK_BLEND_MODES.length) % QUICK_BLEND_MODES.length];
-    applyBlendModePreset(next);
-    requestAnimationFrame(() => group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus());
-  };
   const applyShadowPreset = (preset: typeof SHADOW_PRESETS[number]) => {
     if (preset.value) {
       setShadow({ enabled: true, ...preset.value });
@@ -485,25 +407,6 @@ export function PropertiesPanel() {
       setShadow({ enabled: false });
       applyShadowToSelection(null);
     }
-  };
-  const handleShadowPresetKeys = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const group = event.currentTarget;
-    const activeValue = group.contains(document.activeElement)
-      ? (document.activeElement as HTMLElement | null)?.dataset.value
-      : undefined;
-    const activePresetId = SHADOW_PRESET_ACTIONS.find((id) => id === activeValue);
-    const index = activePresetId ? SHADOW_PRESET_ACTIONS.indexOf(activePresetId) : -1;
-    const baseIndex = index >= 0 ? index : event.key === 'ArrowLeft' ? 0 : -1;
-    const next = event.key === 'Home'
-      ? SHADOW_PRESET_ACTIONS[0]
-      : event.key === 'End'
-        ? SHADOW_PRESET_ACTIONS[SHADOW_PRESET_ACTIONS.length - 1]
-        : SHADOW_PRESET_ACTIONS[(baseIndex + (event.key === 'ArrowRight' ? 1 : -1) + SHADOW_PRESET_ACTIONS.length) % SHADOW_PRESET_ACTIONS.length];
-    const preset = SHADOW_PRESETS.find((entry) => entry.id === next);
-    if (preset) applyShadowPreset(preset);
-    requestAnimationFrame(() => group.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus());
   };
   const isFitWidth = !!sum && sum.width > 0 && Math.abs(sum.width - doc.width) <= 1;
   const isFitHeight = !!sum && sum.height > 0 && Math.abs(sum.height - doc.height) <= 1;
@@ -521,7 +424,7 @@ export function PropertiesPanel() {
       height: baseHeight > 0 ? baseHeight * (scale / 100) : sum.height * (scale / 100),
     });
   };
-  const applyFitPreset = (mode: typeof FIT_SIZE_ACTIONS[number]) => {
+  const applyFitPreset = (mode: FitSizeAction) => {
     if (!sum) return;
     if (mode === 'fit-width') {
       const ratio = sum.width > 0 ? doc.width / sum.width : 1;
@@ -538,7 +441,7 @@ export function PropertiesPanel() {
     const height = sum.height * ratio;
     applyTransformToSelection({ width, height, left: (doc.width - width) / 2, top: (doc.height - height) / 2 });
   };
-  const applyCenterPreset = (mode: typeof DOCUMENT_CENTER_ACTIONS[number]) => {
+  const applyCenterPreset = (mode: DocumentCenterAction) => {
     if (!sum) return;
     if (mode === 'center-x') {
       applyTransformToSelection({ left: (doc.width - sum.width) / 2 });
@@ -550,26 +453,135 @@ export function PropertiesPanel() {
     }
     applyTransformToSelection({ left: (doc.width - sum.width) / 2, top: (doc.height - sum.height) / 2 });
   };
-  const handleTransformUnitKeys = (event: React.KeyboardEvent<HTMLElement>) => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const units = ['mm', 'px'] as const;
-    const index = units.indexOf(xfUnit);
-    const next = event.key === 'Home'
-      ? units[0]
-      : event.key === 'End'
-        ? units[units.length - 1]
-        : units[(index + (event.key === 'ArrowRight' ? 1 : -1) + units.length) % units.length];
-    changeUnit(next);
-    requestAnimationFrame(() => event.currentTarget.querySelector<HTMLButtonElement>(`[data-value="${next}"]`)?.focus());
-  };
-  const handleTransformActionKeys = <T extends string>(
-    event: React.KeyboardEvent<HTMLElement>,
-    values: readonly T[],
-    current: T,
-    apply: (next: T) => void,
-    onReview?: (next: T) => void,
-  ) => handleStrokeOptionKeys(event, values, current, apply, onReview);
+  // ---- Shared-kit roving handlers -------------------------------------------
+  // The focus-indexed value groups below rove off the FOCUSED button's
+  // data-value — the HEAD semantics (component state was only the fallback
+  // for a focused value outside the list, unreachable while every button
+  // carries an in-list value). Arrows wrap, Home/End hit the absolute ends,
+  // nothing skipped disabled buttons, apply ran synchronously, and focus
+  // followed on the next animation frame — makeRovingKeys({ wrap, defer,
+  // onNavigate applies, setReview: noReview }) reproduces that exactly. The
+  // no-op publisher is deliberate: none of these regions had a keyboard-driven
+  // review announcement in HEAD — the text arrives via the buttons' onFocus.
+  // One theoretical divergence: with focus NOT on any matching button, HEAD's
+  // baseIndex −1 sent ArrowRight to the FIRST button while the kit's
+  // max(0, findIndex) sends it to the second — unreachable here because the
+  // containers hold no other focusable descendants.
+  const noReview = () => {};
+  const handleObjectNameKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      const action = button?.dataset.value as ObjectNameAction | undefined;
+      if (action) applyObjectNameAction(action);
+    },
+    setReview: noReview,
+  });
+  const handlePaletteKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      const fill = button?.dataset.value;
+      if (fill) { setStyle({ fill }); applyStyleToSelection({ fill }); }
+    },
+    setReview: noReview,
+  });
+  const handlePatternKindKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      const kind = button?.dataset.value as PatternKind | undefined;
+      if (kind) applyPatternPreset(kind);
+    },
+    setReview: noReview,
+  });
+  const handleBlendModeKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      const mode = button?.dataset.value as GlobalCompositeOperation | undefined;
+      if (mode) applyBlendModePreset(mode);
+    },
+    setReview: noReview,
+  });
+  const handleShadowPresetKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      const preset = SHADOW_PRESETS.find((entry) => entry.id === button?.dataset.value);
+      if (preset) applyShadowPreset(preset);
+    },
+    setReview: noReview,
+  });
+  const handleDashKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      if (button?.dataset.value) applyDashPreset(button.dataset.value as keyof typeof DASH_PRESETS);
+    },
+    setReview: noReview,
+  });
+  const handleLineCapKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      if (button?.dataset.value) applyLineCapPreset(button.dataset.value as CanvasLineCap);
+    },
+    setReview: noReview,
+  });
+  const handleLineJoinKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      if (button?.dataset.value) applyLineJoinPreset(button.dataset.value as CanvasLineJoin);
+    },
+    setReview: noReview,
+  });
+  const handleStrokeAlignKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      if (button?.dataset.value) applyStrokeAlignPreset(button.dataset.value as StrokeAlign);
+    },
+    setReview: noReview,
+  });
+  const handleFitPresetKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      if (button?.dataset.value) applyFitPreset(button.dataset.value as FitSizeAction);
+    },
+    setReview: noReview,
+  });
+  const handleCenterPresetKeys = makeRovingKeys({
+    selector: '[data-value]',
+    wrap: true,
+    defer: true,
+    onNavigate: (button) => {
+      if (button?.dataset.value) applyCenterPreset(button.dataset.value as DocumentCenterAction);
+    },
+    setReview: noReview,
+  });
+  // transformUnit is the one STATE-indexed group (HEAD read xfUnit, never
+  // focus) — makeSegmentKeys is the exact fit. Capturing the container before
+  // the deferred commit also un-breaks the rAF focus: HEAD read
+  // event.currentTarget inside the frame, which React nulls once dispatch
+  // returns (uncaught TypeError, focus never moved).
+  const handleTransformUnitKeys = makeSegmentKeys({
+    values: ['mm', 'px'] as const,
+    current: xfUnit,
+    apply: changeUnit,
+  });
 
   return (
     <>
@@ -597,7 +609,7 @@ export function PropertiesPanel() {
                 aria-label={t('Object name actions')}
                 aria-describedby="properties-object-name-action-review-status"
                 title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleToolbarPresetKeys(event, OBJECT_NAME_ACTIONS, (action) => applyObjectNameAction(action as typeof OBJECT_NAME_ACTIONS[number]))}
+                onKeyDown={handleObjectNameKeys}
               >
                 <span id="properties-object-name-action-review-status" className="sr-only" aria-live="polite">
                   {`${t('Reviewing')} ${reviewedNameAction || t('Object name actions')}`}
@@ -681,7 +693,7 @@ export function PropertiesPanel() {
             role="group"
             aria-label={t('Suggested palette colors')}
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleToolbarPresetKeys(event, palette, (fill) => { setStyle({ fill }); applyStyleToSelection({ fill }); })}
+            onKeyDown={handlePaletteKeys}
           >
             {palette.map((c, i) => (
               <button
@@ -1348,7 +1360,7 @@ export function PropertiesPanel() {
             aria-label={t('Dash')}
             aria-describedby="properties-dash-preset-review-status"
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleStrokeOptionKeys(event, DASH_STYLE_ACTIONS, dashKey, applyDashPreset, (key) => setReviewedDashPreset(dashPresetLabel(key, t)))}
+            onKeyDown={handleDashKeys}
           >
             <span id="properties-dash-preset-review-status" className="sr-only" aria-live="polite">
               {`${t('Reviewing')} ${reviewedDashPreset || t('Dash')}`}
@@ -1403,7 +1415,7 @@ export function PropertiesPanel() {
             aria-label={t('Line cap')}
             aria-describedby="properties-line-cap-preset-review-status"
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleStrokeOptionKeys(event, LINE_CAP_ACTIONS, lineCap, applyLineCapPreset, (cap) => setReviewedLineCapPreset(`${t('Line cap')} ${lineCapLabel(cap, t)}`))}
+            onKeyDown={handleLineCapKeys}
           >
             <span id="properties-line-cap-preset-review-status" className="sr-only" aria-live="polite">
               {`${t('Reviewing')} ${reviewedLineCapPreset || t('Line cap')}`}
@@ -1440,7 +1452,7 @@ export function PropertiesPanel() {
             aria-label={t('Line join')}
             aria-describedby="properties-line-join-preset-review-status"
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleStrokeOptionKeys(event, LINE_JOIN_ACTIONS, lineJoin, applyLineJoinPreset, (join) => setReviewedLineJoinPreset(`${t('Line join')} ${lineJoinLabel(join, t)}`))}
+            onKeyDown={handleLineJoinKeys}
           >
             <span id="properties-line-join-preset-review-status" className="sr-only" aria-live="polite">
               {`${t('Reviewing')} ${reviewedLineJoinPreset || t('Line join')}`}
@@ -1528,7 +1540,7 @@ export function PropertiesPanel() {
             aria-label={t('Stroke alignment')}
             aria-describedby="properties-stroke-align-preset-review-status"
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleStrokeOptionKeys(event, STROKE_ALIGN_ACTIONS, strokeAlign, applyStrokeAlignPreset, (mode) => setReviewedStrokeAlignPreset(`${t('Stroke alignment')} ${strokeAlignLabel(mode, t)}`))}
+            onKeyDown={handleStrokeAlignKeys}
           >
             <span id="properties-stroke-align-preset-review-status" className="sr-only" aria-live="polite">
               {`${t('Reviewing')} ${reviewedStrokeAlignPreset || t('Stroke alignment')}`}
@@ -1724,7 +1736,7 @@ export function PropertiesPanel() {
             aria-label={t('Fit size presets')}
             aria-describedby="properties-fit-size-preset-review-status"
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleTransformActionKeys(event, FIT_SIZE_ACTIONS, isFitWidth ? 'fit-width' : isFitHeight ? 'fit-height' : 'fit-page', applyFitPreset, (mode) => setReviewedFitPreset(transformActionLabel(mode, t)))}
+            onKeyDown={handleFitPresetKeys}
           >
             <span id="properties-fit-size-preset-review-status" className="sr-only" aria-live="polite">
               {`${t('Reviewing')} ${reviewedFitPreset || t('Fit size presets')}`}
@@ -1769,7 +1781,7 @@ export function PropertiesPanel() {
             aria-label={t('Document center presets')}
             aria-describedby="properties-document-center-preset-review-status"
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleTransformActionKeys(event, DOCUMENT_CENTER_ACTIONS, isCenteredX && isCenteredY ? 'center' : isCenteredX ? 'center-x' : isCenteredY ? 'center-y' : 'center', applyCenterPreset, (mode) => setReviewedCenterPreset(transformActionLabel(mode, t)))}
+            onKeyDown={handleCenterPresetKeys}
           >
             <span id="properties-document-center-preset-review-status" className="sr-only" aria-live="polite">
               {`${t('Reviewing')} ${reviewedCenterPreset || t('Document center presets')}`}
@@ -1987,7 +1999,7 @@ function blendModeLabel(mode: GlobalCompositeOperation, t: (key: string) => stri
   return mode;
 }
 
-function transformActionLabel(action: typeof FIT_SIZE_ACTIONS[number] | typeof DOCUMENT_CENTER_ACTIONS[number], t: (key: string) => string): string {
+function transformActionLabel(action: FitSizeAction | DocumentCenterAction, t: (key: string) => string): string {
   if (action === 'fit-width') return t('Fit width to document');
   if (action === 'fit-height') return t('Fit height to document');
   if (action === 'fit-page') return t('Fit selection inside document');
