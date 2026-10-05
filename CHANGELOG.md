@@ -4,6 +4,14 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Removed
+- **The self-generated "certificate chain"** — 75 families / 450 exported functions of image-handoff paperwork that a runaway improvement loop manufactured against itself in June (post-reseal remediation plans, records-destruction certificates, custody ledgers… every one a zero-input derivation with empty signature fields, existing only as clipboard strings about other documents). The real Links-package capability — collect/verify/digest/audit/release-gate/delivery-receipt/SBOM and the print-production chain — is untouched (independently re-adjudicated family by family). `imageHandoff.ts` drops from 1.15 MB / 662 exports to 254 kB / 212; 450 menu items and palette commands disappear; the three lazy chunks shed ~540 kB combined. 444 dead zhDict keys swept with it, and the closed PARITY/TODO backlogs moved to `docs/history/` so no future loop mistakes them for live work.
+
+### Added
+- **First-paint: PropertiesPanel subtree defers behind a skeleton** — the right rail's top section lazy-loads (immediate import, same-shape skeleton), taking CharacterPanel/FontPicker/contrast/ColorPicker and the swatch/style libraries with it: entry 375.5 → **284.0 kB raw / 81.2 kB gzip** (session total: 956.3 → 284.0 raw, −70%).
+
 ## [0.14.0] — 2026-10-04
 
 ### Added
