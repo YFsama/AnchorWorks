@@ -1,5 +1,13 @@
 # Parity backlog — Adobe Illustrator + SignMaster
 
+> **CLOSED 2026-06-10, archived 2026-10-04** — all 1,267 entries checked,
+> superseded by `OPTIMIZATION_BACKLOG.md` (the active list). Historical
+> record only. Note for future automation: the tail "Operation-convenience"
+> stream (136 "Links package" entries) was self-generated make-work whose
+> code legacy (`imageHandoff.ts` certificate chain) was pruned afterwards —
+> do not restart a loop against this file; it has demonstrated it will
+> manufacture work when none remains.
+
 Living worklist driving the `/loop` improvement cadence. Each loop iteration:
 picks the **top unchecked `[ ]` item**, verifies the gap in code (grep first),
 implements one surgical production-quality change (full en/zh i18n), keeps

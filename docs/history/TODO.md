@@ -1,5 +1,9 @@
 # Anchorworks — Open Work
 
+> **CLOSED 2026-06-03 snapshot, archived 2026-10-04** — every item checked
+> long ago; kept as a historical record under `docs/history/`. The active
+> worklist is `OPTIMIZATION_BACKLOG.md`.
+
 Snapshot of in-flight feature work + polish residue noted across the recent
 polish-loop cycles. Items below are roughly ordered by impact / dependency.
 
