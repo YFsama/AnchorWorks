@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Toolbar } from './components/Toolbar';
 import { CanvasView } from './components/CanvasView';
-import { PropertiesPanel } from './components/PropertiesPanel';
 import { AlignPanel } from './components/AlignPanel';
 import { ArtboardsPanel } from './components/ArtboardsPanel';
 import { SymbolsPanel } from './components/SymbolsPanel';
@@ -30,6 +29,18 @@ import { useResizableWidth } from './lib/hooks/useResizableWidth';
 // (window keydown below) and the file.open flow live in App itself, so
 // nothing else waits on this chunk.
 const MenuBar = lazy(() => import('./components/MenuBar').then(m => ({ default: m.MenuBar })));
+
+// PropertiesPanel is the right column's top node and the entry chunk's
+// second-largest panel line item — statically it drags its exclusive style
+// deps with it (graphicStyles / globalSwatches / filters / contrast /
+// ColorPickerPopover / variableWidth) plus FontPicker + CharacterPanel,
+// which only it imports (they render solely when a text object is selected).
+// It mounts prop-less and ref-less off the store, and its only mount effect
+// no-ops without a selection, so nothing needs it synchronously — same
+// immediate-lazy shape as MenuBar above: the import fires on App's first
+// render behind a same-shape skeleton (PropertiesSkeleton below), no delay
+// timer, and the SW/local cache resolves it in well under a frame budget.
+const PropertiesPanel = lazy(() => import('./components/PropertiesPanel').then(m => ({ default: m.PropertiesPanel })));
 
 // Code-split the heaviest dialogs / panels — they only load when opened.
 const ShortcutsDialog = lazy(() => import('./components/ShortcutsDialog').then(m => ({ default: m.ShortcutsDialog })));
@@ -785,6 +796,36 @@ export function MenuBarSkeleton() {
   );
 }
 
+/**
+ * Skeleton for the lazy PropertiesPanel — same root element and class string
+ * as the real panel (<div class="flex flex-col text-xs overflow-y-auto h-full">)
+ * so the swap at chunk-load reads as the rows filling in, not a
+ * late-appearing panel: identical scroll container, section dividers and
+ * padding (.panel-section p-3), and the field-label rhythm all come free from
+ * the shared classes. Placeholder blocks approximate the no-selection first
+ * screen (an "Appearance"-style section header plus fill/stroke rows, then a
+ * second section — the real panel skips the Selection section when nothing
+ * is selected). Decorative only: aria-hidden, plain divs — no landmark, no
+ * buttons or inputs, so nothing joins the tab order or the accessibility
+ * tree while the chunk streams in (same contract as MenuBarSkeleton /
+ * LayersSkeleton; the global prefers-reduced-motion rule neutralises the
+ * pulse). Exported for the propertiesLazy test, which pins the same-shape
+ * contract against the real panel's root classes.
+ */
+export function PropertiesSkeleton() {
+  return (
+    <div className="flex flex-col text-xs overflow-y-auto h-full" aria-hidden="true">
+      {[0, 1].map((section) => (
+        <div key={section} className="panel-section p-3 space-y-1.5">
+          <div className="h-2.5 w-20 rounded bg-panel3 animate-pulse" />
+          <div className="h-5 rounded bg-panel3 animate-pulse" style={{ width: '100%' }} />
+          <div className="h-5 rounded bg-panel3 animate-pulse" style={{ width: '70%' }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const t = useT();
   const lang = useI18n((s) => s.lang);
@@ -1514,7 +1555,13 @@ export default function App() {
           style={{ width: `${rightPanelWidth}px` }}
           aria-label={t('Properties and panels')}
         >
-          <PropertiesPanel />
+          {/* PropertiesPanel lazy chunk: the import fires at this first render
+              (see the lazy() declaration at the top) — the skeleton below
+              holds the panel's exact root shape (same scroll-container
+              classes) until it resolves. */}
+          <Suspense fallback={<PropertiesSkeleton />}>
+            <PropertiesPanel />
+          </Suspense>
           <AlignPanel />
           <ArtboardsPanel />
           <SymbolsPanel />
