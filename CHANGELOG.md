@@ -4,7 +4,7 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.15.0] — 2026-10-05
 
 ### Added
 - **Glyph-level Text-to-Outlines (slice 1 — custom fonts)**: uploaded fonts now outline to true bezier curves instead of the raster trace, wherever the exact face the canvas paints can be proven (real bold/italic faces resolve; anything the browser would synthesize — faux bold, faux italic — falls back to the tracer, which stays faithful to the paint). Placement replays fabric's own layout caches so glyph positions match the rendered text; fontkit loads lazily in its own precached 356 kB chunk. Slice 2 (Google-font byte fetching) to follow.
