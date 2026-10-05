@@ -1,4 +1,5 @@
 /** Built-in + Google font registry. Lazily injects @import links into the page. */
+import { registerFontBytes, sniffFontFaceStyle } from './fontBytes';
 
 export interface FontDef { name: string; family: string; google?: boolean; weights?: number[]; }
 
@@ -48,9 +49,20 @@ export function ensureFontLoaded(name: string) {
 export async function loadCustomFontFile(file: File): Promise<FontDef> {
   const buf = await file.arrayBuffer();
   const family = file.name.replace(/\.(woff2?|ttf|otf)$/i, '');
-  const fontFace = new FontFace(family, buf);
+  // Pass the sniffed face style as FontFace descriptors: browsers match
+  // font requests against the DESCRIPTORS, not the binary's OS/2 table.
+  // Without this, a Bold-designed upload plus a bold request synthesizes
+  // bold on top of the true bold design (double-bold paint) while the
+  // outline resolver returns the true bold glyphs — outline and paint
+  // would diverge exactly where fidelity matters.
+  const sniffed = sniffFontFaceStyle(buf);
+  const fontFace = new FontFace(family, buf, {
+    weight: sniffed.weight != null ? String(sniffed.weight) : 'normal',
+    style: sniffed.italic === true ? 'italic' : 'normal',
+  });
   await fontFace.load();
   document.fonts.add(fontFace);
+  registerFontBytes(family, buf); // keep the bytes so Create-Outlines can use real glyph vectors
   const def: FontDef = { name: family, family };
   SYSTEM_FONTS.push(def);
   loaded.add(family);

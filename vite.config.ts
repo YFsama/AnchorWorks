@@ -15,6 +15,23 @@ const manualChunks = (id: string): string | undefined => {
   if (!id.includes('node_modules')) return undefined
   if (id.includes('/fabric/')) return 'fabric'
   if (id.includes('/lucide-react/')) return 'lucide'
+  // fontkit (lazy-imported by textToOutline for glyph-level outlines) and its
+  // runtime deps — brotli carries the woff2 decoder, the rest are its parsing
+  // helpers. Nothing else in the app uses them, so one named async chunk keeps
+  // them out of the entry bundle entirely.
+  if (
+    id.includes('/fontkit/') ||
+    id.includes('/brotli/') ||
+    id.includes('/restructure/') ||
+    id.includes('/@swc/') ||
+    id.includes('/fast-deep-equal/') ||
+    id.includes('/unicode-properties/') ||
+    id.includes('/unicode-trie/') ||
+    id.includes('/dfa/') ||
+    id.includes('/clone/') ||
+    id.includes('/tiny-inflate/')
+  )
+    return 'fontkit'
   if (
     id.includes('/react-dom/') ||
     id.includes('/react/') ||
