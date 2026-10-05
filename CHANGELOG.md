@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Glyph-level Text-to-Outlines (slice 1 — custom fonts)**: uploaded fonts now outline to true bezier curves instead of the raster trace, wherever the exact face the canvas paints can be proven (real bold/italic faces resolve; anything the browser would synthesize — faux bold, faux italic — falls back to the tracer, which stays faithful to the paint). Placement replays fabric's own layout caches so glyph positions match the rendered text; fontkit loads lazily in its own precached 356 kB chunk. Slice 2 (Google-font byte fetching) to follow.
+
+### Fixed
+- **i18n silent-failure class closed**: 12 zhDict keys realigned to their components' exact byte form (two genuinely failed lookup at runtime), 38 dead keys swept under a three-level liveness check that correctly rescued 11 dynamically-built keys, plotter quick-command descriptions now translate, and two mutation-verified guards make the byte-drift failure class unlandable.
+
 ### Removed
 - **The self-generated "certificate chain"** — 75 families / 450 exported functions of image-handoff paperwork that a runaway improvement loop manufactured against itself in June (post-reseal remediation plans, records-destruction certificates, custody ledgers… every one a zero-input derivation with empty signature fields, existing only as clipboard strings about other documents). The real Links-package capability — collect/verify/digest/audit/release-gate/delivery-receipt/SBOM and the print-production chain — is untouched (independently re-adjudicated family by family). `imageHandoff.ts` drops from 1.15 MB / 662 exports to 254 kB / 212; 450 menu items and palette commands disappear; the three lazy chunks shed ~540 kB combined. 444 dead zhDict keys swept with it, and the closed PARITY/TODO backlogs moved to `docs/history/` so no future loop mistakes them for live work.
 
