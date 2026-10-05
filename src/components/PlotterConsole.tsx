@@ -710,7 +710,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
                 className="btn !py-0.5 !px-1.5 !text-[10px]"
                 onClick={() => runQuick(cmd)}
                 disabled={!connected || sending}
-                title={`${cmd.description}${cmd.expectsReply ? ` ${t('(awaits reply)')}` : ''}`}
+                title={`${t(cmd.description)}${cmd.expectsReply ? ` ${t('(awaits reply)')}` : ''}`}
               >
                 {t(cmd.label)}
               </button>
@@ -742,7 +742,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
                       {cmd.id === 'force-speed' ? (forceSpeedCommand || 'FS..;VS..;') : cmd.command}
                     </code>
                     <span className="min-w-0 flex-1 text-muted">
-                      {cmd.description}{cmd.expectsReply ? ` ${t('(awaits reply)')}` : ''}
+                      {t(cmd.description)}{cmd.expectsReply ? ` ${t('(awaits reply)')}` : ''}
                     </span>
                   </div>
                 ))}
