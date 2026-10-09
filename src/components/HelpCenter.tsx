@@ -30,7 +30,11 @@ interface Topic {
   id: string;
   category: string;
   title: string;
-  /** Plain-text keywords that the fuzzy search also scans. */
+  /** Plain-text keywords that the fuzzy search also scans. Wrapped in t()
+   *  with the whole space-separated group as a single key: the zh entry is
+   *  a space-separated list of Chinese search terms, so the substring
+   *  matcher hits in either language with no splitting logic here (and the
+   *  static dead-key guard sees one plain literal per topic). */
   keywords?: string;
   body: () => React.ReactNode;
 }
@@ -79,10 +83,10 @@ function Note({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Build the topic list. Category labels are translated via the
- * provided `t` so the rail follows the user's language; the body
- * prose stays in English (translation is out of scope for the
- * help text itself).
+ * Build the topic list. Category labels, titles and the keyword groups are
+ * translated via the provided `t` so the rail and the search follow the
+ * user's language; the body prose stays in English (translation is out of
+ * scope for the help text itself).
  */
 function buildTopics(t: (k: string) => string): Topic[] {
   return [
@@ -91,7 +95,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'welcome',
       category: t('Getting started'),
       title: t('Welcome'),
-      keywords: 'intro overview start',
+      keywords: t('intro overview start'),
       body: () => (
         <>
           <P>
@@ -131,7 +135,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'workspace',
       category: t('Getting started'),
       title: t('Workspace tour'),
-      keywords: 'ui layout panels menu',
+      keywords: t('ui layout panels menu'),
       body: () => (
         <>
           <P>
@@ -179,7 +183,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'first-drawing',
       category: t('Getting started'),
       title: t('First drawing'),
-      keywords: 'tutorial hello',
+      keywords: t('tutorial hello'),
       body: () => (
         <>
           <P>
@@ -219,7 +223,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-select',
       category: t('Tools'),
       title: t('Select tool'),
-      keywords: 'pointer arrow move resize',
+      keywords: t('pointer arrow move resize'),
       body: () => (
         <>
           <P>
@@ -256,7 +260,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-shapes',
       category: t('Tools'),
       title: t('Shape tools'),
-      keywords: 'rectangle ellipse line polygon star',
+      keywords: t('rectangle ellipse line polygon star'),
       body: () => (
         <>
           <P>
@@ -295,7 +299,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-pen',
       category: t('Tools'),
       title: t('Pen tool'),
-      keywords: 'bezier path nodes anchors',
+      keywords: t('bezier path nodes anchors'),
       body: () => (
         <>
           <P>
@@ -331,7 +335,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-pencil',
       category: t('Tools'),
       title: t('Pencil tool'),
-      keywords: 'freehand brush draw',
+      keywords: t('freehand brush draw'),
       body: () => (
         <>
           <P>
@@ -362,7 +366,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-eraser',
       category: t('Tools'),
       title: t('Eraser tool'),
-      keywords: 'remove rub delete',
+      keywords: t('remove rub delete'),
       body: () => (
         <>
           <P>
@@ -391,7 +395,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-text',
       category: t('Tools'),
       title: t('Text tool'),
-      keywords: 'type font label heading',
+      keywords: t('type font label heading'),
       body: () => (
         <>
           <P>
@@ -419,7 +423,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-hand',
       category: t('Tools'),
       title: t('Hand tool'),
-      keywords: 'pan move viewport',
+      keywords: t('pan move viewport'),
       body: () => (
         <>
           <P>
@@ -440,7 +444,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-zoom',
       category: t('Tools'),
       title: t('Zoom tool'),
-      keywords: 'magnify scale view',
+      keywords: t('magnify scale view'),
       body: () => (
         <>
           <P>
@@ -468,7 +472,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'bezier',
       category: t('Drawing & paths'),
       title: t('Bezier handles'),
-      keywords: 'curves smooth tangent control',
+      keywords: t('curves smooth tangent control'),
       body: () => (
         <>
           <P>
@@ -502,7 +506,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'anchor-edit',
       category: t('Drawing & paths'),
       title: t('Anchor edit'),
-      keywords: 'nodes path editing',
+      keywords: t('nodes path editing'),
       body: () => (
         <>
           <P>
@@ -530,7 +534,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'boolean',
       category: t('Drawing & paths'),
       title: t('Boolean operations'),
-      keywords: 'union subtract intersect exclude pathfinder',
+      keywords: t('union subtract intersect exclude pathfinder'),
       body: () => (
         <>
           <P>
@@ -568,7 +572,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'compound',
       category: t('Drawing & paths'),
       title: t('Compound paths'),
-      keywords: 'holes subpath donut',
+      keywords: t('holes subpath donut'),
       body: () => (
         <>
           <P>
@@ -596,7 +600,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'clip',
       category: t('Drawing & paths'),
       title: t('Clip masks'),
-      keywords: 'mask crop hide',
+      keywords: t('mask crop hide'),
       body: () => (
         <>
           <P>
@@ -629,7 +633,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'fill-stroke',
       category: t('Styling'),
       title: t('Fill & stroke'),
-      keywords: 'color paint outline width',
+      keywords: t('color paint outline width'),
       body: () => (
         <>
           <P>
@@ -664,7 +668,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'gradients',
       category: t('Styling'),
       title: t('Gradients'),
-      keywords: 'linear radial stops',
+      keywords: t('linear radial stops'),
       body: () => (
         <>
           <P>
@@ -694,7 +698,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'shadows',
       category: t('Styling'),
       title: t('Drop shadows'),
-      keywords: 'shadow elevation depth',
+      keywords: t('shadow elevation depth'),
       body: () => (
         <>
           <P>
@@ -715,7 +719,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'filters',
       category: t('Styling'),
       title: t('SVG filters'),
-      keywords: 'blur glow effects',
+      keywords: t('blur glow effects'),
       body: () => (
         <>
           <P>
@@ -741,7 +745,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'patterns',
       category: t('Styling'),
       title: t('Pattern fills'),
-      keywords: 'tile pattern repeat texture',
+      keywords: t('tile pattern repeat texture'),
       body: () => (
         <>
           <P>
@@ -762,7 +766,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'color-picker',
       category: t('Styling'),
       title: t('Color picker'),
-      keywords: 'eyedropper hex hsl rgb',
+      keywords: t('eyedropper hex hsl rgb'),
       body: () => (
         <>
           <P>
@@ -797,7 +801,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'fonts',
       category: t('Text'),
       title: t('Fonts & uploads'),
-      keywords: 'font family upload otf ttf',
+      keywords: t('font family upload otf ttf'),
       body: () => (
         <>
           <P>
@@ -825,7 +829,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'character',
       category: t('Text'),
       title: t('Character panel'),
-      keywords: 'kerning leading tracking size',
+      keywords: t('kerning leading tracking size'),
       body: () => (
         <>
           <P>
@@ -852,7 +856,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'text-on-path',
       category: t('Text'),
       title: t('Text on path'),
-      keywords: 'curve flow follow',
+      keywords: t('curve flow follow'),
       body: () => (
         <>
           <P>
@@ -877,7 +881,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'contrast',
       category: t('Text'),
       title: t('Contrast check'),
-      keywords: 'wcag accessibility a11y',
+      keywords: t('wcag accessibility a11y'),
       body: () => (
         <>
           <P>
@@ -908,7 +912,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'layers',
       category: t('Layers & layout'),
       title: t('Layers panel'),
-      keywords: 'order visibility lock',
+      keywords: t('order visibility lock'),
       body: () => (
         <>
           <P>
@@ -941,7 +945,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'artboards',
       category: t('Layers & layout'),
       title: t('Artboards'),
-      keywords: 'pages multi page',
+      keywords: t('pages multi page'),
       body: () => (
         <>
           <P>
@@ -968,7 +972,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'symbols',
       category: t('Layers & layout'),
       title: t('Symbols'),
-      keywords: 'reusable component instance',
+      keywords: t('reusable component instance'),
       body: () => (
         <>
           <P>
@@ -996,7 +1000,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'align',
       category: t('Layers & layout'),
       title: t('Align & distribute'),
-      keywords: 'arrangement spacing equal',
+      keywords: t('arrangement spacing equal'),
       body: () => (
         <>
           <P>
@@ -1025,7 +1029,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'smart-guides',
       category: t('Layers & layout'),
       title: t('Smart guides'),
-      keywords: 'snap alignment guide',
+      keywords: t('snap alignment guide'),
       body: () => (
         <>
           <P>
@@ -1054,7 +1058,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'drag-drop',
       category: t('Assets'),
       title: t('Drag-drop import'),
-      keywords: 'drop file svg png import',
+      keywords: t('drop file svg png import'),
       body: () => (
         <>
           <P>
@@ -1076,7 +1080,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'image-trace',
       category: t('Assets'),
       title: t('Image trace'),
-      keywords: 'vectorize raster convert',
+      keywords: t('vectorize raster convert'),
       body: () => (
         <>
           <P>
@@ -1103,7 +1107,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'assets-library',
       category: t('Assets'),
       title: t('Asset library'),
-      keywords: 'pinned reuse images',
+      keywords: t('pinned reuse images'),
       body: () => (
         <>
           <P>
@@ -1125,7 +1129,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'templates',
       category: t('Templates'),
       title: t('Built-in templates'),
-      keywords: 'starter preset new from',
+      keywords: t('starter preset new from'),
       body: () => (
         <>
           <P>
@@ -1154,7 +1158,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'ai-setup',
       category: t('AI assistant'),
       title: t('AI setup'),
-      keywords: 'api key anthropic configure',
+      keywords: t('api key anthropic configure'),
       body: () => (
         <>
           <P>
@@ -1183,7 +1187,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'ai-vision',
       category: t('AI assistant'),
       title: t('AI vision'),
-      keywords: 'screenshot canvas see image',
+      keywords: t('screenshot canvas see image'),
       body: () => (
         <>
           <P>
@@ -1211,7 +1215,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'ai-skills',
       category: t('AI assistant'),
       title: t('Tools & skills'),
-      keywords: 'mcp skill registered',
+      keywords: t('mcp skill registered'),
       body: () => (
         <>
           <P>
@@ -1240,7 +1244,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'mcp',
       category: t('AI assistant'),
       title: t('MCP servers'),
-      keywords: 'model context protocol external',
+      keywords: t('model context protocol external'),
       body: () => (
         <>
           <P>
@@ -1268,7 +1272,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'ai-quick',
       category: t('AI assistant'),
       title: t('Quick actions'),
-      keywords: 'preset critique palette icon',
+      keywords: t('preset critique palette icon'),
       body: () => (
         <>
           <P>
@@ -1295,7 +1299,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'gcode',
       category: t('Plotter & cutter'),
       title: t('G-code output'),
-      keywords: 'cnc pen plotter export',
+      keywords: t('cnc pen plotter export'),
       body: () => (
         <>
           <P>
@@ -1326,7 +1330,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'hpgl',
       category: t('Plotter & cutter'),
       title: t('HP-GL output'),
-      keywords: 'vinyl cutter plotter hpgl',
+      keywords: t('vinyl cutter plotter hpgl'),
       body: () => (
         <>
           <P>
@@ -1349,7 +1353,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'web-serial',
       category: t('Plotter & cutter'),
       title: t('Web Serial USB'),
-      keywords: 'usb stream connect device',
+      keywords: t('usb stream connect device'),
       body: () => (
         <>
           <P>
@@ -1377,7 +1381,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'plotter-options',
       category: t('Plotter & cutter'),
       title: t('Plotter options'),
-      keywords: 'feed travel pen z paper',
+      keywords: t('feed travel pen z paper'),
       body: () => (
         <>
           <P>
@@ -1406,7 +1410,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'print-pages',
       category: t('Printing'),
       title: t('Page sizes'),
-      keywords: 'print paper a4 letter',
+      keywords: t('print paper a4 letter'),
       body: () => (
         <>
           <P>
@@ -1429,7 +1433,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'print-bleed',
       category: t('Printing'),
       title: t('Bleed & margins'),
-      keywords: 'crop print margin',
+      keywords: t('crop print margin'),
       body: () => (
         <>
           <P>
@@ -1449,7 +1453,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tile-print',
       category: t('Printing'),
       title: t('Tile print'),
-      keywords: 'poster multi page large',
+      keywords: t('poster multi page large'),
       body: () => (
         <>
           <P>
@@ -1472,7 +1476,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'autosave',
       category: t('Save & restore'),
       title: t('Autosave'),
-      keywords: 'recovery local storage backup',
+      keywords: t('recovery local storage backup'),
       body: () => (
         <>
           <P>
@@ -1501,7 +1505,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'project-files',
       category: t('Save & restore'),
       title: t('Project files'),
-      keywords: 'save load vector project json',
+      keywords: t('save load vector project json'),
       body: () => (
         <>
           <P>
@@ -1526,7 +1530,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'recovery',
       category: t('Save & restore'),
       title: t('Recovery'),
-      keywords: 'crash restore last session',
+      keywords: t('crash restore last session'),
       body: () => (
         <>
           <P>
@@ -1553,7 +1557,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'shortcuts',
       category: t('Keyboard shortcuts'),
       title: t('Full shortcut reference'),
-      keywords: 'hotkey keys keyboard',
+      keywords: t('hotkey keys keyboard'),
       body: () => (
         <>
           <P>
@@ -1607,7 +1611,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'a11y',
       category: t('Accessibility'),
       title: t('Accessibility features'),
-      keywords: 'a11y aria skip focus contrast motion',
+      keywords: t('a11y aria skip focus contrast motion'),
       body: () => (
         <>
           <P>
@@ -1650,8 +1654,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'stroke-alignment',
       category: t('Styling'),
-      title: 'Stroke alignment',
-      keywords: 'stroke center inside outside align position',
+      title: t('Stroke alignment'),
+      keywords: t('stroke center inside outside align position'),
       body: () => (
         <>
           <P>
@@ -1695,8 +1699,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'repeat-transforms',
       category: t('Drawing & paths'),
-      title: 'Repeat transforms',
-      keywords: 'pattern grid radial mirror array clone',
+      title: t('Repeat transforms'),
+      keywords: t('pattern grid radial mirror array clone'),
       body: () => (
         <>
           <P>
@@ -1741,8 +1745,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'anchor-snap',
       category: t('Layers & layout'),
-      title: 'Anchor snap',
-      keywords: 'snap anchor corner midpoint center node guide',
+      title: t('Anchor snap'),
+      keywords: t('snap anchor corner midpoint center node guide'),
       body: () => (
         <>
           <P>
@@ -1780,8 +1784,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'inspector-panel',
       category: t('Layers & layout'),
-      title: 'Inspector panel',
-      keywords: 'inspect stats document area palette size bounding',
+      title: t('Inspector panel'),
+      keywords: t('inspect stats document area palette size bounding'),
       body: () => (
         <>
           <P>
@@ -1821,8 +1825,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'recent-files',
       category: t('Save & restore'),
-      title: 'Recent files',
-      keywords: 'lru history reopen recent fs access',
+      title: t('Recent files'),
+      keywords: t('lru history reopen recent fs access'),
       body: () => (
         <>
           <P>
@@ -1863,8 +1867,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'wcag-contrast',
       category: t('Accessibility'),
-      title: 'WCAG contrast checker',
-      keywords: 'wcag aa aaa contrast ratio luminance a11y',
+      title: t('WCAG contrast checker'),
+      keywords: t('wcag aa aaa contrast ratio luminance a11y'),
       body: () => (
         <>
           <P>
@@ -1905,8 +1909,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'outline-view',
       category: t('View'),
-      title: 'Outline View',
-      keywords: 'wireframe outline preview hidden hollow xray',
+      title: t('Outline View'),
+      keywords: t('wireframe outline preview hidden hollow xray'),
       body: () => (
         <>
           <P>
@@ -1936,8 +1940,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'light-theme',
       category: t('View'),
-      title: 'Light theme & auto theme',
-      keywords: 'light dark theme auto system prefers color scheme high contrast',
+      title: t('Light theme & auto theme'),
+      keywords: t('light dark theme auto system prefers color scheme high contrast'),
       body: () => (
         <>
           <P>
@@ -1977,8 +1981,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'preferences',
       category: t('Preferences'),
-      title: 'Preferences',
-      keywords: 'preferences settings options config',
+      title: t('Preferences'),
+      keywords: t('preferences settings options config'),
       body: () => (
         <>
           <P>
@@ -2038,8 +2042,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'customize-shortcuts',
       category: t('Preferences'),
-      title: 'Customize Shortcuts',
-      keywords: 'rebind keymap hotkey customize keyboard',
+      title: t('Customize Shortcuts'),
+      keywords: t('rebind keymap hotkey customize keyboard'),
       body: () => (
         <>
           <P>
@@ -2098,8 +2102,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
     {
       id: 'pwa-offline',
       category: t('Platform'),
-      title: 'PWA & offline mode',
-      keywords: 'pwa progressive web app install offline service worker',
+      title: t('PWA & offline mode'),
+      keywords: t('pwa progressive web app install offline service worker'),
       body: () => (
         <>
           <P>
@@ -2125,11 +2129,11 @@ function buildTopics(t: (k: string) => string): Topic[] {
           </P>
           <H>The offline banner</H>
           <P>
-            When the browser reports <code>navigator.online === false</code>, a small
-            chip — the <code>OfflineBanner</code> — appears at the top of the canvas
-            stating <em>You're offline</em>. AI-related menu items show a muted state
-            and a tooltip explaining why. The banner disappears automatically when
-            connectivity returns; nothing else changes.
+            When the browser reports <code>navigator.onLine === false</code>, a small
+            chip — the <code>OfflineBanner</code> — pins to the bottom-left corner
+            of the window stating <em>You're offline</em>. AI-related menu items show
+            a muted state and a tooltip explaining why. The banner disappears
+            automatically when connectivity returns; nothing else changes.
           </P>
           <H>Service worker updates</H>
           <P>
@@ -2148,7 +2152,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-knife',
       category: t('Tools'),
       title: t('Knife tool'),
-      keywords: 'slice cut split freehand kerf divide carve',
+      keywords: t('slice cut split freehand kerf divide carve'),
       body: () => (
         <>
           <P>
@@ -2178,7 +2182,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-shape-builder',
       category: t('Tools'),
       title: t('Shape Builder'),
-      keywords: 'merge weld erase regions paint pathfinder combine',
+      keywords: t('merge weld erase regions paint pathfinder combine'),
       body: () => (
         <>
           <P>
@@ -2209,7 +2213,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'tool-width',
       category: t('Tools'),
       title: t('Width tool'),
-      keywords: 'taper variable stroke thickness broaden narrow calligraphy',
+      keywords: t('taper variable stroke thickness broaden narrow calligraphy'),
       body: () => (
         <>
           <P>
@@ -2241,7 +2245,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'envelope-distort',
       category: t('Drawing & paths'),
       title: t('Envelope Distort'),
-      keywords: 'warp fit top object arch badge banner reshape distort',
+      keywords: t('warp fit top object arch badge banner reshape distort'),
       body: () => (
         <>
           <P>
@@ -2272,7 +2276,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'pdf-import',
       category: t('Assets'),
       title: t('PDF vector import'),
-      keywords: 'pdf import vector drop file page text outlines',
+      keywords: t('pdf import vector drop file page text outlines'),
       body: () => (
         <>
           <P>
@@ -2298,7 +2302,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'trace-presets',
       category: t('Assets'),
       title: t('Trace presets'),
-      keywords: 'image trace kmeans colour logo photo cut line art raster',
+      keywords: t('image trace kmeans colour logo photo cut line art raster'),
       body: () => (
         <>
           <P>
@@ -2327,7 +2331,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'cut-simulation',
       category: t('Plotter & cutter'),
       title: t('Cut simulation'),
-      keywords: 'simulate replay animate feed rate preview plotter toggle',
+      keywords: t('simulate replay animate feed rate preview plotter toggle'),
       body: () => (
         <>
           <P>
@@ -2353,7 +2357,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'nesting',
       category: t('Plotter & cutter'),
       title: t('Rotation-aware nesting'),
-      keywords: 'nest pack skyline material vinyl arrange rotate 90 sheet',
+      keywords: t('nest pack skyline material vinyl arrange rotate 90 sheet'),
       body: () => (
         <>
           <P>
@@ -2382,7 +2386,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'plotter-console',
       category: t('Plotter & cutter'),
       title: t('Plotter debug console'),
-      keywords: 'console serial baud jog machine profile saved history tx rx',
+      keywords: t('console serial baud jog machine profile saved history tx rx'),
       body: () => (
         <>
           <P>
@@ -2407,7 +2411,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'csv-merge',
       category: t('Text'),
       title: t('CSV data merge'),
-      keywords: 'variable data csv mail merge token records grid badge',
+      keywords: t('variable data csv mail merge token records grid badge'),
       body: () => (
         <>
           <P>
@@ -2436,7 +2440,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'canvas-operability',
       category: t('Getting started'),
       title: t('Canvas operability'),
-      keywords: 'hud axis lock wheel pan zoom preference alt duplicate middle drag',
+      keywords: t('hud axis lock wheel pan zoom preference alt duplicate middle drag'),
       body: () => (
         <>
           <P>A quick reference for how the canvas feels while you work.</P>
@@ -2455,7 +2459,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'epson-snmp-transport',
       category: t('Printing'),
       title: t('Epson maintenance: SNMP network transport'),
-      keywords: 'epson maintenance snmp network transport udp 161 oid ip host bare simple 1284.4 d4 spooler remote',
+      keywords: t('epson maintenance snmp network transport udp 161 oid ip host bare simple 1284.4 d4 spooler remote'),
       body: () => (
         <>
           <P>
@@ -2511,7 +2515,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'epson-chip-queries',
       category: t('Printing'),
       title: t('Epson maintenance: cartridge chips, firmware, device ID'),
-      keywords: 'epson cartridge chip ii vi di firmware version device id iqt production date slot scan bdc ps',
+      keywords: t('epson cartridge chip ii vi di firmware version device id iqt production date slot scan bdc ps'),
       body: () => (
         <>
           <P>
@@ -2561,7 +2565,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'object-caching',
       category: t('Preferences'),
       title: t('Object caching'),
-      keywords: 'object caching performance zoom 4x bitmap cache slow drag lag crisp vector render fabric escape valve',
+      keywords: t('object caching performance zoom 4x bitmap cache slow drag lag crisp vector render fabric escape valve'),
       body: () => (
         <>
           <P>

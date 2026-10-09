@@ -25,13 +25,15 @@ Pre-built installers for every release are on the [Releases page](https://github
 
 | OS | File | First-launch note |
 |---|---|---|
-| **macOS (universal)** | `Anchorworks_0.15.0_universal.dmg` | The build is **not Apple-signed yet** — Gatekeeper will refuse to open it on double-click and show "cannot be opened because Apple cannot verify the developer". **Workaround**: right-click the `.app` → **Open** → confirm in the dialog. macOS remembers your choice and stops asking. We'll ship a notarized build once we have an Apple Developer cert. |
-| **Windows x64** | `Anchorworks_0.15.0_x64-setup.exe` (NSIS) or `.msi` | The `.exe` is **not Authenticode-signed yet** — SmartScreen will show "Windows protected your PC". **Workaround**: click **More info** → **Run anyway**. Future builds with an OV/EV code-signing cert will skip this entirely. |
-| **Linux (Debian / Ubuntu)** | `Anchorworks_0.15.0_amd64.deb` | `sudo apt install ./Anchorworks_0.15.0_amd64.deb` (apt resolves the WebKitGTK + GTK deps automatically). |
-| **Linux (Fedora / RHEL)** | `Anchorworks-0.15.0-1.x86_64.rpm` | `sudo dnf install ./Anchorworks-0.15.0-1.x86_64.rpm` |
-| **Linux (any)** | `Anchorworks_0.15.0_amd64.AppImage` | `chmod +x` and run directly. Self-contained — no install needed. |
+| **macOS (universal)** | `Anchorworks_0.16.0_universal.dmg` | The build is **not Apple-signed yet** — Gatekeeper will refuse to open it on double-click and show "cannot be opened because Apple cannot verify the developer". **Workaround**: right-click the `.app` → **Open** → confirm in the dialog. macOS remembers your choice and stops asking. We'll ship a notarized build once we have an Apple Developer cert. |
+| **Windows x64** | `Anchorworks_0.16.0_x64-setup.exe` (NSIS) or `.msi` | The `.exe` is **not Authenticode-signed yet** — SmartScreen will show "Windows protected your PC". **Workaround**: click **More info** → **Run anyway**. Future builds with an OV/EV code-signing cert will skip this entirely. |
+| **Linux (Debian / Ubuntu)** | `Anchorworks_0.16.0_amd64.deb` | `sudo apt install ./Anchorworks_0.16.0_amd64.deb` (apt resolves the WebKitGTK + GTK deps automatically). |
+| **Linux (Fedora / RHEL)** | `Anchorworks-0.16.0-1.x86_64.rpm` | `sudo dnf install ./Anchorworks-0.16.0-1.x86_64.rpm` |
+| **Linux (any)** | `Anchorworks_0.16.0_amd64.AppImage` | `chmod +x` and run directly. Self-contained — no install needed. |
 
 > **Don't want to install?** The PWA path above is fully offline-capable after first visit and gets every Tauri feature *except* native file dialogs / serial port direct access. For most users the PWA install is the better path.
+
+Both native shells remember your window size, position, and maximised state across launches (falls back to the 1440×900 default if the saved position is no longer on a connected display). The optional Electron build (`npm run electron:build`) produces its own NSIS installer with the same `.awk.json` / `.vstudio.json` Windows file associations as the Tauri bundle.
 
 ## Features
 
@@ -184,8 +186,9 @@ The web/PWA build remains the default target; Tauri 2 wraps the same `dist/` in 
 - **T1** — native commands: `platform_info`, `fs_save_project`, `fs_open_project`, `fs_read_path`, `serial_list_ports`, `serial_send`, plus the persistent plotter link (`serial_open` / `serial_write` / `serial_read` / `serial_close`, with RTS/CTS and XON/XOFF flow control), and `print_native`. Frontend routes through `runtime.ts#callNative` and falls back to Web Serial / `window.print` / `showSaveFilePicker` under the PWA.
 - **T2** — `build_app_menu()` mirrors the DOM MenuBar (File/Edit/View/Document/Help). `on_menu_event` emits `menu-action`; `src/lib/tauriMenu.ts` maps id → handler. DOM MenuBar stays visible for brand chrome; both surfaces dispatch through one action table.
 - **T3** — `tauri.conf.json#bundle.fileAssociations`: `.vstudio.json` (Owner) + `.svg` (Alternate). `tauri-plugin-single-instance` forwards argv → `file-open` event → `fs_read_path` → project apply. `tauri-plugin-deep-link` recognises `anchorworks://open?path=…` / `command/<id>` / `tool/<id>`.
-- **T4** — `tauri-plugin-updater` configured with real pubkey + endpoint. `.github/workflows/release.yml` signs per-OS bundles on `v*` tags via `tauri-apps/tauri-action@v0`.
+- **T4** — `tauri-plugin-updater` configured with real pubkey + endpoint. `.github/workflows/release.yml` signs per-OS bundles on `v*` tags via `tauri-apps/tauri-action@v0`. The in-app prompt offers Install / **Skip this version** (`vs:updater-skipped` — the boot poll stays quiet for exactly that version; Help → Check for updates always prompts).
 - **T5** — `package.json` scripts `build:web` / `build:native` / `build:all`; `.github/workflows/build.yml` runs the PWA on every push plus a native matrix on macos/ubuntu/windows-latest.
+- **Window state** — `tauri-plugin-window-state` persists size / position / maximised per window label in the app-data dir and restores them on launch, replacing the hardcoded 1440×900 reopen.
 
 ## Building native bundles locally (Docker)
 
@@ -207,9 +210,9 @@ docker run --rm \
 ```
 
 Output (`out/`):
-- `Anchorworks_0.15.0_amd64.deb` (7.7 MB) + `.sig` — Debian / Ubuntu
-- `Anchorworks-0.15.0-1.x86_64.rpm` (7.7 MB) + `.sig` — Fedora / RHEL / openSUSE
-- `Anchorworks_0.15.0_amd64.AppImage` (85 MB) + `.sig` — distro-agnostic
+- `Anchorworks_0.16.0_amd64.deb` (7.7 MB) + `.sig` — Debian / Ubuntu
+- `Anchorworks-0.16.0-1.x86_64.rpm` (7.7 MB) + `.sig` — Fedora / RHEL / openSUSE
+- `Anchorworks_0.16.0_amd64.AppImage` (85 MB) + `.sig` — distro-agnostic
 - `latest.json` — updater manifest the in-app plugin polls
 
 Signing keys live in `.tauri/` (gitignored; only `.pub` is committed). Generate yours via:
@@ -238,8 +241,8 @@ docker run --rm \
 ```
 
 Output (`out-win/`):
-- `Anchorworks_0.15.0_x64-setup.exe` (~4.5 MB) — NSIS installer
-- `Anchorworks_0.15.0_x64-setup.exe.sig` — updater-side minisign
+- `Anchorworks_0.16.0_x64-setup.exe` (~4.5 MB) — NSIS installer
+- `Anchorworks_0.16.0_x64-setup.exe.sig` — updater-side minisign
 - `anchorworks.exe` (~17 MB) — portable PE32+ binary
 - `latest-windows.json` — updater manifest for Windows
 

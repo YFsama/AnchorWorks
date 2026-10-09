@@ -5,19 +5,38 @@
  *   1. App boot waits ~5 s, then quietly polls the configured updater
  *      endpoint via `check()`.
  *   2. If a newer version is available, show a sticky info toast with
- *      "Install" + "Later" actions.
+ *      "Install" / "Skip this version" actions (plus the always-present
+ *      dismiss X for "not now").
  *   3. On Install, kick off `downloadAndInstall()` and patch a toast
  *      progress bar from the plugin's progress callback.
  *   4. When the install finishes, show a Restart toast that calls
  *      `relaunch()` from `@tauri-apps/plugin-process`.
+ *   5. "Skip this version" records the version in `vs:updater-skipped`;
+ *      the boot poll stays quiet for exactly that version until a newer
+ *      one ships. A manual check (Help → Check for updates) always
+ *      prompts, skipped or not.
  *
  * All of this is no-op outside the Tauri shell — the PWA build is updated
  * via Service Worker and never reaches this module.
  */
 
 import { toast } from './toast';
-import { isTauri } from './runtime';
+import { isTauri, isElectron } from './runtime';
 import { t } from './i18n';
+
+/** Version string the user dismissed with "Skip this version". Cleared
+ *  implicitly whenever a different (newer) version becomes available. */
+const SKIPPED_KEY = 'vs:updater-skipped';
+
+function readSkippedVersion(): string | null {
+  try { return window.localStorage.getItem(SKIPPED_KEY); }
+  catch { return null; } // storage blocked — treat as "nothing skipped"
+}
+
+function skipVersion(version: string): void {
+  try { window.localStorage.setItem(SKIPPED_KEY, version); }
+  catch { /* storage blocked — the boot poll will re-prompt next session */ }
+}
 
 interface UpdateInfo {
   version: string;
@@ -35,14 +54,20 @@ type ProgressEvent =
 /**
  * Boot-time updater hook. Called once from App.tsx after the canvas is
  * ready. Silently no-ops in the PWA build (Service Worker handles those
- * updates already) and on the user's first launch after install if they
- * opt out via the `vs:updater-paused` localStorage flag.
+ * updates already) and for the version, if any, the user dismissed with
+ * "Skip this version" (`vs:updater-skipped`).
+ *
+ * Note on `vs:updater-paused` below: it's a legacy opt-out flag that
+ * nothing in the codebase writes any more (an earlier design had a
+ * "pause updates" toggle; the current UX only skips per-version). The
+ * read is kept so a profile that somehow still carries the flag keeps
+ * getting its old behaviour, but it is a dead path today.
  */
 export function initUpdaterOnBoot(): void {
   if (!isTauri()) return;
   try {
     if (window.localStorage.getItem('vs:updater-paused') === '1') return;
-  } catch { /* localStorage blocked — proceed; user can opt out again */ }
+  } catch { /* localStorage blocked — proceed; nothing to honor */ }
 
   // 5s warm-up: don't compete for bandwidth/CPU with the first paint.
   // Long enough to feel "after startup," short enough to catch the
@@ -59,7 +84,19 @@ export function initUpdaterOnBoot(): void {
  */
 export async function checkAndPrompt(opts: { announceNoUpdate?: boolean } = {}): Promise<void> {
   if (!isTauri()) {
-    toast.info(t('Updates apply automatically in the PWA build.'), { title: t('Updates') });
+    // Neither non-Tauri shell can run the updater flow, but the *reason*
+    // differs and users deserve the right guidance: the Electron build has
+    // no update channel at all (the PWA message about Service-Worker
+    // auto-updates would be false there), while the PWA really does update
+    // itself on reload.
+    if (isElectron()) {
+      toast.info(
+        t('The desktop (Electron) build does not self-update — download new versions from GitHub Releases.'),
+        { title: t('Updates') },
+      );
+    } else {
+      toast.info(t('Updates apply automatically in the PWA build.'), { title: t('Updates') });
+    }
     return;
   }
 
@@ -82,6 +119,11 @@ export async function checkAndPrompt(opts: { announceNoUpdate?: boolean } = {}):
     }
     return;
   }
+
+  // A skipped version stays quiet on the background boot poll; a manual
+  // check (recognisable by `announceNoUpdate`) always prompts — the user
+  // explicitly asked, so "skip" shouldn't hide the answer.
+  if (!opts.announceNoUpdate && readSkippedVersion() === info.version) return;
 
   promptInstall(info);
 }
@@ -113,6 +155,14 @@ function promptInstall(info: UpdateInfo): void {
       label: t('Install'),
       onClick: () => { void runInstall(info); },
     },
+    // Secondary action — records the version as skipped; the toast host's
+    // action wrapper dismisses the prompt after the handler runs.
+    actions: [
+      {
+        label: t('Skip this version'),
+        onClick: () => { skipVersion(info.version); },
+      },
+    ],
   });
   // No-op log so static analysis doesn't flag `id` as unused — we keep
   // the id around in case a future iteration wants to update this toast

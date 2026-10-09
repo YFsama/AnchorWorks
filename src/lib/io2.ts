@@ -1,8 +1,9 @@
 /** Extended I/O: PDF, DXF, JSON, JPG. */
 
 import { getCanvas, pushHistory } from './canvasEngine';
-import { exportSVG, download } from './io';
+import { exportSVG, download, saveBytesNative } from './io';
 import { renderTrimMarksSVG, type PrintPrep } from './printPrep';
+import { isTauri } from './runtime';
 import * as fabric from 'fabric';
 
 export function exportJPG(multiplier = 2): string {
@@ -112,7 +113,14 @@ export async function exportPDFReal(opts?: {
     });
   }
 
-  pdf.save('design.pdf');
+  // jsPDF's save() internally does the same `<a download>` click io.ts works
+  // around — under the Tauri shell that's a silent no-op on WKWebView /
+  // WebKitGTK, so emit the bytes through the native save dialog instead.
+  if (isTauri()) {
+    await saveBytesNative('design.pdf', new Uint8Array(pdf.output('arraybuffer')));
+  } else {
+    pdf.save('design.pdf');
+  }
 }
 
 /**

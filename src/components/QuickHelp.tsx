@@ -3,6 +3,7 @@ import { HelpCircle, X } from 'lucide-react';
 import { useT } from '../lib/i18n';
 import { useEditor } from '../store/editor';
 import { isMac } from '../lib/runtime';
+import { getBinding, subscribeKeymap } from '../lib/keymap';
 
 /**
  * Floating quick-help affordance.
@@ -47,20 +48,45 @@ export function QuickHelp() {
     };
   }, [open]);
 
-  const cmd = isMac() ? '⌘' : 'Ctrl';
+  // Re-render when the user rebinds a key so the tips never go stale
+  // (same subscribeKeymap tick pattern as KeymapEditor / ShortcutsDialog).
+  const [, setKeymapTick] = useState(0);
+  useEffect(() => subscribeKeymap(() => setKeymapTick((n) => n + 1)), []);
+
+  // Format a keymap combo ('Ctrl+Shift+S') for the compact chip: swap
+  // Ctrl/Alt/Shift for their macOS glyphs (same substitution rules as the
+  // Kbd helpers in MenuBar / CanvasContextMenu / KeymapEditor) and join the
+  // parts with plain spaces inside the single kbd chip.
+  const onMac = isMac();
+  const fmtCombo = (combo: string) =>
+    combo
+      .split('+')
+      .map((part) => {
+        const k = part.trim();
+        if (onMac && /^Ctrl$/i.test(k)) return '⌘';
+        if (onMac && /^Alt$/i.test(k)) return '⌥';
+        if (onMac && /^Shift$/i.test(k)) return '⇧';
+        if (onMac && /^Meta$/i.test(k)) return '⌘';
+        return k;
+      })
+      .join(' ');
+
   // Each tip pairs an English-source phrase (translated below) with a
-  // visual `kbd` representation. Order = frequency of use, not category.
+  // visual `kbd` representation pulled from the keymap registry so custom
+  // bindings show through. Order = frequency of use, not category. Arrow
+  // nudging and the two pointer gestures have no registry binding (keymap.ts
+  // excludes multi-key arrow groups and hold-pairs) so they stay verbatim.
   const tips: Array<{ key: string; kbd: string }> = [
     { key: 'Zoom: scroll wheel · pinch trackpad', kbd: '' },
     { key: 'Pan: middle-mouse drag · hold Space + drag', kbd: '' },
-    { key: 'Fit page to view', kbd: `${cmd} 0` },
-    { key: 'Open Command Palette', kbd: `${cmd} K` },
-    { key: 'Save project', kbd: `${cmd} ⇧ S` },
-    { key: 'Group / Ungroup', kbd: `${cmd} G / ${cmd} ⇧ G` },
-    { key: 'Duplicate selection', kbd: `${cmd} D` },
+    { key: 'Fit page to view', kbd: fmtCombo(getBinding('view.zoomFit')) },
+    { key: 'Open Command Palette', kbd: fmtCombo(getBinding('window.commandPalette')) },
+    { key: 'Save project', kbd: fmtCombo(getBinding('file.saveProject')) },
+    { key: 'Group / Ungroup', kbd: `${fmtCombo(getBinding('edit.group'))} / ${fmtCombo(getBinding('edit.ungroup'))}` },
+    { key: 'Duplicate selection', kbd: fmtCombo(getBinding('edit.duplicate')) },
     { key: 'Nudge selection (Shift for 10px)', kbd: '← ↑ → ↓' },
     { key: 'Open AI assistant', kbd: '' },
-    { key: 'Full keyboard shortcut list', kbd: '?' },
+    { key: 'Full keyboard shortcut list', kbd: fmtCombo(getBinding('help.shortcuts')) },
   ];
 
   return (

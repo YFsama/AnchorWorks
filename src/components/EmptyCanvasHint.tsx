@@ -33,13 +33,15 @@ export function EmptyCanvasHint() {
           {t('Blank canvas')}
         </div>
         <div className="type-caption leading-relaxed">
-          {t('Pick a tool from the left, drop an SVG, or pick a template from File menu.')}
+          {t('Pick a tool from the left, drop a file to import — SVG, PDF, PLT, JSON project, PNG / JPG / WebP / GIF — or start from a template in the File menu.')}
         </div>
         {/* Small caps style only suits Latin scripts — letter-spacing splits
          * CJK into "按 ⌘ K 打 开" gaps. Keep plain typography here; the
          * shortcut chip-like reading still comes through from `⌘K` / `Ctrl+K`. */}
         <div className="text-[10px] text-muted/70 mt-3">
           {onMac ? t('Press ⌘K for command palette') : t('Press Ctrl+K for command palette')}
+          {' · '}
+          {t('Press F1 for help')}
         </div>
       </div>
     </div>

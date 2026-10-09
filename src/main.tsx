@@ -2,6 +2,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { ErrorBoundary } from './components/ErrorBoundary.tsx'
+import { installGlobalErrorHandlers } from './lib/errorLog.ts'
+
+// Global error capture must be attached BEFORE anything else runs, so
+// boot-time failures (chunk load errors, module side-effect throws) land in
+// the error log instead of vanishing into the console.
+installGlobalErrorHandlers()
 
 // Service-worker registration — `vite-plugin-pwa` injects the generated SW
 // behind the `virtual:pwa-register` module. Wrapped in try/catch so dev
@@ -19,6 +26,8 @@ try {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )

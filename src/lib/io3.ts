@@ -6,6 +6,7 @@
 import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
 import { exportSVG, importSVGString } from './io';
+import { printHtmlDocument } from './printer';
 import { toast } from './toast';
 import { t } from './i18n';
 import { logger } from './debug';
@@ -332,36 +333,25 @@ export interface TilePrintOptions {
 
 /**
  * Multi-page PDF helper — each provided SVG becomes one printed page.
- * Falls back to a single empty page if the array is empty.
+ * Falls back to a single empty page if the array is empty. Transport is
+ * picked by `printHtmlDocument` (iframe + window.print on the web, native
+ * PrintOperation under the Tauri shell).
  */
 export function exportPDFMultiPage(svgs: string[]): void {
   const pages = svgs.length ? svgs : [exportSVG()];
-  const html = `<!doctype html><html><head><title>PDF Export</title><style>
+  printHtmlDocument({
+    title: 'PDF Export',
+    // Many pages can take seconds to settle before onload fires the print —
+    // keep the iframe alive as long as the pre-refactor code did.
+    iframeRemovalMs: 8000,
+    css: `
     @page { margin: 0; }
     html, body { margin: 0; padding: 0; background: #fff; }
     .page { page-break-after: always; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
     .page:last-child { page-break-after: auto; }
-    svg { max-width: 100%; max-height: 100%; display: block; }
-  </style></head><body>
-    ${pages.map((s) => `<div class="page">${s}</div>`).join('')}
-    <script>window.onload = () => { setTimeout(() => { window.print(); }, 200); };</script>
-  </body></html>`;
-
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-  const doc = iframe.contentDocument!;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  setTimeout(() => {
-    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-  }, 8000);
+    svg { max-width: 100%; max-height: 100%; display: block; }`,
+    body: pages.map((s) => `<div class="page">${s}</div>`).join(''),
+  });
 }
 
 /**
@@ -428,44 +418,29 @@ export function tilePrint(opts: TilePrintOptions): void {
 }
 
 function sendTilesToPrint(tiles: string[], pageW: number, pageH: number, cols: number, rows: number, marginPx: number) {
-  const pages = tiles
-    .map((url, i) => {
-      const r = Math.floor(i / cols) + 1;
-      const c = (i % cols) + 1;
-      return `<div class="page">
-        <div class="label">Tile ${r}/${rows} × ${c}/${cols}</div>
-        <div class="tile"><img src="${url}" /></div>
-      </div>`;
-    })
-    .join('');
-  const html = `<!doctype html><html><head><title>Tile Print</title><style>
+  printHtmlDocument({
+    title: 'Tile Print',
+    // Tile pages are raster data-URLs — heavy to decode before onload.
+    iframeRemovalMs: 8000,
+    css: `
     @page { size: ${pageW}px ${pageH}px; margin: 0; }
     html, body { margin: 0; padding: 0; background: #fff; }
     .page { width: ${pageW}px; height: ${pageH}px; position: relative; page-break-after: always; overflow: hidden; box-sizing: border-box; padding: ${marginPx}px; }
     .page:last-child { page-break-after: auto; }
     .tile { width: 100%; height: 100%; overflow: hidden; }
     .page img { width: 100%; height: 100%; object-fit: fill; display: block; }
-    .label { position: absolute; top: 4px; left: 6px; font: 10px system-ui, sans-serif; color: #888; }
-  </style></head><body>
-    ${pages}
-    <script>window.onload = () => { setTimeout(() => { window.print(); }, 200); };</script>
-  </body></html>`;
-
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-  const doc = iframe.contentDocument!;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  setTimeout(() => {
-    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-  }, 8000);
+    .label { position: absolute; top: 4px; left: 6px; font: 10px system-ui, sans-serif; color: #888; }`,
+    body: tiles
+      .map((url, i) => {
+        const r = Math.floor(i / cols) + 1;
+        const c = (i % cols) + 1;
+        return `<div class="page">
+        <div class="label">Tile ${r}/${rows} × ${c}/${cols}</div>
+        <div class="tile"><img src="${url}" /></div>
+      </div>`;
+      })
+      .join(''),
+  });
 }
 
 /* ----------------------------------------------------------------- */

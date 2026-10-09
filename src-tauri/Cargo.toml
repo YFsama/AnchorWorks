@@ -1,6 +1,6 @@
 [package]
 name = "anchorworks"
-version = "0.15.0"
+version = "0.16.0"
 description = "Anchorworks — Illustrator-class vector graphics editor"
 authors = ["YFsama <yf@rbq.ai>"]
 edition = "2021"
@@ -40,6 +40,11 @@ tauri-plugin-process = "2"
 # the navigation. Registered alongside `tauri-plugin-single-instance` so
 # the same window receives the URL on subsequent launches.
 tauri-plugin-deep-link = "2"
+# Remembers the window's size / position / maximised state across
+# launches (keyed by window label, persisted in the app-data dir).
+# Without it every start re-opens the hardcoded 1440×900 from
+# tauri.conf.json, ignoring what the user resized the window to.
+tauri-plugin-window-state = "2"
 # T1 commands — native filesystem + serial. The dialog/fs plugins handle
 # native open/save UI; `serialport` enumerates platform serial ports for the
 # Plotter dialog when running under the desktop shell.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2, X, Copy, Download } from 'lucide-react';
+import { Trash2, X, Copy, Download, Bug, ScrollText } from 'lucide-react';
 import { clearLog, getLog, subscribeLog } from '../lib/debug';
 import { getCanvas } from '../lib/canvasEngine';
 import { snapshotKeymap } from '../lib/keymap';
@@ -9,6 +9,7 @@ import { download } from '../lib/io';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { formatHMS } from '../lib/time';
+import { openErrorLogDialog } from '../lib/errorLog';
 import { makeRovingKeys } from './ui/useRovingActions';
 import { ActionToolbar } from './ui/ActionToolbar';
 
@@ -16,11 +17,13 @@ interface Props { onClose: () => void; }
 
 type Tab = 'log' | 'state' | 'perf' | 'keymap';
 const TABS: Tab[] = ['log', 'state', 'perf', 'keymap'];
-type DebugAction = 'copy' | 'download' | 'clear' | 'close';
+type DebugAction = 'copy' | 'download' | 'clear' | 'errorLog' | 'simulate' | 'close';
 const DEBUG_ACTION_LABELS: Record<DebugAction, string> = {
   copy: 'Copy diagnostics',
   download: 'Download diagnostics',
   clear: 'Clear log',
+  errorLog: 'Open error log',
+  simulate: 'Simulate error',
   close: 'Close',
 };
 
@@ -89,6 +92,12 @@ export function DebugPanel({ onClose }: Props) {
   };
   const downloadDiagnostics = () =>
     download('anchorworks-diagnostics.json', JSON.stringify(diagnostics(), null, 2), 'application/json');
+  // Throw from a macrotask so the error escapes React's event wrapper and
+  // surfaces through window.onerror — the same path a real async failure
+  // takes, which is exactly what the error-log slice should exercise.
+  const simulateError = () => {
+    setTimeout(() => { throw new Error(t('Simulated error from the Debug Panel')); }, 0);
+  };
 
   // Roving keyboard conventions live in ui/useRovingActions: wrapping arrows
   // and Home/End over the icon-only diagnostics actions, skipping disabled
@@ -153,6 +162,8 @@ export function DebugPanel({ onClose }: Props) {
           reviewed={t(DEBUG_ACTION_LABELS[focusedAction])}
           fallback={t('Copy diagnostics')}
         >
+          <button data-debug-action="simulate" onFocus={() => setFocusedAction('simulate')} onClick={simulateError} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Simulate error')} title={t('Simulate error')}><Bug size={12} aria-hidden="true" /></button>
+          <button data-debug-action="errorLog" onFocus={() => setFocusedAction('errorLog')} onClick={openErrorLogDialog} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Open error log')} title={t('Open error log')}><ScrollText size={12} aria-hidden="true" /></button>
           <button data-debug-action="copy" onFocus={() => setFocusedAction('copy')} onClick={copyDiagnostics} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Copy diagnostics')} title={t('Copy diagnostics')}><Copy size={12} aria-hidden="true" /></button>
           <button data-debug-action="download" onFocus={() => setFocusedAction('download')} onClick={downloadDiagnostics} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Download diagnostics')} title={t('Download diagnostics')}><Download size={12} aria-hidden="true" /></button>
           <button data-debug-action="clear" onFocus={() => setFocusedAction('clear')} onClick={clearLog} className="text-muted hover:text-ink p-1 transition-colors" aria-label={t('Clear log')} title={t('Clear log')}><Trash2 size={12} aria-hidden="true" /></button>

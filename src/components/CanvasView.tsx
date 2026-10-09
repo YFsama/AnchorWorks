@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { initCanvas, disposeCanvas, setTool, zoomFit } from '../lib/canvasEngine';
+import { computeResizeViewportTransform } from '../lib/viewport';
+import { emitViewport } from '../lib/canvasEvents';
 import { loadArtboardsFromStorage } from '../lib/artboards';
 import { getGridSize } from '../lib/preferences';
 import { useEditor } from '../store/editor';
@@ -36,20 +38,64 @@ export function CanvasView() {
     // Wire touch / pinch-zoom / two-finger pan / pen-pressure tracking.
     const detachTouch = enhanceTouchSupport(el);
 
-    // rAF-coalesced reflow. Fired by both the ResizeObserver and the
-    // legacy window.resize listener; the boolean guard prevents queuing
-    // multiple rAF callbacks per frame when both signals fire together
-    // (which is what happens on OS-window resize: ResizeObserver fires
-    // as the layout settles, and `window.resize` fires for the same
+    // rAF-coalesced reflow. Fired by the ResizeObserver, the legacy
+    // window.resize listener, and the DPR watcher below; the boolean guard
+    // prevents queuing multiple rAF callbacks per frame when several signals
+    // fire together (which is what happens on OS-window resize: ResizeObserver
+    // fires as the layout settles, and `window.resize` fires for the same
     // event a moment later).
     let pending = false;
+    // Wrap dimensions the previous reflow committed — the "old viewport" half
+    // of the resize-preserving transform. Zero until the first layout, which
+    // is exactly how reflow distinguishes "first mount" from "later resize".
+    let lastW = 0;
+    let lastH = 0;
     const reflow = () => {
       pending = false;
       const w = wrap.clientWidth;
       const h = wrap.clientHeight;
       if (w === 0 || h === 0) return;
+      // One call covers BOTH a CSS-size change and a DPR change (window moved
+      // between monitors, OS display-scale adjusted): fabric v6 re-reads
+      // devicePixelRatio live on every call — StaticCanvas#setDimensions →
+      // _setDimensionsImpl → elements.setDimensions(size, getRetinaScaling())
+      // (node_modules/fabric/dist/index.mjs, StaticCanvasDOMManager
+      // .setDimensions → setCanvasDimensions) — and setCanvasDimensions
+      // re-assigns `el.width`, which per the HTML canvas spec resets the
+      // backstore bitmap and the ctx transform state before re-applying
+      // ctx.scale(dpr, dpr). So even a same-size call after a DPR change
+      // rebuilds the retina buffer at the new ratio; no extra API needed.
+      // _setDimensionsImpl also ends with calcOffset(), keeping pointer
+      // offsets fresh without a manual call here.
+      // Capture the live canvas extent BEFORE resizing. `resizeCanvas`
+      // (document settings, template apply, project load) can restamp the
+      // fabric element without a wrap-size change, so lastW/lastH may no
+      // longer describe the viewport the user was looking at — the element
+      // itself does. Re-anchoring from the true previous extent keeps the
+      // centred scene point stable even across that interleaved resize.
+      const prevW = c.getWidth();
+      const prevH = c.getHeight();
       c.setDimensions({ width: w, height: h }, { backstoreOnly: false });
-      zoomFit();
+      if (lastW === 0 || lastH === 0) {
+        // First layout — establish the initial fit.
+        zoomFit();
+      } else if (prevW !== w || prevH !== h) {
+        // Later resizes (window, sidebar drag, panel toggle) keep what the
+        // user was looking at: zoom untouched, the scene point that was
+        // centred stays centred — instead of stomping their viewport with a
+        // refit on every layout change. A pure DPR change leaves the extent
+        // untouched and skips the math.
+        const vt = c.viewportTransform;
+        if (vt) c.setViewportTransform(computeResizeViewportTransform(vt, prevW, prevH, w, h));
+      }
+      lastW = w;
+      lastH = h;
+      // Always broadcast, even when the VPT is mathematically identical (a
+      // pure DPR change keeps w/h and thus the transform): canvasEngine's
+      // after:render gate (lastViewportKey) stays silent on that path, but
+      // the overlay canvases (rulers, grid, artboards, guides, cut paths,
+      // measure) still need to re-sync to the rebuilt buffers.
+      emitViewport();
     };
     const queueReflow = () => {
       if (pending) return;
@@ -70,7 +116,29 @@ export function CanvasView() {
     ro.observe(wrap);
     window.addEventListener('resize', queueReflow);
 
+    // Screen-DPI watcher. A resolution query pinned to the CURRENT
+    // devicePixelRatio fires exactly once — when the ratio moves AWAY from
+    // that value — so every change tears the listener down and re-arms one
+    // pinned to the new ratio. The queued reflow is what actually rebuilds
+    // fabric's retina buffers (see the setDimensions comment above); without
+    // this watcher a same-CSS-size DPR change (OS display-scale slider)
+    // emits no resize event at all and the canvas would keep its stale
+    // bitmap dimensions.
+    let teardownDpr: (() => void) | null = null;
+    const watchDpr = () => {
+      const mql = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+      const onChange = () => {
+        mql.removeEventListener('change', onChange);
+        watchDpr();
+        queueReflow();
+      };
+      mql.addEventListener('change', onChange);
+      teardownDpr = () => mql.removeEventListener('change', onChange);
+    };
+    watchDpr();
+
     return () => {
+      teardownDpr?.();
       ro.disconnect();
       window.removeEventListener('resize', queueReflow);
       detachTouch();

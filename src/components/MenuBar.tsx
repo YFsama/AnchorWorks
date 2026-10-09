@@ -26,6 +26,7 @@ import { createArtboardFromSelection, deleteActiveArtboard, duplicateActiveArtbo
 import { booleanOp, divideSelection, trimSelection, cropSelection, mergeSelection, mergeSameFillSelection } from '../lib/booleanOps';
 import { applyClipMask, releaseClipMask, expandClippingMask, makeCompoundPath, releaseCompoundPath } from '../lib/masks';
 import { toast } from '../lib/toast';
+import { openErrorLogDialog } from '../lib/errorLog';
 import { getFormat } from '../lib/formats';
 import { copySelection, cutSelection, pasteFromClipboard } from '../lib/clipboard';
 import { resetOnboarding } from '../lib/onboarding';
@@ -33,6 +34,7 @@ import { useT, useI18n, LANGUAGES, t as tStatic, type Lang } from '../lib/i18n';
 import { Logo } from './Logo';
 import { showConfirm } from '../lib/confirm';
 import { isTauri, isMac, getOSLabel, platformInfo, ariaKeyshortcuts, type NativePlatformInfo } from '../lib/runtime';
+import { canInstall, subscribeInstallAvailability, promptInstall } from '../lib/pwaInstall';
 import { getAutoSaveStatus, subscribeAutoSaveStatus, type AutoSaveStatus } from '../lib/autosave';
 import { setOutlineMode } from '../lib/outlineView';
 import type { RecentFile } from '../lib/recentFiles';
@@ -90,10 +92,18 @@ const imageLinksSummaryText = (summary: ReturnType<typeof imageLinksSummary>) =>
 
 export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) {
   const t = useT();
-  const copyImageHandoffReport = (report: string) => {
-    void navigator.clipboard.writeText(report)
-      .then(() => toast.success(t('Image handoff report copied')))
-      .catch(() => toast.info(report));
+  // Safe clipboard copy — `navigator.clipboard` is undefined on insecure
+  // origins (e.g. http://LAN-IP served to a plotter PC), and touching the
+  // property throws synchronously, which the old trailing .catch could not
+  // rescue. try/await keeps both the success and fallback toasts honest
+  // (same pattern as DebugPanel's copyDiagnostics).
+  const copyImageHandoffReport = async (report: string) => {
+    try {
+      await navigator.clipboard.writeText(report);
+      toast.success(t('Image handoff report copied'));
+    } catch {
+      toast.info(report);
+    }
   };
   const fileRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
@@ -115,6 +125,14 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
     platformInfo().then((info) => { if (!cancelled && info) setNativeInfo(info); }).catch(() => { /* fall back silently to getOSLabel() */ });
     return () => { cancelled = true; };
   }, [showAbout, nativeInfo]);
+  // In-app PWA install — the Help-menu entry below renders only while the
+  // browser holds a capturable `beforeinstallprompt` event (armed once in
+  // App.tsx via armPwaInstall). The subscription flips this state at the
+  // exact moment installability changes, so the item appears/disappears
+  // without relying on a lucky re-render. Safari, already-installed, Tauri
+  // and Electron sessions never fire the event — the entry never shows.
+  const [installable, setInstallable] = useState(canInstall());
+  useEffect(() => subscribeInstallAvailability(() => setInstallable(canInstall())), []);
   const setModal = useEditor(s => s.setModal);
   const zoom = useEditor(s => s.zoom);
   const canUndo = useEditor(s => s.canUndo);
@@ -1456,6 +1474,10 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Keyboard Shortcuts'), onClick: () => setModal('showShortcuts', true), kbd: getBinding('help.shortcuts') },
         { label: t('Customize Shortcuts…'), onClick: () => setModal('showKeymapEditor', true) },
         { sep: true },
+        // In-app install entry — conditional because `beforeinstallprompt`
+        // never fires on Safari / already-installed / Tauri / Electron
+        // sessions, and a dead menu item would be worse than none.
+        ...(installable ? [{ label: t('Install Anchorworks…'), onClick: () => { void promptInstall(); } }] : []),
         // Manual updater check — auto-runs once on boot, but this entry lets
         // users force-check (e.g. after seeing a release blog post). Wired to
         // checkAndPrompt with `announceNoUpdate` so the user gets a confirming
@@ -1470,6 +1492,9 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // not something end users should see as primary. Still reachable
         // via Ctrl+Shift+D (dev-tool convention) or this menu entry.
         { label: t('Debug Panel'), onClick: onToggleDebug, kbd: getBinding('help.debugPanel') },
+        // Error log lives next to the debug panel: same "support & diagnose"
+        // cluster, but useful to end users reporting a bug, not just devs.
+        { label: t('Error Log…'), onClick: () => openErrorLogDialog() },
         { label: t('About'), onClick: () => setShowAbout(true) },
       ]} />
       </div>

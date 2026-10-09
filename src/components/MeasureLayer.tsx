@@ -16,7 +16,6 @@ export function MeasureLayer() {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
 
     const draw = () => {
       const c = getCanvas();
@@ -27,6 +26,9 @@ export function MeasureLayer() {
       const vt = c.viewportTransform;
       if (!vt) return;
       const panX = vt[4], panY = vt[5];
+      // Read at draw time — a DPR change (monitor move / OS scale change)
+      // reallocates the backing store via the width check below.
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
 
       if (el.width !== cw * dpr || el.height !== ch * dpr) {
         el.width = cw * dpr; el.height = ch * dpr;

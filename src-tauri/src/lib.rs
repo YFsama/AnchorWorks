@@ -85,6 +85,70 @@ async fn fs_save_project<R: Runtime>(
     Ok(Some(target.to_string_lossy().into_owned()))
 }
 
+/// Save-dialog filter for an export filename, keyed off its extension.
+/// Returns `(label, extensions)` for `add_filter`; `None` means "show all
+/// files" so unknown extensions never hide the suggested name behind a
+/// mismatched filter (e.g. macOS save panels grey out non-matching names).
+fn export_filter_for(name: &str) -> Option<(&'static str, Vec<&'static str>)> {
+    // rsplit gives the LAST dotted segment, so "design.vstudio.json" → "json".
+    let ext = name.rsplit('.').next()?.to_ascii_lowercase();
+    if ext.is_empty() || ext == name {
+        return None; // no extension at all — don't constrain the dialog
+    }
+    match ext.as_str() {
+        "svg" => Some(("Scalable Vector Graphics", vec!["svg"])),
+        "png" => Some(("PNG Image", vec!["png"])),
+        "jpg" | "jpeg" => Some(("JPEG Image", vec!["jpg", "jpeg"])),
+        "pdf" => Some(("PDF Document", vec!["pdf"])),
+        "dxf" => Some(("AutoCAD DXF", vec!["dxf"])),
+        "plt" => Some(("HP-GL Plot File", vec!["plt"])),
+        "json" => Some(("JSON", vec!["json", "vstudio.json"])),
+        _ => None,
+    }
+}
+
+/// Save arbitrary EXPORT bytes (PNG / JPG / PDF / SVG / DXF / PLT / JSON) to
+/// a user-chosen path. Same contract as `fs_save_project` but for the io.ts
+/// export funnel: wry registers no `download_handler`, so the web build's
+/// `<a download>` click is a silent no-op on WKWebView / WebKitGTK (it only
+/// works on Windows' WebView2). Every format goes through this one channel —
+/// text is pre-encoded to UTF-8 on the JS side so Rust stays byte-agnostic
+/// and `fs_save_project` keeps its project-only dialog filter untouched.
+///
+/// Bytes travel as a JSON number array (plain `invoke` args) — for typical
+/// design exports (a few MB at 2×) that's a one-shot cost on explicit user
+/// action; switching to `tauri::ipc::Request` raw bodies would buy IPC
+/// efficiency at the price of a bespoke invoke path, not worth it here.
+///
+/// Returns the absolute path on success, `None` when the user cancelled the
+/// dialog (NOT an error — the frontend treats cancellation as a silent
+/// no-op, mirroring `fs_save_project`).
+#[tauri::command]
+async fn fs_save_bytes<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    bytes: Vec<u8>,
+    suggested_name: Option<String>,
+    path: Option<String>,
+) -> Result<Option<String>, String> {
+    let name = suggested_name.unwrap_or_else(|| "export.bin".into());
+    let target: PathBuf = if let Some(p) = path {
+        PathBuf::from(p)
+    } else {
+        let builder = app.dialog().file().set_file_name(&name);
+        let builder = match export_filter_for(&name) {
+            Some((label, exts)) => builder.add_filter(label, &exts),
+            None => builder,
+        };
+        match builder.blocking_save_file() {
+            Some(p) => p.into_path().map_err(|e| e.to_string())?,
+            None => return Ok(None),
+        }
+    };
+
+    std::fs::write(&target, &bytes).map_err(|e| e.to_string())?;
+    Ok(Some(target.to_string_lossy().into_owned()))
+}
+
 /// Open a `.vstudio.json` (or `.json`) from disk. Returns the file body and
 /// the absolute path the frontend should remember for subsequent quick-saves.
 /// `None` indicates the user cancelled the dialog.
@@ -261,6 +325,11 @@ pub fn run() {
         // process plugin gives the JS side `relaunch()` after a successful
         // updater install. Pairs with the in-app updater UX in src/lib/updater.ts.
         .plugin(tauri_plugin_process::init())
+        // Window-state plugin: restores each window's size / position /
+        // maximised state on launch (persisted per window label under the
+        // app-data dir) and re-saves on close. The 1440×900 in
+        // tauri.conf.json then only seeds the very first launch.
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .setup(|app| {
             // Menu surface policy — avoid a double menu bar.
             //
@@ -290,6 +359,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             platform_info,
             fs_save_project,
+            fs_save_bytes,
             fs_open_project,
             fs_read_path,
             serial::serial_list_ports,

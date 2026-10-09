@@ -52,6 +52,10 @@ export function Onboarding({ open, onClose }: Props) {
             <li>{t('Direct plotter (G-code / HPGL) output')}</li>
           </ul>
           <p className="text-muted text-xs pt-1">{t('Press')} <kbd className="kbd-inline">F1</kbd> {t('to open the Help Center anytime.')}</p>
+          {/* Same muted one-liner register as the F1 hint above. The Help
+              menu entry itself lands with the PWA install plumbing — the
+              copy only points at it. */}
+          <p className="text-muted text-xs">{t('Tip: install Anchorworks as a desktop app from the Help menu.')}</p>
         </div>
       ),
     },
@@ -143,7 +147,7 @@ export function Onboarding({ open, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={close}>
       <div
-        className="w-[460px] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden"
+        className="w-[460px] max-w-[95vw] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

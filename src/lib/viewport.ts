@@ -13,6 +13,10 @@
  * viewport event so Rulers / GridOverlay / ArtboardLayer / outlineView
  * re-paint.
  *
+ * A sixth export, computeResizeViewportTransform, is pure viewport math for
+ * CanvasView's reflow: it maps a pre-resize viewportTransform onto new
+ * canvas dimensions while keeping the user's zoom and centre scene point.
+ *
  * Lives in its own file so canvasEngine.ts stays focused on tool dispatch
  * and event routing (task #20). Re-exported from canvasEngine for back-compat
  * — call sites in CommandPalette / MenuBar / Toolbar / StatusBar /
@@ -72,6 +76,51 @@ export function handleWheel(e: fabric.TPointerEventInfo<WheelEvent>): void {
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 32;
 const FIT_PADDING = 0.9; // 90% of viewport so the artwork has visible margin
+
+/** Compute the post-resize viewport transform that preserves what the user
+ *  was looking at: the scene point sitting at the centre of the OLD viewport
+ *  is re-anchored at the centre of the NEW one; zoom (and any skew/rotation
+ *  terms) ride along untouched. Pure — no canvas, no store — so CanvasView's
+ *  reflow can call it on every resize and the invariants are unit-testable
+ *  in isolation (see __tests__/viewportResize.test.ts).
+ *
+ *  Degenerate inputs (old dimensions ≤ 0 or non-finite, a singular matrix,
+ *  non-finite new dimensions) return the transform unchanged rather than
+ *  inventing geometry out of a division by zero — callers treat that as
+ *  "keep the current pan", never a crash. */
+export function computeResizeViewportTransform(
+  vt: readonly number[],
+  oldW: number,
+  oldH: number,
+  newW: number,
+  newH: number,
+): [number, number, number, number, number, number] {
+  const next: [number, number, number, number, number, number] =
+    [vt[0], vt[1], vt[2], vt[3], vt[4], vt[5]];
+  // `!(x > 0)` also rejects NaN (NaN comparisons are false), so first-layout
+  // zero dims and corrupted numbers take the same safe path.
+  if (!(oldW > 0) || !(oldH > 0) || !Number.isFinite(newW) || !Number.isFinite(newH)) {
+    return next;
+  }
+  const [a, b, c, d] = next;
+  const det = a * d - b * c;
+  if (!Number.isFinite(det) || det === 0) return next;
+  // Canvas-2D matrix convention (fabric's viewportTransform is
+  // [a,b,c,d,tx,ty] with x' = a·x + c·y + tx, y' = b·x + d·y + ty): invert
+  // the linear part and apply it to (old centre − translation) to get the
+  // scene point the user had centred.
+  const px = oldW / 2 - next[4];
+  const py = oldH / 2 - next[5];
+  const sx = (d * px - c * py) / det;
+  const sy = (a * py - b * px) / det;
+  // Solve translation = new centre − M·s so that scene point lands exactly
+  // on the new centre. Reduces to tx += (newW − oldW)/2 for the diagonal
+  // matrices every zoom helper here produces; the general form keeps it
+  // correct if a rotated/skewed VPT ever enters the picture.
+  next[4] = newW / 2 - (a * sx + c * sy);
+  next[5] = newH / 2 - (b * sx + d * sy);
+  return next;
+}
 
 function clampZoom(z: number): number {
   return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { CheckCircle2, AlertTriangle, XCircle, Info, X } from 'lucide-react';
-import { subscribeToasts, toast as toastApi, type Toast, type ToastKind } from '../lib/toast';
+import { subscribeToasts, toast as toastApi, type Toast, type ToastAction, type ToastKind } from '../lib/toast';
 import { useT } from '../lib/i18n';
 
 /**
@@ -97,6 +97,15 @@ function KindIcon({ kind }: { kind: ToastKind }) {
 
 function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
   const t = useT();
+  // Flatten the (optional) primary action + extra actions into one ordered
+  // list — `action` renders first for backwards compatibility, `actions`
+  // follow, and every entry shares the same button styling + dismiss
+  // behaviour. The arrow-key roving below targets `[data-toast-action]`
+  // generically, so it covers the whole flattened set.
+  const actions: ToastAction[] = [
+    ...(toast.action ? [toast.action] : []),
+    ...(toast.actions ?? []),
+  ];
   const handleToastActionKeys = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-toast-action]'));
@@ -181,19 +190,20 @@ function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
         title={t('Use arrow keys to review toast actions')}
         onKeyDown={handleToastActionKeys}
       >
-        {toast.action && (
+        {actions.map((action, i) => (
           <button
+            key={i}
             type="button"
             data-toast-action
             className="btn"
             style={{ flexShrink: 0, marginTop: -2 }}
             onClick={() => {
-              try { toast.action!.onClick(); } finally { toastApi.dismiss(toast.id); }
+              try { action.onClick(); } finally { toastApi.dismiss(toast.id); }
             }}
           >
-            {toast.action.label}
+            {action.label}
           </button>
-        )}
+        ))}
         <button
           type="button"
           data-toast-action

@@ -16,6 +16,7 @@ import { useT, useI18n, useI18nReady } from './lib/i18n';
 import { announce, setLiveRegion } from './lib/a11y';
 import { getFormat } from './lib/formats';
 import { setNativeWindowTitle } from './lib/runtime';
+import { armPwaInstall } from './lib/pwaInstall';
 import { useResizableWidth } from './lib/hooks/useResizableWidth';
 
 // MenuBar is the entry chunk's single largest line item (451 kB minified,
@@ -130,6 +131,7 @@ import { startAutoSave, stopAutoSave, subscribeAutoSaveStatus } from './lib/auto
 import { ToastHost } from './components/ToastHost';
 import { TooltipHost } from './components/TooltipHost';
 import { ConfirmHost } from './components/ConfirmHost';
+import { ErrorLogDialog } from './components/ErrorLogDialog';
 import { OfflineBanner } from './components/OfflineBanner';
 // Context menu — thin lazy shell; the 157 kB menu module only loads on the
 // first right-click (or after the shell's idle warm-up), not with the entry.
@@ -924,6 +926,11 @@ export default function App() {
   // Loaded dynamically — this was the only static import pinning the
   // updater module into the eager entry chunk.
   useEffect(() => { void import('./lib/updater').then((m) => m.initUpdaterOnBoot()); }, []);
+
+  // Capture the browser's beforeinstallprompt event so Help → Install can
+  // offer an in-app install entry. StrictMode-safe (listeners removed on
+  // cleanup); no-ops on platforms that never fire the event.
+  useEffect(() => armPwaInstall(), []);
 
   // Apply high-contrast theme via a data attribute on <html> and persist the
   // choice to localStorage so subsequent loads honour the user's selection
@@ -1799,6 +1806,10 @@ export default function App() {
       <ToastHost />
       <TooltipHost />
       <ConfirmHost />
+      {/* Self-managed visibility (errorLog module flag) so the ErrorBoundary
+          fallback, MenuBar and DebugPanel can open it without prop drilling
+          through App — same reason ConfirmHost mounts prop-less. */}
+      <ErrorLogDialog />
       <OfflineBanner />
       <IsolationBadge />
       <LazyCanvasContextMenu

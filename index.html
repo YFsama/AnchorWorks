@@ -17,7 +17,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Anchorworks" />
-    <link rel="apple-touch-icon" href="/icon-192.svg" />
+    <!-- PNG (not SVG) — iOS Safari ignores SVG touch icons and would fall
+         back to a page screenshot for the Home Screen tile. Regenerate with
+         `node scripts/generate-icons.mjs` (full-bleed square: iOS applies
+         its own corner mask). -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta
       name="description"
       content="AI-assisted vector graphics editor — Illustrator-class tooling, multi-format export, and direct output to laser cutters, plotters, and printers. Works offline."

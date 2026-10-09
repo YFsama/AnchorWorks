@@ -32,7 +32,6 @@ export function ArtboardLayer() {
     const el = ref.current;
     const labelEl = labelRef.current;
     if (!el || !labelEl) return;
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
 
     const draw = () => {
       const c = getCanvas();
@@ -44,6 +43,9 @@ export function ArtboardLayer() {
       if (!vt) return;
       const panX = vt[4];
       const panY = vt[5];
+      // Read at draw time — a DPR change (monitor move / OS scale change)
+      // reallocates the backing store via the width check below.
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
 
       for (const target of [el, labelEl]) {
         if (target.width !== cw * dpr || target.height !== ch * dpr) {

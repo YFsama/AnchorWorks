@@ -18,6 +18,10 @@ export function Rulers() {
   const topRef = useRef<HTMLCanvasElement>(null);
   const leftRef = useRef<HTMLCanvasElement>(null);
   const sizeRef = useRef<Size>({ w: 0, h: 0 });
+  // Last devicePixelRatio the backing stores were allocated at. A DPR change
+  // (window dragged between monitors, OS scale change) must reallocate the
+  // canvases, not just repaint them — tracked separately from CSS size below.
+  const dprRef = useRef(0);
   // Rulers tick in the same unit the inspector + status bar show (shared store
   // flag). px ⇒ 1 doc-px/label-unit; mm ⇒ MM_TO_PX doc-px/label-unit.
   const dimUnit = useEditor(s => s.dimUnit);
@@ -27,8 +31,6 @@ export function Rulers() {
     const top = topRef.current;
     const left = leftRef.current;
     if (!top || !left) return;
-
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
 
     const draw = () => {
       const canvas = getCanvas();
@@ -40,23 +42,29 @@ export function Rulers() {
       if (!vt) return;
       const panX = vt[4];
       const panY = vt[5];
+      // Read at draw time: a monitor/scale change after mount bumps the
+      // ratio while CSS sizes stay identical, so treat a ratio change as a
+      // resize and reallocate the backing stores at the new density.
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const dprChanged = dprRef.current !== dpr;
 
       // Resize top ruler if needed
       const topW = cw;
       const topH = RULER_SIZE;
-      if (sizeRef.current.w !== topW) {
+      if (sizeRef.current.w !== topW || dprChanged) {
         top.width = topW * dpr;
         top.height = topH * dpr;
         top.style.width = `${topW}px`;
         top.style.height = `${topH}px`;
       }
-      if (sizeRef.current.h !== ch) {
+      if (sizeRef.current.h !== ch || dprChanged) {
         left.width = RULER_SIZE * dpr;
         left.height = ch * dpr;
         left.style.width = `${RULER_SIZE}px`;
         left.style.height = `${ch}px`;
       }
       sizeRef.current = { w: topW, h: ch };
+      dprRef.current = dpr;
 
       drawTop(top, dpr, topW, topH, zoom, panX, unitPx);
       drawLeft(left, dpr, RULER_SIZE, ch, zoom, panY, unitPx);

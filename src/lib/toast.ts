@@ -26,6 +26,14 @@ export interface Toast {
   duration?: number;
   action?: ToastAction;
   /**
+   * Additional actions, rendered after `action` and before the dismiss X.
+   * Use when a prompt needs more than one choice beyond the primary action
+   * (e.g. the updater toast's Install / Skip this version pair). `action`
+   * stays for the common single-action case; supplying both renders the
+   * single `action` first.
+   */
+  actions?: ToastAction[];
+  /**
    * Optional 0..100 progress. Renders a thin horizontal bar in the toast
    * footer; used by long-running flows (updater download, file export) that
    * want a self-contained status indicator instead of a separate progress
@@ -118,11 +126,11 @@ function subscribeToasts(fn: Listener): () => void {
   return () => { listeners.delete(fn); };
 }
 
-type ShortOpts = { title?: string; duration?: number; action?: ToastAction };
+type ShortOpts = { title?: string; duration?: number; action?: ToastAction; actions?: ToastAction[] };
 
 function shortHelper(kind: ToastKind) {
   return (message: string, opts: ShortOpts = {}): string =>
-    show({ kind, message, title: opts.title, duration: opts.duration, action: opts.action });
+    show({ kind, message, title: opts.title, duration: opts.duration, action: opts.action, actions: opts.actions });
 }
 
 export const toast = {

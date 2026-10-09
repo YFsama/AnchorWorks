@@ -180,8 +180,11 @@ export function VariableDataDialog() {
 
   /** Copy a column's {{token}} so it can be pasted into the template text. */
   const copyToken = async (column: string) => {
+    // Optional-chain first: `navigator.clipboard` is undefined on insecure
+    // origins (http://LAN-IP previews), and the property access itself throws
+    // synchronously — route that through the catch's toast instead.
     try {
-      await navigator.clipboard.writeText(`{{${column}}}`);
+      await navigator.clipboard?.writeText(`{{${column}}}`);
       toast.success(t('Token copied to clipboard'));
     } catch {
       toast.warn(t('Clipboard unavailable.'));

@@ -233,7 +233,9 @@ export function StatusBar() {
         <Badge active={smartGuides} icon={<Crosshair size={11} aria-hidden="true" />} label={t('GUIDES')} onToggle={() => setSmartGuidesEnabled(!smartGuides)} />
         <Badge active={anchorSnap} icon={<Target size={11} aria-hidden="true" />} label={t('ANCHOR')} onToggle={() => setAnchorSnapEnabled(!anchorSnap)} />
         <Sep />
-        {/* Always-visible build version — opens About for full credits. */}
+        {/* Always-visible build version — opens the Help Center (About is a
+            MenuBar-local dialog, not in the editor's modal store, so the
+            version chip routes to the Help Center instead). */}
         <button
           type="button"
           data-status-action

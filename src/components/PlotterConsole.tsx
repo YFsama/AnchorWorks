@@ -510,8 +510,11 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   }).join('\n');
 
   const copyLog = async () => {
+    // Optional-chain first: `navigator.clipboard` is undefined on insecure
+    // origins (http://LAN-IP previews), and the property access itself throws
+    // synchronously — route that through the catch's toast instead.
     try {
-      await navigator.clipboard.writeText(plainLog());
+      await navigator.clipboard?.writeText(plainLog());
       toast.success(t('Console log copied'));
     } catch { toast.error(t('Clipboard copy failed')); }
   };

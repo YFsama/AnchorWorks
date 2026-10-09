@@ -3,7 +3,7 @@ import {
   Search, PenTool, FilePlus2, FolderOpen, FileImage, Image, Printer, Send, FileText, Save, Undo2,
   Redo2, Copy, Trash2, Group, Ungroup, MousePointerClick, ChevronsUp, ChevronUp, ChevronDown,
   ChevronsDown, Plus, Minus, Maximize2, Bug, Settings2, Keyboard, HelpCircle, Sparkles, BookOpen,
-  Wand2, Palette, AlignCenter, Grid3X3, Ruler, SunMoon, Type, RotateCw, RotateCcw, Star,
+  Wand2, Palette, AlignCenter, Grid3X3, Ruler, SunMoon, Type, RotateCw, RotateCcw, Star, Download,
   type LucideIcon,
   } from 'lucide-react';
 import { useEditor } from '../store/editor';
@@ -115,6 +115,7 @@ import {
   deselectAll, selectObjectInStack, setKeyObject
 } from '../lib/canvasEngine';
 import { getCanvas } from '../lib/canvasEngine';
+import { canInstall, subscribeInstallAvailability, promptInstall } from '../lib/pwaInstall';
 import { nestSelection } from '../lib/alignDistribute';
 import { getFormat } from '../lib/formats';
 import { toast } from '../lib/toast';
@@ -249,10 +250,17 @@ export function CommandPalette({
   onToggleAI, onToggleDebug, onShowOnboarding, onNewDocument, onOpenFile, onImportImage,
 }: Props) {
   const t = useT();
-  const copyImageHandoffReport = (report: string) => {
-    void navigator.clipboard.writeText(report)
-      .then(() => toast.success(t('Image handoff report copied')))
-      .catch(() => toast.info(report));
+  // Safe clipboard copy — `navigator.clipboard` is undefined on insecure
+  // origins (e.g. http://LAN-IP), and touching the property throws
+  // synchronously, which a trailing .catch cannot rescue. try/await keeps
+  // both toasts honest (DebugPanel's copyDiagnostics pattern).
+  const copyImageHandoffReport = async (report: string) => {
+    try {
+      await navigator.clipboard.writeText(report);
+      toast.success(t('Image handoff report copied'));
+    } catch {
+      toast.info(report);
+    }
   };
   const open = useEditor((s) => s.showCommandPalette);
   const setModal = useEditor((s) => s.setModal);
@@ -272,6 +280,13 @@ export function CommandPalette({
   const [graphicStyleRevision, setGraphicStyleRevision] = useState(0);
   const [reviewedSearchAction, setReviewedSearchAction] = useState('');
   const [recent, setRecent] = useState<RecentFile[]>([]);
+  // In-app install availability — mirrors MenuBar: the install command only
+  // exists while a `beforeinstallprompt` event is captured (armed in
+  // App.tsx), and the subscription re-renders at the exact flip so the
+  // command list below stays truthful. Safari / Tauri / Electron never
+  // fire the event, so the command never appears there.
+  const [installable, setInstallable] = useState(canInstall());
+  useEffect(() => subscribeInstallAvailability(() => setInstallable(canInstall())), []);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -1463,6 +1478,10 @@ export function CommandPalette({
     { id: 'window.keymapEditor', label: t('Customize Shortcuts…'), category: t('Window'), keywords: 'rebind remap keybinding hotkey custom', icon: Keyboard, run: () => setModal('showKeymapEditor', true) },
     { id: 'window.onboarding',  label: t('Onboarding…'),        category: t('Window'), keywords: 'tour welcome help start', icon: HelpCircle, run: onShowOnboarding },
     { id: 'window.checkUpdates', label: t('Check for Updates…'), category: t('Window'), keywords: 'update upgrade release version check', icon: HelpCircle, run: () => { void import('../lib/updater').then(m => m.checkAndPrompt({ announceNoUpdate: true })); } },
+    // Install command — conditional for the same reason as the Help-menu
+    // entry: platforms that never fire beforeinstallprompt (Safari, Tauri,
+    // Electron, already-installed sessions) shouldn't see a dead command.
+    ...(installable ? [{ id: 'window.install', label: t('Install Anchorworks…'), category: t('Window'), keywords: 'install pwa app desktop home screen', icon: Download, run: () => { void promptInstall(); } }] : []),
     { id: 'window.ai',          label: t('Open AI Panel'),      category: t('Window'), keywords: 'assistant chat',          icon: Sparkles,   run: onToggleAI },
     { id: 'window.debug',       label: t('Debug Panel'),        category: t('Window'), shortcut: getBinding('help.debugPanel'), keywords: 'debug logs diagnostics inspect developer', icon: Bug, run: onToggleDebug },
     { id: 'window.theme', label: theme === 'light' ? t('Dark Theme') : t('Light Theme'), category: t('Window'), shortcut: getBinding('view.toggleTheme'), keywords: 'light dark mode appearance theme toggle', icon: SunMoon, run: () => { const s = useEditor.getState(); s.setTheme(s.theme === 'light' ? 'dark' : 'light'); } },
@@ -1480,7 +1499,7 @@ export function CommandPalette({
   // We intentionally do not depend on the callbacks here — they are stable for
   // the lifetime of the parent and the closures read fresh state on call.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [t, recent, graphicStyleRevision, rulersVisible, gridVisible, snapEnabled, smartGuidesEnabled, anchorSnapEnabled, guidesVisible, guidesLocked, outlineMode, theme, highContrast]);
+  ], [t, recent, graphicStyleRevision, rulersVisible, gridVisible, snapEnabled, smartGuidesEnabled, anchorSnapEnabled, guidesVisible, guidesLocked, outlineMode, theme, highContrast, installable]);
 
   // Filter + rank against the query.
   const filtered = useMemo(() => {

@@ -43,6 +43,38 @@ export function isTauri(): boolean {
 export function isWeb(): boolean { return !isTauri(); }
 
 /**
+ * Electron-shell detection. The Electron wrapper (electron/preload.cjs)
+ * exposes a minimal `window.vectorStudio` bridge ({ isDesktop, platform,
+ * versions }) via contextBridge. Nothing else distinguishes the Electron
+ * renderer from a plain browser (both lack `__TAURI_INTERNALS__`), so before
+ * this check the Electron build silently ran the pure-PWA code paths —
+ * including update messaging that assumed Service-Worker auto-updates,
+ * which the Electron shell has no channel for.
+ *
+ * Memoized like `isTauri()`; the bridge is injected before any renderer
+ * script runs, so the cached value can never go stale.
+ */
+interface ElectronGlobals {
+  vectorStudio?: unknown;
+}
+let electronCache: boolean | null = null;
+export function isElectron(): boolean {
+  if (electronCache !== null) return electronCache;
+  if (typeof window === 'undefined') {
+    electronCache = false;
+    return electronCache;
+  }
+  const w = window as unknown as ElectronGlobals;
+  // Shape-check, not just key presence, so a stray global named
+  // `vectorStudio` on the open web doesn't trip the detection.
+  electronCache =
+    typeof w.vectorStudio === 'object' &&
+    w.vectorStudio !== null &&
+    (w.vectorStudio as { isDesktop?: unknown }).isDesktop === true;
+  return electronCache;
+}
+
+/**
  * True when the current session is on macOS (or iPad / iPhone, which share
  * the same Cmd-key convention). Used by keyboard-shortcut hint UI ("⌘K" vs
  * "Ctrl+K"), drag-feel tweaks, and any future native-menu glue that wants to
