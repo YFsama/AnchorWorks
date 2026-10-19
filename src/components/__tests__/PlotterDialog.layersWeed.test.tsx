@@ -463,3 +463,76 @@ describe('PlotterDialog per-layer mirror + trap', () => {
     expect(mark).toEqual(original[2]);
   });
 });
+
+describe('PlotterDialog per-layer DXF + trap preview', () => {
+  /** Open two-point coloured path (an upper layer with nothing trappable). */
+  function linePath(id: string, color: string): CutPath {
+    return { id, points: [[200, 0], [250, 0]], closed: false, kind: 'outline', color };
+  }
+
+  it('DXF downloads a stamped per-layer DXF with LAYER content, and Save all (DXF) staggers', () => {
+    useEditor.setState({ cutPaths: layeredJob() });
+    const c = mountDialog();
+
+    click(rowButton(layerRow(c, '#ff0000'), 'DXF'));
+    expect(vi.mocked(download)).toHaveBeenCalledTimes(1);
+    const [fileName, payload, mime] = vi.mocked(download).mock.calls[0]!;
+    // Same stamped-name pattern as saveLayer, but with the .dxf extension.
+    expect(fileName).toMatch(/^layer-1-ff0000-\d{8}-\d{4}\.dxf$/);
+    // The file body is the cut-path DXF: the layer's colour rides as a DXF
+    // LAYER name (plus the shared regmark's kind layer).
+    expect(payload).toContain('LWPOLYLINE');
+    expect(payload).toContain('8\nFF0000');
+    expect(payload).toContain('8\nREGMARK');
+    expect(mime).toBe('text/plain');
+
+    // Save all (DXF): same 300 ms stagger as Save all layers.
+    vi.useFakeTimers();
+    vi.mocked(download).mockClear();
+    act(() => {
+      Array.from(c.querySelectorAll('button')).find(b => b.textContent === 'Save all (DXF)')!
+        .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+    expect(vi.mocked(download)).toHaveBeenCalledTimes(1); // layer 1 immediate
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(vi.mocked(download)).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(download).mock.calls[1]![0]).toMatch(/^layer-2-0000ff-\d{8}-\d{4}\.dxf$/);
+    expect(vi.mocked(download).mock.calls[1]![1]).toContain('8\n0000FF');
+  });
+
+  it('trap preview shows the would-be count, recomputes when layers change, and disables Trap at 0', () => {
+    // Three colours: red bottom (10 000 mm²), blue + green upper → N = 2.
+    const threeColour = [
+      rectPath('red', '#ff0000', 0, 0, 100, 100),
+      rectPath('blue', '#0000ff', 200, 0, 50, 40),
+      rectPath('green', '#00ff00', 300, 0, 30, 20),
+      regmark('mark'),
+    ];
+    useEditor.setState({ cutPaths: threeColour });
+    const c = mountDialog();
+
+    // Tolerance guidance rides under the section header.
+    expect(c.textContent).toContain('Layer alignment tolerance is ~0.5 mm');
+
+    const preview = () => Array.from(c.querySelectorAll('span'))
+      .find(s => s.textContent?.includes('paths will be offset'))!;
+    expect(preview().textContent).toContain('2 paths will be offset');
+    const trapButton = () => Array.from(c.querySelectorAll('button'))
+      .find(b => b.textContent === 'Trap layers')! as HTMLButtonElement;
+    expect(trapButton().disabled).toBe(false);
+
+    // Green muted away from the job → layers recompute → only blue is
+    // trappable, the preview follows.
+    act(() => { useEditor.setState({ cutPaths: threeColour.slice(0, 2).concat(threeColour[3]!) }); });
+    expect(preview().textContent).toContain('1 paths will be offset');
+
+    // An upper colour with only OPEN geometry leaves nothing to trap: the
+    // preview reads 0 and the Trap button is disabled.
+    act(() => { useEditor.setState({ cutPaths: [threeColour[0]!, linePath('blue-open', '#0000ff'), threeColour[3]!] }); });
+    expect(preview().textContent).toContain('0 paths will be offset');
+    expect(trapButton().disabled).toBe(true);
+    // …and the store was never touched by the previews.
+    expect(useEditor.getState().cutPaths).toHaveLength(3);
+    expect(useEditor.getState().cutPaths[1]!.points).toHaveLength(2);
+  });
+});

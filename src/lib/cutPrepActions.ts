@@ -6,6 +6,7 @@ import { getCanvas, pushHistory } from './canvasEngine';
 import { rhinestoneFromSelection } from './rhinestone';
 import { download, exportSVG } from './io';
 import { nestPolygons } from './nesting';
+import { nestPolygonsRaster } from './rasterNest';
 import { buildTestCut, defaultPlotterOptions } from './plotter';
 import { toast } from './toast';
 
@@ -268,5 +269,71 @@ export function nestCutPathsVinyl(t: T, opts?: { sheetWidthMm?: number; gapMm?: 
   pushHistory(); // one undo step for the whole re-layout
   const utilPct = Math.round(nest.utilization * 100);
   toast.success(`${packed.length} ${t('cut paths nested')} · ${utilPct}% ${t('material used')}`, { title: t('Vinyl nesting — cut geometry only') });
+  return packed.length;
+}
+
+/**
+ * One-click raster true-shape nesting — repositions the CUT GEOMETRY ONLY.
+ *
+ * Concavity-aware sibling of `nestCutPathsVinyl`: packs the store's cut
+ * paths with `nestPolygonsRaster` (bitmap occupancy grid + distance
+ * transform, the "raster penetration map" from
+ * docs/research-sticker-printcut-2026-10.md §nesting) instead of convex-hull
+ * AABBs, so interleaving / irregular shapes (Ls, C-channels, lettering with
+ * counters) interlock into each other's concavities instead of wasting the
+ * material a hull footprint would lock away. Same contract otherwise: only
+ * cut paths move — the printed art on the canvas is NOT touched — and
+ * registration marks are excluded from the packing and appended unchanged.
+ *
+ * Sheet width defaults to the document width in mm (but at least 150 mm —
+ * the narrowest common plotter/transfer-tape span); the 2 mm default gap
+ * sits in the kiss-cut sweet spot (sheets 2–3 mm, rolls 1–2 mm).
+ */
+export function nestCutPathsRaster(t: T, opts?: { sheetWidthMm?: number; gapMm?: number }): number {
+  const editor = useEditor.getState();
+  const packable = editor.cutPaths.filter(p => p.kind !== 'regmark');
+  if (packable.length < 2) {
+    toast.warn(t('Need at least two cut paths to nest.'), { title: t('Raster true-shape nesting — cut geometry only') });
+    return 0;
+  }
+
+  const sheetWidthMm = opts?.sheetWidthMm ?? Math.max(150, editor.doc.width / MM_TO_PX);
+  const gapMm = opts?.gapMm ?? 2;
+  const nest = nestPolygonsRaster(packable.map(p => ({ id: p.id, points: p.points })), sheetWidthMm, gapMm);
+
+  // Rebuild every packable path at its placement — the SAME transform
+  // convention nestCutPathsVinyl uses: rotation 90 turns a point [x, y] into
+  // [-y, x] about the origin; the rotated cloud is then translated so its
+  // AABB min lands exactly at the placement's (x, y) — the placement IS the
+  // top-left of the (possibly rotated) geometry. All other CutPath fields
+  // (kind, color, passes, bridge metadata, …) survive untouched; unfit
+  // overhang rows land at the bottom of the pack. Output order is sheet
+  // reading order (top row first, left to right).
+  const byId = new Map(packable.map(p => [p.id, p]));
+  const packed = nest.placements
+    .slice()
+    .sort((a, b) => a.y - b.y || a.x - b.x || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .flatMap(placement => {
+      const path = byId.get(placement.id);
+      if (!path) return [];
+      const rotated = path.points.map(([px, py]) =>
+        (placement.rotation === 90 ? [-py, px] : [px, py]) as [number, number]);
+      let minX = Infinity;
+      let minY = Infinity;
+      for (const [x, y] of rotated) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+      }
+      return [{
+        ...path,
+        points: rotated.map(([x, y]) => [x - minX + placement.x, y - minY + placement.y] as [number, number]),
+      }];
+    });
+
+  const regmarks = editor.cutPaths.filter(p => p.kind === 'regmark');
+  editor.setCutPaths([...packed, ...regmarks]);
+  pushHistory(); // one undo step for the whole re-layout
+  const utilPct = Math.round(nest.utilization * 100);
+  toast.success(`${packed.length} ${t('cut paths nested')} · ${utilPct}% ${t('material used')}`, { title: t('Raster true-shape nesting — cut geometry only') });
   return packed.length;
 }

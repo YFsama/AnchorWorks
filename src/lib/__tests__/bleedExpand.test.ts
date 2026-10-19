@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fabric from 'fabric';
+import type { CutPath } from '../../store/editor';
 import { bleedRingOffsets, buildBleedImage } from '../bleedExpand';
 
 const MM_TO_PX = 3.7795; // 96dpi convention shared across the cutter pipeline
@@ -325,5 +326,154 @@ describe('buildBleedImage nearest-colour HQ mode', () => {
     expect(offscreenPasses[0][2]).toBeCloseTo((outH - 150) / 2, 6);
     expect(toDataURL).toHaveBeenCalledTimes(1);
     expect(toDataURL).toHaveBeenCalledWith('image/png');
+  });
+});
+
+describe('buildBleedImage cut-path-masked bleed', () => {
+  // Same two-rect selection as the ring suite: union bbox 100×50 px at
+  // (100, 200). Output grid for bleedMm 1: 323×173 px, centered source
+  // footprint [12, 312) × [12, 162).
+  const makeRects = () => [
+    new fabric.Rect({ left: 100, top: 200, width: 60, height: 50, strokeWidth: 0, fill: '#e11d48' }),
+    new fabric.Rect({ left: 130, top: 220, width: 70, height: 30, strokeWidth: 0, fill: '#2563eb' }),
+  ];
+  const OUT_W = 323; // round((100 + 2·3.7795)·3)
+  const OUT_H = 173; // round((50 + 2·3.7795)·3)
+
+  /** Instrumented headless ctx, nearest-test style: getImageData returns a
+   *  synthetic FULLY-SMEARED bitmap (alpha 255 everywhere), putImageData
+   *  captures the post-mask composite, drawImage records the ring passes. */
+  const installPixelCtx = () => {
+    const putImageData = vi.fn();
+    const drawImage = vi.fn();
+    const getImageData = vi.fn((_x: number, _y: number, w: number, h: number) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (let i = 0; i < w * h; i++) {
+        data[i * 4] = 200;
+        data[i * 4 + 3] = 255;
+      }
+      return { width: w, height: h, data, colorSpace: 'srgb' } as unknown as ImageData;
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      measureText: (text: string) => ({ width: text.length * 12 }),
+      save: vi.fn(),
+      restore: vi.fn(),
+      scale: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      setTransform: vi.fn(),
+      transform: vi.fn(),
+      setLineDash: vi.fn(),
+      fillText: vi.fn(),
+      strokeText: vi.fn(),
+      beginPath: vi.fn(),
+      closePath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      bezierCurveTo: vi.fn(),
+      quadraticCurveTo: vi.fn(),
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      drawImage,
+      getImageData,
+      createImageData: (w: number, h: number) =>
+        ({ width: w, height: h, data: new Uint8ClampedArray(w * h * 4), colorSpace: 'srgb' }) as unknown as ImageData,
+      putImageData,
+      createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+      createPattern: vi.fn(() => null),
+      canvas: document.createElement('canvas'),
+    } as unknown as CanvasRenderingContext2D);
+    return { putImageData, getImageData, drawImage };
+  };
+
+  /** The RIGHT edge of the selection as an open document-mm cut path
+   *  (canvas px x = 200, y = 200…250) — one side only, so the mask has a
+   *  near side and a far side. */
+  const cutRightEdge = (): CutPath => {
+    const mm = (px: number) => px / MM_TO_PX;
+    return {
+      id: 'cut-right',
+      points: [[mm(200), mm(200)], [mm(200), mm(250)]],
+      closed: false,
+      kind: 'outline',
+    };
+  };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('erases smear pixels far from the cut line, keeps them within bleed reach, never touches the original', async () => {
+    const { putImageData, drawImage } = installPixelCtx();
+    const toDataURL = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,bleed-test');
+
+    const result = await buildBleedImage(makeRects(), { bleedMm: 1, cutPaths: [cutRightEdge()] });
+    expect(result).not.toBeNull();
+
+    // The mask ran: exactly one read-modify-write cycle at the origin,
+    // after the ring composite (drawImage order checked below).
+    expect(putImageData).toHaveBeenCalledTimes(1);
+    expect(putImageData.mock.calls[0][1]).toBe(0);
+    expect(putImageData.mock.calls[0][2]).toBe(0);
+    const data = (putImageData.mock.calls[0][0] as unknown as { data: Uint8ClampedArray }).data;
+    expect(data).toHaveLength(OUT_W * OUT_H * 4);
+    const alpha = (x: number, y: number): number => data[(y * OUT_W + x) * 4 + 3];
+
+    // The cut line lands at output x ≈ 311.3 spanning y ≈ 11.3…161.3
+    // ((200px − (100 − 3.7795)px)·3); reach = 3.7795·3 + 2 ≈ 13.3 px.
+    // Source footprint (the on-top original) is untouched…
+    expect(alpha(100, 75)).toBe(255);
+    // …outside the footprint but within reach of the cut line the smear
+    // stands (just right of the line; and above the line's top end).
+    expect(alpha(313, 100)).toBe(255);
+    expect(alpha(311, 5)).toBe(255);
+    // …far from the ONLY cut line (left column, top-left margin) → erased.
+    expect(alpha(50, 5)).toBe(0);
+    expect(alpha(5, 87)).toBe(0);
+    expect(alpha(160, 3)).toBe(0);
+
+    // The ring composite itself is unchanged: 20 ring passes + the
+    // centered original, exactly like the no-mask raster.
+    const ringPasses = drawImage.mock.calls.filter(
+      ([src]) => (src as HTMLCanvasElement)?.width === 300 && (src as HTMLCanvasElement)?.height === 150,
+    );
+    expect(ringPasses).toHaveLength(21);
+    expect(toDataURL).toHaveBeenCalledTimes(1);
+  });
+
+  it('absent or empty cutPaths make no pixel calls at all — behaviour identical to today', async () => {
+    const { putImageData, getImageData, drawImage } = installPixelCtx();
+    const toDataURL = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,bleed-test');
+
+    expect(await buildBleedImage(makeRects(), { bleedMm: 1 })).not.toBeNull();
+    // An empty array is explicitly the absent case (documented contract).
+    expect(await buildBleedImage(makeRects(), { bleedMm: 1, cutPaths: [] })).not.toBeNull();
+    expect(putImageData).not.toHaveBeenCalled();
+    expect(getImageData).not.toHaveBeenCalled();
+    // Two runs × (20 ring passes + 1 original).
+    const ringPasses = drawImage.mock.calls.filter(
+      ([src]) => (src as HTMLCanvasElement)?.width === 300 && (src as HTMLCanvasElement)?.height === 150,
+    );
+    expect(ringPasses).toHaveLength(42);
+    expect(toDataURL).toHaveBeenCalledTimes(2);
+  });
+
+  it('masks the nearest-mode smear too: a second pixel cycle after the smear composite', async () => {
+    const { putImageData } = installPixelCtx();
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,bleed-test');
+    expect(await buildBleedImage(makeRects(), {
+      bleedMm: 1, mode: 'nearest', cutPaths: [cutRightEdge()],
+    })).not.toBeNull();
+    // Cycle 1: the nearest-colour smear composite; cycle 2: the cut-line
+    // erase — both at the origin.
+    expect(putImageData).toHaveBeenCalledTimes(2);
+    expect(putImageData.mock.calls[0][1]).toBe(0);
+    expect(putImageData.mock.calls[1][2]).toBe(0);
   });
 });

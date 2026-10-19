@@ -501,19 +501,73 @@ export function estimateSeconds(
  * ------------------------------------------------------------------ */
 
 /**
- * Cruise-speed multiplier for a vertex from its unsigned turn angle — the
- * documented turn-angle PROXY for CutTime's radius→speed corner table
- * (docs/research-sticker-printcut-2026-10.md §3/§6). We operate on
- * flattened polylines that no longer carry arc radii, so the turn angle at
- * each vertex stands in for curvature: the sharper the turn, the slower it
- * must be taken.
+ * CutTime's corner-radius → speed table for a 400 mm/s-class head
+ * (docs/research-sticker-printcut-2026-10.md §3): the cruise speed a
+ * corner of the given radius (mm) may be taken at (mm/s). Lookup is
+ * nearest-key (`cornerSpeedByRadius`); the head-class constant lives here
+ * so per-material tables can later replace it wholesale.
  */
-function cornerSpeedFactor(turn: number | null): number {
-  if (turn === null) return 1;
-  if (turn >= 60) return 0.25;
-  if (turn >= 30) return 0.4;
-  if (turn >= 15) return 0.6; // CORNER_TURN_DEG band floor
-  return 1;
+export const CORNER_RADIUS_SPEED_TABLE: ReadonlyArray<readonly [radiusMm: number, speedMmS: number]> = [
+  [15, 55],
+  [45, 104],
+  [75, 147],
+  [105, 173],
+  [135, 197],
+  [165, 220],
+  [195, 235],
+  [225, 252],
+  [255, 266],
+  [285, 284],
+  [315, 304],
+  [345, 314],
+  [375, 322],
+];
+
+/**
+ * Cruise-speed cap (mm/s) for a corner of circumscribed radius `radiusMm`
+ * on a head whose straight blade-down ceiling is `vMaxMmS`.
+ *
+ * CutTime's table (§3) describes a 400 mm/s-class head, so entries scale
+ * linearly with vMax/400 and the result is clamped to ≤ vMax (defensive —
+ * every tabulated speed is already < 400). Radii below the smallest key
+ * floor at the smallest entry (15 mm → the 55 mm/s class: tighter than
+ * that, the blade — not the geometry — is the limit); radii above the
+ * largest key (375 mm) and non-finite radii (collinear / degenerate
+ * triples) return vMax unchanged: the corner no longer binds the profile.
+ * Nearest-key lookup; a radius exactly midway between two keys rounds to
+ * the smaller (slower) key — erring slow is the safe direction for an
+ * estimate.
+ */
+export function cornerSpeedByRadius(vMaxMmS: number, radiusMm: number): number {
+  const last = CORNER_RADIUS_SPEED_TABLE[CORNER_RADIUS_SPEED_TABLE.length - 1];
+  if (!Number.isFinite(radiusMm) || radiusMm > last[0]) return vMaxMmS;
+  let best = CORNER_RADIUS_SPEED_TABLE[0];
+  let bestD = Infinity;
+  for (const entry of CORNER_RADIUS_SPEED_TABLE) {
+    const d = Math.abs(entry[0] - radiusMm);
+    if (d < bestD) { bestD = d; best = entry; }
+  }
+  return Math.min(vMaxMmS, (best[1] * vMaxMmS) / 400);
+}
+
+/**
+ * Circumscribed radius (mm) of the triangle a–b–c: R = a·b·c / (4·Area)
+ * where a/b/c are the side lengths. For a polyline triple this is the
+ * radius of the arc the flattened corner approximates — how tight the
+ * corner at `b` is. Collinear triples (|Area| < 1e-12) and degenerate
+ * ones (a coincident endpoint makes a zero-length side) return Infinity:
+ * a straight vertex that caps nothing.
+ */
+export function circumradiusMm(
+  a: [number, number],
+  b: [number, number],
+  c: [number, number],
+): number {
+  const ab = dist(a, b), bc = dist(b, c), ca = dist(c, a);
+  // |cross(b−a, c−a)| is twice the triangle area.
+  const area2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  if (area2 < 1e-12 || ab < 1e-12 || bc < 1e-12 || ca < 1e-12) return Infinity;
+  return (ab * bc * ca) / (2 * area2); // a·b·c / (4·Area), Area = area2/2
 }
 
 /**
@@ -555,12 +609,15 @@ function moveSeconds(d: number, v0: number, v1: number, vMax: number, accel: num
 /**
  * Blade-down time for one polyline under the trapezoidal model. Speeds are
  * chained per segment: the head starts and ends at rest (blade drop /
- * lift), and each interior vertex's junction speed is capped by the turn AT
- * that vertex (arrive at the corner already pre-slowed). For closed paths
- * the closing segment is always traversed (matching cutStats' segment
- * convention) and the seam turn — the last→first corner — additionally caps
- * the final segment's cruise ceiling, mirroring how cutStats counts the
- * seam corner.
+ * lift), and each interior vertex's junction speed is capped by the
+ * corner's circumscribed radius AT that vertex — `cornerSpeedByRadius` of
+ * `circumradiusMm` over the (prev, v, next) triple, CutTime's
+ * radius→speed table (§3) — so the head arrives already pre-slowed. For
+ * closed paths the closing segment is always traversed (matching
+ * cutStats' segment convention) and the seam corner — the last→first
+ * turn — additionally caps the final segment's cruise ceiling, mirroring
+ * how cutStats counts the seam corner. `cornerSlow: false` bypasses every
+ * cap (all junctions and ceilings at vMax).
  */
 function pathCutSeconds(p: PolyLite, vMax: number, accel: number, cornerSlow: boolean): number {
   // Collapse coincident consecutive vertices (degenerate segments carry no
@@ -578,13 +635,15 @@ function pathCutSeconds(p: PolyLite, vMax: number, accel: number, cornerSlow: bo
   junction[0] = 0;
   junction[n - 1] = 0;
   for (let j = 1; j < n - 1; j++) {
-    junction[j] = vMax * (cornerSlow ? cornerSpeedFactor(turnDeg(t[j - 1], t[j], t[j + 1])) : 1);
+    junction[j] = cornerSlow
+      ? cornerSpeedByRadius(vMax, circumradiusMm(t[j - 1], t[j], t[j + 1]))
+      : vMax;
   }
   let seconds = 0;
   for (let i = 0; i < n - 1; i++) {
     let ceiling = vMax;
     if (cornerSlow && p.closed && i === n - 2) {
-      ceiling = vMax * cornerSpeedFactor(turnDeg(t[n - 2], t[n - 1], t[1]));
+      ceiling = cornerSpeedByRadius(vMax, circumradiusMm(t[n - 2], t[n - 1], t[1]));
     }
     seconds += moveSeconds(dist(t[i], t[i + 1]), junction[i], junction[i + 1], ceiling, accel);
   }
@@ -607,7 +666,7 @@ export interface PhysicsEstimateOptions {
    *  `PER_PATH_OVERHEAD_SECONDS`; research band 0.15–0.35 s (AxiDraw
    *  150 ms, CutTime carton 0.25 s). Negative values clamp to 0. */
   headUpS?: number;
-  /** Apply the turn-angle corner-speed caps (default true). false → vMax
+  /** Apply the corner-radius speed caps (default true). false → vMax
    *  at every junction. */
   cornerSlow?: boolean;
 }
@@ -625,6 +684,16 @@ export interface PhysicsEstimateOptions {
  * (v_start[i] = v_end[i−1], v_end[last] = 0) without a backward
  * reachability pass, so on very short segments the model under-counts the
  * decel blend — a documented approximation, deterministic and pure.
+ *
+ * Corner model: each interior vertex's junction speed (and, for closed
+ * paths, the closing segment's cruise ceiling) is capped by CutTime's
+ * corner-radius → speed table (§3) evaluated at the circumscribed radius
+ * of the vertex's polyline triple — `cornerSpeedByRadius(vMax,
+ * circumradiusMm(prev, v, next))`. Our polylines carry no arcs, so the
+ * triple's circumradius stands in for the true arc radius: the radius of
+ * the flattened corner slightly UNDERESTIMATES the real one (flattening
+ * tolerance makes tight curves look tighter), which errs slow — the safe
+ * direction for an estimate.
  *
  * Speeds ≤ 0 contribute 0 s for their leg kind, mirroring
  * `estimateSeconds`' convention. Model + constants:

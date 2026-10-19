@@ -319,14 +319,19 @@ export function exportPDF(): void {
   w.document.close();
 }
 
+/** Wrap DXF entity bodies in the minimal R12-ish section skeleton shared by
+ *  the canvas export (exportDXF) and the cut-path export (cutPathsToDxf):
+ *  an (empty) HEADER section plus the ENTITIES payload, closed by EOF. */
+function dxfDocument(entities: string[]): string {
+  return `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${entities.join('\n')}\n0\nENDSEC\n0\nEOF\n`;
+}
+
 /** Export a minimal DXF (AutoCAD R12-ish) of LINE and LWPOLYLINE entities. */
 export function exportDXF(): void {
   const c = getCanvas(); if (!c) return;
   const ents: string[] = [];
   c.getObjects().forEach((o) => collectDXFEntities(o, ents));
-  const dxf =
-    `0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${ents.join('\n')}\n0\nENDSEC\n0\nEOF\n`;
-  download('design.dxf', dxf, 'application/dxf');
+  download('design.dxf', dxfDocument(ents), 'application/dxf');
 }
 
 function collectDXFEntities(o: fabric.FabricObject, out: string[]) {
@@ -363,6 +368,44 @@ function polyDXF(points: Array<[number, number]>, closed: boolean): string {
   const head = `0\nLWPOLYLINE\n8\n0\n90\n${points.length}\n70\n${closed ? 1 : 0}`;
   const body = points.map(([x, y]) => `10\n${x}\n20\n${-y}`).join('\n');
   return `${head}\n${body}`;
+}
+
+/** DXF layer name for a cut path: the caller's mapping, else the source
+ *  colour hex uppercased without '#' (so each vinyl colour is its own DXF
+ *  layer), else the kind (colourless geometry — regmarks, manual paths —
+ *  groups by what it is). */
+function cutPathLayerName(p: CutPath, layerNameFor?: (p: CutPath) => string): string {
+  return layerNameFor?.(p)
+    ?? (p.color ? p.color.replace('#', '').toUpperCase() : p.kind.toUpperCase());
+}
+
+/**
+ * Build a DXF of cut paths (AutoCAD R12-ish — the same flavour as exportDXF
+ * above: minimal HEADER + ENTITIES of LWPOLYLINE entities) for lasers /
+ * CAD that eat DXF rather than HP-GL. Coordinates are CutPath document mm
+ * with Y NEGATED (document space is y-down, DXF is y-up — the same
+ * convention polyDXF/exportDXF apply to canvas geometry), so the result
+ * lands in the same orientation as the artwork when re-imported.
+ *
+ * One LWPOLYLINE entity per path (>= 2 points; shorter paths are skipped),
+ * carrying its own vertex count (90) and closed flag (70 — paths whose
+ * points already end on the closing duplicate keep it, mirroring
+ * polyDXF's pass-through), placed on a DXF LAYER named per path via
+ * `opts.layerNameFor` (see cutPathLayerName for the default). Pure string
+ * builder — the caller owns any download.
+ */
+export function cutPathsToDxf(
+  cutPaths: CutPath[],
+  opts?: { layerNameFor?: (p: CutPath) => string },
+): string {
+  const ents: string[] = [];
+  for (const p of cutPaths) {
+    if (p.points.length < 2) continue;
+    const head = `0\nLWPOLYLINE\n8\n${cutPathLayerName(p, opts?.layerNameFor)}\n90\n${p.points.length}\n70\n${p.closed ? 1 : 0}`;
+    const body = p.points.map(([x, y]) => `10\n${x}\n20\n${-y}`).join('\n');
+    ents.push(`${head}\n${body}`);
+  }
+  return dxfDocument(ents);
 }
 
 function sampleObjectPolyline(p: fabric.Path): Array<[number, number]> {

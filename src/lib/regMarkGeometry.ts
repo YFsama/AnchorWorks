@@ -114,3 +114,222 @@ export function scaleCheckExtentMm(withPageInfo: boolean): number {
   const gap = withPageInfo ? SCALE_CHECK_GAP_WITH_INFO_MM : SCALE_CHECK_GAP_MM;
   return gap + SCALE_CHECK_H_MM + SCALE_CHECK_CAPTION_DY_MM + SCALE_CHECK_FONT_MM;
 }
+
+/* ── Graphtec Data-Link barcode band (print side) ──────────────────────────
+ * Roll-media job handoff for networked Graphtecs (CE7000/FC via Data-Link /
+ * Cutting Master): besides the ARMS registration marks, the sheet carries a
+ * CODE39 barcode band the operator scans (or the machine's barcode reader
+ * reads) to recall the matching cut job. Band layout per the Graphtec
+ * Barcode Print Layout Specification Rev 1.10 (as summarized in
+ * docs/research-sticker-printcut-2026-10.md §2, "Barcode Data-Link job
+ * handoff" open item this closes):
+ *   - content   : `*` + 9-char link info + position char `F` + mod-43 check
+ *                 char + `*`
+ *   - band      : 9 mm tall, 20 mm from the media's leading edge
+ *   - Start Mark: solid black 50 × 9 mm on the RIGHT of the band (bars are
+ *                 scanned right-to-left), flush right minus a 10 mm side
+ *                 margin
+ *   - bars      : narrow 0.5 mm, wide = 2.5 × narrow (1.25 mm);
+ *                 inter-character gap = 1 narrow; 7 mm quiet zones either
+ *                 side of the bar run
+ *   - link info : first character must not be `G` (reserved prefix in the
+ *                 Data-Link protocol) and at most 9 characters.
+ * Page-orientation assumption: the media's LEADING edge is the TOP of the
+ * page (the sheet feeds top-first through the printer), so bandY counts
+ * downward from sheetY = 0. */
+
+/** Mod-43 check alphabet — index = character value. */
+export const CODE39_VALUES = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%';
+
+/** Narrow element width (mm). */
+export const CODE39_NARROW_MM = 0.5;
+/** Wide/narrow ratio (wide = 1.25 mm). */
+export const CODE39_WIDE_RATIO = 2.5;
+
+/** Distance from the media's leading (top) edge to the band, mm. */
+export const BARCODE_BAND_LEAD_MM = 20;
+/** Band height, mm (same 9 mm as the Start-Mark/scale-check block). */
+export const BARCODE_BAND_HEIGHT_MM = 9;
+/** Solid-black Start Mark width, mm (bars scanned right-to-left). */
+export const BARCODE_START_MARK_W_MM = 50;
+/** Side margin between the Start Mark and the right media edge, mm. */
+export const BARCODE_SIDE_MARGIN_MM = 10;
+/** Quiet zone either side of the bar run, mm. */
+export const BARCODE_QUIET_MM = 7;
+/** Page margin the band needs beyond the trim box: 20 lead + 9 band + 2
+ *  clear above the trim box. Drives prepMarkMarginMm. */
+export const BARCODE_BAND_PAGE_MARGIN_MM = BARCODE_BAND_LEAD_MM + BARCODE_BAND_HEIGHT_MM + 2;
+
+/** One CODE39 element: a bar (`bar: true`) or the space/gap after it. */
+export interface Code39Element {
+  wMm: number;
+  bar: boolean;
+}
+
+/**
+ * The 43 CODE39 character patterns, in CODE39_VALUES order: nine N/W
+ * elements per character, alternating bar/space and STARTING WITH A BAR
+ * (odd 1-based positions are bars, even are spaces). Each character has
+ * exactly three wide elements (standard characters: two wide bars + one
+ * wide space; `$/+/%`: all-narrow bars + three wide spaces). This is the
+ * canonical ANSI/AIM BC1 table as reproduced by zint/bwip-js.
+ */
+const CODE39_PATTERNS: readonly string[] = [
+  'NNNWWNWNN', // 0
+  'WNNWNNNNW', // 1
+  'NNWWNNNNW', // 2
+  'WNWWNNNNN', // 3
+  'NNNWWNNNW', // 4
+  'WNNWWNNNN', // 5
+  'NNWWWNNNN', // 6
+  'NNNWNNWNW', // 7
+  'WNNWNNWNN', // 8
+  'NNWWNNWNN', // 9
+  'WNNNNWNNW', // A
+  'NNWNNWNNW', // B
+  'WNWNNWNNN', // C
+  'NNNNWWNNW', // D
+  'WNNNWWNNN', // E
+  'NNWNWWNNN', // F
+  'NNNNNWWNW', // G
+  'WNNNNWWNN', // H
+  'NNWNNWWNN', // I
+  'NNNNWWWNN', // J
+  'WNNNNNNWW', // K
+  'NNWNNNNWW', // L
+  'WNWNNNNWN', // M
+  'NNNNWNNWW', // N
+  'WNNNWNNWN', // O
+  'NNWNWNNWN', // P
+  'NNNNNNWWW', // Q
+  'WNNNNNWWN', // R
+  'NNWNNNWWN', // S
+  'NNNNWNWWN', // T
+  'WWNNNNNNW', // U
+  'NWWNNNNNW', // V
+  'WWWNNNNNN', // W
+  'NWNNWNNNW', // X
+  'WWNNWNNNN', // Y
+  'NWWNWNNNN', // Z
+  'NWNNNNWNW', // -
+  'WWNNNNWNN', // .
+  'NWWNNNWNN', // (space)
+  'NWNWNWNNN', // $
+  'NWNWNNNWN', // /
+  'NWNNNWNWN', // +
+  'NNNWNWNWN', // %
+];
+
+/** Start/stop `*` — two wide bars (3rd + 4th) + one wide leading space. */
+const CODE39_START_STOP = 'NWNNWNWNN';
+
+/**
+ * Mod-43 check character of `data`: sum the CODE39_VALUES index of every
+ * character, mod 43. Throws when `data` contains a character outside the
+ * CODE39 set (callers compose the message first, `*` delimiters excluded —
+ * the checksum never covers them).
+ */
+export function code39CheckChar(data: string): string {
+  let sum = 0;
+  for (const ch of data) {
+    const v = CODE39_VALUES.indexOf(ch);
+    if (v < 0) {
+      throw new Error(`CODE39 check character: ${JSON.stringify(ch)} is not in the CODE39 set`);
+    }
+    sum += v;
+  }
+  return CODE39_VALUES[sum % 43];
+}
+
+/**
+ * Bar/space width sequence (mm) of the CODE39 symbol `text` — the caller
+ * passes the FULL framing `*…*` (e.g. `'*1FG*'`); this function is a pure
+ * table encoder and adds nothing. Nine elements per character (odd
+ * positions bars, even spaces) with one NARROW inter-character gap between
+ * consecutive characters. `*` encodes via the start/stop pattern; any other
+ * character outside CODE39_VALUES throws.
+ */
+export function code39BarWidths(text: string): Code39Element[] {
+  const out: Code39Element[] = [];
+  const emitChar = (ch: string): void => {
+    const pattern = ch === '*'
+      ? CODE39_START_STOP
+      : CODE39_PATTERNS[CODE39_VALUES.indexOf(ch)];
+    if (!pattern) {
+      throw new Error(`CODE39 encoding: ${JSON.stringify(ch)} is not in the CODE39 set`);
+    }
+    for (let i = 0; i < pattern.length; i++) {
+      out.push({
+        wMm: pattern[i] === 'W' ? CODE39_NARROW_MM * CODE39_WIDE_RATIO : CODE39_NARROW_MM,
+        bar: i % 2 === 0,
+      });
+    }
+  };
+  for (let i = 0; i < text.length; i++) {
+    emitChar(text[i]);
+    if (i < text.length - 1) out.push({ wMm: CODE39_NARROW_MM, bar: false });
+  }
+  return out;
+}
+
+/** Data-Link band content: the job's link info plus which panel it is. */
+export interface BarcodeBandSpec {
+  /** 1–9 CODE39 characters identifying the cut job on the networked
+   *  cutter. The FIRST character must not be `G` (reserved prefix) and the
+   *  length must not exceed 9 — both throw. */
+  linkInfo: string;
+  /** Position marker in the band message. Default `'F'` (first/only panel). */
+  positionChar?: string;
+}
+
+export interface BarcodeBandRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Geometry (mm, sheet space, origin at the media's top-left) of the
+ * Graphtec Data-Link barcode band for a `sheetW × sheetH` sheet:
+ *
+ *   [ … 7 mm left quiet | bar run | 7 mm quiet | 50 mm Start Mark | 10 mm margin ]
+ *
+ * laid out right-to-left from the Start Mark (the scanner reads the bars
+ * right-to-left behind it). `bandY = 20` (leading edge at the top — see the
+ * page-orientation note in the section header). Every rect is the full
+ * 9 mm band tall; `startX` is the Start Mark's left edge. `sheetH` only
+ * gates the sanity check that the sheet is tall enough to carry the band.
+ * Throws on an invalid `linkInfo` (empty, > 9 chars, leading `G`, or any
+ * non-CODE39 character).
+ */
+export function barcodeBandGeometry(
+  sheetW: number,
+  sheetH: number,
+  spec: BarcodeBandSpec,
+): { rects: BarcodeBandRect[]; startX: number; bandY: number } {
+  if (spec.linkInfo.length < 1 || spec.linkInfo.length > 9) {
+    throw new Error(`Data-Link link info must be 1–9 CODE39 characters (got ${spec.linkInfo.length})`);
+  }
+  if (spec.linkInfo[0] === 'G') {
+    throw new Error("Data-Link link info must not start with 'G' (reserved prefix)");
+  }
+  if (sheetH < BARCODE_BAND_LEAD_MM + BARCODE_BAND_HEIGHT_MM) {
+    throw new Error(`Sheet height ${sheetH} mm cannot carry the barcode band (needs >= ${BARCODE_BAND_LEAD_MM + BARCODE_BAND_HEIGHT_MM} mm)`);
+  }
+  const message = spec.linkInfo + (spec.positionChar ?? 'F');
+  const elements = code39BarWidths(`*${message}${code39CheckChar(message)}*`);
+  const runW = elements.reduce((sum, e) => sum + e.wMm, 0);
+
+  const bandY = BARCODE_BAND_LEAD_MM;
+  const startX = sheetW - BARCODE_SIDE_MARGIN_MM - BARCODE_START_MARK_W_MM;
+  const rects: BarcodeBandRect[] = [
+    { x: startX, y: bandY, w: BARCODE_START_MARK_W_MM, h: BARCODE_BAND_HEIGHT_MM },
+  ];
+  let x = startX - BARCODE_QUIET_MM - runW;
+  for (const e of elements) {
+    if (e.bar) rects.push({ x, y: bandY, w: e.wMm, h: BARCODE_BAND_HEIGHT_MM });
+    x += e.wMm;
+  }
+  return { rects, startX, bandY };
+}

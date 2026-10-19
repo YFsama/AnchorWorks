@@ -4058,4 +4058,18 @@ export const zhDict: Record<string, string> = {
   "Roll 300 mm": "300 mm 卷料",
   "Roll 600 mm": "600 mm 卷料",
   "Ring smear": "环形晕染",
+
+  // Wave 5 — raster nesting, radius speeds, per-layer DXF, masked bleed, Data-Link (2026-10)
+  "Nest cut paths (raster true-shape)": "嵌套切割路径（光栅真形）",
+  "Raster true-shape nesting — cut geometry only": "光栅真形嵌套——仅重排切割几何",
+  "DXF": "DXF",
+  "Save all (DXF)": "保存全部 DXF",
+  "Save every layer as its own DXF file.": "每层保存为独立的 DXF 文件。",
+  "Layer alignment tolerance is ~0.5 mm — design a 0.5–1 mm trap so misregistration shows as overlap, not a gap.": "层间对位公差约 0.5 mm——请设计 0.5–1 mm 陷叠，让套位偏差表现为重叠而非露底。",
+  "paths will be offset": "条路径将被外扩",
+  "Data-Link barcode": "Data-Link 条码",
+  "Graphtec roll-media CODE39 band + 50×9 mm Start Mark for Data-Link job handoff": "Graphtec 卷料 CODE39 条码带 + 50×9 mm 起始标记，用于 Data-Link 作业交接",
+  "Link info (9 chars, not starting with G)": "链接信息（9 字符，不以 G 开头）",
+  "Data-Link link info": "Data-Link 链接信息",
+  "Link info must not start with G (reserved).": "链接信息不能以 G 开头（系统保留）。",
 };

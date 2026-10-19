@@ -4,62 +4,39 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — production preview / imposition
+## [Unreleased] — sticker / decal / print-and-cut suite (waves 1–5)
+
+Five research-grounded waves (vendor specs + hardware-validated open-source cutter stacks; full findings and spec tables in docs/research-sticker-printcut-2026-10.md).
 
 ### Added
-- **Production Preview (生产预览)** — one dialog that composes the whole production sheet in real time: select a sticker (art + its cut paths), pick a sheet (A4/A3/Letter/300–600 mm roll/custom), gap, copies cap, bleed (Ring fast / Nearest-colour HQ) and toggles (90° rotation, cut-line overlay, corner registration marks). The preview imposes copies by true-shape convex-hull nesting with the bleed baked into the raster and magenta cut contours + L-marks overlaid, reporting copies · sheet size · material utilization. **Apply** inserts the imposed sheet image at 1:1 and replaces the cut paths with the per-copy contours (kiss/perf kinds and colours preserved) plus regmark paths — one undoable step from design to a print-ready, cut-ready layout. Wired into Document menu, command palette, and the canvas context menu.
-
-## [Unreleased] — sticker / decal / print-and-cut wave 3
-
-Closes the wave-2 review backlog and the remaining research items (docs/research-sticker-printcut-2026-10.md §6).
-
-### Added
-- **Shared raster-EDT kernel** (`rasterEdt.ts`): two-pass 3-4 chamfer EDT, label-carrying variant, and a scanline polygon filler — pure TypedArray math, zero DOM. One kernel, two consumers (below).
-- **Weedability thin-feature v2**: the raster EDT now measures true medial-axis width (bisected deepest still-connected erosion), catching **pinch necks between wide lobes** that the wave-2 erosion bisection missed — the exact false-negative the reviewer flagged (0.8 mm dumbbell neck now flagged; 3 mm neck passes). Erosion stays as the over-budget fallback.
-- **HQ bleed mode**: `buildBleedImage` gained `mode: 'ring' | 'nearest'` — nearest-colour labelled-chamfer dilation, the pixel-perfect form of Cricut's edge smear (ring-draw remains the fast default; headless environments degrade to null → callers keep ring).
-- **Physics time estimate**: `estimateJobSeconds` — per-segment trapezoidal velocity profiles (accel/decel distances, triangular short-move split, chained junction speeds) with a turn-angle corner-speed cap standing in for CutTime's radius table. All 9 material presets carry research-based `accelMmS2` / `headUpS` constants; the Plotter dialog shows a second "≈ (physics)" estimate next to the classic one when the active material has constants, and the animated replay's total now follows the estimate (`etaSeconds` override on CutPreview).
-- **Per-layer mirror** (Layers section): each vinyl layer can flip independently of the global mirror — the HTV case where only some colours go down carrier-first.
-- **Layer trap (陷叠)**: "Trap layers" offsets every upper layer's closed contours outward (round-join, default +0.5 mm) so ~1 mm misregistration between vinyl layers shows as overlap, not a gap — the layered-decal design convention, now one click.
+- **Make Sticker (Ctrl+Alt+K)** — the Sticker Mule / Cricut "Create Sticker" / Silhouette Offset-panel workflow as one command: weld the selection, round-join offset border (2.54 mm default), white/custom underlay behind the art, and a die-cut / kiss-cut / perf-border contour (own overlay colours, project persistence, through→kiss→perf ordering at the plotter, PerfCutContour export naming).
+- **Surface Wrap generator** (Document → Surface Wrap…): cylinder (π·D × H), cone/frustum annular sector (R = L·D/(D−d), θ = 360°·(D−d)/(2L)), and sphere-gore patterns from container dimensions, with starter presets.
+- **Three sticker templates**: kiss-cut sheet with safe areas + perf border, laptop decal with 2.54 mm border ring, tumbler wrap sized from a real cone sector.
+- **Round-join offsets**: offsetPolyline join:round (tessellated outer arcs) — the pro-workflow join for sticker contours; miter default unchanged.
+- **Print-side vendor registration marks**: Graphtec ARMS Type-2 (20 mm / 0.7 mm corner L-brackets, matching the TB52,2 reader), Silhouette (10 / 0.25), Roland (25 / 0.5) with arm/stroke overrides, a printable 50 × 9 mm scale-check block, and a print-at-100% warning — print marks and the cutter reader now share one geometry source.
+- **ARMS emit for Graphtec cutters**: the Graphtec dialect wraps the job in the hardware-validated TB99/TB51/TB52/TB54/TB55/TB24…TB0 registration block (ETX-terminated, 0.1 mm steps, mark rectangle auto-filled from the job bbox).
+- **Blade-offset compensation (drag knives)**: applyBladeOffset inserts Siser-validated corner loops (overshoot + bowed return, ≥15° turns, close-corner merging, seam to the longest edge) with 0 / 0.25 / 0.5 mm presets — sharp corners on every cutter including clones.
+- **CutContour spot-colour export**: SVG / PDF "with cut layer" append the cut paths as a magenta hairline layer (CutContour / PerfCutContour, data-cut-kind) — the VersaWorks / RasterLink7 convention; the PDF variant additionally tags ISO 19593-1 processing-step OCGs (Structural / Cutting / PartialCutting, viewer-hidden by default, pdfjs round-trip verified).
+- **Material library**: glitter-HTV (170 gf, 2 passes, 60° blade), Oracal 651, printable vinyl added; HTV corrected to 85 gf/45°; all presets carry accel/head-up physics constants; cards show blade angle / passes and apply default overcut.
+- **Weedability preflight (排废检查)** — no cutter tool on the market lints this: thin features (EDT medial-axis width with a fail-closed quantization band — pinch necks caught), narrow inter-path gaps, small islands (letter counters), per material profile (vinyl / HTV / glitter / sticker paper), in a collapsible Plotter-dialog panel.
+- **Auto-bleed (Cricut-style)**: ring-draw edge smear (0–5 mm) rasterized beneath the underlay in Make Sticker, an HQ nearest-colour mode (labelled-chamfer dilation), and — in Production Preview — masking to the cut lines (smear only where the blade cuts).
+- **Layered-vinyl jobs (多层贴花)**: per-colour layers (largest = bottom) whose jobs automatically carry the shared registration marks; per-layer Send/Save (+ HP-GL and DXF variants, staggered save-all), per-layer mirror, send-all with vinyl-swap confirmations, +0.5 mm layer trap with a dry-run preview, and ~0.5 mm alignment-tolerance guidance.
+- **True-shape nesting**: convex-hull skyline (nestPolygons) plus a raster occupancy-grid packer (nestPolygonsRaster — interleaves concave parts the hull packer cannot) as one-click cut-path layouts with utilization reporting.
+- **Physics time estimate**: estimateJobSeconds with trapezoidal profiles, chained junction speeds, and CutTime radius→speed corner caps (curvature from polyline triples); shown as a second "≈ (physics)" estimate, with the animated replay total following it.
+- **Production Preview (生产预览)**: live imposed-sheet preview (sheet presets, gap, copies, baked bleed, cut overlay, regmarks, utilization) with a one-step undoable Apply that inserts the sheet at 1:1 and swaps in the per-copy cut paths.
+- **Graphtec Data-Link barcode band (print side)**: full CODE39 encoder (mod-43 check, 0.5 mm narrow / 2.5× wide, 9 mm band 20 mm from the media leading edge, 50×9 mm Start Mark, 7 mm quiet zones, media-space placement) + Print Prep toggle with link-info validation. The network job handoff (TCP 9100) remains open — see the research doc.
 
 ### Changed
-- MATERIAL_PRESETS are fully populated with physics constants (sign vinyl 1500 mm/s² / 0.15 s head-up … cardstock 800 / 0.35).
-
-## [Unreleased] — sticker / decal / print-and-cut wave 2
-
-Research-grounded follow-up pass (weedability conventions, Cricut-style auto-bleed, layered-vinyl practice, SVGnest internals, ISO 19593-1 OCG feasibility; details in `docs/research-sticker-printcut-2026-10.md`).
-
-### Added
-- **Weedability preflight (排废检查)** — no cutter tool on the market lints this. `weedCheck()` analyses the active cut paths against per-material thresholds (vinyl / HTV / glitter HTV / sticker paper; min stroke, min gap, island area, cap height) with three checks: thin features (inward-offset erosion bisection ≈ medial-axis width), narrow gaps between paths (AABB-swept pairwise segment distance), and small islands (containment-depth analysis — letter counters that won't weed cleanly). Surfaced as a collapsible "Weed check" panel in the Plotter dialog's Code tab with a four-profile picker, per-issue rows (kind · mm · path count), and a >400-path skip guard.
-- **Auto-bleed (Cricut-style)** — Make Sticker gained a bleed field: the selection is rasterized at 3× and ring-drawn at 20 offsets around the bleed radius (default samples produce the nearest-colour edge smear Cricut uses for Print Then Cut), inserted at the very back beneath the white underlay. Works with or without a border (full-bleed stickers).
-- **Layered-vinyl job export (多层贴花)** — when cut paths carry ≥2 colours, the Plotter dialog shows a Layers section: per-colour layers ordered largest-area-first (1 = bottom), each layer's job automatically including the shared registration marks/weed geometry (cut identically into every layer — the layering alignment convention). Per-layer Send/Save plus "Send all" with a vinyl-swap confirmation between layers and "Save all" with staggered downloads. `weldOutline` now threads a uniform input colour through welded contours so contoured colour layers group correctly.
-- **True-shape nesting for cut paths** — `nestPolygons()`: convex-hull + skyline packing with 90° rotation and gap inflation (the SVGnest offset-by-gap trick), ~90 % of the material savings of NFP nesting for blob-like sticker shapes. One-click "Nest cut paths (vinyl)" (File menu, palette, right-click) repacks cut geometry onto the document width with 2 mm default gap and reports utilization — vinyl/decal layout where the cut shape IS the product.
-- **ISO 19593-1 processing steps in the PDF cut layer** — the "PDF (with cut layer)" export now wraps cut paths in real Optional Content Groups tagged `GTS_ProcStepsGroup=Structural` + `GTS_ProcStepsType=Cutting` (through-cuts) / `PartialCutting` (kiss cuts), registered in `/OCProperties` and hidden from viewers by default — alongside the existing CutContour magenta strokes this is belt-and-braces for VersaWorks/RasterLink/open-graphtec-server consumers. Injected through verified jsPDF 4.2.1 internals with a silent fallback to the unwrapped draw if anything fails; round-trip verified with pdfjs (OCGs resolve, OFF-by-default works, 2 BDC/EMC pairs).
-
-### Changed
-- **Cut-time estimates now count compensations**: the Plotter dialog's stats pipeline applies overcut retrace and blade-offset corner loops before `cutStats` (mirroring the generator's postProcess), and `estimateSeconds` adds the overcut-retrace time plus the drag-knife corner-swing term (corners × π·offset at cutting speed). The animated replay's own ETA deliberately stays length-based and is documented as excluding those surcharges.
-
-## [Unreleased] — sticker / decal / print-and-cut wave
-
-Research-grounded pass (vendor specs + hardware-validated open-source cutter stacks; full findings in `docs/research-sticker-printcut-2026-10.md`).
-
-### Added
-- **Make Sticker (`Ctrl+Alt+K`)** — the Sticker Mule / Cricut "Create Sticker" / Silhouette Offset-panel workflow as one command: weld the selection's outlines, round-join offset (default 2.54 mm border; presets 1.59 minimum / 4 wide / full-bleed / black), insert the white (or custom-colour) underlay directly behind the art, and add the die-cut contour to the cut paths. Cut type chooses Die-cut / **Kiss-cut** (sticker layer only) / **Perf border** (through-cut released last) — the two new cut kinds render distinctly on the Cut Path layer (cyan dashed / orange solid), persist in project files, order themselves in plotter output (through → kiss → perf), and export under the `PerfCutContour` spot-colour name.
-- **Surface Wrap generator** (Document → Surface Wrap…): cylinder (π·D × H + overlap), cone/frustum annular sector (R = L·D/(D−d), θ = 360°·(D−d)/(2L), ≤2° tessellation), and sphere gore templates from container dimensions — inserts a canvas guide and/or a cut path, with starter presets (straight bottle, 30 oz tumbler, wedding cup, sphere ornament) and a test-fit reminder.
-- **Print-side vendor registration marks**: `regMarkStyle` Generic press / **Graphtec ARMS** (Type-2, 20 mm arms / 0.7 mm stroke — four inward corner L-brackets, matching what the `TB52,2` reader expects) / **Silhouette** (10 mm / 0.25 mm) / **Roland** (25 mm / 0.5 mm) with per-style arm/stroke overrides, plus a printable **50 × 9 mm scale-check block** and a "print at 100%" warning — the print marks and the cutter's mark reader now share one geometry source (page margin grows per style; previews follow).
-- **ARMS emit for Graphtec cutters**: the plotter's Graphtec dialect can wrap the job in the hardware-validated `TB99/TB51/TB52/TB54/TB55/TB24 … TB0` registration block (ETX-terminated, 0.1 mm steps; arm 4–20 mm, type 1/2, mark rectangle auto-filled from the job bbox) so an FC/CE-class cutter optically locates the printed marks before cutting.
-- **Blade-offset compensation (drag knives)**: `applyBladeOffset` inserts Siser-validated corner loops (overshoot + bowed return, ≥15° turns, close-corner merging, seam rotated to the longest edge) with 0 / 0.25 / 0.5 mm presets — sharp corners on every cutter including clones, independent of overcut.
-- **CutContour spot-colour export**: "Export SVG (with cut layer)" / "Export PDF (with cut layer)" append the cut paths as a magenta hairline layer (`class="CutContour"` / `PerfCutContour`, `data-cut-kind`), the de-facto VersaWorks / RasterLink7 convention for RIP-driven print & cut.
-- **Round-join offsets**: `offsetPolyline` gained `join: 'round'` (tessellated outer arcs) — the pro-workflow join for sticker contours; miter default unchanged.
-- **Material library**: new presets glitter-HTV (170 gf, 2 passes, 60° blade, ≤30 cm/s), Oracal 651, printable vinyl; HTV corrected to 85 gf/45°; sticker paper default overcut 0.5 mm; cards show blade angle / passes and apply default overcut.
-- **Three sticker templates**: Sticker Sheet (Kiss-cut) with safe areas + perf border, Laptop Decal with 2.54 mm border ring, Tumbler Wrap sized from a real cone sector.
+- Cut-time estimates count compensations: overcut retrace and blade-offset loops enter the stats, and the classic estimate adds the corner-swing term (pre-adjustment corner counts).
+- MATERIAL_PRESETS fully populated with physics constants (sign vinyl 1500 mm/s² / 0.15 s head-up … cardstock 800 / 0.35).
+- applyLayerTrap gained a dryRun mode (shared detection engine) powering the preview line.
 
 ### Fixed
-- Project files now persist kiss/perf cut kinds (schema + loader validation widened — they were silently dropped on load).
-- 100+ new zh dictionary entries (sticker/wrap/ARMS/blade-offset surfaces fully bilingual).
+- Project files persist kiss/perf cut kinds (schema + loader widened — previously silently dropped on load).
+- 230+ new zh dictionary entries across the suite (fully bilingual).
 
 ## [0.16.0] — 2026-10-09
 
-### Added
 - **Error recording, copying, and one-click reporting**: a global error net now catches `window.onerror`, `unhandledrejection`, error toasts, and React render crashes into a 200-entry ring buffer (consecutive repeats fold into a count). Help → Error Log… opens a viewer with the environment summary (version · shell · OS · viewport), expandable stacks, **Copy all / Download .txt / Report on GitHub / Clear** — the report button prefills a GitHub issue (recent errors + env, with a redact-anything-private footer; opens externally via the shell plugin under Tauri). A React `ErrorBoundary` replaces the blank white screen with a recovery card (Reload / Copy details / Report / Open error log); the Debug Panel gains **Simulate error** and **Open error log** buttons. 15 unit tests cover the ring buffer, dedupe, formatting, and issue-URL building.
 - **Native export under the Tauri shell (macOS/Linux)**: `<a download>` exports (SVG/PNG/JPG/JSON/DXF/PDF) silently did nothing in WKWebView/WebKitGTK because wry registers no download handler — `download()`/`downloadDataURL()`/jsPDF now route through a new `fs_save_bytes` Rust command (OS save dialog with per-extension filters, cancel is not an error; a generic `print_native`-style transport keeps the web path byte-identical). 16 unit tests pin the branch selection and dataURL decoding.
 - **Native print under the Tauri shell**: `print_native` existed in Rust but nothing called it — JS `window.print()` in an embedded WKWebView/WebKitGTK is exactly where printing silently fails. All three print paths (canvas print, multi-page PDF, tile print) now share `printHtmlDocument()`, which injects the payload into a print-only container (screen-hidden, `@media print` isolates it from the app UI, `@page` preserved), prints via wry's real PrintOperation, and cleans up on `afterprint` (500 ms settle fallback + 5-minute failsafe). The hidden-iframe web transport keeps byte-identical markup, with the image-heavy paths keeping their 8-second survival window.
@@ -79,7 +56,6 @@ Research-grounded pass (vendor specs + hardware-validated open-source cutter sta
 
 ## [0.15.0] — 2026-10-05
 
-### Added
 - **Glyph-level Text-to-Outlines (slice 1 — custom fonts)**: uploaded fonts now outline to true bezier curves instead of the raster trace, wherever the exact face the canvas paints can be proven (real bold/italic faces resolve; anything the browser would synthesize — faux bold, faux italic — falls back to the tracer, which stays faithful to the paint). Placement replays fabric's own layout caches so glyph positions match the rendered text; fontkit loads lazily in its own precached 356 kB chunk. Slice 2 (Google-font byte fetching) to follow.
 
 ### Fixed
@@ -88,12 +64,10 @@ Research-grounded pass (vendor specs + hardware-validated open-source cutter sta
 ### Removed
 - **The self-generated "certificate chain"** — 75 families / 450 exported functions of image-handoff paperwork that a runaway improvement loop manufactured against itself in June (post-reseal remediation plans, records-destruction certificates, custody ledgers… every one a zero-input derivation with empty signature fields, existing only as clipboard strings about other documents). The real Links-package capability — collect/verify/digest/audit/release-gate/delivery-receipt/SBOM and the print-production chain — is untouched (independently re-adjudicated family by family). `imageHandoff.ts` drops from 1.15 MB / 662 exports to 254 kB / 212; 450 menu items and palette commands disappear; the three lazy chunks shed ~540 kB combined. 444 dead zhDict keys swept with it, and the closed PARITY/TODO backlogs moved to `docs/history/` so no future loop mistakes them for live work.
 
-### Added
 - **First-paint: PropertiesPanel subtree defers behind a skeleton** — the right rail's top section lazy-loads (immediate import, same-shape skeleton), taking CharacterPanel/FontPicker/contrast/ColorPicker and the swatch/style libraries with it: entry 375.5 → **284.0 kB raw / 81.2 kB gzip** (session total: 956.3 → 284.0 raw, −70%).
 
 ## [0.14.0] — 2026-10-04
 
-### Added
 - **Long-tail polish wave**: MenuBar — 53% of the entry chunk — now lazy-loads behind a pixel-matched same-height skeleton, taking the blend/envelope/printMarks families with it (**entry 956.3 kB raw / 177.1 kB gzip → 375.5 / 101.1 kB, −60.7% / −42.9% this session**; the >750 kB chunk warning is gone). The Firefox question is closed with evidence: the full e2e suite runs green there, and a two-browser probe proved the suspected roving fallback divergence is unreachable for real keyboard input in either browser — plus a `RUN_FIREFOX=1`-gated Playwright project for future runs. `objectCaching` gets its documented trade-off and an escape hatch: a Preferences → Editor control (`off` default / `on at ≥4× zoom`) with memo-throttled per-threshold walks and a proven side-effect-free default path.
 - **Build hygiene: zero dynamic-import warnings + `strict` TypeScript**: io3 (the last statically-pinned lazy module — image import/paste/trace/asset registry/drag-drop) now loads through cached-dynamic loaders in App/CanvasView/AssetsPanel/MenuBar, taking the eager entry to **844.7 kB raw / 140.3 kB gzip (−36.8 kB gzip, −20.8% over this session's start)** with **zero INEFFECTIVE_DYNAMIC_IMPORT warnings**; drag-drop listeners attach the moment the chunk lands with StrictMode-safe cleanup. `strict: true` is now enforced in both tsconfigs — the whole tree already passed (measured with CLI overrides and a planted-violation probe before flipping), so the safety net went from coincidental to guaranteed at zero churn. Nine more e2e specs land with it: PrintDialog's first-ever coverage (presets, orientation/summary wiring, print-prep handshake — never actually prints), Templates search/category filters with empty states, and Find & Replace match-case + recipes driving real replacements.
 - **Kit tail pass + e2e regression net**: the a11y kit gained `aria-busy` passthrough, a `fallbackIndex` option (reproducing the one roving container in the codebase whose asymmetric fallback is actually reachable — the Symbols naming toolbar with its auto-focused input), and a standalone `ActionButton` primitive; AIPanel's busy buttons and the naming toolbar are now on the kit, retiring the last legacy roving handlers anywhere. Three new e2e specs protect what unit tests can't: undo/redo flows (History button disabled states mirror the stack), Templates' 2-D grid keyboard navigation + external live region, and Find & Replace's match counting / Replace All (verified by re-querying the dialog).
@@ -110,12 +84,10 @@ Research-grounded pass (vendor specs + hardware-validated open-source cutter sta
 - **SNMP reply parser walked the wrong BER level** (never shipped): the varbind value was sliced out of the OID content instead of its sibling position, so even a correct request could never return the printer's answer. Rewritten with a strict sibling-walk parser (never panics on malformed replies) and unit-tested against exhaustive truncation prefixes.
 - **`parseCartridgeReplies` slot numbering shifted by leading NUL**: replies open with a NUL byte (same wire shape as @BDC ST2) that `trim()` keeps, consuming slot 1 for the preamble; multi-slot streams now number from 1 regardless.
 
-### Changed
 - The high-level Epson flows (`epsonReadWaste`, `epsonResetWastePermanent`/`Temporary`, `epsonReadStats`, `epsonDumpEeprom`, `epsonRestoreBackup`) now take one options object (`{ log, transport, host }`) instead of trailing positional parameters; the Epson prefs record gains an optional `host` field.
 
 ## [0.13.0] — 2026-09-28
 
-### Added
 - **Plotter debug console**: the Send to Plotter dialog now has a built-in serial console. Connect once and keep the cutter link alive across dialog reopens, pick the baud rate (most HP-GL vinyl cutters speak 9600, not the previous hard-coded 115200) and flow control (none / RTS-CTS / XON-XOFF), then use one-click machine commands (initialize, pen up, blade tap, HP-GL OE/OH/OA/OS queries, grbl status / unlock / home / pause / resume, immediate force/speed push), a jog pad with set-origin, and a raw-command input with automatic reply decoding. The TX/RX traffic log timestamps every byte with an ASCII/HEX toggle plus copy / download / clear.
 - **Paced, cancellable job streaming**: Send via USB and Test cut now stream through the persistent link with chunk pacing below the line rate (protects cutters whose tiny buffers overflow without RTS/CTS wiring), a live progress bar, and a Stop button that aborts the transfer and lifts the blade (PU; / grbl feed-hold). Falls back to the legacy one-shot send when no connection is open.
 - **Native persistent serial link (Tauri)**: new serial_open / serial_write / serial_read / serial_close commands keep OS handles in a Rust-side registry with configurable flow control, so read-back and interleaved operations work in the desktop app; all serial commands now run off the main thread.
@@ -146,16 +118,13 @@ Research-grounded pass (vendor specs + hardware-validated open-source cutter sta
 
 ## [0.12.1] — 2026-06-10
 
-### Added
 - **Production workflow parity**: expanded SignMaster/FlexiSign-style command surfaces across menus, command palette, context menus, and layer/search workflows for artboards, blends, masks, path effects, selection cleanup, symbols, measurement, snapping, and cutter-prep operations.
 - **Vector cleanup coverage**: added focused utilities and tests for layer operations, artboards, blends, brush presets, global swatches, graphic styles, knife/scissors cuts, path smoothing, print marks, recolor sorting, variable-width strokes, viewport operations, and related selection tools.
 
-### Changed
 - **Release metadata**: synchronized npm, Tauri, Cargo, and lockfile package versions for the 0.12.1 release.
 
 ## [0.12.0] — 2026-06-05
 
-### Added
 - **Desktop plotter USB picker**: the Send to Plotter dialog now lists OS serial ports in the Tauri desktop app, lets operators refresh/select the cutter USB port, and uses that selection for Test cut and Send via USB instead of relying on ambiguous auto-detection.
 - **Workflow parity polish**: added more keyboard-browsable dialog actions, preset review status, and reset baselines across production dialogs so sign, print, and path-editing workflows are safer to explore before applying.
 - **Roughen reset**: the Roughen effect now exposes a footer Reset action that restores the default 1 mm Size and 3 mm Detail while clearing stale recipe review status.
@@ -166,7 +135,6 @@ Research-grounded pass (vendor specs + hardware-validated open-source cutter sta
 - **Topbar bridge cleanup**: the output toolbar now places Clear bridges beside the one-click Standard bridge action for faster bridge/revert cutter-prep trials.
 - **Status-bar cut cleanup**: the pink cut-count shortcut now supports Ctrl/Cmd-click to clear cut paths directly, while click and Shift/Alt-click still open Plotter and Cut Contour.
 
-### Changed
 - **Release metadata**: synchronized npm, Tauri, and Cargo package versions for the 0.12.0 release.
 
 ## [0.11.1] — 2026-06-03
@@ -183,7 +151,6 @@ Research-grounded pass (vendor specs + hardware-validated open-source cutter sta
 
 A large Adobe Illustrator + SignMaster parity release. The headline themes:
 
-### Added
 - **Pathfinder** — Union, Subtract, Intersect, Exclude, Minus Back, Divide,
   Trim, Merge, Crop, plus Clipping Mask and Compound Path (menu + right-click +
   Align panel + shortcuts).
@@ -240,7 +207,6 @@ A large Adobe Illustrator + SignMaster parity release. The headline themes:
 
 ## [0.10.3] — 2026-06-02
 
-### Added
 - **One-click contour**: right-click a selection → *Create Contour* drops a
   default 2 mm offset cut line with no dialog. The dialog stays for tuning.
 - **Print preview**: the Print dialog now shows a live WYSIWYG preview — page,
@@ -251,7 +217,6 @@ A large Adobe Illustrator + SignMaster parity release. The headline themes:
   state, and the job estimate counts it too.
 - **Version chip**: the build version is always visible in the status bar.
 
-### Changed
 - **Single menu bar on Windows/Linux**: the native Tauri menu is now attached
   only on macOS (where it lives in the system menu bar). On Windows/Linux the
   in-window top bar is the sole menu surface — no more duplicated strip under
@@ -319,7 +284,6 @@ beefed-up debug panel.
   version/shell, and one-click **Copy / Download diagnostics** (a structured
   JSON bug-report blob).
 
-### Changed
 - The cutter's "needs Chrome" gate is reframed: **Save File** works in any
   browser and is the primary action when direct USB (Tauri native or Web
   Serial) is unavailable.

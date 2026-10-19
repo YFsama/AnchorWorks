@@ -21,30 +21,30 @@ import { toast } from './toast';
 
 type T = (key: string) => string;
 
-/**
- * Offset every upper vinyl layer's closed rings outward by `trapMm`
- * (round joins, so the extra millimetre hugs corners smoothly). The
- * bottom layer (order 1), open paths, regmarks and colourless geometry
- * (weed borders) are untouched — the bottom of the stack is the surface
- * everything else registers against, and shared marks must keep cutting
- * identically into every sheet. Document order is preserved: the original
- * cutPaths array is iterated and only non-bottom-colour closed paths are
- * replaced. One pushHistory for the whole trap. Returns the number of
- * trapped paths (rings that replaced a source path).
- */
-export function applyLayerTrap(t: T, trapMm = 0.5): number {
-  const editor = useEditor.getState();
-  const layers = buildVinylLayers(editor.cutPaths);
-  if (layers.length < 2) {
-    toast.warn(t('Trap needs at least two colour layers.'), { title: t('Trap layers') });
-    return 0;
-  }
-  // Everything above the bottom layer gets the intentional overlap.
-  const trappedColors = new Set(layers.filter(layer => layer.order > 1).map(layer => layer.color));
+/** applyLayerTrap options. */
+export interface LayerTrapOptions {
+  /** Compute the would-be-trapped count WITHOUT touching the store or
+   *  history and without any toast — silent by design, because the caller
+   *  (the PlotterDialog trap preview) renders the number itself. */
+  dryRun?: boolean;
+}
 
+/**
+ * Rebuild the job with every trappable path offset outward by `trapMm` —
+ * the shared engine of the real action and the dry-run preview, so the
+ * reported count can never drift from what a real run would do. Trappable =
+ * closed, non-regmark, coloured, and above the bottom layer; a trappable
+ * path whose offset collapses to nothing is kept as-is, and one that
+ * self-intersection cleanup splits becomes one cut path per ring.
+ */
+function trapRebuild(
+  cutPaths: CutPath[],
+  trappedColors: Set<string>,
+  trapMm: number,
+): { rebuilt: CutPath[]; trapped: number } {
   const rebuilt: CutPath[] = [];
   let trapped = 0;
-  for (const path of editor.cutPaths) {
+  for (const path of cutPaths) {
     // regmark kind excluded defensively (layerJobs' guard: marks are shared
     // geometry, never trapped, even if a stale blob somehow coloured one).
     const trappable = path.closed && path.kind !== 'regmark' && path.color !== undefined && trappedColors.has(path.color);
@@ -63,6 +63,37 @@ export function applyLayerTrap(t: T, trapMm = 0.5): number {
       trapped += 1;
     }
   }
+  return { rebuilt, trapped };
+}
+
+/**
+ * Offset every upper vinyl layer's closed rings outward by `trapMm`
+ * (round joins, so the extra millimetre hugs corners smoothly). The
+ * bottom layer (order 1), open paths, regmarks and colourless geometry
+ * (weed borders) are untouched — the bottom of the stack is the surface
+ * everything else registers against, and shared marks must keep cutting
+ * identically into every sheet. Document order is preserved: the original
+ * cutPaths array is iterated and only non-bottom-colour closed paths are
+ * replaced. One pushHistory for the whole trap. Returns the number of
+ * trapped paths (rings that replaced a source path).
+ *
+ * With `opts.dryRun` the same trapRebuild runs but nothing is applied:
+ * no store write, no history step, no toast — just the would-be count,
+ * for the caller to preview.
+ */
+export function applyLayerTrap(t: T, trapMm = 0.5, opts?: LayerTrapOptions): number {
+  const dryRun = opts?.dryRun === true;
+  const editor = useEditor.getState();
+  const layers = buildVinylLayers(editor.cutPaths);
+  if (layers.length < 2) {
+    if (!dryRun) toast.warn(t('Trap needs at least two colour layers.'), { title: t('Trap layers') });
+    return 0;
+  }
+  // Everything above the bottom layer gets the intentional overlap.
+  const trappedColors = new Set(layers.filter(layer => layer.order > 1).map(layer => layer.color));
+
+  const { rebuilt, trapped } = trapRebuild(editor.cutPaths, trappedColors, trapMm);
+  if (dryRun) return trapped;
 
   if (trapped === 0) {
     toast.warn(t('No closed paths above the bottom layer to trap.'), { title: t('Trap layers') });

@@ -19,13 +19,19 @@
  * needs real canvas pixel access (getImageData/createImageData/putImageData)
  * and returns null without it, so headless callers keep the ring default.
  *
+ * The optional `cutPaths` mask (document mm) trims the finished smear back
+ * to the bleed reach of the cut lines: Cricut bakes the smear only where
+ * the blade cuts, so ink elsewhere is waste and can straddle an intended
+ * white border. Same doc §1/"Bleed only along cut paths" open item.
+ *
  * Entirely non-destructive: the live canvas is never touched; objects are
  * serialized + re-enlivened into an offscreen StaticCanvas exactly like
  * rasterize.ts does, and the smear is composited on a detached
  * HTMLCanvasElement the caller places itself.
  */
 import * as fabric from 'fabric';
-import { labelledChamfer } from './rasterEdt';
+import { interiorEdt, labelledChamfer } from './rasterEdt';
+import type { CutPath } from '../store/editor';
 
 /** 96dpi mm→px divisor shared across the cutter pipeline (makeSticker et al). */
 const MM_TO_PX = 3.7795;
@@ -34,6 +40,10 @@ const MM_TO_PX = 3.7795;
 const DEFAULT_MULTIPLIER = 3;
 /** Default ring samples — enough for smooth 1–3 mm bleeds. */
 const DEFAULT_SAMPLES = 20;
+/** Extra reach (output-bitmap px) the cut-line mask keeps beyond
+ *  bleedPx·multiplier, so chamfer quantisation can never shave the smear
+ *  right at a cut line. */
+const CUT_LINE_SLACK_PX = 2;
 
 export interface BleedOptions {
   /** Bleed width in mm (1–3 mm typical; Print Then Cut spec ~1/16 in). */
@@ -48,6 +58,18 @@ export interface BleedOptions {
    *  getImageData/createImageData/putImageData — returns null under a
    *  headless ctx mock so callers fall back to the ring default. */
   mode?: 'ring' | 'nearest';
+  /** Cut paths in DOCUMENT mm that will blade-cut this artwork (the same
+   *  paths productionPreview imposes). When provided AND non-empty, the
+   *  finished smear is ERASED everywhere except within the bleed reach of a
+   *  cut line: Cricut bakes the smear only where the blade actually cuts,
+   *  because elsewhere the ink is wasted and can straddle an intended white
+   *  border between neighbouring stickers (docs/research-sticker-printcut-
+   *  2026-10.md §1 bleed table + the "Bleed only along cut paths" open
+   *  item). The on-top original is never touched. Applying the mask needs
+   *  getImageData/putImageData — without pixel access (headless ctx) the
+   *  unmasked smear is kept rather than failing the whole raster. Absent or
+   *  empty → behaviour byte-identical to the no-option raster. */
+  cutPaths?: CutPath[];
 }
 
 export interface BleedResult {
@@ -132,6 +154,82 @@ export function nearestColourSmear(
     out[d + 3] = 255;
   }
   return out;
+}
+
+/**
+ * Bresenham line stamp: 1-px-wide rasterization of the segment
+ * (x0,y0)→(x1,y1) into `mask` (clipped to the w×h grid). Lines are
+ * ZERO-WIDTH at raster resolution — the correct model here, because the
+ * chamfer distance to the nearest line pixel is what gates the smear, not
+ * any physical blade kerf.
+ */
+function stampLine(
+  mask: Uint8Array,
+  w: number,
+  h: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): boolean {
+  let x = Math.round(x0);
+  let y = Math.round(y0);
+  const xe = Math.round(x1);
+  const ye = Math.round(y1);
+  const dx = Math.abs(xe - x);
+  const sx = x < xe ? 1 : -1;
+  const dy = -Math.abs(ye - y);
+  const sy = y < ye ? 1 : -1;
+  let err = dx + dy;
+  let stamped = false;
+  for (;;) {
+    if (x >= 0 && x < w && y >= 0 && y < h) { mask[y * w + x] = 1; stamped = true; }
+    if (x === xe && y === ye) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x += sx; }
+    if (e2 <= dx) { err += dx; y += sy; }
+  }
+  return stamped;
+}
+
+/**
+ * Rasterize `cutPaths` (document mm) onto the outW×outH OUTPUT bitmap grid:
+ * a cut point at document mm (cx, cy) maps to output px
+ *
+ *   ((cx·MM_TO_PX − originXPx) · multiplier, (cy·MM_TO_PX − originYPx) · multiplier)
+ *
+ * where (originXPx, originYPx) is the document-canvas-px position of the
+ * output bitmap's (0,0) — the selection bbox origin shrunk by the bleed,
+ * i.e. (left − bleedPx, top − bleedPx). This is the inverse of
+ * productionPreview's stamp delta (rx = bleed.leftPx/MM_TO_PX − footOrigin):
+ * the raster PLACEMENT converts bitmap px → document mm; the mask converts
+ * document mm → bitmap px. Closed paths also stamp their closing segment.
+ * Returns the 1-per-cut-line-pixel mask.
+ */
+function cutLineMask(
+  cutPaths: CutPath[],
+  outW: number,
+  outH: number,
+  originXPx: number,
+  originYPx: number,
+  multiplier: number,
+): { mask: Uint8Array; anyLine: boolean } {
+  const mask = new Uint8Array(outW * outH);
+  let anyLine = false;
+  for (const path of cutPaths) {
+    if (path.points.length < 2) continue;
+    const pts = path.points.map(([xm, ym]) => [
+      (xm * MM_TO_PX - originXPx) * multiplier,
+      (ym * MM_TO_PX - originYPx) * multiplier,
+    ] as [number, number]);
+    const segments = path.closed ? pts.length : pts.length - 1;
+    for (let i = 0; i < segments; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (stampLine(mask, outW, outH, a[0], a[1], b[0], b[1])) anyLine = true;
+    }
+  }
+  return { mask, anyLine };
 }
 
 /**
@@ -222,6 +320,46 @@ export async function buildBleedImage(
         }
       }
       ctx.drawImage(source, baseX, baseY);
+
+      // ── Cut-path mask ────────────────────────────────────────────────
+      // Erase every SMEARED pixel (outside the centered source footprint)
+      // farther than the bleed reach from the nearest cut line — the smear
+      // only needs to exist along the lines the blade cuts. Needs pixel
+      // access; without it (headless ctx) the unmasked smear stands.
+      if (opts.cutPaths && opts.cutPaths.length > 0 &&
+          typeof ctx.getImageData === 'function' &&
+          typeof ctx.putImageData === 'function') {
+        const { mask: line, anyLine } = cutLineMask(
+          opts.cutPaths, outW, outH, left - bleedPx, top - bleedPx, multiplier,
+        );
+        // interiorEdt measures dist-to-nearest-0-pixel from 1-pixels, so the
+        // INVERTED line mask (line pixels = 0) yields, for every output
+        // pixel, its distance to the nearest cut-line pixel. When NO cut line
+        // intersects the bitmap at all (anyLine false — e.g. a selection
+        // carrying no contour of its own), masking would erase the whole
+        // smear; keep it instead, the safer default for a bleed the caller
+        // explicitly asked for.
+        if (anyLine) {
+          const inverted = new Uint8Array(outW * outH);
+          for (let i = 0; i < inverted.length; i++) inverted[i] = line[i] ? 0 : 1;
+          const lineDist = interiorEdt(inverted, outW, outH);
+          const reach = bleedPx * multiplier + CUT_LINE_SLACK_PX;
+          const img = ctx.getImageData(0, 0, outW, outH);
+          // The centered source rect (rounded, same as nearestColourSmear's
+          // base): pixels inside it belong to the on-top original and stay.
+          const srcX0 = Math.round(baseX);
+          const srcY0 = Math.round(baseY);
+          for (let y = 0; y < outH; y++) {
+            const inSrcRow = y >= srcY0 && y < srcY0 + offH;
+            for (let x = 0; x < outW; x++) {
+              if (inSrcRow && x >= srcX0 && x < srcX0 + offW) continue;
+              const i = y * outW + x;
+              if (lineDist[i] > reach) img.data[i * 4 + 3] = 0;
+            }
+          }
+          ctx.putImageData(img, 0, 0);
+        }
+      }
 
       return {
         url: outEl.toDataURL('image/png'),

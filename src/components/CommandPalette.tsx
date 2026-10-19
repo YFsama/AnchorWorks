@@ -162,7 +162,7 @@ import { getBinding } from '../lib/keymap';
 import { listTools } from '../lib/tools/types';
 
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
-import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, exportPdfWithCutLayer, exportSvgWithCutLayer, nestCutPathsVinyl, savePlotterTestCut } from '../lib/cutPrepActions';
+import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, exportPdfWithCutLayer, exportSvgWithCutLayer, nestCutPathsRaster, nestCutPathsVinyl, savePlotterTestCut } from '../lib/cutPrepActions';
 import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
 import { expandBlendSteps, releaseBlendSteps, removeOrphanBlendSteps, relinkBlendEndpointFromSelection, reverseBlendSteps, selectAllBlendEndpoints, selectAllBlendGroups, selectBlendEndpointsFromSelection, selectBlendGroupFromSelection, selectBlendSteps, selectBlendStepsFromSelection, selectOrphanBlendSteps, updateBlendSteps } from '../lib/blend';
 import type { ToolId } from '../types';
@@ -500,6 +500,7 @@ export function CommandPalette({
       else toast.warn(t('Select 2 or more objects first.'), { title: t('Nest (rotation-aware)') });
     } },
     { id: 'file.nestCutVinyl', label: t('Nest cut paths (vinyl)'), category: t('File'), keywords: 'nest nesting pack hull convex polygon cut paths vinyl roll sheet material waste layout cutter plotter decal true shape', icon: Grid3X3, run: () => nestCutPathsVinyl(t) },
+    { id: 'file.nestCutRaster', label: t('Nest cut paths (raster true-shape)'), category: t('File'), keywords: 'nest raster occupancy grid true shape concave nesting vinyl cutter plotter material', icon: Grid3X3, run: () => nestCutPathsRaster(t) },
     { id: 'file.plotterRegMarks', label: t('Add positioning marks'), category: t('File'), keywords: 'registration marks reg marks print cut contour plotter cutter align', icon: Send, run: () => addPlotterRegistrationMarks(t) },
     { id: 'file.plotterWeedBorder', label: t('Weed border'), category: t('File'), keywords: 'weed border weeding vinyl cutter plotter peel waste cut prep', icon: Send, run: () => addPlotterWeedBorder(t) },
     { id: 'file.plotterWeedRows', label: `${t('Weed border')} — ${t('Weed rows')}`, category: t('File'), keywords: 'weed grid rows horizontal divider weeding vinyl cutter plotter peel waste cut prep', icon: Grid3X3, run: () => addPlotterWeedBorder(t, 2, 0) },

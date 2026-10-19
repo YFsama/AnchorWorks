@@ -14,6 +14,7 @@ import { optimizeOrder, cutStats, estimateSeconds, estimateJobSeconds, formatDur
 import { weedCheck, WEED_PROFILES, type WeedIssueKind, type WeedProfileId, type WeedReport } from '../lib/weedCheck';
 import { buildVinylLayers, type VinylLayer } from '../lib/layerJobs';
 import { applyLayerTrap } from '../lib/layerTrap';
+import { cutPathsToDxf } from '../lib/io2';
 import { showConfirm } from '../lib/confirm';
 import { getCanvas } from '../lib/canvasEngine';
 import { download } from '../lib/io';
@@ -287,6 +288,15 @@ export function PlotterDialog() {
   // section only appears when this yields ≥2 colours to stack — otherwise
   // there is nothing multi-colour to cut and we render nothing at all.
   const layers = useMemo(() => buildVinylLayers(cutPaths), [cutPaths]);
+
+  // Trap dry-run preview: how many paths the Trap button would offset at
+  // the current trap mm for the CURRENT layer set — recomputed when the mm
+  // input or the layers change. applyLayerTrap(dryRun) reads the store
+  // read-only (no write, no history, no toast); the real click applies.
+  const trapPreviewCount = useMemo(
+    () => (layers.length >= 2 ? applyLayerTrap(t, trapMm, { dryRun: true }) : 0),
+    [layers, trapMm, t],
+  );
 
   // What the preview + stats draw. With cut paths present, that's the active
   // (colour-filtered) set. With NONE, the plotter exports the canvas geometry
@@ -643,10 +653,10 @@ export function PlotterDialog() {
    *  tell yesterday's GX job from today's clone job in the downloads
    *  folder. Built inside handlers — reading the clock during render
    *  trips the purity lint. */
-  const stampedFileName = (prefix = 'design') => {
+  const stampedFileName = (prefix = 'design', extOverride?: string) => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
-    const ext = format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl');
+    const ext = extOverride ?? (format === 'gcode' ? 'gcode' : (opts.dialect !== 'bare' ? 'plt' : 'hpgl'));
     return `${profileId ? `${profileId}-` : ''}${prefix}-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`;
   };
   const saveFile = () => {
@@ -850,6 +860,18 @@ export function PlotterDialog() {
     download(stampedFileName(`layer-${index + 1}-${layerFileToken(layer.color)}`), payload, 'text/plain');
   };
 
+  /** Save one layer as a cut-path DXF (io2.cutPathsToDxf) — for lasers /
+   *  CAD that eat DXF rather than HP-GL/G-code. Same stamped-name pattern
+   *  as saveLayer; the file body is the DXF text itself. */
+  const saveLayerDxf = (layer: VinylLayer, index: number) => {
+    download(
+      // DXF content under a DXF extension — laser/CAD consumers key on it.
+      stampedFileName(`layer-${index + 1}-${layerFileToken(layer.color)}`, 'dxf'),
+      cutPathsToDxf(layer.paths),
+      'text/plain',
+    );
+  };
+
   /** Save every layer, staggered ~300 ms apart — browsers swallow bursts of
    *  downloads (same stagger pattern as separations.exportPlates; the first
    *  file goes out immediately). */
@@ -857,6 +879,14 @@ export function PlotterDialog() {
     layers.forEach((layer, i) => {
       if (i === 0) saveLayer(layer, i);
       else setTimeout(() => saveLayer(layer, i), i * 300);
+    });
+  };
+
+  /** DXF twin of saveAllLayers — one DXF per layer, same 300 ms stagger. */
+  const saveAllLayersDxf = () => {
+    layers.forEach((layer, i) => {
+      if (i === 0) saveLayerDxf(layer, i);
+      else setTimeout(() => saveLayerDxf(layer, i), i * 300);
     });
   };
 
@@ -1852,6 +1882,9 @@ export function PlotterDialog() {
                   <Layers size={12} aria-hidden="true" className="text-[#ff2e9a] shrink-0" />
                   <span className="font-medium text-ink">{t('Layers (multi-colour vinyl)')}</span>
                 </div>
+                <div className="mt-1 text-[10px] text-muted leading-snug">
+                  {t('Layer alignment tolerance is ~0.5 mm — design a 0.5–1 mm trap so misregistration shows as overlap, not a gap.')}
+                </div>
                 <div className="mt-1 flex flex-col gap-1">
                   {layers.map((layer, i) => (
                     <div key={layer.color} data-plotter-layer={layer.color} className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1901,6 +1934,15 @@ export function PlotterDialog() {
                       >
                         {t('Save')}
                       </button>
+                      <button
+                        type="button"
+                        className="btn !py-0.5 !px-1.5 !text-[10px]"
+                        onClick={() => saveLayerDxf(layer, i)}
+                        disabled={busy}
+                        title={`${t('DXF')} ${t('Layer')} ${i + 1} (${layer.color})`}
+                      >
+                        {t('DXF')}
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1926,12 +1968,24 @@ export function PlotterDialog() {
                   <button
                     type="button"
                     className="btn !py-0.5 !px-1.5 !text-[10px]"
-                    onClick={() => applyLayerTrap(t, trapMm)}
+                    onClick={saveAllLayersDxf}
                     disabled={busy}
+                    title={t('Save every layer as its own DXF file.')}
+                  >
+                    {t('Save all (DXF)')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    onClick={() => applyLayerTrap(t, trapMm)}
+                    disabled={busy || trapPreviewCount === 0}
                     title={t('Offset every upper layer outward for an intentional overlap, so ~1 mm misregistration shows as overlap, not a gap.')}
                   >
                     {t('Trap layers')}
                   </button>
+                  <span className="text-muted tabular-nums" aria-live="polite" title={t('paths will be offset')}>
+                    {trapPreviewCount} {t('paths will be offset')}
+                  </span>
                   <input
                     type="number" min={0.25} max={1.5} step={0.05} value={trapMm}
                     onChange={(e) => setTrapMm(Math.min(1.5, Math.max(0.25, parseFloat(e.target.value) || 0.5)))}

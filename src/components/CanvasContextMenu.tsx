@@ -189,7 +189,7 @@ import { addSavedSwatchColor, applySwatchToSelection, collectSelectionColorsInto
 import { getFormat } from '../lib/formats';
 import { openProjectFromFile, openRecentFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
-import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, nestCutPathsVinyl, savePlotterTestCut } from '../lib/cutPrepActions';
+import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, nestCutPathsRaster, nestCutPathsVinyl, savePlotterTestCut } from '../lib/cutPrepActions';
 import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
 import { expandBlendSteps, releaseBlendSteps, removeOrphanBlendSteps, relinkBlendEndpointFromSelection, reverseBlendSteps, selectAllBlendEndpoints, selectAllBlendGroups, selectBlendEndpointsFromSelection, selectBlendGroupFromSelection, selectBlendSteps, selectBlendStepsFromSelection, selectOrphanBlendSteps, updateBlendSteps } from '../lib/blend';
 
@@ -1095,6 +1095,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Stroke edges to cut paths')} disabled={!hasSelection} onClick={() => run(() => outlineStroke(), hasSelection)} />
         <Item label={t('Add positioning marks')} onClick={() => run(() => addPlotterRegistrationMarks(t), true)} />
         <Item label={t('Nest cut paths (vinyl)')} onClick={() => run(() => { nestCutPathsVinyl(t); }, true)} />
+        <Item label={t('Nest cut paths (raster true-shape)')} onClick={() => run(() => { nestCutPathsRaster(t); }, true)} />
         <Item label={t('Weed border')} onClick={() => run(() => addPlotterWeedBorder(t), true)} />
         <SubMenu label={t('Weed grid presets')} openLeft={openLeft}>
           <Item label={t('Weed rows')} onClick={() => run(() => addPlotterWeedBorder(t, 2, 0), true)} />
@@ -1134,6 +1135,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Auto-arrange (Nest)')} disabled={active.length < 2} onClick={() => run(() => nest(), active.length >= 2)} />
         <Item label={t('Add positioning marks')} onClick={() => run(() => addPlotterRegistrationMarks(t), true)} />
         <Item label={t('Nest cut paths (vinyl)')} onClick={() => run(() => { nestCutPathsVinyl(t); }, true)} />
+        <Item label={t('Nest cut paths (raster true-shape)')} onClick={() => run(() => { nestCutPathsRaster(t); }, true)} />
         <Item label={t('Weed border')} onClick={() => run(() => addPlotterWeedBorder(t), true)} />
         <SubMenu label={t('Weed grid presets')} openLeft={openLeft}>
           <Item label={t('Weed rows')} onClick={() => run(() => addPlotterWeedBorder(t, 2, 0), true)} />

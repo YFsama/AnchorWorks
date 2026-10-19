@@ -368,4 +368,34 @@ describe('buildProductionPreview', () => {
     expect(kept.map(p => p.id).sort()).toEqual(['mine', 'nearby']);
   });
 
+  it('cut-path-masked bleed: cut paths + bleed build fine and change no placements', async () => {
+    // Selection bbox == cut bbox, so the nesting inputs are identical with
+    // or without the cut paths — isolating the buildBleedImage cutPaths
+    // pass-through (a raster refinement) from the layout.
+    const objects = [mmRect(10, 10, 60, 40)];
+    const cutPaths = [rectCutPath('outline-1', 10, 10, 60, 40, 'outline')];
+    const opts = { sheetWidthMm: 200, gapMm: 2, copies: 3, bleedMm: 1, showMarks: false } as const;
+
+    const withCuts = await buildProductionPreview(objects, cutPaths, opts);
+    expect(withCuts).not.toBeNull();
+    expect(withCuts!.bleedUsed).toBe(true);
+    expect(withCuts!.copies).toBe(3);
+
+    // Under the headless ctx the mask degrades gracefully (no pixel
+    // access → unmasked smear kept), the build still succeeds, and the
+    // placements match the cutPaths-undefined run to the last float digit
+    // (deep-equal modulo 1e-9: the no-cut run rebuilds the hull from the
+    // selection bbox, which round-trips mm→px→mm with ~1e-14 noise).
+    const noCuts = await buildProductionPreview(objects, [], opts);
+    expect(noCuts).not.toBeNull();
+    expect(noCuts!.placements).toHaveLength(withCuts!.placements.length);
+    for (let i = 0; i < noCuts!.placements.length; i++) {
+      expect(noCuts!.placements[i].rotation).toBe(withCuts!.placements[i].rotation);
+      expect(noCuts!.placements[i].x).toBeCloseTo(withCuts!.placements[i].x, 9);
+      expect(noCuts!.placements[i].y).toBeCloseTo(withCuts!.placements[i].y, 9);
+    }
+    expect(noCuts!.copies).toBe(withCuts!.copies);
+    expect(noCuts!.utilization).toBeCloseTo(withCuts!.utilization, 9);
+  });
+
 });

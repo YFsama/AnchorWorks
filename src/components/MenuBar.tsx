@@ -375,6 +375,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
         { label: t('Nest (rotation-aware)'), onClick: runRotationNest },
         { label: t('Nest cut paths (vinyl)'), onClick: async () => (await import('../lib/cutPrepActions')).nestCutPathsVinyl(t) },
+        { label: t('Nest cut paths (raster true-shape)'), onClick: async () => (await import('../lib/cutPrepActions')).nestCutPathsRaster(t) },
         { label: t('Add positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
         {
           label: t('Weed border'),

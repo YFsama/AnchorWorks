@@ -278,7 +278,14 @@ export async function buildProductionPreview(
   // ── 4. Raster (selection + optional baked bleed) ───────────────────────
   // bleedMm 0 is well-defined for the ring mode: radius-0 offsets + the
   // centered original = a plain multiplier× raster of the selection.
-  const bleed = await buildBleedImage(objects, { bleedMm, mode: bleedMode });
+  // With bleed on, the cut paths (document mm, the same frame relPaths
+  // uses, regmarks excluded) ride along so buildBleedImage can mask the
+  // smear down to the cut lines — pass-through only, never layout input.
+  const bleed = await buildBleedImage(objects, {
+    bleedMm,
+    mode: bleedMode,
+    cutPaths: bleedMm > 0 ? nonReg : undefined,
+  });
   if (!bleed) return null;
   const pxPerMm = bleed.multiplier * MM_TO_PX;
 

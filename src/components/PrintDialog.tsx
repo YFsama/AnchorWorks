@@ -7,6 +7,7 @@ import { defaultPrintPrep, type PrintPrep } from '../lib/printPrep';
 import { REG_MARK_DEFAULTS, type RegMarkStyle } from '../lib/regMarkGeometry';
 import { PrintPreview } from './PrintPreview';
 import { useT } from '../lib/i18n';
+import { toast } from '../lib/toast';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
 import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { actionReviewKey, makeRovingKeys, makeSegmentKeys, useReviewedAction } from './ui/useRovingActions';
@@ -62,9 +63,13 @@ export function PrintDialog() {
   const open = useEditor(s => s.showPrint);
   const openPrep = useEditor(s => s.openPrintPrep);
   const close = useCallback(() => useEditor.getState().setModal('showPrint', false), []);
+  /** CODE39 link-info gate: 1–9 chars, no leading 'G' (Graphtec-reserved). */
+  const validBarcodeLink = (s: string): boolean =>
+    s.length >= 1 && s.length <= 9 && !s.startsWith('G') && /^[0-9A-Z\-.\s$/%]+$/.test(s);
   const [opts, setOpts] = useState<PrintOptions>({ pageSize: 'A4', orientation: 'portrait', fit: 'fit', marginMm: 10 });
   const [prep, setPrep] = useState<PrintPrep>(defaultPrintPrep);
   const [prepOpen, setPrepOpen] = useState(false);
+  const [barcodeLink, setBarcodeLink] = useState('');
   // True once the operator hand-edits the vendor arm/stroke values — style
   // switches then keep the edited numbers instead of re-prefilling defaults
   // (the "Style default" chip clears it again).
@@ -105,7 +110,7 @@ export function PrintDialog() {
   // hasPrep / io2.ts's wantPrep so prep flows to print/PDF exactly when the
   // libs would draw something.
   const regStyle: RegMarkStyle = prep.regMarkStyle ?? 'generic';
-  const prepActive = prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0 || prep.scaleCheck === true;
+  const prepActive = prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0 || prep.scaleCheck === true || !!prep.barcodeBand;
 
   /** Switch the vendor mark style. Arm/stroke re-prefill from the style's
    *  defaults on every switch until the operator edits them by hand
@@ -121,17 +126,24 @@ export function PrintDialog() {
   };
 
   const handlePrint = () => {
-    printCanvas(opts, prepActive ? prep : undefined);
+    try {
+      printCanvas(opts, prepActive ? prep : undefined);
+    } catch (e) {
+      toast.error((e as Error).message, { title: t('Print failed') });
+      return;
+    }
     close();
   };
   const handlePDF = () => {
-    void exportPDFReal({ pageSize: opts.pageSize, orientation: opts.orientation, prep: prepActive ? prep : undefined });
+    void exportPDFReal({ pageSize: opts.pageSize, orientation: opts.orientation, prep: prepActive ? prep : undefined })
+      .catch((e: unknown) => toast.error((e as Error).message, { title: t('Export failed') }));
     close();
   };
   const resetPrintSettings = () => {
     setOpts({ pageSize: 'A4', orientation: 'portrait', fit: 'fit', marginMm: 10 });
     setPrep(defaultPrintPrep);
     setRegMarkCustom(false);
+    setBarcodeLink('');
     setPageQuery('');
     setPrepOpen(false);
     setReviewedOutputAction(t('Reset print settings'));
@@ -671,6 +683,39 @@ export function PrintDialog() {
                 onChange={(v) => setPrep({ ...prep, scaleCheck: v })}
                 hint={t('Prints a 50 × 9 mm block — measure it to verify 100% scale before cutting')}
               />
+              <ToggleRow
+                label={t('Data-Link barcode')}
+                checked={!!prep.barcodeBand}
+                onChange={(v) => setPrep({
+                  ...prep,
+                  // A stale/invalid typed link never reaches the geometry
+                  // layer (which throws) — the toggle seeds the safe default.
+                  barcodeBand: v ? { linkInfo: validBarcodeLink(barcodeLink) ? barcodeLink : 'ANCHOR01' } : undefined,
+                })}
+                hint={t('Graphtec roll-media CODE39 band + 50×9 mm Start Mark for Data-Link job handoff')}
+              />
+              {!!prep.barcodeBand && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] text-muted">{t('Link info (9 chars, not starting with G)')}</span>
+                  <input
+                    type="text"
+                    className="input text-xs !py-0.5 !px-1.5 w-32 tabular-nums"
+                    value={barcodeLink || prep.barcodeBand.linkInfo}
+                    maxLength={9}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setBarcodeLink(val);
+                      if (validBarcodeLink(val)) {
+                        setPrep(p => ({ ...p, barcodeBand: { linkInfo: val } }));
+                      }
+                    }}
+                    aria-label={t('Data-Link link info')}
+                  />
+                  {barcodeLink.startsWith('G') && (
+                    <span className="text-[10px] text-rose-500">{t('Link info must not start with G (reserved).')}</span>
+                  )}
+                </div>
+              )}
               <ToggleRow
                 label={t('Page info')}
                 checked={prep.pageInfo}

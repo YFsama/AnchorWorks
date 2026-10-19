@@ -97,3 +97,48 @@ describe('prepMarkMarginMm', () => {
     expect(prepMarkMarginMm({ ...basePrep, pageInfo: true, scaleCheck: true })).toBe(33);
   });
 });
+
+describe('Graphtec Data-Link barcode band', () => {
+  it('emits the band as solid black rects in the top margin when set', () => {
+    const svg = renderTrimMarksSVG(100, 80, { ...basePrep, barcodeBand: { linkInfo: 'A12345678' } });
+    // 50×9 Start Mark + 65 CODE39 bars ('*' + 'A12345678' + 'F' + check
+    // 'I' + '*' = 13 chars × 5 bars) — well above the six-rect sanity bar.
+    const rects = svg.match(/<rect /g) ?? [];
+    expect(rects.length).toBeGreaterThanOrEqual(6);
+    expect(rects.length).toBe(66);
+    // Start Mark pinned in MEDIA space: media width = trim 100 + 2·(margin
+    // 31 + bleed 0); x = 162 − 10 − 50 − 31 = 71; y = lead 20 − 31 = −11.
+    expect(svg).toContain('<rect x="71" y="-11" width="50" height="9" fill="#000" />');
+    // The CODE39 bar run follows left of the start mark behind a 7 mm quiet
+    // zone (first bar of the leading '*' is narrow, 0.5 mm tall 9).
+    expect(svg.match(/<rect x="[^"]*" y="-11" width="0.5" height="9" fill="#000" \/>/g)).not.toBeNull();
+  });
+
+  it('shifts the band with bleed so it stays at the fixed MEDIA-space offsets', () => {
+    // bleed 3 → shift 34: media width 168 → Start Mark x = 108 − 34 = 74,
+    // lead y = 20 − 34 = −14 — the band rides out with the grown page.
+    const svg = renderTrimMarksSVG(100, 80, { ...basePrep, bleedMm: 3, barcodeBand: { linkInfo: 'A12345678' } });
+    expect(svg).toContain('<rect x="74" y="-14" width="50" height="9" fill="#000" />');
+  });
+
+  it('keeps the output byte-identical when barcodeBand is unset', () => {
+    // Today's generic registration output, unchanged.
+    expect(renderTrimMarksSVG(100, 80, { ...basePrep, registrationMarks: true })).toBe(GENERIC_REGISTRATION_PIN);
+    // And the bare prep still emits no rects at all.
+    expect(renderTrimMarksSVG(100, 80, basePrep)).not.toContain('<rect');
+  });
+
+  it('grows prepMarkMarginMm to at least 31 mm (20 lead + 9 band + 2 clear)', () => {
+    expect(prepMarkMarginMm({ ...basePrep, barcodeBand: { linkInfo: 'A12345678' } })).toBe(31);
+    // Band + generic marks stays 31; a physically larger extent still wins.
+    expect(prepMarkMarginMm({ ...basePrep, registrationMarks: true, barcodeBand: { linkInfo: 'A12345678' } })).toBe(31);
+    expect(prepMarkMarginMm({ ...basePrep, pageInfo: true, scaleCheck: true, barcodeBand: { linkInfo: 'A12345678' } })).toBe(33);
+  });
+
+  it('propagates invalid linkInfo as a throw from the geometry layer', () => {
+    expect(() => renderTrimMarksSVG(100, 80, { ...basePrep, barcodeBand: { linkInfo: 'G12345678' } }))
+      .toThrow(/must not start with 'G'/);
+    expect(() => renderTrimMarksSVG(100, 80, { ...basePrep, barcodeBand: { linkInfo: 'A123456789' } }))
+      .toThrow(/1–9 CODE39 characters/);
+  });
+});

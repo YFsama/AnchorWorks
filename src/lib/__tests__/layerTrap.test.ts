@@ -85,4 +85,54 @@ describe('applyLayerTrap', () => {
     expect(warn).toHaveBeenCalledOnce();
     expect(warn).toHaveBeenCalledWith('Trap needs at least two colour layers.', { title: 'Trap layers' });
   });
+
+  it('dryRun returns the same count a real run would, touching neither store nor history', () => {
+    const pushHistory = vi.spyOn(canvasEngine, 'pushHistory').mockImplementation(() => {});
+    const success = vi.spyOn(toast, 'success').mockImplementation(() => '');
+    const warn = vi.spyOn(toast, 'warn').mockImplementation(() => '');
+
+    const red = rectPath('red', '#ff0000', 0, 0, 100, 100);    // 10 000 mm² → bottom
+    const blue = rectPath('blue', '#0000ff', 200, 0, 50, 40);  // 2 000 mm² → upper
+    const mark = regmark('mark');
+    useEditor.getState().setCutPaths([red, blue, mark]);
+    // Spy installed AFTER seeding so the setup write doesn't count.
+    const setCutPaths = vi.spyOn(useEditor.getState(), 'setCutPaths');
+
+    expect(applyLayerTrap(t, 0.5, { dryRun: true })).toBe(1);
+    // Completely inert: no store write, no history step, no toast at all.
+    expect(setCutPaths).not.toHaveBeenCalled();
+    expect(pushHistory).not.toHaveBeenCalled();
+    expect(success).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    // The store still holds the exact input objects.
+    expect(useEditor.getState().cutPaths).toEqual([red, blue, mark]);
+
+    // A real run on the same job still mutates (count matches the dry-run).
+    expect(applyLayerTrap(t, 0.5)).toBe(1);
+    expect(setCutPaths).toHaveBeenCalledOnce();
+    expect(pushHistory).toHaveBeenCalledOnce();
+    const paths = useEditor.getState().cutPaths;
+    expect(paths[1]!.points.length).toBeGreaterThan(blue.points.length); // trapped
+    expect(paths[0]).toBe(red);   // bottom untouched
+    expect(paths[2]).toBe(mark);  // regmark untouched
+  });
+
+  it('dryRun is silent for jobs the real run would warn about (single colour, nothing trappable)', () => {
+    const warn = vi.spyOn(toast, 'warn').mockImplementation(() => '');
+
+    // Single colour: real run warns, dry run just reports 0.
+    const red = rectPath('red', '#ff0000', 0, 0, 100, 100);
+    useEditor.getState().setCutPaths([red, regmark('mark')]);
+    expect(applyLayerTrap(t, 0.5, { dryRun: true })).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+
+    // Two colours but the upper layer holds only an OPEN path — nothing
+    // trappable, so both the dry run and a real run report 0.
+    const openBlue: CutPath = { id: 'blue-open', closed: false, kind: 'outline', color: '#0000ff', points: [[200, 0], [250, 0]] };
+    const mark = regmark('mark');
+    useEditor.getState().setCutPaths([red, openBlue, mark]);
+    expect(applyLayerTrap(t, 0.5, { dryRun: true })).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+    expect(useEditor.getState().cutPaths).toEqual([red, openBlue, mark]);
+  });
 });

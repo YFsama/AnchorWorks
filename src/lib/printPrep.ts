@@ -5,6 +5,8 @@
  */
 
 import {
+  BARCODE_BAND_PAGE_MARGIN_MM,
+  barcodeBandGeometry,
   CORNER_IDS,
   SCALE_CHECK_CAPTION,
   SCALE_CHECK_CAPTION_DY_MM,
@@ -40,6 +42,11 @@ export interface PrintPrep {
    *  Start-Mark dimensions) with a caption in the bottom margin, so print
    *  scaling can be checked with a ruler before cutting. */
   scaleCheck?: boolean;
+  /** Prints the Graphtec Data-Link barcode band (CODE39 link-info bars +
+   *  50 x 9 mm Start Mark, regMarkGeometry.ts) in the TOP margin so a
+   *  networked Graphtec can recall this sheet's cut job by scanning it.
+   *  Independent of `registrationMarks`. Unset → output unchanged. */
+  barcodeBand?: { linkInfo: string };
 }
 
 export const defaultPrintPrep: PrintPrep = {
@@ -163,6 +170,29 @@ export function renderTrimMarksSVG(pageW: number, pageH: number, prep: PrintPrep
     );
   }
 
+  // Graphtec Data-Link barcode band: CODE39 link-info bars + the 50 x 9 mm
+  // Start Mark in the TOP margin, independent of the mark style. The band's
+  // contract is MEDIA space (barcodeBandGeometry docs): 20 mm below the
+  // media's leading edge, Start Mark 10 mm from the right media edge — and
+  // the media is the grown page (trim + bleed + mark margin on every side,
+  // which prepMarkMarginMm grows to >= 31 mm for exactly this band). So the
+  // geometry is computed on the grown page and mapped back into trim space
+  // by subtracting (margin + bleed) from both axes. Throws through
+  // barcodeBandGeometry on an invalid linkInfo (leading 'G', > 9 chars,
+  // non-CODE39 character).
+  if (prep.barcodeBand) {
+    const margin = prepMarkMarginMm(prep);
+    const shift = margin + (prep.bleedMm ?? 0);
+    const band = barcodeBandGeometry(pageW + 2 * shift, pageH + 2 * shift, {
+      linkInfo: prep.barcodeBand.linkInfo,
+    });
+    for (const r of band.rects) {
+      parts.push(
+        `<rect x="${r.x - shift}" y="${r.y - shift}" width="${r.w}" height="${r.h}" fill="#000" />`,
+      );
+    }
+  }
+
   return parts.join('');
 }
 
@@ -171,6 +201,10 @@ export function renderTrimMarksSVG(pageW: number, pageH: number, prep: PrintPrep
  * `prep`: the historical 12 mm, grown only when a vendor mark style or the
  * scale-check block physically reaches further (Roland's 25 mm arms need
  * >=28 mm, which also satisfies their >=15 mm feed-direction offset rule).
+ * The Data-Link barcode band forces at least 31 mm (20 mm lead + 9 mm band
+ * + 2 mm clear above the trim box) so the band really lands 20 mm from the
+ * media's leading edge; a larger extent (e.g. scale-check + page-info at
+ * 33 mm) still wins.
  */
 export function prepMarkMarginMm(prep: PrintPrep): number {
   let extent = 8; // crop marks: 3mm offset + 5mm arm
@@ -180,7 +214,9 @@ export function prepMarkMarginMm(prep: PrintPrep): number {
   if (prep.scaleCheck) {
     extent = Math.max(extent, scaleCheckExtentMm(prep.pageInfo === true));
   }
-  return Math.max(12, extent + 1);
+  // The band is a flat media-space requirement (not extent+1 like the
+  // stroke-based marks) — clamp the final result directly.
+  return Math.max(12, extent + 1, prep.barcodeBand ? BARCODE_BAND_PAGE_MARGIN_MM : 0);
 }
 
 function round1(n: number): string {

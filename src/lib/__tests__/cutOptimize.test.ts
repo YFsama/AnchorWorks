@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  optimizeOrder, mirrorPolys, cutStats, estimateSeconds, estimateJobSeconds, formatDuration, bounds, applyOvercut, reversePolys, sortInsideFirst, applyBladeOffset, PER_PATH_OVERHEAD_SECONDS, type PolyLite,
+  optimizeOrder, mirrorPolys, cutStats, estimateSeconds, estimateJobSeconds, formatDuration, bounds, applyOvercut, reversePolys, sortInsideFirst, applyBladeOffset, PER_PATH_OVERHEAD_SECONDS, cornerSpeedByRadius, circumradiusMm, type PolyLite,
 } from '../cutOptimize';
 
 const seg = (a: [number, number], b: [number, number]): PolyLite => ({ points: [a, b], closed: false });
@@ -249,13 +249,16 @@ describe('estimateJobSeconds (physics model)', () => {
     expect(t).toBeCloseTo(0.3133, 3);
   });
 
-  it('10mm square: 90° corner caps (0.25·feed) are slower than cornerSlow:false; both pinned', () => {
+  it('10mm square: corner-radius caps are slower than cornerSlow:false; both pinned', () => {
     const sq: PolyLite = { points: [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], closed: true };
     const slow = estimateJobSeconds([sq], [0, 0], opts); // cornerSlow defaults true
     const fast = estimateJobSeconds([sq], [0, 0], { ...opts, cornerSlow: false });
     expect(slow).toBeGreaterThan(fast);
-    // slow: 75mm/s at every junction → 0.12795 + 0.09149 + 0.09149 + 0.15833 + 0.15.
-    expect(slow).toBeCloseTo(0.6193, 3);
+    // Every 90° corner triple (legs 10/10, chord 10√2) has circumradius
+    // 10/√2 ≈ 7.07 mm — below the table's 15 mm floor → the 55 mm/s entry
+    // scaled by 300/400 = 41.25 mm/s at each junction and the seam ceiling:
+    // 0.14037 + 0.11731 + 0.11731 + 0.25617 + 0.15.
+    expect(slow).toBeCloseTo(0.7812, 3);
     // fast: 300mm/s junctions → 0.11547 + 0.03333 + 0.03333 + 0.03670 + 0.15.
     expect(fast).toBeCloseTo(0.3688, 3);
   });
@@ -282,5 +285,80 @@ describe('estimateJobSeconds (physics model)', () => {
     const one = estimateJobSeconds([p], [0, 0], { ...opts, accelMmS2: 1 });
     expect(zero).toBe(one);
     expect(zero).toBeCloseTo(2 * Math.sqrt(10 / 1) + 0.15, 3);
+  });
+
+  it('curvature sensitivity: tight-cornered hexagon cuts slower per mm than the gentle one; all pinned', () => {
+    // Regular 6-point hexagon whose vertices sit on a radius-R circle: every
+    // consecutive vertex triple lies on that same circle, so each corner's
+    // circumradius is exactly R. R = 45 sits on a table key (→ 104 mm/s
+    // class, 78 at feed 300); R = 5 floors below the 15 mm key (→ 55 class,
+    // 41.25 at feed 300). 30 mm was avoided: it lands exactly on the 15/45
+    // nearest-key midpoint (a float knife-edge that also maps to the same
+    // floored speed as 5 mm, killing the contrast).
+    const hex = (R: number): PolyLite => ({
+      closed: true,
+      points: Array.from({ length: 6 }, (_, k) => {
+        const a = Math.PI + (k * Math.PI) / 3; // first vertex at angle 180° → (0,0)
+        return [R + R * Math.cos(a), R * Math.sin(a)] as [number, number];
+      }),
+    });
+    expect(cornerSpeedByRadius(300, 45)).toBeCloseTo(78, 9);
+    expect(cornerSpeedByRadius(300, 5)).toBeCloseTo(41.25, 9);
+
+    const gentle = estimateJobSeconds([hex(45)], [0, 0], opts); // 6 × 45 mm sides
+    const tight = estimateJobSeconds([hex(5)], [0, 0], opts);   // 6 × 5 mm sides
+    // gentle: 78 mm/s junctions, 45 mm sides → 0.30213 + 4×0.25768 +
+    // 0.60292 + 0.15; tight: 41.25 mm/s junctions, 5 mm sides →
+    // 0.09434 + 4×0.07290 + 0.13496 + 0.15.
+    expect(gentle).toBeCloseTo(2.0858, 3);
+    expect(tight).toBeCloseTo(0.6709, 3);
+    // The small hexagon is 9× shorter, so its absolute time is lower — but
+    // per cut millimetre the tight curvature more than halves the average
+    // blade-down speed (270/1.93579 vs 30/0.52090).
+    expect(270 / (gentle - 0.15)).toBeCloseTo(139.5, 1);
+    expect(30 / (tight - 0.15)).toBeCloseTo(57.6, 1);
+    expect(30 / (tight - 0.15)).toBeLessThan(270 / (gentle - 0.15));
+    // Isolating curvature on the SAME tight geometry: with the caps off it
+    // runs 0.08165 + 4×0.01667 + 0.01743 + 0.15 — the radius caps alone
+    // more than double its blade-down time.
+    const tightFast = estimateJobSeconds([hex(5)], [0, 0], { ...opts, cornerSlow: false });
+    expect(tightFast).toBeCloseTo(0.3157, 3);
+    expect(tight - 0.15).toBeGreaterThan(2 * (tightFast - 0.15));
+  });
+});
+
+describe('cornerSpeedByRadius (CutTime radius→speed table)', () => {
+  it('scales the 400 mm/s-class table linearly with vMax; beyond-table radii run at vMax', () => {
+    expect(cornerSpeedByRadius(300, 7)).toBeCloseTo(41.25, 9);   // below 15 mm → floor entry 55·0.75
+    expect(cornerSpeedByRadius(300, 375)).toBeCloseTo(241.5, 9); // exact key 375 → 322·0.75
+    expect(cornerSpeedByRadius(300, 1e6)).toBe(300);             // gentler than the table binds → vMax
+    expect(cornerSpeedByRadius(400, 45)).toBeCloseTo(104, 9);    // head-class speed, verbatim
+    expect(cornerSpeedByRadius(200, 375)).toBeCloseTo(161, 9);   // 322·0.5
+  });
+
+  it('uses nearest-key lookup; exact midpoints err slow; Infinity is uncapped', () => {
+    expect(cornerSpeedByRadius(300, 45)).toBeCloseTo(78, 9);    // key 45 → 104·0.75
+    expect(cornerSpeedByRadius(300, 5)).toBeCloseTo(41.25, 9);  // floor
+    expect(cornerSpeedByRadius(300, 30)).toBeCloseTo(41.25, 9); // 15/45 midpoint → smaller (slower) key 55
+    expect(cornerSpeedByRadius(300, Infinity)).toBe(300);       // collinear triple caps nothing
+  });
+});
+
+describe('circumradiusMm (polyline-triple corner radius)', () => {
+  it('returns the circle radius for three points on a circle (10 mm ± 0.01)', () => {
+    // Three points 120° apart on a radius-10 circle.
+    const s = 5 * Math.sqrt(3);
+    expect(circumradiusMm([10, 0], [-5, s], [-5, -s])).toBeCloseTo(10, 2);
+  });
+
+  it('right triangle → half the hypotenuse; 10 mm square corner → 10/√2', () => {
+    expect(circumradiusMm([0, 0], [6, 0], [0, 8])).toBeCloseTo(5, 6);
+    // The pinned square test's corner: legs 10/10, chord 10√2 → R = 5√2.
+    expect(circumradiusMm([0, 0], [10, 0], [10, 10])).toBeCloseTo(10 / Math.SQRT2, 6);
+  });
+
+  it('collinear and degenerate triples return Infinity (no cap)', () => {
+    expect(circumradiusMm([0, 0], [5, 5], [10, 10])).toBe(Infinity);
+    expect(circumradiusMm([1, 1], [1, 1], [2, 2])).toBe(Infinity);
   });
 });

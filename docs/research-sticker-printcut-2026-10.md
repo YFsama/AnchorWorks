@@ -86,7 +86,7 @@ with a ruler) + print-at-100% note.
 - Weedability floor: strokes/gaps ≥ ~1.5–2 mm on adhesive vinyl; islands need bridges
   or reverse weeding.
 
-## 6. Implemented in waves 2–3 (2026-10); remaining backlog
+## 6. Implemented in waves 2–5 (2026-10); remaining backlog
 
 Wave 2: weedability linter, Cricut-style auto-bleed (ring-draw), layered-vinyl per-colour
 jobs with shared marks, convex-hull skyline nesting, estimate surcharges, ISO 19593-1 OCG
@@ -94,20 +94,26 @@ processing steps (inline-dict BDC; pdfjs round-trip verified).
 
 Wave 3: shared raster-EDT kernel (chamfer + labels + scanline fill), weedability
 thin-feature v2 (connected-erosion bisection — pinch necks caught), HQ nearest-colour
-bleed mode, physics trapezoidal time model (`estimateJobSeconds` + per-material
-accel/head-up constants + "≈ (physics)" second estimate + CutPreview eta override),
-per-layer mirror, layer trap (+0.5 mm intentional overlap).
+bleed mode, physics trapezoidal time model + per-material accel/head-up constants +
+"≈ (physics)" second estimate + CutPreview eta override, per-layer mirror, layer trap.
+
+Wave 4: Production Preview — live imposed-sheet preview (true-shape nesting, baked
+bleed, cut overlay, regmarks, utilization) with one-step apply; selection-derived
+contour filtering.
+
+Wave 5 (backlog completion): raster occupancy-grid nesting (`nestPolygonsRaster`,
+interleaves concave parts), CutTime radius→speed corner model replacing the turn-angle
+proxy, per-layer DXF export + trap dry-run preview + tolerance guidance, cut-path-masked
+bleed (smear only along cut lines), Graphtec Data-Link CODE39 band print-side encoder.
 
 Still open:
 
-- Barcode Data-Link job handoff (`ESC.d3/d5`, CODE39 band) for networked Graphtecs.
-- Full NFP+GA nesting (SVGnest-class) with web-worker GA; raster occupancy-grid nesting
-  as the robust alternative.
-- Radius-based corner speeds (real curvature, not the turn-angle proxy) if arcs survive
-  into the cut-path model; per-material radius→speed tables per CutTime.
-- Layered-vinyl extras: DXF per-layer export, 0.5 mm alignment-tolerance design guidance
-  in the dialog, auto-trap preview before applying.
-- "Bleed only along cut paths" (Cricut bakes the smear only where the blade cuts).
+- Data-Link network handoff: the CODE39 band prints (wave 5), but the actual job
+  handoff needs a TCP-9100 transport (`ESC.d1`–`ESC.d6` protocol) — browser-safe only
+  via a Tauri Rust command; requires real-hardware validation.
+- Full NFP+GA nesting (SVGnest-class web-worker GA) — the raster grid now covers the
+  concave-shape cases; NFP would add speed at fine rotations.
+- Part-in-hole nesting (cutting inside discarded holes of a bigger part).
 
 ## Source index (primary)
 
