@@ -7,6 +7,7 @@
 import * as fabric from 'fabric';
 import { pushHistory, resizeCanvas, setBackground } from './canvasEngine';
 import { useEditor } from '../store/editor';
+import { coneSector } from './surfaceWrap';
 
 export interface Template {
   id: string;
@@ -325,6 +326,195 @@ const flyer: Template = {
   },
 };
 
+/* ----------------------------------------------------------------- */
+/* 7. Sticker sheet (kiss-cut)                                       */
+/* ----------------------------------------------------------------- */
+
+const MM_TO_PX = 3.7795; // 96dpi convention shared across the cutter pipeline
+
+const stickerSheetKisscut: Template = {
+  id: 'sticker-sheet-kisscut',
+  name: 'Sticker Sheet (Kiss-cut)',
+  description: 'A4 sheet, 3×2 rounded stickers with kiss-cut outlines, perf-cut border and safe areas.',
+  category: 'Stickers',
+  thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 330">
+    <rect width="240" height="330" fill="#fff"/>
+    <rect x="10" y="10" width="220" height="310" fill="none" stroke="#ff7a3d" stroke-width="3"/>
+    <rect x="28" y="40" width="56" height="44" rx="6" fill="#f1f1f4" stroke="#3d9bff" stroke-dasharray="6 4"/>
+    <rect x="92" y="40" width="56" height="44" rx="6" fill="#f1f1f4" stroke="#3d9bff" stroke-dasharray="6 4"/>
+    <rect x="156" y="40" width="56" height="44" rx="6" fill="#f1f1f4" stroke="#3d9bff" stroke-dasharray="6 4"/>
+    <rect x="28" y="120" width="56" height="44" rx="6" fill="#f1f1f4" stroke="#3d9bff" stroke-dasharray="6 4"/>
+    <rect x="92" y="120" width="56" height="44" rx="6" fill="#f1f1f4" stroke="#3d9bff" stroke-dasharray="6 4"/>
+    <rect x="156" y="120" width="56" height="44" rx="6" fill="#f1f1f4" stroke="#3d9bff" stroke-dasharray="6 4"/>
+  </svg>`),
+  async build(canvas) {
+    clearAll(canvas);
+    applyDoc(794, 1123, '#ffffff');
+
+    const header = new fabric.IText('STICKER SHEET · A4', {
+      left: 397, top: 52, originX: 'center',
+      fontFamily: 'Inter, sans-serif', fontSize: 30, fontWeight: '800', fill: '#15151a', charSpacing: 200,
+    });
+
+    // Solid perf-cut border around the whole sheet.
+    const perfBorder = new fabric.Rect({
+      left: 30, top: 100, width: 734, height: 993,
+      fill: '', stroke: '#ff7a3d', strokeWidth: 3,
+    });
+
+    const cols = 3;
+    const cellW = 200;
+    const cellH = 170;
+    const gapX = 42;
+    const gapY = 96;
+    const gridW = cols * cellW + (cols - 1) * gapX;
+    const startX = (794 - gridW) / 2;
+    const startY = 190;
+
+    for (let i = 0; i < 6; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const left = startX + col * (cellW + gapX);
+      const top = startY + row * (cellH + gapY);
+
+      const placeholder = new fabric.Rect({
+        left, top, width: cellW, height: cellH, rx: 18, ry: 18,
+        fill: '#f1f1f4',
+      });
+      // Dashed kiss-cut: cuts the sticker top only, leaves the backing.
+      const kissCut = new fabric.Rect({
+        left, top, width: cellW, height: cellH, rx: 18, ry: 18,
+        fill: '', stroke: '#3d9bff', strokeWidth: 2, strokeDashArray: [8, 6],
+      });
+      // 5 mm safe area inside the die line.
+      const safe = 5 * MM_TO_PX;
+      const safeArea = new fabric.Rect({
+        left: left + safe, top: top + safe, width: cellW - safe * 2, height: cellH - safe * 2, rx: 12, ry: 12,
+        fill: '', stroke: '#5a5a64', strokeWidth: 1, strokeDashArray: [4, 4],
+      });
+      canvas.add(placeholder, kissCut, safeArea);
+    }
+
+    const footer = new fabric.IText('dashed = kiss-cut · solid = perf-cut · inner = 5 mm safe area', {
+      left: 397, top: 1040, originX: 'center',
+      fontFamily: 'Inter, sans-serif', fontSize: 20, fill: '#5a5a64',
+    });
+
+    canvas.add(header, perfBorder, footer);
+    canvas.requestRenderAll();
+    pushHistory();
+  },
+};
+
+/* ----------------------------------------------------------------- */
+/* 8. Laptop decal                                                   */
+/* ----------------------------------------------------------------- */
+
+const laptopDecal: Template = {
+  id: 'laptop-decal',
+  name: 'Laptop Decal',
+  description: '300×200 mm decal with centered die-cut ellipse, 2.54 mm border ring and safe guides.',
+  category: 'Stickers',
+  thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">
+    <rect width="240" height="160" fill="#fff"/>
+    <ellipse cx="120" cy="80" rx="88" ry="52" fill="#f1f1f4"/>
+    <ellipse cx="120" cy="80" rx="96" ry="60" fill="none" stroke="#3d9bff" stroke-width="2" stroke-dasharray="6 4"/>
+    <ellipse cx="120" cy="80" rx="78" ry="42" fill="none" stroke="#5a5a64" stroke-width="1" stroke-dasharray="3 3"/>
+  </svg>`),
+  async build(canvas) {
+    clearAll(canvas);
+    applyDoc(1134, 756, '#ffffff');
+
+    const cx = 567;
+    const cy = 378;
+    const border = 2.54 * MM_TO_PX;
+
+    const art = new fabric.Ellipse({
+      left: cx - 380, top: cy - 230, rx: 380, ry: 230,
+      fill: '#f1f1f4',
+    });
+    // Die-cut line: 2.54 mm white border ring around the art.
+    const dieCut = new fabric.Ellipse({
+      left: cx - 380 - border, top: cy - 230 - border, rx: 380 + border, ry: 230 + border,
+      fill: '', stroke: '#3d9bff', strokeWidth: 2, strokeDashArray: [8, 6],
+    });
+    // 5 mm safe margin inside the art edge.
+    const safe = 5 * MM_TO_PX;
+    const safeGuide = new fabric.Ellipse({
+      left: cx - 380 + safe, top: cy - 230 + safe, rx: 380 - safe, ry: 230 - safe,
+      fill: '', stroke: '#5a5a64', strokeWidth: 1, strokeDashArray: [4, 4],
+    });
+    const caption = new fabric.IText('die-cut ellipse · 2.54 mm border · dashed inner = 5 mm safe area', {
+      left: cx, top: 700, originX: 'center',
+      fontFamily: 'Inter, sans-serif', fontSize: 20, fill: '#5a5a64',
+    });
+
+    canvas.add(art, dieCut, safeGuide, caption);
+    canvas.requestRenderAll();
+    pushHistory();
+  },
+};
+
+/* ----------------------------------------------------------------- */
+/* 9. Tumbler wrap (cone sector preview)                             */
+/* ----------------------------------------------------------------- */
+
+const tumblerWrap: Template = {
+  id: 'tumbler-wrap',
+  name: 'Tumbler Wrap',
+  description: 'Cone-sector wrap preview for a 30 oz tumbler (95→82 mm taper) with cut guide.',
+  category: 'Stickers',
+  thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 110">
+    <rect width="240" height="110" fill="#fff"/>
+    <path d="M 32 22 A 170 170 0 0 1 208 22 L 196 82 A 150 150 0 0 0 44 82 Z" fill="#eef5ff" stroke="#3d9bff" stroke-width="2"/>
+    <text x="120" y="100" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" fill="#5a5a64">test fit before cutting</text>
+  </svg>`),
+  async build(canvas) {
+    clearAll(canvas);
+    const sector = coneSector(95, 82, 110);
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [x, y] of sector.outline) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const marginMm = 10;
+    const labelMm = 14;
+    const wPx = Math.ceil((maxX - minX + marginMm * 2) * MM_TO_PX);
+    const hPx = Math.ceil((maxY - minY + marginMm * 2 + labelMm) * MM_TO_PX);
+    applyDoc(wPx, hPx, '#ffffff');
+
+    const toPx = (p: readonly [number, number]): [number, number] => [
+      (p[0] - minX + marginMm) * MM_TO_PX,
+      (p[1] - minY + marginMm + labelMm) * MM_TO_PX,
+    ];
+    let d = '';
+    for (const p of sector.outline) {
+      const [x, y] = toPx(p);
+      d += `${d ? ' L' : 'M'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }
+    d += ' Z';
+
+    const guide = new fabric.Path(d, {
+      fill: '#eef5ff', stroke: '#3d9bff', strokeWidth: 2,
+    });
+    const title = new fabric.IText('Tumbler Wrap · 30 oz · 95→82 mm taper', {
+      left: marginMm * MM_TO_PX, top: marginMm * MM_TO_PX,
+      fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: '700', fill: '#15151a',
+    });
+    const note = new fabric.IText('Test fit before cutting', {
+      left: wPx / 2, top: marginMm * MM_TO_PX + 34, originX: 'center',
+      fontFamily: 'Inter, sans-serif', fontSize: 20, fill: '#ff7a3d',
+    });
+
+    canvas.add(guide, title, note);
+    canvas.requestRenderAll();
+    pushHistory();
+  },
+};
+
 export const TEMPLATES: Template[] = [
   businessCard,
   squareSocial,
@@ -332,4 +522,7 @@ export const TEMPLATES: Template[] = [
   posterA4,
   stickerPack,
   flyer,
+  stickerSheetKisscut,
+  laptopDecal,
+  tumblerWrap,
 ];

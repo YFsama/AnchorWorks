@@ -39,6 +39,14 @@ interface CutPreviewProps {
   /** Reorder paths for the simulation exactly the way the output pipeline
    *  does (greedy travel optimise). Off keeps document order. */
   optimize?: boolean;
+  /** Display override for the replay readout's TOTAL. When provided, the
+   *  "elapsed / total" readout shows this instead of the timeline's own
+   *  total — the dialog's job estimate (physics/classic) is computed over
+   *  the post-processed geometry and includes overcut/corner-loop extras
+   *  the replay timeline (built from raw cut paths) doesn't carry. Purely
+   *  cosmetic: the animation clock, elapsed time and progress % still run
+   *  off the internal timeline exactly as before. */
+  etaSeconds?: number;
   className?: string;
 }
 
@@ -66,6 +74,7 @@ export function CutPreview({
   feedMmMin = 200,
   travelMmMin = 800,
   optimize = false,
+  etaSeconds,
   className,
 }: CutPreviewProps) {
   const t = useT();
@@ -316,6 +325,7 @@ export function CutPreview({
       timeline={sim.timeline}
       kinds={sim.kinds}
       feedMmMin={feedMmMin}
+      etaSeconds={etaSeconds}
       svg={renderSvg}
       className={className}
     />
@@ -337,10 +347,12 @@ function prefersReducedMotion(): boolean {
  * unmount and when the job finishes; jumps straight to the end for
  * reduced-motion users.
  */
-function CutSimulation({ timeline, kinds, feedMmMin, svg, className }: {
+function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, svg, className }: {
   timeline: SimTimeline;
   kinds: string[];
   feedMmMin: number;
+  /** Display-only total override — see CutPreviewProps.etaSeconds. */
+  etaSeconds?: number;
   svg: (overlay: React.ReactNode) => React.ReactNode;
   className?: string;
 }) {
@@ -533,7 +545,7 @@ function CutSimulation({ timeline, kinds, feedMmMin, svg, className }: {
           {pct}%
         </span>
         <span className="tabular-nums text-muted" title={t('Estimated job time')}>
-          {formatDuration(elapsed)} / {formatDuration(total)}
+          {formatDuration(elapsed)} / {formatDuration(etaSeconds ?? total)}
         </span>
       </div>
     </div>

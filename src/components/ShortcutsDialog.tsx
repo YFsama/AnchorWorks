@@ -90,6 +90,7 @@ const FILE_VIEW: Shortcut[] = [
   { bindingIds: ['file.exportSvg'], labelKey: 'Export SVG' },
   { bindingIds: ['file.print'], labelKey: 'Print…' },
   { bindingIds: ['window.cutContour'], labelKey: 'Cut Contour…' },
+  { bindingIds: ['document.makeSticker'], labelKey: 'Make Sticker…' },
   { bindingIds: ['view.zoomIn'], labelKey: 'Zoom in' },
   { bindingIds: ['view.zoomOut'], labelKey: 'Zoom out' },
   { bindingIds: ['view.zoomFit'], labelKey: 'Zoom fit' },

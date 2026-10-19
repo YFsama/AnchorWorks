@@ -1,6 +1,18 @@
 import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
 import { useEditor } from '../store/editor';
+import {
+  CORNER_IDS,
+  SCALE_CHECK_CAPTION,
+  SCALE_CHECK_CAPTION_DY_MM,
+  SCALE_CHECK_GAP_MM,
+  SCALE_CHECK_GAP_WITH_INFO_MM,
+  SCALE_CHECK_H_MM,
+  SCALE_CHECK_W_MM,
+  regMarkCornerSegments,
+  resolveRegMarkSpec,
+  type RegMarkStyle,
+} from './regMarkGeometry';
 
 const MM_TO_PX = 3.7795;
 const CROP_MARK_OFFSET_MM = 3;
@@ -11,7 +23,7 @@ const REGISTRATION_MARK_INNER_RADIUS_MM = 1.5;
 const REGISTRATION_CROSSHAIR_MM = 4;
 const MARK_STROKE_MM = 0.25;
 
-type MarkKind = 'crop' | 'registration' | 'bleed' | 'page-info';
+type MarkKind = 'crop' | 'registration' | 'bleed' | 'page-info' | 'scale-check';
 
 type PrintMarkObject = fabric.FabricObject & {
   name?: string;
@@ -24,14 +36,27 @@ export type PrintMarkOptions = {
   bleedIndicator?: boolean;
   pageInfo?: boolean;
   bleedMm?: number;
+  regMarkStyle?: RegMarkStyle;
+  regMarkArmMm?: number;
+  regMarkStrokeMm?: number;
+  scaleCheck?: boolean;
 };
 
-export const defaultPrintMarkOptions: Required<PrintMarkOptions> = {
+/** PrintMarkOptions with every flag defaulted; the arm/stroke overrides
+ *  stay optional so the vendor style's own defaults apply when unset. */
+export type ResolvedPrintMarkOptions = Required<Omit<PrintMarkOptions, 'regMarkArmMm' | 'regMarkStrokeMm'>> &
+  Pick<PrintMarkOptions, 'regMarkArmMm' | 'regMarkStrokeMm'>;
+
+export const defaultPrintMarkOptions: ResolvedPrintMarkOptions = {
   cropMarks: true,
   registrationMarks: true,
   bleedIndicator: true,
   pageInfo: true,
   bleedMm: 3,
+  regMarkStyle: 'generic',
+  regMarkArmMm: undefined,
+  regMarkStrokeMm: undefined,
+  scaleCheck: false,
 };
 
 function mm(value: number): number {
@@ -47,10 +72,10 @@ function markObject<T extends PrintMarkObject>(object: T, kind: MarkKind): T {
   return object;
 }
 
-function makeLine(x1: number, y1: number, x2: number, y2: number, kind: MarkKind): fabric.Line {
+function makeLine(x1: number, y1: number, x2: number, y2: number, kind: MarkKind, strokeMm = MARK_STROKE_MM): fabric.Line {
   return markObject(new fabric.Line([x1, y1, x2, y2], {
     stroke: '#000000',
-    strokeWidth: mm(MARK_STROKE_MM),
+    strokeWidth: mm(strokeMm),
     strokeLineCap: 'butt',
     fill: '',
   }), kind);
@@ -67,14 +92,14 @@ function makeCircle(cx: number, cy: number, radius: number): fabric.Circle {
   }), 'registration');
 }
 
-function makeText(text: string, left: number, top: number): fabric.FabricText {
+function makeText(text: string, left: number, top: number, kind: MarkKind = 'page-info'): fabric.FabricText {
   return markObject(new fabric.FabricText(text, {
     left,
     top,
     fill: '#000000',
     fontFamily: 'Helvetica, Arial, sans-serif',
     fontSize: mm(3),
-  }), 'page-info');
+  }), kind);
 }
 
 export function createPrintMarkObjects(bounds: { left: number; top: number; width: number; height: number }, options: PrintMarkOptions = {}): fabric.FabricObject[] {
@@ -101,23 +126,42 @@ export function createPrintMarkObjects(bounds: { left: number; top: number; widt
   }
 
   if (config.registrationMarks) {
-    const offset = mm(REGISTRATION_MARK_OFFSET_MM);
-    const outer = mm(REGISTRATION_MARK_OUTER_RADIUS_MM);
-    const inner = mm(REGISTRATION_MARK_INNER_RADIUS_MM);
-    const cross = mm(REGISTRATION_CROSSHAIR_MM);
-    const targets: Array<[number, number]> = [
-      [left + bounds.width / 2, top - offset - outer],
-      [left + bounds.width / 2, bottom + offset + outer],
-      [left - offset - outer, top + bounds.height / 2],
-      [right + offset + outer, top + bounds.height / 2],
-    ];
-    for (const [cx, cy] of targets) {
-      objects.push(
-        makeCircle(cx, cy, outer),
-        makeCircle(cx, cy, inner),
-        makeLine(cx - cross, cy, cx + cross, cy, 'registration'),
-        makeLine(cx, cy - cross, cx, cy + cross, 'registration'),
-      );
+    const style: RegMarkStyle = config.regMarkStyle ?? 'generic';
+    if (style === 'generic') {
+      const offset = mm(REGISTRATION_MARK_OFFSET_MM);
+      const outer = mm(REGISTRATION_MARK_OUTER_RADIUS_MM);
+      const inner = mm(REGISTRATION_MARK_INNER_RADIUS_MM);
+      const cross = mm(REGISTRATION_CROSSHAIR_MM);
+      const targets: Array<[number, number]> = [
+        [left + bounds.width / 2, top - offset - outer],
+        [left + bounds.width / 2, bottom + offset + outer],
+        [left - offset - outer, top + bounds.height / 2],
+        [right + offset + outer, top + bounds.height / 2],
+      ];
+      for (const [cx, cy] of targets) {
+        objects.push(
+          makeCircle(cx, cy, outer),
+          makeCircle(cx, cy, inner),
+          makeLine(cx - cross, cy, cx + cross, cy, 'registration'),
+          makeLine(cx, cy - cross, cx, cy + cross, 'registration'),
+        );
+      }
+    } else {
+      const spec = resolveRegMarkSpec(style, config.regMarkArmMm, config.regMarkStrokeMm);
+      const wMm = bounds.width / MM_TO_PX;
+      const hMm = bounds.height / MM_TO_PX;
+      for (const corner of CORNER_IDS) {
+        for (const seg of regMarkCornerSegments(wMm, hMm, corner, spec)) {
+          objects.push(makeLine(
+            left + seg.x1 * MM_TO_PX,
+            top + seg.y1 * MM_TO_PX,
+            left + seg.x2 * MM_TO_PX,
+            top + seg.y2 * MM_TO_PX,
+            'registration',
+            spec.strokeMm,
+          ));
+        }
+      }
     }
   }
 
@@ -139,6 +183,23 @@ export function createPrintMarkObjects(bounds: { left: number; top: number; widt
     const heightMm = bounds.height / MM_TO_PX;
     const info = `trim ${widthMm.toFixed(1)}mm × ${heightMm.toFixed(1)}mm${config.bleedMm > 0 ? `  bleed ${config.bleedMm.toFixed(1)}mm` : ''}`;
     objects.push(makeText(info, left, bottom + mm(10)));
+  }
+
+  if (config.scaleCheck) {
+    const gap = config.pageInfo ? SCALE_CHECK_GAP_WITH_INFO_MM : SCALE_CHECK_GAP_MM;
+    objects.push(markObject(new fabric.Rect({
+      left,
+      top: bottom + mm(gap),
+      width: mm(SCALE_CHECK_W_MM),
+      height: mm(SCALE_CHECK_H_MM),
+      fill: '#000000',
+    }), 'scale-check'));
+    objects.push(makeText(
+      SCALE_CHECK_CAPTION,
+      left,
+      bottom + mm(gap + SCALE_CHECK_H_MM + SCALE_CHECK_CAPTION_DY_MM),
+      'scale-check',
+    ));
   }
 
   return objects;

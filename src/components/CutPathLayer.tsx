@@ -13,6 +13,10 @@ import { useEditor, type CutPath } from '../store/editor';
  *   regmark                   →  amber solid, 1.5px (more conspicuous so
  *                                the user can immediately spot when the
  *                                regmarks have been generated and where)
+ *   kiss                      →  cyan dashed, 1.2px (scores the sticker
+ *                                layer only — distinct from through-cuts)
+ *   perf                      →  orange solid, 1.5px (through-cut border
+ *                                released last — reads as "final cut")
  *
  * Layout: positioned absolutely over the canvas, pointer-events: none so
  * the user can keep manipulating fabric objects through it. Re-renders on
@@ -81,6 +85,8 @@ export function CutPathLayer() {
       // hundreds of polylines.
       const outlines = cutPaths.filter(p => p.kind === 'outline' || p.kind === 'trace' || p.kind === 'manual');
       const regmarks = cutPaths.filter(p => p.kind === 'regmark');
+      const kisses = cutPaths.filter(p => p.kind === 'kiss');
+      const perfs = cutPaths.filter(p => p.kind === 'perf');
 
       if (outlines.length > 0) {
         ctx.save();
@@ -94,6 +100,34 @@ export function CutPathLayer() {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         for (const p of outlines) drawPath(p);
+        ctx.restore();
+      }
+
+      if (kisses.length > 0) {
+        ctx.save();
+        // Kiss-cut: cyan dashed — the cut only scores the sticker layer, so
+        // it gets its own colour family away from the magenta through-cuts.
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = 1.2;
+        const dashOn = Math.max(4, 6 / Math.sqrt(zoom));
+        const dashOff = Math.max(3, 4 / Math.sqrt(zoom));
+        ctx.setLineDash([dashOn, dashOff]);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (const p of kisses) drawPath(p);
+        ctx.restore();
+      }
+
+      if (perfs.length > 0) {
+        ctx.save();
+        // Perf border: orange solid — the through-cut released last, solid so
+        // it reads as the final cut even next to dashed kiss/contour lines.
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        for (const p of perfs) drawPath(p);
         ctx.restore();
       }
 

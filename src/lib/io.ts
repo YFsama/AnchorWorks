@@ -3,6 +3,7 @@ import { getCanvas, pushHistory } from './canvasEngine';
 import { callNative, isTauri } from './runtime';
 import { toast } from './toast';
 import { t } from './i18n';
+import { useEditor, type CutPath } from '../store/editor';
 
 export async function importSVGFile(file: File) {
   const text = await file.text();
@@ -29,10 +30,55 @@ export async function importSVGString(svg: string) {
   pushHistory();
 }
 
-export function exportSVG(): string {
+export interface ExportSvgOptions {
+  /** Append the store's cut paths as a `CutContour` spot layer for
+   *  print-then-cut RIP workflows. */
+  includeCutPaths?: boolean;
+}
+
+export function exportSVG(opts?: ExportSvgOptions): string {
   const canvas = getCanvas();
   if (!canvas) return '';
-  return canvas.toSVG();
+  const svg = canvas.toSVG();
+  return opts?.includeCutPaths ? appendCutPathsToSvg(svg, useEditor.getState().cutPaths) : svg;
+}
+
+/**
+ * mm → px factor for cut paths. CutPath points live in document mm-space and
+ * the canvas SVG is authored in px, so both `d` coordinates and the stroke
+ * width are converted with the fixed 96dpi convention (3.7795) the rest of
+ * the cutter pipeline uses (printMarks, CutPathLayer, cutContour,
+ * contourFromSelection) — not the per-document `doc.dpi`, which only drives
+ * paper-preset sizing in paperSizes.ts.
+ */
+const CUT_MM_TO_PX = 3.7795;
+
+/**
+ * Append a RIP cut layer to a canvas SVG string, just before `</svg>`:
+ * `<g id="cut-layer" data-cut="true">` holding one `<path>` per CutPath with
+ * the de-facto spot-colour convention (Roland VersaWorks / Mimaki
+ * RasterLink7) — class `CutContour` (`PerfCutContour` for perf/kiss cuts),
+ * 100% magenta `#FF00FF` hairline stroke (default 0.25 mm), no fill, and
+ * `data-cut-kind` carrying the CutPath kind. Coordinates are converted from
+ * document mm to SVG px with the shared 96dpi factor (see CUT_MM_TO_PX).
+ * A string without a `</svg>` closing tag is returned unchanged (fabric's
+ * toSVG always emits one; anything else isn't an SVG document).
+ */
+export function appendCutPathsToSvg(svgString: string, cutPaths: CutPath[], opts?: { strokeMm?: number }): string {
+  if (!cutPaths.length) return svgString;
+  const strokePx = (opts?.strokeMm ?? 0.25) * CUT_MM_TO_PX;
+  const paths = cutPaths
+    .filter((cutPath) => cutPath.points.length > 0)
+    .map((cutPath) => {
+      const cls = (['perf', 'kiss'] as string[]).includes(cutPath.kind) ? 'PerfCutContour' : 'CutContour';
+      const d = cutPath.points
+        .map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${(x * CUT_MM_TO_PX).toFixed(3)} ${(y * CUT_MM_TO_PX).toFixed(3)}`)
+        .join(' ') + (cutPath.closed ? ' Z' : '');
+      return `<path class="${cls}" stroke="#FF00FF" fill="none" stroke-width="${strokePx.toFixed(3)}" data-cut-kind="${cutPath.kind}" d="${d}" />`;
+    })
+    .join('');
+  if (!paths) return svgString;
+  return svgString.replace(/<\/svg>\s*$/, `<g id="cut-layer" data-cut="true">${paths}</g></svg>`);
 }
 
 export function exportPNG(multiplier = 2): string {

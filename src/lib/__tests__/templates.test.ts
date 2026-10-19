@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import * as fabric from 'fabric';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TEMPLATES } from '../templates';
 
 /**
@@ -68,5 +69,78 @@ describe('TEMPLATES', () => {
       expect(decoded).toMatch(/<svg/);
       expect(decoded).toMatch(/<\/svg>/);
     }
+  });
+});
+
+/**
+ * Sticker template additions. build() runs against a stub canvas (the
+ * booleanOps/splitText makeCanvas pattern) under the repo-standard jsdom
+ * 2D-context stub so real fabric.IText construction succeeds; the doc /
+ * history helpers no-op safely with no initialized engine canvas.
+ */
+describe('Sticker templates', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      measureText: (text: string) => ({ width: text.length * 12 }),
+      save: vi.fn(), restore: vi.fn(), scale: vi.fn(), translate: vi.fn(), rotate: vi.fn(),
+      transform: vi.fn(), setTransform: vi.fn(), fillText: vi.fn(), strokeText: vi.fn(),
+      beginPath: vi.fn(), closePath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(),
+      bezierCurveTo: vi.fn(), quadraticCurveTo: vi.fn(), clearRect: vi.fn(),
+      fillRect: vi.fn(), strokeRect: vi.fn(), fill: vi.fn(), stroke: vi.fn(), drawImage: vi.fn(),
+      createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+      createPattern: vi.fn(() => null),
+      canvas: document.createElement('canvas'),
+    } as unknown as CanvasRenderingContext2D);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function makeCanvas() {
+    const objects: fabric.FabricObject[] = [];
+    return {
+      objects,
+      getObjects: () => objects,
+      remove: vi.fn((o: fabric.FabricObject) => {
+        const i = objects.indexOf(o);
+        if (i >= 0) objects.splice(i, 1);
+      }),
+      add: vi.fn((...os: fabric.FabricObject[]) => {
+        objects.push(...os);
+      }),
+      discardActiveObject: vi.fn(),
+      requestRenderAll: vi.fn(),
+      fire: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+  }
+
+  const NEW_IDS = ['sticker-sheet-kisscut', 'laptop-decal', 'tumbler-wrap'];
+
+  it('registers the three new sticker templates', () => {
+    const ids = TEMPLATES.map((t) => t.id);
+    for (const id of NEW_IDS) expect(ids).toContain(id);
+  });
+
+  it('categorizes them under Stickers (4+ with the existing stickerPack)', () => {
+    const stickers = TEMPLATES.filter((t) => t.category === 'Stickers');
+    expect(stickers.length).toBeGreaterThanOrEqual(4);
+    for (const id of NEW_IDS) {
+      const t = TEMPLATES.find((x) => x.id === id);
+      expect(t?.category).toBe('Stickers');
+    }
+  });
+
+  it.each(NEW_IDS)('build(%s) does not throw and populates the canvas', async (id) => {
+    const template = TEMPLATES.find((t) => t.id === id);
+    expect(template).toBeDefined();
+    const canvas = makeCanvas();
+    await expect(
+      template!.build(canvas as unknown as fabric.Canvas),
+    ).resolves.toBeUndefined();
+    expect(canvas.objects.length).toBeGreaterThan(0);
+    expect(canvas.requestRenderAll).toHaveBeenCalled();
   });
 });

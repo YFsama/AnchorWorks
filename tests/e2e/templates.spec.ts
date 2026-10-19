@@ -46,15 +46,15 @@ test('Ctrl+Alt+N opens Templates with 2-D keyboard grid navigation; Escape close
 
   const dialog = await openTemplates(page);
 
-  // The results grid is present with the full gallery listed (6 templates in
+  // The results grid is present with the full gallery listed (9 templates in
   // src/lib/templates.ts — the "N templates" result summary is a visible,
   // i18n-sourced count anchor).
   const grid = dialog.getByRole('grid', { name: 'Template results' });
   await expect(grid).toBeVisible();
-  await expect(dialog.getByText('6 templates')).toBeVisible();
+  await expect(dialog.getByText('9 templates')).toBeVisible();
 
   const tiles = grid.getByRole('gridcell');
-  await expect(tiles).toHaveCount(6);
+  await expect(tiles).toHaveCount(9);
 
   // Tile 0 ("Business Card") is the default review target.
   await expect(tiles.first()).toHaveAttribute('aria-selected', 'true');
@@ -74,7 +74,7 @@ test('Ctrl+Alt+N opens Templates with 2-D keyboard grid navigation; Escape close
   await expect(tiles.nth(0)).toHaveAttribute('aria-selected', 'false');
 
   // The external live region announces the reviewed tile with its position.
-  await expect(dialog.getByText(/Reviewing Square Social Post 2 \/ 6/)).toBeVisible();
+  await expect(dialog.getByText(/Reviewing Square Social Post 2 \/ 9/)).toBeVisible();
 
   // ArrowDown steps a full row (3 columns): 1 → 4; ArrowUp climbs back —
   // vertical navigation is clamped, never wrapping.

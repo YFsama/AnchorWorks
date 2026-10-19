@@ -2,7 +2,7 @@ import { exportSVG } from './io';
 import { callNative, isTauri } from './runtime';
 import { toast } from './toast';
 import { t } from './i18n';
-import { renderTrimMarksSVG, type PrintPrep } from './printPrep';
+import { prepMarkMarginMm, renderTrimMarksSVG, type PrintPrep } from './printPrep';
 
 export interface PrintOptions {
   pageSize: 'A4' | 'A3' | 'Letter' | 'Legal';
@@ -21,7 +21,7 @@ export const PAGE_DIMS_MM: Record<PrintOptions['pageSize'], [number, number]> = 
 /** True when any prep overlay actually needs to be drawn. */
 function hasPrep(prep?: PrintPrep): prep is PrintPrep {
   if (!prep) return false;
-  return prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0;
+  return prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0 || prep.scaleCheck === true;
 }
 
 /* ------------------------------------------------------------------ */
@@ -198,9 +198,11 @@ export function printCanvas(opts: PrintOptions, prep?: PrintPrep) {
   // on the printed page.
   if (hasPrep(prep)) {
     const bleed = Math.max(0, prep.bleedMm);
-    // Outer page size includes bleed plus a small margin so marks aren't
-    // clipped by the printer's hardware margin.
-    const MARK_MARGIN = 12; // mm of room outside trim+bleed for marks/text
+    // Outer page size includes bleed plus a mark margin so marks aren't
+    // clipped by the printer's hardware margin. Vendor reg-mark styles with
+    // long arms (Roland 25 mm) and the scale-check block grow it; 'generic'
+    // stays at the historical 12 mm.
+    const MARK_MARGIN = prepMarkMarginMm(prep);
     const outerW = pw + (bleed + MARK_MARGIN) * 2;
     const outerH = ph + (bleed + MARK_MARGIN) * 2;
     const offX = bleed + MARK_MARGIN; // trim box top-left within outer SVG

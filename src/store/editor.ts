@@ -12,6 +12,10 @@ import { DEFAULT_BRUSH_PRESET, type BrushPresetId } from '../lib/brushPresets';
  *   - regmark  : Roland-style L-shape registration mark (always 4 of them
  *                in the corners; sourceObjectId is omitted)
  *   - manual   : user-drawn / imported cut path (e.g. via PLT import)
+ *   - kiss     : kiss-cut — scores the sticker layer only, carrier backing
+ *                stays intact (stacked-sticker jobs)
+ *   - perf     : through-cut border released LAST so the sheet stays
+ *                anchored until the rest of the job has cut
  *
  * Points are in document mm-space (top-down Y, same as artboards/objects).
  * The PlotterDialog handles mm → plotter-unit conversion at send time.
@@ -27,7 +31,7 @@ export interface CutPath {
   id: string;
   points: Array<[number, number]>;
   closed: boolean;
-  kind: 'outline' | 'trace' | 'regmark' | 'manual';
+  kind: 'outline' | 'trace' | 'regmark' | 'manual' | 'kiss' | 'perf';
   /** Source object id for outline/trace kinds — lets a future "regenerate"
    *  flow re-run the operation when the underlying object moves. */
   sourceObjectId?: string;
@@ -206,9 +210,12 @@ interface EditorState {
   showShear: boolean;
   showWarp: boolean;
   showGrommets: boolean;
+  showMakeSticker: boolean;
+  showSurfaceWrap: boolean;
   showMarginGuides: boolean;
   showSeparations: boolean;
-  setModal: (k: 'openPrintPrep' | 'showPlotter' | 'showEpsonMaint' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showStar' | 'showFindReplace' | 'showSingleLineText' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMarginGuides' | 'showSeparations', v: boolean) => void;
+  showProductionPreview: boolean;
+  setModal: (k: 'openPrintPrep' | 'showPlotter' | 'showEpsonMaint' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showStar' | 'showFindReplace' | 'showSingleLineText' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMakeSticker' | 'showSurfaceWrap' | 'showMarginGuides' | 'showSeparations' | 'showProductionPreview', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -380,8 +387,11 @@ export const useEditor = create<EditorState>((set) => ({
   showShear: false,
   showWarp: false,
   showGrommets: false,
+  showMakeSticker: false,
+  showSurfaceWrap: false,
   showMarginGuides: false,
   showSeparations: false,
+  showProductionPreview: false,
   setModal: (k, v) => set({ [k]: v } as Partial<EditorState>),
 
   cutPaths: [],

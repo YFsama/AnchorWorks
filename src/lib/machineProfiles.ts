@@ -133,6 +133,8 @@ export const MACHINE_PROFILES: MachineProfile[] = [
     quirks: [
       'Prefers PA (absolute plot) mode — the Graphtec dialect header includes it.',
       'Serial wants XON/XOFF software flow control; the driver default is 9600.',
+      'ARMS mark-reading supported: Type 1 circle / Type 2 square marks, arm length 4-20 mm — keep marks at least 50 mm from the sheet edges and the mark rectangle at least 60x60 mm.',
+      'Blade offset: 0.25 mm is typical for a 45° blade — set it in the machine options before cutting fine detail.',
     ],
   },
   {
@@ -153,6 +155,8 @@ export const MACHINE_PROFILES: MachineProfile[] = [
     quirks: [
       'Condition (force/speed) can also be set per-slot on the panel; FS/VS here override the active slot.',
       'USB shows up as a virtual COM port — baud is whatever the Graphtec driver exposes (often 19200/38400).',
+      'ARMS mark-reading supported: Type 1 circle / Type 2 square marks, arm length 4-20 mm — keep marks at least 50 mm from the sheet edges and the mark rectangle at least 60x60 mm.',
+      'Blade offset: 0.25 mm is typical for a 45° blade — set it in the machine options before cutting fine detail.',
     ],
   },
   {

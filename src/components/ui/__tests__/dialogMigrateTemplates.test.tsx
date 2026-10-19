@@ -109,7 +109,7 @@ const emptyToolbar = (c: HTMLElement) => c.querySelector('[aria-describedby="tem
 const emptyActions = (c: HTMLElement) => Array.from(c.querySelectorAll<HTMLButtonElement>('[data-template-empty-action]'));
 
 const CATEGORIES: Array<[name: string, count: number]> = [
-  ['All', 6], ['Business', 1], ['Social', 1], ['Logo', 1], ['Print', 2], ['Stickers', 1],
+  ['All', 9], ['Business', 1], ['Social', 1], ['Logo', 1], ['Print', 2], ['Stickers', 4],
 ];
 
 const TEMPLATES_BY_INDEX: Array<[name: string, description: string]> = [
@@ -119,6 +119,9 @@ const TEMPLATES_BY_INDEX: Array<[name: string, description: string]> = [
   ['Poster A4', 'A4 poster with big headline, subhead and accent block.'],
   ['Sticker Pack', 'A grid of six colorful sticker discs with emoji labels.'],
   ['Flyer', 'Header strip, body block and footer info on letter-ish size.'],
+  ['Sticker Sheet (Kiss-cut)', 'A4 sheet, 3×2 rounded stickers with kiss-cut outlines, perf-cut border and safe areas.'],
+  ['Laptop Decal', '300×200 mm decal with centered die-cut ellipse, 2.54 mm border ring and safe guides.'],
+  ['Tumbler Wrap', 'Cone-sector wrap preview for a 30 oz tumbler (95→82 mm taper) with cut guide.'],
 ];
 
 const frozenTile = (index: number, selected: boolean): string => {
@@ -162,11 +165,11 @@ const frozenPanel = (): string =>
   '<div class="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="templates-dialog-title">'
   + '<div class="bg-panel border border-border rounded-lg shadow-2xl w-[760px] max-h-[80vh] overflow-hidden flex flex-col">'
   + '<div class="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2"><h2 id="templates-dialog-title" class="dialog-title">New from Template</h2><button class="btn-dialog-close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>'
-  + '<div class="px-5 py-3 border-b border-border bg-panel/80"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search text-muted shrink-0" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg><input class="input text-sm min-w-0 flex-1" placeholder="Search templates…" aria-label="Search templates…" title="Press Enter to use first search result · Press Arrow Down to focus first template" type="search" value=""><span class="text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">6 templates</span></div></div>'
+  + '<div class="px-5 py-3 border-b border-border bg-panel/80"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search text-muted shrink-0" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg><input class="input text-sm min-w-0 flex-1" placeholder="Search templates…" aria-label="Search templates…" title="Press Enter to use first search result · Press Arrow Down to focus first template" type="search" value=""><span class="text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">9 templates</span></div></div>'
   + `<div class="px-5 py-2.5 border-b border-border bg-panel2/50">${frozenCategoryToolbar('All', 'Template category filters')}</div>`
   + '<div class="p-5 overflow-y-auto">'
-  + '<div id="template-grid-review-status" class="sr-only" aria-live="polite">Reviewing Business Card 1 / 6. Press Enter to use template</div>'
-  + frozenGrid([0, 1, 2, 3, 4, 5], 0)
+  + '<div id="template-grid-review-status" class="sr-only" aria-live="polite">Reviewing Business Card 1 / 9. Press Enter to use template</div>'
+  + frozenGrid([0, 1, 2, 3, 4, 5, 6, 7, 8], 0)
   + '</div></div></div>';
 
 // ---- the suite ----------------------------------------------------------------
@@ -193,20 +196,20 @@ describe('TemplatesDialog migration — frozen legacy DOM (byte-exact)', () => {
     expect(grid(c).previousElementSibling!.id).toBe('template-grid-review-status');
     expect(grid(c).parentElement).toBe(c.querySelector('#template-grid-review-status')!.parentElement);
     expect(grid(c).getAttribute('aria-describedby')).toBe('template-grid-review-status');
-    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 6. Press Enter to use template');
+    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 9. Press Enter to use template');
   });
 
   it('search toolbar: fallback initially with query, focused review, and Use First disabled at zero matches', async () => {
     const c = await mountDialog();
     expect(searchToolbar(c)).toBeNull();
     type(searchInput(c), 'a');
-    expect(countSpan(c)).toBe('6 / 6 matches');
+    expect(countSpan(c)).toBe('9 / 9 matches');
     expect(searchToolbar(c).outerHTML).toBe(frozenSearchToolbar('Template search actions', false));
     act(() => searchActions(c)[0].focus());
     expect(searchToolbar(c).outerHTML).toBe(frozenSearchToolbar('Use first search result', false));
     type(searchInput(c), '');
     type(searchInput(c), 'zzz');
-    expect(countSpan(c)).toBe('0 / 6 matches');
+    expect(countSpan(c)).toBe('0 / 9 matches');
     // Use First is disabled now, but its review announcement persists (typing
     // does not reset the reviewed action) — the frozen legacy behavior.
     expect(searchToolbar(c).outerHTML).toBe(frozenSearchToolbar('Use first search result', true));
@@ -259,12 +262,12 @@ describe('TemplatesDialog migration — grid keyboard snapshots (legacy-frozen)'
     const c = await mountDialog();
     const all = tiles(c);
     act(() => all[0].focus());
-    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 6. Press Enter to use template');
+    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 9. Press Enter to use template');
 
     // Horizontal ±1 crosses row boundaries freely.
     expect(await press(all[0], 'ArrowRight')).toBe(true);
     expect(document.activeElement).toBe(all[1]);
-    expect(gridRegionText(c)).toBe('Reviewing Square Social Post 2 / 6. Press Enter to use template');
+    expect(gridRegionText(c)).toBe('Reviewing Square Social Post 2 / 9. Press Enter to use template');
     expect(all[1].getAttribute('aria-selected')).toBe('true');
     expect(all[0].getAttribute('aria-selected')).toBe('false');
     expect(all[1].className.endsWith('group border-accent2 shadow-md ring-1 ring-accent2/40')).toBe(true);
@@ -272,7 +275,7 @@ describe('TemplatesDialog migration — grid keyboard snapshots (legacy-frozen)'
     // Vertical ±columns.
     expect(await press(all[1], 'ArrowDown')).toBe(true);
     expect(document.activeElement).toBe(all[4]);
-    expect(gridRegionText(c)).toBe('Reviewing Sticker Pack 5 / 6. Press Enter to use template');
+    expect(gridRegionText(c)).toBe('Reviewing Sticker Pack 5 / 9. Press Enter to use template');
     expect(await press(all[4], 'ArrowUp')).toBe(true);
     expect(document.activeElement).toBe(all[1]);
 
@@ -281,28 +284,29 @@ describe('TemplatesDialog migration — grid keyboard snapshots (legacy-frozen)'
     expect(document.activeElement).toBe(all[0]);
     expect(await press(all[0], 'ArrowLeft')).toBe(true);
     expect(document.activeElement).toBe(all[0]);
-    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 6. Press Enter to use template');
+    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 9. Press Enter to use template');
 
     // Home/End absolute; End from anywhere reaches the last tile; ArrowRight/Down clamp there.
     expect(await press(all[0], 'End')).toBe(true);
-    expect(document.activeElement).toBe(all[5]);
-    expect(gridRegionText(c)).toBe('Reviewing Flyer 6 / 6. Press Enter to use template');
-    expect(await press(all[5], 'ArrowRight')).toBe(true);
-    expect(document.activeElement).toBe(all[5]);
-    expect(await press(all[5], 'ArrowDown')).toBe(true);
-    expect(document.activeElement).toBe(all[5]);
-    expect(await press(all[5], 'Home')).toBe(true);
+    expect(document.activeElement).toBe(all[8]);
+    expect(gridRegionText(c)).toBe('Reviewing Tumbler Wrap 9 / 9. Press Enter to use template');
+    expect(await press(all[8], 'ArrowRight')).toBe(true);
+    expect(document.activeElement).toBe(all[8]);
+    expect(await press(all[8], 'ArrowDown')).toBe(true);
+    expect(document.activeElement).toBe(all[8]);
+    expect(await press(all[8], 'Home')).toBe(true);
     expect(document.activeElement).toBe(all[0]);
 
-    // Second row ArrowDown clamps onto the tail (index 3+3=6 → 5).
+    // Full third row: two ArrowDowns land on the last row (0 → 3 → 6).
     expect(await press(all[0], 'ArrowDown')).toBe(true);
     expect(document.activeElement).toBe(all[3]);
     expect(await press(all[3], 'ArrowDown')).toBe(true);
-    expect(document.activeElement).toBe(all[5]);
+    expect(document.activeElement).toBe(all[6]);
+    expect(gridRegionText(c)).toBe('Reviewing Sticker Sheet (Kiss-cut) 7 / 9. Press Enter to use template');
 
-    // Unrelated keys pass through untouched (focus stays on the last tile).
-    expect(await press(all[5], 'z')).toBe(false);
-    expect(document.activeElement).toBe(all[5]);
+    // Unrelated keys pass through untouched (focus stays on the last focused tile).
+    expect(await press(all[6], 'z')).toBe(false);
+    expect(document.activeElement).toBe(all[6]);
   });
 
   it('short tail row (Print, 2 tiles): vertical and horizontal moves clamp to the last tile', async () => {
@@ -330,8 +334,8 @@ describe('TemplatesDialog migration — grid keyboard snapshots (legacy-frozen)'
     const all = tiles(c);
     act(() => all[2].focus());
     await flushFrames();
-    expect(gridRegionText(c)).toBe('Reviewing Mountain Logo 3 / 6. Press Enter to use template');
-    expect(all.map((tileEl) => tileEl.getAttribute('aria-selected'))).toEqual(['false', 'false', 'true', 'false', 'false', 'false']);
+    expect(gridRegionText(c)).toBe('Reviewing Mountain Logo 3 / 9. Press Enter to use template');
+    expect(all.map((tileEl) => tileEl.getAttribute('aria-selected'))).toEqual(['false', 'false', 'true', 'false', 'false', 'false', 'false', 'false', 'false']);
   });
 });
 
@@ -354,7 +358,7 @@ describe('TemplatesDialog migration — search / category / empty keyboard snaps
     type(input, 'a');
     expect(await press(input, 'ArrowDown')).toBe(true);
     expect(document.activeElement).toBe(tiles(c)[0]);
-    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 6. Press Enter to use template');
+    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 9. Press Enter to use template');
 
     // Escape is captured at document level and closes the dialog; the query survives.
     expect(await press(input, 'Escape')).toBe(true);
@@ -411,14 +415,14 @@ describe('TemplatesDialog migration — search / category / empty keyboard snaps
     act(() => searchActions(reopened)[1].click());
     expect(searchInput(reopened).value).toBe('');
     expect(searchToolbar(reopened)).toBeNull();
-    expect(countSpan(reopened)).toBe('6 templates');
+    expect(countSpan(reopened)).toBe('9 templates');
   });
 
   it('category toolbar: wrapping arrows + Home/End, every move APPLIES the category and resets the review index', async () => {
     const c = await mountDialog();
     const cats = categoryActions(c);
     act(() => cats[0].focus());
-    expect(c.querySelector('#template-category-action-review-status')!.textContent).toBe('Reviewing All 6 templates');
+    expect(c.querySelector('#template-category-action-review-status')!.textContent).toBe('Reviewing All 9 templates');
 
     expect(pressSync(cats[0], 'ArrowRight')).toBe(true);
     expect(document.activeElement).toBe(cats[1]);
@@ -436,17 +440,17 @@ describe('TemplatesDialog migration — search / category / empty keyboard snaps
     act(() => cats[0].focus());
     expect(pressSync(cats[0], 'ArrowLeft')).toBe(true);
     expect(document.activeElement).toBe(cats[5]);
-    expect(c.querySelector('#template-category-action-review-status')!.textContent).toBe('Reviewing Stickers 1 templates');
-    expect(gridRegionText(c)).toBe('Reviewing Sticker Pack 1 / 1. Press Enter to use template');
+    expect(c.querySelector('#template-category-action-review-status')!.textContent).toBe('Reviewing Stickers 4 templates');
+    expect(gridRegionText(c)).toBe('Reviewing Sticker Pack 1 / 4. Press Enter to use template');
 
     expect(pressSync(cats[5], 'End')).toBe(true);
     expect(document.activeElement).toBe(cats[5]);
     expect(pressSync(cats[5], 'Home')).toBe(true);
     expect(document.activeElement).toBe(cats[0]);
-    expect(tiles(c)).toHaveLength(6);
-    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 6. Press Enter to use template');
+    expect(tiles(c)).toHaveLength(9);
+    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 9. Press Enter to use template');
 
-    // Clicking a category resets the review index (Flyer 2/2 → All 1/6).
+    // Clicking a category resets the review index (Flyer 2/2 → All 1/9).
     act(() => cats[4].click()); // Print
     expect(gridRegionText(c)).toBe('Reviewing Poster A4 1 / 2. Press Enter to use template');
   });
@@ -482,7 +486,7 @@ describe('TemplatesDialog migration — search / category / empty keyboard snaps
     // Clear search: query emptied, grid restored, search input focused.
     act(() => emptyActions(c)[0].click());
     expect(searchInput(c).value).toBe('');
-    expect(tiles(c)).toHaveLength(6);
+    expect(tiles(c)).toHaveLength(9);
     expect(document.activeElement).toBe(searchInput(c));
 
     // Reset filters from the 3-action state clears both and focuses search.
@@ -491,9 +495,9 @@ describe('TemplatesDialog migration — search / category / empty keyboard snaps
     act(() => emptyActions(c)[2].click());
     expect(searchInput(c).value).toBe('');
     expect(c.querySelector('[data-template-category="All"]')!.getAttribute('aria-pressed')).toBe('true');
-    expect(tiles(c)).toHaveLength(6);
+    expect(tiles(c)).toHaveLength(9);
     expect(document.activeElement).toBe(searchInput(c));
-    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 6. Press Enter to use template');
+    expect(gridRegionText(c)).toBe('Reviewing Business Card 1 / 9. Press Enter to use template');
   });
 });
 
@@ -525,11 +529,11 @@ describe('TemplatesDialog migration — intended kit deltas (pinned new forms)',
     const c = await mountDialog();
     // Category button, new kit byte form (class after the data-* trio)…
     expect(categoryActions(c)[0].outerHTML).toBe(
-      '<button type="button" data-template-category-action="true" data-template-category="All" data-template-category-review="All 6 templates" class="btn !py-1 !px-2 text-xs border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" title="All 6 templates">All <span class="text-muted tabular-nums">6</span></button>',
+      '<button type="button" data-template-category-action="true" data-template-category="All" data-template-category-review="All 9 templates" class="btn !py-1 !px-2 text-xs border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" title="All 9 templates">All <span class="text-muted tabular-nums">9</span></button>',
     );
     // …whose attribute SET and content are exactly the legacy bytes:
     expect(attrSignature(categoryActions(c)[0].outerHTML)).toBe(attrSignature(
-      '<button type="button" class="btn !py-1 !px-2 text-xs border-accent2 text-accent2 bg-accent2/10" data-template-category-action="true" data-template-category="All" data-template-category-review="All 6 templates" aria-pressed="true" title="All 6 templates">All <span class="text-muted tabular-nums">6</span></button>',
+      '<button type="button" class="btn !py-1 !px-2 text-xs border-accent2 text-accent2 bg-accent2/10" data-template-category-action="true" data-template-category="All" data-template-category-review="All 9 templates" aria-pressed="true" title="All 9 templates">All <span class="text-muted tabular-nums">9</span></button>',
     ));
 
     type(searchInput(c), 'zzz');

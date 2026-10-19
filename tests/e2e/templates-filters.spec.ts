@@ -14,9 +14,9 @@ import { test, expect, type Locator, type Page } from './fixtures';
 //     toolbar adapts to what is filtered (Clear search / Show all
 //     categories / Reset filters)
 //
-// Template facts pinned here come from src/lib/templates.ts: 6 templates —
+// Template facts pinned here come from src/lib/templates.ts: 9 templates —
 // Business Card (Business), Square Social Post (Social), Mountain Logo
-// (Logo), Poster A4 + Flyer (Print), Sticker Pack (Stickers).
+// (Logo), Poster A4 + Flyer (Print), Sticker Pack + Sticker Sheet (Kiss-cut) + Laptop Decal + Tumbler Wrap (Stickers, 4).
 
 /** Open Templates via its keyboard binding (templates.spec.ts precedent)
  *  and return the dialog locator. */
@@ -30,12 +30,12 @@ async function openTemplates(page: Page): Promise<Locator> {
 // Intent: typing in the search box filters the gallery across
 // name/description/category/id — "poster" matches exactly one template
 // ("Poster A4"; no other name, description or id contains it), the live
-// count region reads "1 / 6 matches", and the search-actions toolbar (only
-// rendered while a query is active) clears the query to restore all six
+// count region reads "1 / 9 matches", and the search-actions toolbar (only
+// rendered while a query is active) clears the query to restore all nine
 // tiles and the "6 templates" summary.
 // Anchors: searchbox by its label prefix, grid by role/name, gridcell
 // counts, per-tile heading, i18n count strings matched exactly so
-// "1 / 6 matches" can never collide with a longer count.
+// "1 / 9 matches" can never collide with a longer count.
 test('search narrows the grid and the count live region; Clear search restores', async ({ page }) => {
   await page.goto('/');
   // Wait for the chrome so the shortcut isn't eaten by the boot splash.
@@ -44,11 +44,11 @@ test('search narrows the grid and the count live region; Clear search restores',
   const dialog = await openTemplates(page);
   const grid = dialog.getByRole('grid', { name: 'Template results' });
   const tiles = grid.getByRole('gridcell');
-  await expect(tiles).toHaveCount(6);
+  await expect(tiles).toHaveCount(9);
 
   await dialog.getByRole('searchbox', { name: /^Search templates/ }).fill('poster');
   await expect(tiles).toHaveCount(1);
-  await expect(dialog.getByText('1 / 6 matches', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('1 / 9 matches', { exact: true })).toBeVisible();
   // The surviving tile is the matching template, identified by its heading.
   await expect(grid.getByRole('heading', { name: 'Poster A4' })).toBeVisible();
 
@@ -56,8 +56,8 @@ test('search narrows the grid and the count live region; Clear search restores',
   const searchActions = dialog.getByRole('toolbar', { name: 'Template search actions' });
   await expect(searchActions).toBeVisible();
   await searchActions.getByRole('button', { name: 'Clear search' }).click();
-  await expect(tiles).toHaveCount(6);
-  await expect(dialog.getByText('6 templates', { exact: true })).toBeVisible();
+  await expect(tiles).toHaveCount(9);
+  await expect(dialog.getByText('9 templates', { exact: true })).toBeVisible();
 });
 
 // Intent: the category chips are the second filter — Print holds exactly
@@ -65,8 +65,8 @@ test('search narrows the grid and the count live region; Clear search restores',
 // while "All" loses it, and the result summary becomes
 // "N templates · Category". ArrowRight from the focused chip roves onto the
 // next chip and COMMITS it (handleCategoryActionKeys' onNavigate), so pure
-// keyboard navigation also swaps the grid — Stickers holds only Sticker
-// Pack.
+// keyboard navigation also swaps the grid — Stickers holds four templates
+// (Sticker Pack first).
 // Anchors: category toolbar by name, chips by their "Name N" accessible
 // names (label + count span), aria-pressed, gridcell count, tile heading,
 // exact i18n summary strings.
@@ -82,21 +82,21 @@ test('category chips switch the grid; roving arrows commit the focused category'
   const printChip = categories.getByRole('button', { name: 'Print 2' });
   await printChip.click();
   await expect(printChip).toHaveAttribute('aria-pressed', 'true');
-  await expect(categories.getByRole('button', { name: 'All 6' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(categories.getByRole('button', { name: 'All 9' })).toHaveAttribute('aria-pressed', 'false');
   await expect(tiles).toHaveCount(2);
   await expect(dialog.getByText('2 templates · Print', { exact: true })).toBeVisible();
 
   // ArrowRight (focus sits on Print after the click) roves onto Stickers
   // and the roving handler commits the category change as a side effect.
   await page.keyboard.press('ArrowRight');
-  const stickersChip = categories.getByRole('button', { name: 'Stickers 1' });
+  const stickersChip = categories.getByRole('button', { name: 'Stickers 4' });
   await expect(stickersChip).toBeFocused();
   await expect(stickersChip).toHaveAttribute('aria-pressed', 'true');
   await expect(printChip).toHaveAttribute('aria-pressed', 'false');
-  await expect(tiles).toHaveCount(1);
+  await expect(tiles).toHaveCount(4);
   await expect(grid.getByRole('heading', { name: 'Sticker Pack' })).toBeVisible();
   // The summary string is the dialog's own (unpluralized) i18n output.
-  await expect(dialog.getByText('1 templates · Stickers', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('4 templates · Stickers', { exact: true })).toBeVisible();
 });
 
 // Intent: a query that matches nothing replaces the grid with the empty
@@ -104,7 +104,7 @@ test('category chips switch the grid; roving arrows commit the focused category'
 // query set: Clear search + Reset filters; with a query AND a non-All
 // category: all three buttons. Reset filters restores the full gallery;
 // Show all categories keeps the query but widens the pool so "flyer" finds
-// the Flyer template again ("1 / 6 matches").
+// the Flyer template again ("1 / 9 matches").
 // Anchors: "No templates found." text, empty-actions toolbar by name and
 // its per-button names/count, gridcell count, count live region.
 test('no-result search shows the empty state; Reset filters and Show all categories recover', async ({ page }) => {
@@ -120,7 +120,7 @@ test('no-result search shows the empty state; Reset filters and Show all categor
   await search.fill('zzz-no-match');
   await expect(grid).toBeHidden();
   await expect(dialog.getByText('No templates found.', { exact: true })).toBeVisible();
-  await expect(dialog.getByText('0 / 6 matches', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('0 / 9 matches', { exact: true })).toBeVisible();
 
   // Category is still "All", so only the two query-driven actions render.
   await expect(emptyActions.getByRole('button')).toHaveCount(2);
@@ -129,7 +129,7 @@ test('no-result search shows the empty state; Reset filters and Show all categor
 
   // Reset filters clears query + category — the full gallery returns.
   await emptyActions.getByRole('button', { name: 'Reset filters' }).click();
-  await expect(grid.getByRole('gridcell')).toHaveCount(6);
+  await expect(grid.getByRole('gridcell')).toHaveCount(9);
   await expect(dialog.getByText('No templates found.', { exact: true })).toBeHidden();
 
   // Category-scoped dead end: Logo holds only Mountain Logo, so "flyer"
@@ -146,5 +146,5 @@ test('no-result search shows the empty state; Reset filters and Show all categor
   await showAll.click();
   await expect(grid.getByRole('gridcell')).toHaveCount(1);
   await expect(grid.getByRole('heading', { name: 'Flyer' })).toBeVisible();
-  await expect(dialog.getByText('1 / 6 matches', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('1 / 9 matches', { exact: true })).toBeVisible();
 });

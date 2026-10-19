@@ -350,6 +350,12 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Export PDF (Vector)'), onClick: async () => { void getFormat('pdf-vector')?.export?.(); } },
         { label: t('Export DXF (paths)'), onClick: async () => { void getFormat('dxf')?.export?.(); } },
         { label: t('Export JSON'), onClick: async () => { void getFormat('json')?.export?.(); } },
+        // Print-then-cut RIP handoff: same files as the plain exports, with
+        // the store's cut paths appended (CutContour spot layer in the SVG,
+        // magenta hairlines in the PDF). Shared with the command palette via
+        // the cutPrepActions helpers.
+        { label: t('Export SVG (with cut layer)'), onClick: async () => (await import('../lib/cutPrepActions')).exportSvgWithCutLayer(t) },
+        { label: t('Export PDF (with cut layer)'), onClick: async () => (await import('../lib/cutPrepActions')).exportPdfWithCutLayer(t) },
         { sep: true },
         { label: t('Export Active Artboard (SVG)'), onClick: () => { void exportActiveArtboardAsSVG().then(ok => { if (ok) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); }); } },
         { label: t('Export Active Artboard (PNG)'), onClick: () => { if (exportActiveArtboardAsPNG()) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); } },
@@ -368,6 +374,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true), kbd: getBinding('file.tilePrint') },
         { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
         { label: t('Nest (rotation-aware)'), onClick: runRotationNest },
+        { label: t('Nest cut paths (vinyl)'), onClick: async () => (await import('../lib/cutPrepActions')).nestCutPathsVinyl(t) },
         { label: t('Add positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
         {
           label: t('Weed border'),
@@ -1177,6 +1184,12 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: `${t('Banner Grommets')} — ${t('Small banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 15, 300, 8) },
         { label: `${t('Banner Grommets')} — ${t('Standard banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 20, 500, 10) },
         { label: `${t('Banner Grommets')} — ${t('Large banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 25, 750, 12) },
+        // Make Sticker — welded art + offset white border + die/kiss/perf cut.
+        { label: t('Make Sticker…'), onClick: () => openWithSelection('showMakeSticker'), kbd: getBinding('document.makeSticker') },
+        // Production Preview — imposed sheet composition (nest + bleed + cut overlay + regmarks).
+        { label: t('Production Preview…'), onClick: () => openWithSelection('showProductionPreview') },
+        // Surface Wrap — flat developments for cylinder/cone/sphere decals.
+        { label: t('Surface Wrap…'), onClick: () => setModal('showSurfaceWrap', true) },
         { label: t('Clear positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterRegistrationMarks(t) },
         { label: t('Clear weed borders'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterWeedBorders(t) },
         { label: t('Clear bridges'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterBridges(t) },

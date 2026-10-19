@@ -2,9 +2,10 @@ import { useEditor } from '../store/editor';
 import { addBridges } from './bridges';
 import { generateRegMarks, generateWeedBorder, generateWeedLines, type RegMarkStyle } from './cutContour';
 import { grommetsFromSelection } from './grommets';
-import { getCanvas } from './canvasEngine';
+import { getCanvas, pushHistory } from './canvasEngine';
 import { rhinestoneFromSelection } from './rhinestone';
-import { download } from './io';
+import { download, exportSVG } from './io';
+import { nestPolygons } from './nesting';
 import { buildTestCut, defaultPlotterOptions } from './plotter';
 import { toast } from './toast';
 
@@ -181,4 +182,91 @@ export function savePlotterTestCut(t: T) {
   const format = 'hpgl';
   download('test-cut.plt', buildTestCut(format, defaultPlotterOptions), 'text/plain');
   toast.success(t('Test cut file saved.'), { title: t('Test cut') });
+}
+
+/**
+ * Export-with-cut-layer variants shared by the File menu and the command
+ * palette (print-then-cut RIP handoff). Same download path as the plain
+ * SVG export — `download('design.svg', …)` from io.ts — but with the
+ * store's cut paths appended as a CutContour spot layer.
+ */
+export function exportSvgWithCutLayer(t: T) {
+  const hasCuts = useEditor.getState().cutPaths.length > 0;
+  download('design.svg', exportSVG({ includeCutPaths: true }), 'image/svg+xml');
+  if (!hasCuts) toast.info(t('No cut paths — exported without a cut layer.'), { title: t('Export SVG') });
+}
+
+/** Vector PDF with the magenta CutContour overlay (io2's exportPDFReal). */
+export async function exportPdfWithCutLayer(t: T) {
+  const hasCuts = useEditor.getState().cutPaths.length > 0;
+  const { exportPDFReal } = await import('./io2');
+  await exportPDFReal({ includeCutPaths: true });
+  if (!hasCuts) toast.info(t('No cut paths — exported without a cut layer.'), { title: t('Export PDF') });
+}
+
+/*
+ * ── Vinyl nesting ───────────────────────────────────────────────────────────
+ */
+
+/**
+ * One-click vinyl nesting — repositions the CUT GEOMETRY ONLY.
+ *
+ * Packs the store's cut paths with `nestPolygons` (convex-hull skyline
+ * packer) onto the material sheet to minimise offcut. This is the vinyl /
+ * decal workflow where the CUT SHAPE IS THE PRODUCT: only cut paths move,
+ * the printed art on the canvas is NOT touched — use `nestSelection` when
+ * canvas objects should move with the layout. Registration marks are
+ * excluded from the packing and appended unchanged (regenerate them around
+ * the packed area if the sheet needs them).
+ *
+ * Sheet width defaults to the document width in mm (but at least 150 mm —
+ * the narrowest common plotter/transfer-tape span); the 2 mm default gap
+ * sits in the kiss-cut sweet spot (sheets 2–3 mm, rolls 1–2 mm).
+ */
+export function nestCutPathsVinyl(t: T, opts?: { sheetWidthMm?: number; gapMm?: number }): number {
+  const editor = useEditor.getState();
+  const packable = editor.cutPaths.filter(p => p.kind !== 'regmark');
+  if (packable.length < 2) {
+    toast.warn(t('Need at least two cut paths to nest.'), { title: t('Vinyl nesting — cut geometry only') });
+    return 0;
+  }
+
+  const sheetWidthMm = opts?.sheetWidthMm ?? Math.max(150, editor.doc.width / MM_TO_PX);
+  const gapMm = opts?.gapMm ?? 2;
+  const nest = nestPolygons(packable.map(p => ({ id: p.id, points: p.points })), sheetWidthMm, gapMm);
+
+  // Rebuild every packable path at its placement. Rotation 90 turns a point
+  // [x, y] into [-y, x] about the origin; the rotated cloud is then
+  // translated so its AABB min lands exactly at the placement's (x, y) —
+  // the placement IS the top-left of the (possibly rotated) geometry. All
+  // other CutPath fields (kind, color, passes, bridge metadata, …) survive
+  // untouched; unfit overhang rows land at the bottom of the pack. Output
+  // order is sheet reading order (top row first, left to right).
+  const byId = new Map(packable.map(p => [p.id, p]));
+  const packed = nest.placements
+    .slice()
+    .sort((a, b) => a.y - b.y || a.x - b.x || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .flatMap(placement => {
+      const path = byId.get(placement.id);
+      if (!path) return [];
+      const rotated = path.points.map(([px, py]) =>
+        (placement.rotation === 90 ? [-py, px] : [px, py]) as [number, number]);
+      let minX = Infinity;
+      let minY = Infinity;
+      for (const [x, y] of rotated) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+      }
+      return [{
+        ...path,
+        points: rotated.map(([x, y]) => [x - minX + placement.x, y - minY + placement.y] as [number, number]),
+      }];
+    });
+
+  const regmarks = editor.cutPaths.filter(p => p.kind === 'regmark');
+  editor.setCutPaths([...packed, ...regmarks]);
+  pushHistory(); // one undo step for the whole re-layout
+  const utilPct = Math.round(nest.utilization * 100);
+  toast.success(`${packed.length} ${t('cut paths nested')} · ${utilPct}% ${t('material used')}`, { title: t('Vinyl nesting — cut geometry only') });
+  return packed.length;
 }

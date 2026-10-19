@@ -87,6 +87,9 @@ const ShearDialog = lazy(() => import('./components/ShearDialog').then(m => ({ d
 const WarpDialog = lazy(() => import('./components/WarpDialog').then(m => ({ default: m.WarpDialog })));
 const FreeDistortDialog = lazy(() => import('./components/FreeDistortDialog').then(m => ({ default: m.FreeDistortDialog })));
 const GrommetsDialog = lazy(() => import('./components/GrommetsDialog').then(m => ({ default: m.GrommetsDialog })));
+const MakeStickerDialog = lazy(() => import('./components/MakeStickerDialog').then(m => ({ default: m.MakeStickerDialog })));
+const ProductionPreviewDialog = lazy(() => import('./components/ProductionPreviewDialog').then(m => ({ default: m.ProductionPreviewDialog })));
+const WrapDialog = lazy(() => import('./components/WrapDialog').then(m => ({ default: m.WrapDialog })));
 const MarginGuidesDialog = lazy(() => import('./components/MarginGuidesDialog').then(m => ({ default: m.MarginGuidesDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
 const PreferencesDialog = lazy(() => import('./components/PreferencesDialog').then(m => ({ default: m.PreferencesDialog })));
@@ -903,6 +906,9 @@ export default function App() {
   const showShear = useEditor(s => s.showShear);
   const showWarp = useEditor(s => s.showWarp);
   const showGrommets = useEditor(s => s.showGrommets);
+  const showMakeSticker = useEditor(s => s.showMakeSticker);
+  const showProductionPreview = useEditor(s => s.showProductionPreview);
+  const showSurfaceWrap = useEditor(s => s.showSurfaceWrap);
   const showMarginGuides = useEditor(s => s.showMarginGuides);
   const showSeparations = useEditor(s => s.showSeparations);
   const showPreferences = useEditor(s => s.showPreferences);
@@ -990,6 +996,15 @@ export default function App() {
         e.preventDefault();
         const { showCutContour, setModal: m } = useEditor.getState();
         m('showCutContour', !showCutContour);
+        return;
+      }
+      // Make Sticker — Ctrl+Alt+K (plain Ctrl+K is the command palette).
+      // The dialog itself guards for a selection on open, so an empty-canvas
+      // press toasts "Select something first." and re-closes.
+      if (match('document.makeSticker')) {
+        e.preventDefault();
+        const { showMakeSticker, setModal: m } = useEditor.getState();
+        m('showMakeSticker', !showMakeSticker);
         return;
       }
       // Legacy Ctrl+Z block also routes Ctrl+Shift+Z → Redo; we keep that
@@ -1769,6 +1784,21 @@ export default function App() {
       {showGrommets && (
         <Suspense fallback={null}>
           <GrommetsDialog />
+        </Suspense>
+      )}
+      {showMakeSticker && (
+        <Suspense fallback={null}>
+          <MakeStickerDialog />
+        </Suspense>
+      )}
+      {showProductionPreview && (
+        <Suspense fallback={null}>
+          <ProductionPreviewDialog />
+        </Suspense>
+      )}
+      {showSurfaceWrap && (
+        <Suspense fallback={null}>
+          <WrapDialog />
         </Suspense>
       )}
       {showMarginGuides && (

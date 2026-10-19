@@ -49,7 +49,7 @@ export interface ProjectFile {
     id: string;
     points: Array<[number, number]>;
     closed: boolean;
-    kind: 'outline' | 'trace' | 'regmark' | 'manual';
+    kind: 'outline' | 'trace' | 'regmark' | 'manual' | 'kiss' | 'perf';
     sourceObjectId?: string;
     passes?: number;
   }>;
@@ -216,7 +216,7 @@ export async function applyProject(p: ProjectFile): Promise<void> {
   // look like CutPath shape (defensive against future-version files opened
   // by an older build that doesn't know the latest schema additions).
   if (Array.isArray(p.cutPaths)) {
-    const validKinds = new Set(['outline', 'trace', 'regmark', 'manual']);
+    const validKinds = new Set(['outline', 'trace', 'regmark', 'manual', 'kiss', 'perf']);
     const cleaned = p.cutPaths.filter(c =>
       c && typeof c.id === 'string'
         && Array.isArray(c.points)

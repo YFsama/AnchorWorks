@@ -162,7 +162,7 @@ import { getBinding } from '../lib/keymap';
 import { listTools } from '../lib/tools/types';
 
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
-import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, savePlotterTestCut } from '../lib/cutPrepActions';
+import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, exportPdfWithCutLayer, exportSvgWithCutLayer, nestCutPathsVinyl, savePlotterTestCut } from '../lib/cutPrepActions';
 import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
 import { expandBlendSteps, releaseBlendSteps, removeOrphanBlendSteps, relinkBlendEndpointFromSelection, reverseBlendSteps, selectAllBlendEndpoints, selectAllBlendGroups, selectBlendEndpointsFromSelection, selectBlendGroupFromSelection, selectBlendSteps, selectBlendStepsFromSelection, selectOrphanBlendSteps, updateBlendSteps } from '../lib/blend';
 import type { ToolId } from '../types';
@@ -479,6 +479,10 @@ export function CommandPalette({
     { id: 'file.exportPdfV',  label: t('Export PDF (Vector)'), category: t('File'), keywords: getFormat('pdf-vector')?.keywords, icon: FileText,   run: () => { void getFormat('pdf-vector')?.export?.(); } },
     { id: 'file.exportDxf', label: t('Export DXF (paths)'), category: t('File'), keywords: getFormat('dxf')?.keywords, icon: Save, run: () => { void getFormat('dxf')?.export?.(); } },
     { id: 'file.exportJson', label: t('Export JSON'), category: t('File'), keywords: getFormat('json')?.keywords, icon: Save, run: () => { void getFormat('json')?.export?.(); } },
+    // Print-then-cut RIP handoff — same exporters with the store's cut paths
+    // appended (CutContour spot layer in the SVG, magenta overlay in the PDF).
+    { id: 'file.exportSvgCut', label: t('Export SVG with cut layer'), category: t('File'), keywords: 'export svg cut layer contour rip print cut spotcolour spotcolor versaworks', icon: Save, run: () => exportSvgWithCutLayer(t) },
+    { id: 'file.exportPdfCut', label: t('Export PDF with cut layer'), category: t('File'), keywords: 'export pdf cut layer contour rip print cut overlay versaworks', icon: FileText, run: () => { void exportPdfWithCutLayer(t); } },
     { id: 'file.print',       label: t('Print…'),              category: t('File'), shortcut: getBinding('file.print'), icon: Printer,    run: () => setModal('showPrint', true) },
     { id: 'file.printPrep',   label: t('Print Prep…'),         category: t('File'), keywords: 'print prep crop marks registration marks bleed margins output', icon: Printer, run: openPrintPrep },
     { id: 'file.separations', label: t('Separations…'),        category: t('File'), keywords: 'separations spot color colour plate ink pantone pms per-plate preview print output export', icon: Printer, run: () => setModal('showSeparations', true) },
@@ -495,6 +499,7 @@ export function CommandPalette({
       if (result) toast.success(`${result.arranged} ${t('objects arranged')} · ${Math.round(result.utilization * 100)}% ${t('material used')}${result.rotated > 0 ? ` · ${result.rotated} ${t('objects rotated')}` : ''}`, { title: t('Nest (rotation-aware)') });
       else toast.warn(t('Select 2 or more objects first.'), { title: t('Nest (rotation-aware)') });
     } },
+    { id: 'file.nestCutVinyl', label: t('Nest cut paths (vinyl)'), category: t('File'), keywords: 'nest nesting pack hull convex polygon cut paths vinyl roll sheet material waste layout cutter plotter decal true shape', icon: Grid3X3, run: () => nestCutPathsVinyl(t) },
     { id: 'file.plotterRegMarks', label: t('Add positioning marks'), category: t('File'), keywords: 'registration marks reg marks print cut contour plotter cutter align', icon: Send, run: () => addPlotterRegistrationMarks(t) },
     { id: 'file.plotterWeedBorder', label: t('Weed border'), category: t('File'), keywords: 'weed border weeding vinyl cutter plotter peel waste cut prep', icon: Send, run: () => addPlotterWeedBorder(t) },
     { id: 'file.plotterWeedRows', label: `${t('Weed border')} — ${t('Weed rows')}`, category: t('File'), keywords: 'weed grid rows horizontal divider weeding vinyl cutter plotter peel waste cut prep', icon: Grid3X3, run: () => addPlotterWeedBorder(t, 2, 0) },
@@ -505,6 +510,9 @@ export function CommandPalette({
     { id: 'file.plotterBridgeStandard', label: `${t('Bridges')} — ${t('Standard')}`, category: t('File'), keywords: 'bridge bridges tabs standard stencil island weeding vinyl cutter plotter cut prep', icon: Send, run: () => addPlotterBridges(t, 4, 1) },
     { id: 'file.plotterBridgeHeavy', label: `${t('Bridges')} — ${t('Heavy')}`, category: t('File'), keywords: 'bridge bridges tabs heavy stencil island weeding vinyl cutter plotter cut prep', icon: Send, run: () => addPlotterBridges(t, 6, 1.5) },
     { id: 'file.bannerGrommets', label: t('Banner Grommets…'), category: t('File'), keywords: 'grommet eyelet banner finishing hole vinyl cutter plotter output signmaster', icon: Send, run: () => runWithSelection(() => setModal('showGrommets', true)) },
+    { id: 'document.makeSticker', label: t('Make Sticker…'), category: t('File'), shortcut: getBinding('document.makeSticker'), keywords: 'sticker decal contour kiss perf border underlay die-cut sticker mule white border vinyl', icon: Send, run: () => runWithSelection(() => setModal('showMakeSticker', true)) },
+    { id: 'document.productionPreview', label: t('Production Preview…'), category: t('File'), keywords: 'production preview imposition sheet layout bleed nest copies print cut 生产', icon: Printer, run: () => runWithSelection(() => setModal('showProductionPreview', true)) },
+    { id: 'document.surfaceWrap', label: t('Surface Wrap…'), category: t('File'), keywords: 'wrap cone cylinder tumbler sphere gore decal unwrap curved surface label bottle cup ornament', icon: Send, run: () => setModal('showSurfaceWrap', true) },
     { id: 'file.bannerGrommetsSmall', label: `${t('Banner Grommets')} — ${t('Small banner')}`, category: t('File'), keywords: 'grommet eyelet small banner finishing hole preset vinyl cutter plotter output signmaster', icon: Send, run: () => addPlotterGrommets(t, 15, 300, 8) },
     { id: 'file.bannerGrommetsStandard', label: `${t('Banner Grommets')} — ${t('Standard banner')}`, category: t('File'), keywords: 'grommet eyelet standard banner finishing hole preset vinyl cutter plotter output signmaster', icon: Send, run: () => addPlotterGrommets(t, 20, 500, 10) },
     { id: 'file.bannerGrommetsLarge', label: `${t('Banner Grommets')} — ${t('Large banner')}`, category: t('File'), keywords: 'grommet eyelet large banner finishing hole preset vinyl cutter plotter output signmaster', icon: Send, run: () => addPlotterGrommets(t, 25, 750, 12) },

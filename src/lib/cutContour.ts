@@ -33,11 +33,16 @@ interface OffsetOptions {
   /** Polylines with a closing-segment shorter than this (mm) are treated
    *  as already-closed for the purpose of normal calculation. */
   closeTolerance: number;
+  /** Corner join style. Default 'miter' (SVG semantics); 'round' fills
+   *  convex corners with a tessellated arc of radius |distance| centred
+   *  on the source vertex. */
+  join: 'miter' | 'bevel' | 'round';
 }
 
 const DEFAULT_OFFSET: OffsetOptions = {
   miterLimit: 4,
   closeTolerance: 0.01,
+  join: 'miter',
 };
 
 /** A closed result ring with |area| below this (mm² — unit-agnostic, it is
@@ -96,7 +101,10 @@ function pointRingDistance(
  *  1. Compute outward normals for each segment.
  *  2. For each interior vertex, intersect the two offset half-lines.
  *     If the intersection is too far (miter > limit), fall back to a
- *     bevel by emitting two points instead of one.
+ *     bevel by emitting two points instead of one. `opts.join: 'round'`
+ *     replaces both with a tessellated arc (radius |distance|, centred
+ *     on the source vertex) at corners convex w.r.t. the offset side;
+ *     concave corners always keep the intersection trim.
  *  3. For closed paths, fold the first/last vertex through the same
  *     miter logic.
  *  4. Clean up self-intersections via polygon-clipping union of the
@@ -112,7 +120,7 @@ export function offsetPolyline(
   if (points.length < 2 || Math.abs(distance) < 1e-9) {
     return [points.slice()];
   }
-  const { miterLimit, closeTolerance } = { ...DEFAULT_OFFSET, ...opts };
+  const { miterLimit, closeTolerance, join } = { ...DEFAULT_OFFSET, ...opts };
 
   // Detect "actually closed" — a polyline whose last point matches its
   // first counts as closed even if the caller didn't set the flag.
@@ -193,19 +201,65 @@ export function offsetPolyline(
 
   const out: Array<[number, number]> = [];
 
-  if (reallyClosed) {
-    // Every vertex gets a miter (or bevel fallback).
-    for (let i = 0; i < n; i++) {
-      const { p, len } = miterAt(i);
-      if (len > miterLimit) {
-        // Bevel: emit the two end points of the offset segments
-        // adjacent to this vertex instead of the miter point.
-        out.push(offSegs[(i - 1 + n) % n].b);
-        out.push(offSegs[i].a);
-      } else {
-        out.push(p);
-      }
+  /**
+   * Round join: tessellate the arc of radius |distance| centred on the
+   * source vertex, from the end of the incoming offset segment to the
+   * start of the outgoing one, swept the short (outer) way. Angular step
+   * stays ≤ 8° with at least 2 intermediate points, fine enough for
+   * smooth plotter output.
+   */
+  const pushRoundJoin = (
+    from: [number, number],
+    to: [number, number],
+    centre: readonly [number, number],
+  ): void => {
+    out.push(from);
+    const r = Math.abs(distance);
+    const a1 = Math.atan2(from[1] - centre[1], from[0] - centre[0]);
+    const a2 = Math.atan2(to[1] - centre[1], to[0] - centre[0]);
+    let delta = a2 - a1;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    const sweep = Math.abs(delta);
+    const step = Math.min((8 * Math.PI) / 180, sweep / 4);
+    const steps = sweep > 1e-12 ? Math.max(3, Math.ceil(sweep / step)) : 1;
+    for (let k = 1; k < steps; k++) {
+      const a = a1 + (delta * k) / steps;
+      out.push([centre[0] + Math.cos(a) * r, centre[1] + Math.sin(a) * r]);
     }
+    out.push(to);
+  };
+
+  /**
+   * Emit the join at vertex `vi`. Miter (with a bevel fallback past the
+   * limit) is the default; 'round' / 'bevel' apply only at corners
+   * convex w.r.t. the offset side — a concave corner's offset lines
+   * already cross short of the vertex, so the intersection trim stays.
+   */
+  const emitJoin = (vi: number): void => {
+    const prev = offSegs[(vi - 1 + n) % n];
+    const next = offSegs[vi];
+    const { p, len } = miterAt(vi);
+    // Convex w.r.t. the offset side: the miter intersection lies past
+    // the end of the incoming offset segment (a concave corner's lands
+    // short of it).
+    const d1 = segDir[(vi - 1 + n) % n];
+    const convex = (p[0] - prev.b[0]) * d1[0] + (p[1] - prev.b[1]) * d1[1] > 0;
+    if (join === 'round' && convex) {
+      pushRoundJoin(prev.b, next.a, pts[vi]);
+      return;
+    }
+    if ((join === 'bevel' && convex) || len > miterLimit) {
+      out.push(prev.b);
+      out.push(next.a);
+      return;
+    }
+    out.push(p);
+  };
+
+  if (reallyClosed) {
+    // Every vertex gets a join (miter with bevel fallback, or round).
+    for (let i = 0; i < n; i++) emitJoin(i);
     out.push(out[0]); // close
 
     // Inward-overflow guard (P1-8): once |distance| exceeds the ring's
@@ -237,17 +291,9 @@ export function offsetPolyline(
     }
   } else {
     // Open polyline: first/last vertices keep their respective offset
-    // endpoint; interior vertices get miters.
+    // endpoint; interior vertices get joins.
     out.push(offSegs[0].a);
-    for (let i = 1; i < n - 1; i++) {
-      const { p, len } = miterAt(i);
-      if (len > miterLimit) {
-        out.push(offSegs[i - 1].b);
-        out.push(offSegs[i].a);
-      } else {
-        out.push(p);
-      }
-    }
+    for (let i = 1; i < n - 1; i++) emitJoin(i);
     out.push(offSegs[n - 2].b);
   }
 

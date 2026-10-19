@@ -148,9 +148,25 @@ export function outlineStrokeToCutPaths(objects: fabric.FabricObject[]): CutPath
  * the fewest possible cut paths, so overlapping letters/shapes cut as one
  * continuous line instead of crossing each other. Open polylines (no area)
  * pass through unchanged. Returns mm-space cut paths ready for the store.
+ *
+ * Colour threading: when EVERY input object carries the same source colour,
+ * the welded rings inherit it — the union has one owner. Mixed colours or any
+ * colourless input leaves `color` undefined: a welded union of two vinyl
+ * colours has no single sheet to cut from. This matches the layered-vinyl
+ * workflow, which contours one colour layer at a time, so uniform input is
+ * the real case; mixed input still welds (for weeding/sticker outlines) and
+ * simply cuts as shared colourless geometry.
  */
 export function weldOutline(objects: fabric.FabricObject[]): CutPath[] {
   const flat = buildOutlineCutPaths(objects, 0, 1);
+  // One colour shared by every flattened path → that colour owns the weld.
+  const colors = new Set<string>();
+  let allColored = flat.length > 0;
+  for (const p of flat) {
+    if (!p.color) { allColored = false; break; }
+    colors.add(p.color);
+  }
+  const uniformColor = allColored && colors.size === 1 ? [...colors][0] : undefined;
   const closed = flat.filter(p => p.closed && p.points.length >= 4);
   const open = flat.filter(p => !(p.closed && p.points.length >= 4));
   if (closed.length < 1) return flat;
@@ -167,6 +183,7 @@ export function weldOutline(objects: fabric.FabricObject[]): CutPath[] {
       closed: true,
       kind: 'outline',
       passes: 1,
+      color: uniformColor,
     }));
     return [...welded, ...open];
   } catch {

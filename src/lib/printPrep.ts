@@ -4,6 +4,22 @@
  * suitable for embedding in an outer SVG sized in mm.
  */
 
+import {
+  CORNER_IDS,
+  SCALE_CHECK_CAPTION,
+  SCALE_CHECK_CAPTION_DY_MM,
+  SCALE_CHECK_FONT_MM,
+  SCALE_CHECK_GAP_MM,
+  SCALE_CHECK_GAP_WITH_INFO_MM,
+  SCALE_CHECK_H_MM,
+  SCALE_CHECK_W_MM,
+  regMarkCornerSegments,
+  regMarkExtentMm,
+  resolveRegMarkSpec,
+  scaleCheckExtentMm,
+  type RegMarkStyle,
+} from './regMarkGeometry';
+
 export interface PrintPrep {
   /** Bleed in millimetres added on every side of the trim box. */
   bleedMm: number;
@@ -13,6 +29,17 @@ export interface PrintPrep {
   registrationMarks: boolean;
   /** Show the page-info text strip below the trim box. */
   pageInfo: boolean;
+  /** Registration-mark geometry style. Unset / 'generic' keeps the classic
+   *  concentric-circle + crosshair edge-midpoint targets. */
+  regMarkStyle?: RegMarkStyle;
+  /** Overrides the vendor style's default L-arm length (mm). */
+  regMarkArmMm?: number;
+  /** Overrides the vendor style's default stroke width (mm). */
+  regMarkStrokeMm?: number;
+  /** Adds a solid-black 50 x 9 mm verification rectangle (Graphtec barcode
+   *  Start-Mark dimensions) with a caption in the bottom margin, so print
+   *  scaling can be checked with a ruler before cutting. */
+  scaleCheck?: boolean;
 }
 
 export const defaultPrintPrep: PrintPrep = {
@@ -20,6 +47,8 @@ export const defaultPrintPrep: PrintPrep = {
   cropMarks: false,
   registrationMarks: false,
   pageInfo: false,
+  regMarkStyle: 'generic',
+  scaleCheck: false,
 };
 
 /**
@@ -66,26 +95,39 @@ export function renderTrimMarksSVG(pageW: number, pageH: number, prep: PrintPrep
 
   // Registration marks: a 6mm diameter target (outer + inner concentric
   // circles) with a crosshair through it, placed 4mm outside each edge
-  // midpoint of the trim box.
+  // midpoint of the trim box. A vendor `regMarkStyle` swaps the geometry for
+  // L-brackets at the four trim-box corners (see regMarkGeometry.ts).
   if (prep.registrationMarks) {
-    const OFFSET = 4;
-    const R_OUTER = 3;
-    const R_INNER = 1.5;
-    const CROSS = 4;
-    const STROKE = 0.25;
-    const targets: Array<[number, number]> = [
-      [pageW / 2, -OFFSET - R_OUTER], // top
-      [pageW / 2, pageH + OFFSET + R_OUTER], // bottom
-      [-OFFSET - R_OUTER, pageH / 2], // left
-      [pageW + OFFSET + R_OUTER, pageH / 2], // right
-    ];
-    for (const [cx, cy] of targets) {
-      parts.push(
-        `<circle cx="${cx}" cy="${cy}" r="${R_OUTER}" stroke="#000" stroke-width="${STROKE}" fill="none" />`,
-        `<circle cx="${cx}" cy="${cy}" r="${R_INNER}" stroke="#000" stroke-width="${STROKE}" fill="none" />`,
-        `<line x1="${cx - CROSS}" y1="${cy}" x2="${cx + CROSS}" y2="${cy}" stroke="#000" stroke-width="${STROKE}" />`,
-        `<line x1="${cx}" y1="${cy - CROSS}" x2="${cx}" y2="${cy + CROSS}" stroke="#000" stroke-width="${STROKE}" />`,
-      );
+    const style: RegMarkStyle = prep.regMarkStyle ?? 'generic';
+    if (style === 'generic') {
+      const OFFSET = 4;
+      const R_OUTER = 3;
+      const R_INNER = 1.5;
+      const CROSS = 4;
+      const STROKE = 0.25;
+      const targets: Array<[number, number]> = [
+        [pageW / 2, -OFFSET - R_OUTER], // top
+        [pageW / 2, pageH + OFFSET + R_OUTER], // bottom
+        [-OFFSET - R_OUTER, pageH / 2], // left
+        [pageW + OFFSET + R_OUTER, pageH / 2], // right
+      ];
+      for (const [cx, cy] of targets) {
+        parts.push(
+          `<circle cx="${cx}" cy="${cy}" r="${R_OUTER}" stroke="#000" stroke-width="${STROKE}" fill="none" />`,
+          `<circle cx="${cx}" cy="${cy}" r="${R_INNER}" stroke="#000" stroke-width="${STROKE}" fill="none" />`,
+          `<line x1="${cx - CROSS}" y1="${cy}" x2="${cx + CROSS}" y2="${cy}" stroke="#000" stroke-width="${STROKE}" />`,
+          `<line x1="${cx}" y1="${cy - CROSS}" x2="${cx}" y2="${cy + CROSS}" stroke="#000" stroke-width="${STROKE}" />`,
+        );
+      }
+    } else {
+      const spec = resolveRegMarkSpec(style, prep.regMarkArmMm, prep.regMarkStrokeMm);
+      for (const corner of CORNER_IDS) {
+        for (const seg of regMarkCornerSegments(pageW, pageH, corner, spec)) {
+          parts.push(
+            `<line x1="${seg.x1}" y1="${seg.y1}" x2="${seg.x2}" y2="${seg.y2}" stroke="#000" stroke-width="${spec.strokeMm}" stroke-linecap="butt" />`,
+          );
+        }
+      }
     }
   }
 
@@ -109,7 +151,36 @@ export function renderTrimMarksSVG(pageW: number, pageH: number, prep: PrintPrep
     );
   }
 
+  // Scale-check block: solid-black 50 x 9 mm rectangle plus caption, placed
+  // in the bottom margin (below the page-info strip when both are shown) so
+  // the operator can verify print scaling with a ruler before cutting.
+  if (prep.scaleCheck) {
+    const gap = prep.pageInfo ? SCALE_CHECK_GAP_WITH_INFO_MM : SCALE_CHECK_GAP_MM;
+    const top = pageH + gap;
+    parts.push(
+      `<rect x="0" y="${top}" width="${SCALE_CHECK_W_MM}" height="${SCALE_CHECK_H_MM}" fill="#000" />`,
+      `<text x="0" y="${top + SCALE_CHECK_H_MM + SCALE_CHECK_CAPTION_DY_MM}" font-family="Helvetica, Arial, sans-serif" font-size="${SCALE_CHECK_FONT_MM}" fill="#000">${escapeXML(SCALE_CHECK_CAPTION)}</text>`,
+    );
+  }
+
   return parts.join('');
+}
+
+/**
+ * Mark margin (mm) a print wrapper must reserve outside trim + bleed for
+ * `prep`: the historical 12 mm, grown only when a vendor mark style or the
+ * scale-check block physically reaches further (Roland's 25 mm arms need
+ * >=28 mm, which also satisfies their >=15 mm feed-direction offset rule).
+ */
+export function prepMarkMarginMm(prep: PrintPrep): number {
+  let extent = 8; // crop marks: 3mm offset + 5mm arm
+  if (prep.registrationMarks) {
+    extent = Math.max(extent, regMarkExtentMm(prep.regMarkStyle ?? 'generic', prep.regMarkArmMm, prep.regMarkStrokeMm));
+  }
+  if (prep.scaleCheck) {
+    extent = Math.max(extent, scaleCheckExtentMm(prep.pageInfo === true));
+  }
+  return Math.max(12, extent + 1);
 }
 
 function round1(n: number): string {

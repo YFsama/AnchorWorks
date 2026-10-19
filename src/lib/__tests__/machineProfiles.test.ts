@@ -73,3 +73,18 @@ describe('profile command builders', () => {
     expect(profileConnectInit(null, 0, 0)).toBe('');
   });
 });
+
+describe('Graphtec ARMS + blade-offset guidance', () => {
+  it('graphtec-ce and graphtec-fc carry the ARMS mark specs and blade-offset tip', () => {
+    for (const id of ['graphtec-ce', 'graphtec-fc']) {
+      const p = getMachineProfile(id)!;
+      const notes = p.quirks.join(' ');
+      expect(notes).toMatch(/ARMS mark-reading supported/);
+      expect(notes).toMatch(/Type 1 circle \/ Type 2 square/);
+      expect(notes).toMatch(/arm length 4-20 mm/);
+      expect(notes).toMatch(/at least 50 mm from the sheet edges/);
+      expect(notes).toMatch(/at least 60x60 mm/);
+      expect(notes).toMatch(/0\.25 mm is typical for a 45° blade/);
+    }
+  });
+});

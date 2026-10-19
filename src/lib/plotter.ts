@@ -5,7 +5,7 @@
 
 import { exportSVG } from './io';
 import { useEditor } from '../store/editor';
-import { optimizeOrder, mirrorPolys, applyOvercut, reversePolys, sortInsideFirst } from './cutOptimize';
+import { optimizeOrder, mirrorPolys, applyOvercut, applyBladeOffset, reversePolys, sortInsideFirst } from './cutOptimize';
 import { isTauri, callNative } from './runtime';
 
 /**
@@ -56,6 +56,19 @@ export interface PlotterOptions {
   optimize: boolean;
   /** Overcut (mm) past each closed-path start, for clean corners. 0 = off. */
   overcutMm: number;
+  /** Drag-knife blade-offset compensation (mm) — a swivel blade trails its
+   *  pivot so corners undercut; > 0 inserts corner loops via `applyBladeOffset`
+   *  after overcut and before mirroring, so the loops land on the finished
+   *  geometry. 0 = off. */
+  bladeOffsetMm?: number;
+  /** ARMS optical registration (Graphtec FC/CE, `graphtec-fc` dialect only —
+   *  other dialects throw). Emits the GP-GL TB registration block before the
+   *  geometry and `TB0` after the footer: the Graphtec footer parks the head
+   *  (`PU0,0; SP0;`, no `!PG` eject), so the job ends by leaving ARMS mode.
+   *  `armMm` = mark arm length, `type` 1 circle / 2 square, rect = expected
+   *  mark rectangle; all lengths in mm, sent as 0.1 mm steps, every command
+   *  ETX-terminated. Source: open-graphtec-server marks.py, FC9000-validated. */
+  arms?: { armMm: number; type: 1 | 2; rectW: number; rectH: number };
   /** Reverse the cut direction of every path. */
   reverse: boolean;
   /** Cut contours contained inside others first (print-and-cut weeding order). */
@@ -76,15 +89,40 @@ export interface MaterialPreset {
   speed: number;      // Graphtec VS, cm/s
   overcut: number;    // recommended overcut, mm
   mirror?: boolean;
+  /** Recommended blade angle — 45° general purpose, 60° thick / glitter. */
+  bladeAngleDeg?: number;
+  /** Explicit-name twin of `overcut` for UI that surfaces the default
+   *  directly; kept in sync where research gave a number. */
+  defaultOvercutMm?: number;
+  /** Multi-pass recommendation for hard / thick materials (CutPath.passes). */
+  passes?: number;
+  /** Acceleration (mm/s²) the material cuts cleanly at — feeds the
+   *  trapezoidal job-time estimate (`estimateJobSeconds`). Research bands
+   *  (docs/research-sticker-printcut-2026-10.md §3, CutTime model): sign
+   *  vinyl ~1500, HTV ~1000, cardstock ~800 mm/s². */
+  accelMmS2?: number;
+  /** Per-path head-lift + blade-drop settle delay (s) — the physics-estimate
+   *  twin of PER_PATH_OVERHEAD_SECONDS. Research band 0.15–0.35 s (AxiDraw
+   *  150 ms; CutTime carton 0.25 s); thicker stock needs the slower head. */
+  headUpS?: number;
 }
 
 export const MATERIAL_PRESETS: MaterialPreset[] = [
-  { id: 'sign-vinyl', label: 'Sign vinyl (standard)', feedRate: 400, force: 60, speed: 30, overcut: 0.25 },
-  { id: 'htv', label: 'Heat-transfer vinyl (HTV)', feedRate: 300, force: 50, speed: 25, overcut: 0.25, mirror: true },
-  { id: 'sticker', label: 'Sticker / label paper', feedRate: 300, force: 80, speed: 20, overcut: 0.3 },
-  { id: 'cardstock', label: 'Cardstock', feedRate: 200, force: 120, speed: 15, overcut: 0.5 },
-  { id: 'window-tint', label: 'Window tint film', feedRate: 300, force: 40, speed: 20, overcut: 0.2 },
-  { id: 'stencil', label: 'Sandblast / stencil', feedRate: 200, force: 150, speed: 15, overcut: 0.5 },
+  // accelMmS2 / headUpS per the CutTime research constants (§3): thin vinyl
+  // family 1500 / 0.15, HTV 1000 / 0.2 (glitter needs the slower settle,
+  // 0.25), cardstock 800 / 0.35. Every preset carries both so the physics
+  // estimate never sees undefined.
+  { id: 'sign-vinyl', label: 'Sign vinyl (standard)', feedRate: 400, force: 60, speed: 30, overcut: 0.25, accelMmS2: 1500, headUpS: 0.15 },
+  { id: 'oracal-651', label: 'Oracal 651 (calendered vinyl)', feedRate: 400, force: 14, speed: 50, overcut: 0.25, bladeAngleDeg: 45, accelMmS2: 1500, headUpS: 0.15 },
+  { id: 'printable-vinyl', label: 'Printable vinyl (print then cut)', feedRate: 400, force: 12, speed: 40, overcut: 0.25, bladeAngleDeg: 45, accelMmS2: 1500, headUpS: 0.15 },
+  // Siser EasyWeed: 80–90 gf
+  { id: 'htv', label: 'Heat-transfer vinyl (HTV)', feedRate: 300, force: 85, speed: 25, overcut: 0.25, mirror: true, bladeAngleDeg: 45, accelMmS2: 1000, headUpS: 0.2 },
+  // Siser Glitter: 150–190 gf, ≤30 cm/s, 2 passes
+  { id: 'glitter-htv', label: 'Glitter HTV', feedRate: 300, force: 170, speed: 30, overcut: 0.5, defaultOvercutMm: 0.5, mirror: true, bladeAngleDeg: 60, passes: 2, accelMmS2: 1000, headUpS: 0.25 },
+  { id: 'sticker', label: 'Sticker / label paper', feedRate: 300, force: 80, speed: 20, overcut: 0.5, defaultOvercutMm: 0.5, accelMmS2: 1500, headUpS: 0.15 },
+  { id: 'cardstock', label: 'Cardstock', feedRate: 200, force: 120, speed: 15, overcut: 0.5, accelMmS2: 800, headUpS: 0.35 },
+  { id: 'window-tint', label: 'Window tint film', feedRate: 300, force: 40, speed: 20, overcut: 0.2, accelMmS2: 1500, headUpS: 0.15 },
+  { id: 'stencil', label: 'Sandblast / stencil', feedRate: 200, force: 150, speed: 15, overcut: 0.5, accelMmS2: 1500, headUpS: 0.15 },
 ];
 
 export const defaultPlotterOptions: PlotterOptions = {
@@ -104,6 +142,7 @@ export const defaultPlotterOptions: PlotterOptions = {
   mirror: false,
   optimize: true,
   overcutMm: 0,
+  bladeOffsetMm: 0,
   reverse: false,
   insideFirst: false,
   ejectAfter: true,
@@ -180,10 +219,27 @@ function sanitizePlotterOptions(o: Partial<PlotterOptions>): PlotterOptions {
     mirror: Boolean(o.mirror),
     optimize: typeof o.optimize === 'boolean' ? o.optimize : d.optimize,
     overcutMm: num(o.overcutMm, d.overcutMm, 0, 10),
+    bladeOffsetMm: num(o.bladeOffsetMm, 0, 0, 5),
+    arms: sanitizeArms(o.arms),
     reverse: Boolean(o.reverse),
     insideFirst: Boolean(o.insideFirst),
     ejectAfter: typeof o.ejectAfter === 'boolean' ? o.ejectAfter : d.ejectAfter,
   };
+}
+
+/** ARMS block survives the round-trip only when every field is a finite,
+ *  in-band number and the type is exactly 1 or 2 — anything else drops the
+ *  whole block (a half-valid ARMS job would misregister silently). */
+function sanitizeArms(a: unknown): PlotterOptions['arms'] {
+  if (!a || typeof a !== 'object') return undefined;
+  const r = a as Record<string, unknown>;
+  const num = (v: unknown, min: number, max: number): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : null;
+  const armMm = num(r.armMm, 1, 100);
+  const rectW = num(r.rectW, 1, 10000);
+  const rectH = num(r.rectH, 1, 10000);
+  if (armMm === null || rectW === null || rectH === null || (r.type !== 1 && r.type !== 2)) return undefined;
+  return { armMm, type: r.type, rectW, rectH };
 }
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
@@ -463,10 +519,33 @@ function hpglDialectFooter(opts: PlotterOptions, pageW: number): string[] {
   return ['PU0,0;', 'SP0;'];
 }
 
+/** ARMS registration block (GP-GL TB commands riding in the HP-GL stream).
+ *  Every command is individually ETX-terminated; lengths go out in 0.1 mm
+ *  steps. TB99 brackets the block (enter/leave setup), TB51 arm length,
+ *  TB52 mark type, TB54 sensor origin, TB55 search direction, TB24 the
+ *  expected mark rectangle. Source: open-graphtec-server marks.py,
+ *  FC9000-validated. */
+function armsRegistrationBlock(arms: NonNullable<PlotterOptions['arms']>): string[] {
+  const d10 = (mm: number) => Math.round(mm * 10);
+  return [
+    'TB99\x03',
+    `TB51,${d10(arms.armMm)}\x03`,
+    `TB52,${arms.type}\x03`,
+    'TB54,0,0\x03',
+    'TB55,1\x03',
+    `TB24,${d10(arms.rectW)},${d10(arms.rectH)}\x03`,
+    'TB99\x03',
+  ];
+}
+
 /** Generate HPGL (HP-GL pen plotter language). Units = plotter units (~1016/inch). */
 export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): string {
+  if (opts.arms && (opts.dialect ?? 'bare') !== 'graphtec-fc') {
+    throw new Error('ARMS registration marks require the Graphtec dialect.');
+  }
   const { pageW, pageH, unitsPerInput } = pageFootprint(polylines, opts);
   const parts: string[] = [...hpglDialectHeader(opts, pageW, pageH)];
+  if (opts.arms) parts.push(...armsRegistrationBlock(opts.arms));
 
   // --- Geometry ---
   for (const pl of polylines) {
@@ -480,6 +559,9 @@ export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): strin
   }
 
   parts.push(...hpglDialectFooter(opts, pageW));
+  // Leave ARMS mode after the footer — the Graphtec footer is a plain park
+  // (`PU0,0; SP0;`, no `!PG` eject), so TB0 is the job's last statement.
+  if (opts.arms) parts.push('TB0\x03');
   return parts.join('\n');
 }
 
@@ -489,7 +571,7 @@ export function generateHPGL(polylines: Polyline[], opts: PlotterOptions): strin
 export function buildPlotterOutput(
   format: 'gcode' | 'hpgl',
   opts: PlotterOptions,
-  cutOverride?: Array<{ points: Array<[number, number]>; closed: boolean; passes?: number }>,
+  cutOverride?: CutPathLike[],
 ): string {
   // When the user has populated cut paths (offsets, traces, regmarks),
   // ship THOSE to the plotter instead of every visible canvas object —
@@ -499,20 +581,42 @@ export function buildPlotterOutput(
   // canvas to plotter" workflow still works for users not using the
   // contour dialog.
   let polylines: Array<{ points: Array<[number, number]>; closed: boolean }>;
+  let kinds: string[] | null = null;
   if (cutOverride !== undefined) {
     // Explicit set (e.g. colour-filtered) — honour it verbatim, never fall
     // back to the canvas SVG, even when it's empty (all swatches muted).
-    polylines = cutPathsToPlotterPolylines(cutOverride, opts);
+    ({ polylines, kinds } = cutPathsToPlotterPolylines(cutOverride, opts));
   } else {
     const cuts = readCutPathsFromStore();
-    polylines = cuts && cuts.length > 0
-      ? cutPathsToPlotterPolylines(cuts, opts)
-      : svgToPolylines(exportSVG(), opts);
+    if (cuts && cuts.length > 0) {
+      ({ polylines, kinds } = cutPathsToPlotterPolylines(cuts, opts));
+    } else {
+      polylines = svgToPolylines(exportSVG(), opts);
+    }
   }
   // Post-process in user-unit space: travel optimisation and HTV mirroring
   // are both invariant under the earlier uniform scale/translate, so this is
-  // the one clean place to apply them for every output path.
-  polylines = postProcess(polylines, opts);
+  // the one clean place to apply them for every output path. Kind ordering
+  // is a hard constraint like inside-first: cut paths are partitioned by
+  // kind rank FIRST and each group post-processed independently, so the
+  // travel optimiser can only permute within a group — through-cuts, then
+  // kiss-cuts, then the perf border (released last so the sheet stays
+  // anchored to the carrier). A parallel `kinds` array applied after
+  // postProcess would pair against permuted polylines and misrank.
+  if (kinds) {
+    const groups = new Map<number, Array<{ points: Array<[number, number]>; closed: boolean }>>();
+    for (let i = 0; i < polylines.length; i++) {
+      const r = CUT_KIND_RANK[kinds[i]] ?? 0;
+      const g = groups.get(r);
+      if (g) g.push(polylines[i]);
+      else groups.set(r, [polylines[i]]);
+    }
+    polylines = [...groups.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .flatMap(([, g]) => postProcess(g, opts));
+  } else {
+    polylines = postProcess(polylines, opts);
+  }
   return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
 }
 
@@ -520,7 +624,7 @@ export function buildPlotterOutput(
  *  preview/stats UI can mirror the exact geometry the machine will receive. */
 export function postProcess(
   polylines: Array<{ points: Array<[number, number]>; closed: boolean }>,
-  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm' | 'reverse' | 'insideFirst'>,
+  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm' | 'bladeOffsetMm' | 'reverse' | 'insideFirst'>,
 ): Array<{ points: Array<[number, number]>; closed: boolean }> {
   let out = polylines;
   if (opts.optimize) out = optimizeOrder(out);
@@ -529,6 +633,10 @@ export function postProcess(
   if (opts.insideFirst) out = sortInsideFirst(out);
   if (opts.reverse) out = reversePolys(out);
   if (opts.overcutMm > 0) out = applyOvercut(out, opts.overcutMm);
+  // Blade-offset loops go on after overcut and before mirroring, so the
+  // mirror flips the finished (looped) geometry.
+  const bladeOffsetMm = opts.bladeOffsetMm ?? 0;
+  if (bladeOffsetMm > 0) out = applyBladeOffset(out, bladeOffsetMm);
   if (opts.mirror) out = mirrorPolys(out, 'h');
   return out;
 }
@@ -611,23 +719,40 @@ export function buildForceTest(
   return parts.join('\n');
 }
 
+/** Cut-path shape the pipeline consumes — the store's CutPath satisfies it,
+ *  and so does any hand-built override (kind defaults to a through-cut). */
+type CutPathLike = { points: Array<[number, number]>; closed: boolean; passes?: number; kind?: string };
+
+/** Kind-rank for cut ordering: 0 through-cut (outline/trace/manual/regmark),
+ *  1 kiss (sticker layer only), 2 perf (border released last). String-keyed
+ *  so this compiles against any vintage of the CutPath kind union. */
+const CUT_KIND_RANK: Record<string, number> = { kiss: 1, perf: 2 };
+
 /**
  * Adapter from the editor's mm-space CutPath objects to the user-unit
  * polyline shape generateGCode / generateHPGL expect. Honours the
  * `passes` field by replaying each polyline N times back-to-back —
  * cutters with stubborn vinyl just need more bites at the same path.
+ * Returns the polylines plus a parallel `kinds` array (index-aligned with
+ * the PRE-postProcess order) so the caller can partition through-cuts /
+ * kiss / perf groups before post-processing. Zero-point
+ * paths are skipped (the generators would drop them anyway) to keep the
+ * two arrays index-aligned.
  */
 function cutPathsToPlotterPolylines(
-  cuts: Array<{ points: Array<[number, number]>; closed: boolean; passes?: number }>,
+  cuts: CutPathLike[],
   opts: PlotterOptions,
-): Array<{ points: Array<[number, number]>; closed: boolean }> {
+): { polylines: Array<{ points: Array<[number, number]>; closed: boolean }>; kinds: string[] } {
   // CutPath coords are in mm. plotter polylines are in `opts.unit`.
   // When opts.unit === 'in', divide by 25.4. When 'mm', identity.
   // Y is also paper-down here; if the caller flagged originBottomLeft
   // we flip via `paperHeightUnits`.
   const scale = opts.unit === 'mm' ? 1 : 1 / 25.4;
   const out: Array<{ points: Array<[number, number]>; closed: boolean }> = [];
+  const kinds: string[] = [];
   for (const c of cuts) {
+    if (c.points.length === 0) continue;
+    const kind = c.kind ?? 'manual';
     const passes = Math.max(1, c.passes ?? 1);
     for (let p = 0; p < passes; p++) {
       const pts = c.points.map(([x, y]) => {
@@ -636,9 +761,10 @@ function cutPathsToPlotterPolylines(
         return [ux, uy] as [number, number];
       });
       out.push({ points: pts, closed: c.closed });
+      kinds.push(kind);
     }
   }
-  return out;
+  return { polylines: out, kinds };
 }
 
 /**
@@ -646,7 +772,7 @@ function cutPathsToPlotterPolylines(
  * file is safe — editor.ts has zero imports from plotter.ts so there's
  * no circular dep risk.
  */
-function readCutPathsFromStore(): Array<{ points: Array<[number, number]>; closed: boolean; passes?: number }> | null {
+function readCutPathsFromStore(): CutPathLike[] | null {
   return useEditor.getState().cutPaths ?? null;
 }
 

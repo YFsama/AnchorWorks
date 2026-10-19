@@ -1,6 +1,6 @@
 import { useMemo, useId } from 'react';
 import { getCanvas } from '../lib/canvasEngine';
-import { renderTrimMarksSVG, type PrintPrep } from '../lib/printPrep';
+import { prepMarkMarginMm, renderTrimMarksSVG, type PrintPrep } from '../lib/printPrep';
 import { PAGE_DIMS_MM, type PrintOptions } from '../lib/printer';
 
 interface Props {
@@ -34,13 +34,17 @@ export function PrintPreview({ opts, prep, refreshKey, className }: Props) {
   const [pw0, ph0] = PAGE_DIMS_MM[opts.pageSize];
   const [pw, ph] = opts.orientation === 'portrait' ? [pw0, ph0] : [ph0, pw0];
 
-  const prepActive = !!prep && (prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0);
+  // Mirrors printer.ts's hasPrep — the vendor mark style only draws when the
+  // registration marks are on, while the scale-check block stands alone.
+  const prepActive = !!prep && (prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0 || prep.scaleCheck === true);
   // 'fill' clips/overflows (slice); 'fit' and (approximately) 'actual' letterbox.
   const par = opts.fit === 'fill' ? 'xMidYMid slice' : 'xMidYMid meet';
 
   if (prepActive && prep) {
     const bleed = Math.max(0, prep.bleedMm);
-    const MARK_MARGIN = 12; // matches printer.ts
+    // Grown per style (Roland 25 mm arms, scale-check block) exactly like
+    // printer.ts, so long marks preview unclipped.
+    const MARK_MARGIN = prepMarkMarginMm(prep);
     const outerW = pw + (bleed + MARK_MARGIN) * 2;
     const outerH = ph + (bleed + MARK_MARGIN) * 2;
     const off = bleed + MARK_MARGIN;

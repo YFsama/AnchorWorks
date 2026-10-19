@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen } from 'lucide-react';
-import { useEditor } from '../store/editor';
+import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers } from 'lucide-react';
+import { useEditor, type CutPath } from '../store/editor';
 import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
 import { buildAbortSnippet, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
@@ -10,7 +10,11 @@ import { estimateEtaSeconds, estimateTransferSeconds } from '../lib/plotterDiag'
 import { addPlotterBridges, addPlotterRegistrationMarks, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders } from '../lib/cutPrepActions';
 import type { RegMarkStyle } from '../lib/cutContour';
 import { buildOutlineCutPaths } from '../lib/contourFromSelection';
-import { optimizeOrder, cutStats, estimateSeconds, formatDuration, type PolyLite } from '../lib/cutOptimize';
+import { optimizeOrder, cutStats, estimateSeconds, estimateJobSeconds, formatDuration, applyOvercut, applyBladeOffset, type PolyLite } from '../lib/cutOptimize';
+import { weedCheck, WEED_PROFILES, type WeedIssueKind, type WeedProfileId, type WeedReport } from '../lib/weedCheck';
+import { buildVinylLayers, type VinylLayer } from '../lib/layerJobs';
+import { applyLayerTrap } from '../lib/layerTrap';
+import { showConfirm } from '../lib/confirm';
 import { getCanvas } from '../lib/canvasEngine';
 import { download } from '../lib/io';
 import { isTauri } from '../lib/runtime';
@@ -23,6 +27,10 @@ import { PlotterConsole } from './PlotterConsole';
 import { AnnotatedCode, MachineSim } from './PlotterCodeViews';
 
 const OVERCUT_PRESETS_MM = [0, 0.1, 0.2, 0.3, 0.5, 1];
+const BLADE_OFFSET_PRESETS_MM = [0, 0.25, 0.5];
+/** Default ARMS block (open-graphtec-server defaults): 20 mm arms, type-2
+ *  square marks, expecting a 200 × 150 mm mark rectangle until Auto-filled. */
+const DEFAULT_ARMS: NonNullable<PlotterOptions['arms']> = { armMm: 20, type: 2, rectW: 200, rectH: 150 };
 const FEED_RATE_PRESETS = [200, 400, 800, 1200];
 const TRAVEL_RATE_PRESETS = [800, 1200, 2000, 3000];
 const CURVE_TOLERANCE_PRESETS_PX = [0.25, 0.5, 1, 2];
@@ -56,6 +64,20 @@ const WEED_GRID_PRESETS = [
   { value: '2x2', label: '2×2', rows: 2, cols: 2 },
   { value: '3x2', label: '3×2', rows: 3, cols: 2 },
 ] as const;
+/** Material weeding profiles for the Weed check panel (weedCheck.ts) — the
+ *  four WEED_PROFILES ids with their operator-facing labels. */
+const WEED_PROFILE_OPTIONS: Array<{ value: WeedProfileId; label: string }> = [
+  { value: 'vinyl', label: 'Vinyl' },
+  { value: 'htv', label: 'HTV' },
+  { value: 'glitter-htv', label: 'Glitter HTV' },
+  { value: 'sticker-paper', label: 'Sticker paper' },
+];
+/** Weed issue kinds → display labels (t()'d at render). */
+const WEED_ISSUE_LABELS: Record<WeedIssueKind, string> = {
+  'thin-feature': 'Thin feature',
+  'narrow-gap': 'Narrow gap',
+  'small-island': 'Small island',
+};
 const CUT_STRATEGY_OPTIONS = [
   { key: 'mirror', label: 'Mirror (HTV)', title: 'Mirror output horizontally — required for heat-transfer vinyl (HTV).', icon: FlipHorizontal2 },
   { key: 'optimize', label: 'Optimize order', title: 'Reorder paths to minimise wasted travel between cuts.', icon: Route },
@@ -117,10 +139,21 @@ export function PlotterDialog() {
   // Registration-mark recipe: shape + arm/shape size in mm (cutContour).
   const [markStyle, setMarkStyle] = useState<RegMarkStyle>('L');
   const [markArm, setMarkArm] = useState(10);
+  // ARMS registration emit toggle. The values live in opts.arms (so they
+  // persist with the prefs blob); the toggle gates whether buildOut actually
+  // passes the block — only valid with the Graphtec FC dialect (see plotter.ts).
+  const [armsEnabled, setArmsEnabled] = useState(() => !!savedPrefs.opts?.arms);
   const [materialId, setMaterialId] = useState(savedPrefs.materialId ?? '');
   const [materialQuery, setMaterialQuery] = useState('');
   // Cut-by-colour: which source swatches are muted (excluded from this job).
   const [mutedColors, setMutedColors] = useState<Set<string>>(() => new Set());
+  // Per-layer mirror overrides (keyed by layer colour). Seeded empty — an
+  // untouched layer follows the global opts.mirror; once a row's toggle is
+  // clicked its colour sticks to that choice for the session (like
+  // mutedColors, intentionally not reset when the layer set changes).
+  const [layerMirrorOverrides, setLayerMirrorOverrides] = useState<Record<string, boolean>>({});
+  // Trap overlap for the Layers section's "Trap layers" action (mm).
+  const [trapMm, setTrapMm] = useState(0.5);
   // Weed grid dividers (0 = border only).
   const [weedRows, setWeedRows] = useState(0);
   const [bridgeCount, setBridgeCount] = useState(4);
@@ -130,6 +163,7 @@ export function PlotterDialog() {
   const [reviewedTravelPreset, setReviewedTravelPreset] = useState('');
   const [reviewedTolerancePreset, setReviewedTolerancePreset] = useState('');
   const [reviewedOvercutPreset, setReviewedOvercutPreset] = useState('');
+  const [reviewedBladeOffsetPreset, setReviewedBladeOffsetPreset] = useState('');
   const [reviewedCutStrategy, setReviewedCutStrategy] = useState('');
   const [reviewedPreviewToggle, setReviewedPreviewToggle] = useState('');
   const [reviewedColorAction, setReviewedColorAction] = useState('');
@@ -187,6 +221,7 @@ export function PlotterDialog() {
     setProfileId(rec.profileId);
     setFormat(rec.format);
     setOpts(rec.opts);
+    setArmsEnabled(!!rec.opts.arms);
     setMaterialId(rec.materialId);
     setBaud(rec.baud);
     setFlow(rec.flowControl);
@@ -247,6 +282,12 @@ export function PlotterDialog() {
     [cutPaths, mutedColors],
   );
 
+  // Layered-vinyl split of the FULL store job (muting is the manual cut-by-
+  // colour workflow; layers manage their own per-colour subsets). The Layers
+  // section only appears when this yields ≥2 colours to stack — otherwise
+  // there is nothing multi-colour to cut and we render nothing at all.
+  const layers = useMemo(() => buildVinylLayers(cutPaths), [cutPaths]);
+
   // What the preview + stats draw. With cut paths present, that's the active
   // (colour-filtered) set. With NONE, the plotter exports the canvas geometry
   // itself — so preview THAT (each object's outline, zero offset) instead of
@@ -299,11 +340,62 @@ export function PlotterDialog() {
       for (let i = 0; i < passes; i++) polys.push({ points: c.points, closed: c.closed });
     }
     if (opts.optimize) polys = optimizeOrder(polys);
+    // Corner count is taken BEFORE the blade-offset adjustment: the corner
+    // loops themselves add ≥15° vertices (their overshoot/retro vertices turn
+    // 70–110°), so counting on the adjusted geometry would inflate the
+    // corner-swing term 2–5×. LENGTHS, however, must come from the adjusted
+    // geometry — the same postProcess order plotter.ts applies to the shipped
+    // job (overcut retrace first, then blade-offset loops) so cut length and
+    // travel include them instead of under-reporting.
+    const overcutMm = opts.overcutMm ?? 0;
+    const bladeOffset = opts.bladeOffsetMm ?? 0;
+    const pathCount = polys.length;
+    const preStats = cutStats(polys);
+    if (overcutMm > 0) polys = applyOvercut(polys, overcutMm);
+    if (bladeOffset > 0) polys = applyBladeOffset(polys, bladeOffset);
     const s = cutStats(polys);
     const feedMmMin = opts.unit === 'mm' ? opts.feedRate : opts.feedRate * 25.4;
     const travelMmMin = opts.unit === 'mm' ? opts.travelRate : opts.travelRate * 25.4;
-    return { ...s, seconds: estimateSeconds(s, feedMmMin, travelMmMin) };
-  }, [previewPaths, opts.optimize, opts.feedRate, opts.travelRate, opts.unit]);
+    // Physics twin (trapezoidal model, cutOptimize.estimateJobSeconds): the
+    // SAME post-overcut/blade-offset geometry, but charged through per-
+    // segment accel/cruise/decel profiles with corner junction slowdowns.
+    // The loops and retrace are already in the coordinates, and the per-
+    // vertex slowdowns model the corner-swing cost — so estimateSeconds'
+    // overcut/corner extras are deliberately NOT stacked on this number.
+    const accelMmS2 = currentMaterial?.accelMmS2;
+    const physicsSeconds = accelMmS2 && feedMmMin > 0 && travelMmMin > 0
+      ? estimateJobSeconds(polys, [0, 0], {
+          feedMmMin,
+          travelMmMin,
+          accelMmS2,
+          headUpS: currentMaterial?.headUpS,
+          cornerSlow: true,
+        })
+      : undefined;
+    // Adjustments are strictly 1:1 per path (loops/overcut add vertices,
+    // never paths), so `paths` is the pre-adjustment count by construction —
+    // keep it from the captured count regardless, so a future adjustment
+    // that ever dropped a path can't wobble the displayed count.
+    return {
+      ...s,
+      paths: polys.length === pathCount ? s.paths : pathCount,
+      corners: preStats.corners,
+      closedPaths: preStats.closedPaths,
+      seconds: estimateSeconds(
+        { ...s, corners: preStats.corners, closedPaths: preStats.closedPaths },
+        feedMmMin,
+        travelMmMin,
+        { bladeOffsetMm: bladeOffset, overcutMm },
+      ),
+      physicsSeconds,
+    };
+    // Sim-timeline divergence: CutPreview rebuilds its own polys from the
+    // `cutPaths` prop (passes → optimizeOrder → buildSimTimeline) and takes
+    // CutPath[] — not adjusted polys — so the animated replay's ETA excludes
+    // the overcut/corner-loop extras this estimate includes. CutPreview is
+    // deliberately left untouched here (its props can't take adjusted polys
+    // without refactoring); the numbers agree when both offsets are 0.
+  }, [previewPaths, opts.optimize, opts.feedRate, opts.travelRate, opts.unit, opts.overcutMm, opts.bladeOffsetMm, currentMaterial]);
 
   // Escape close — capture phase, consistent with other dialogs.
   useEscapeClose(open, close);
@@ -331,7 +423,26 @@ export function PlotterDialog() {
   const outputBlocked = cutPathCount > 0 && activePaths.length === 0;
   const outputBlockedReason = outputBlocked ? t('No active cut paths — enable at least one color before saving or sending.') : '';
   const overrideCuts = cutPathCount > 0 ? activePaths : undefined;
-  const buildOut = () => buildPlotterOutput(format, opts, overrideCuts);
+  // ARMS is only emittable on the Graphtec FC dialect (generateHPGL throws
+  // otherwise) — the section stays visible but disabled elsewhere so the
+  // feature remains discoverable.
+  const armsAvailable = format === 'hpgl' && opts.dialect === 'graphtec-fc';
+  const armsActive = armsEnabled && !!opts.arms && armsAvailable;
+  // The block rides along only while the toggle is on AND the current
+  // format/dialect can emit it; otherwise strip it so a stale prefs blob or
+  // a format switch to G-code can never claim ARMS it isn't sending.
+  const effectiveOpts: PlotterOptions = armsActive ? opts : { ...opts, arms: undefined };
+  const buildOut = () => buildPlotterOutput(format, effectiveOpts, overrideCuts);
+  /** GenerateHPGL throws when ARMS is armed against a non-Graphtec dialect —
+   *  surface the message and return null so the caller skips the action. */
+  const safeGenerate = (build: () => string): string | null => {
+    try {
+      return build();
+    } catch (e) {
+      toast.error((e as Error).message);
+      return null;
+    }
+  };
   // Preflight dry-run of the machine code — lintJob is pure, so it can run
   // on every generate/preview refresh without touching the machine.
   const lintContext = {
@@ -343,11 +454,14 @@ export function PlotterDialog() {
   };
   const runPreflight = (source?: string) => {
     if (outputBlocked) return;
-    setLint(lintJob(format, source ?? (code || buildOut()), lintContext));
+    const src = source ?? (code || safeGenerate(buildOut));
+    if (!src) return;
+    setLint(lintJob(format, src, lintContext));
   };
   const generate = () => {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
-    const out = buildOut();
+    const out = safeGenerate(buildOut);
+    if (out === null) return;
     setCode(out);
     setCodeSource('');
     setLint(lintJob(format, out, lintContext));
@@ -381,7 +495,8 @@ export function PlotterDialog() {
   const setPreview = (mode: PreviewMode) => {
     setPreviewMode(mode);
     if (mode === 'code' && !code) {
-      const out = buildOut();
+      const out = safeGenerate(buildOut);
+      if (out === null) return;
       setCode(out);
       setLint(lintJob(format, out, lintContext));
     }
@@ -536,7 +651,9 @@ export function PlotterDialog() {
   };
   const saveFile = () => {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
-    download(stampedFileName(), code || buildOut(), 'text/plain');
+    const payload = code || safeGenerate(buildOut);
+    if (payload === null) return;
+    download(stampedFileName(), payload, 'text/plain');
   };
 
   /** Stream a job over the persistent link when connected — paced writes,
@@ -627,7 +744,8 @@ export function PlotterDialog() {
     if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
     // Last-chance preflight gate: lintJob is pure and fast, so run it on
     // the exact bytes about to ship and confirm on ERROR-level problems.
-    const payload = code || buildOut();
+    const payload = code || safeGenerate(buildOut);
+    if (payload === null) return;
     const check = lintJob(format, payload, lintContext);
     if (check.issues.some(i => i.severity === 'error')) {
       const first = check.issues.find(i => i.severity === 'error');
@@ -643,6 +761,103 @@ export function PlotterDialog() {
       await streamJob(payload, t('✅ Sent to plotter'));
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
+  };
+
+  /* ---- Layered vinyl (multi-colour) ----
+   * Each layer ships as its own job: that colour's paths + the shared
+   * colourless geometry (regmarks, weed borders) — layerJobs' subset rule:
+   * the marks cut identically into every layer, which is the layered-vinyl
+   * alignment convention (stack layers by matching the same marks). Mirror
+   * defaults to the global job option (opts.mirror via effectiveOpts) and
+   * each row can override it per layer — HTV layers cut from the carrier
+   * side need mirroring, a vinyl layer applied with transfer tape may not.
+   */
+
+  /** Effective mirror flag for a layer colour: the per-row override once
+   *  touched, else the global option. */
+  const layerMirror = (color: string) => layerMirrorOverrides[color] ?? opts.mirror;
+
+  /** Build options for one layer's job — everything global, plus the
+   *  layer's own mirror resolution (see layerMirror). */
+  const layerOpts = (layer: VinylLayer): PlotterOptions => ({ ...effectiveOpts, mirror: layerMirror(layer.color) });
+
+  /** Build + lint-gate one layer's job (same preflight gate as send());
+   *  resolves false when the operator declined or generation failed, so
+   *  batch sequences know to stop. */
+  const sendLayerJob = async (layer: VinylLayer): Promise<boolean> => {
+    const payload = safeGenerate(() => buildPlotterOutput(format, layerOpts(layer), layer.paths));
+    if (payload === null) return false;
+    const check = lintJob(format, payload, lintContext);
+    if (check.issues.some(i => i.severity === 'error')) {
+      const first = check.issues.find(i => i.severity === 'error');
+      const ok = window.confirm(`${t('Preflight found problems')}:\n${first?.message ?? ''}\n\n${t('Send anyway?')}`);
+      if (!ok) {
+        setLint(check);
+        setPreviewMode('code');
+        return false;
+      }
+    }
+    await streamJob(payload, t('✅ Sent to plotter'));
+    return true;
+  };
+
+  const sendLayer = async (layer: VinylLayer) => {
+    setBusy(true);
+    try {
+      await sendLayerJob(layer);
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  /** Send every layer in stacking order. Between layers the operator swaps
+   *  the vinyl sheet on the cutter — showConfirm gates the swap, and
+   *  declining stops the remaining layers. Every send lands in the job
+   *  history via streamJob's logging. */
+  const sendAllLayers = async () => {
+    setBusy(true);
+    try {
+      let sentCount = 0;
+      for (let i = 0; i < layers.length; i++) {
+        if (i > 0) {
+          const next = layers[i];
+          const proceed = await showConfirm({
+            title: t('Layered vinyl'),
+            message: `${t('Layer')} ${i + 1} ${t('of')} ${layers.length} (${next.color}). ${t('Swap the vinyl, then continue.')}`,
+            confirmLabel: t('Send'),
+          });
+          if (!proceed) {
+            if (sentCount > 0 && sentCount < layers.length) {
+              toast.info(`${t('Stopped after')} ${t('Layer')} ${sentCount} ${t('of')} ${layers.length}.`, { title: t('Layered vinyl') });
+            }
+            break;
+          }
+        }
+        const sent = await sendLayerJob(layers[i]);
+        if (!sent) break;
+        sentCount = i + 1;
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Filesystem-safe colour token for layer filenames ('#ff0000' → 'ff0000'). */
+  const layerFileToken = (color: string) => color.replace(/[\\/:*?"<>|#]/g, '').trim() || 'uncolored';
+
+  const saveLayer = (layer: VinylLayer, index: number) => {
+    const payload = safeGenerate(() => buildPlotterOutput(format, layerOpts(layer), layer.paths));
+    if (payload === null) return;
+    download(stampedFileName(`layer-${index + 1}-${layerFileToken(layer.color)}`), payload, 'text/plain');
+  };
+
+  /** Save every layer, staggered ~300 ms apart — browsers swallow bursts of
+   *  downloads (same stagger pattern as separations.exportPlates; the first
+   *  file goes out immediately). */
+  const saveAllLayers = () => {
+    layers.forEach((layer, i) => {
+      if (i === 0) saveLayer(layer, i);
+      else setTimeout(() => saveLayer(layer, i), i * 300);
+    });
   };
 
   const addRegMarks = () => addPlotterRegistrationMarks(t, markStyle, markArm);
@@ -664,14 +879,17 @@ export function PlotterDialog() {
 
   const resetOutputSettings = () => {
     setOpts(defaultPlotterOptions);
+    setArmsEnabled(false);
     setFormat('hpgl');
     setMaterialId('');
     setMaterialQuery('');
     setMutedColors(new Set());
+    setLayerMirrorOverrides({});
     setWeedRows(0);
     setWeedCols(0);
     setBridgeCount(4);
     setBridgeGap(1);
+    setTrapMm(0.5);
     setCode('');
     setPreviewMode('outline');
     setShowPrint(true);
@@ -705,11 +923,20 @@ export function PlotterDialog() {
     opts.mirror ? t('Mirrored') : t('Not mirrored'),
   ].join(' · ');
   const materialSummaryLabel = currentMaterial ? t(currentMaterial.label) : t('Custom material');
-  const speedSummaryLabel = `${t('Feed')} ${opts.feedRate} · ${t('Travel')} ${opts.travelRate} · ${t('Overcut')} ${opts.overcutMm}mm`;
+  const bladeOffsetMm = opts.bladeOffsetMm ?? 0;
+  const speedSummaryLabel = `${t('Feed')} ${opts.feedRate} · ${t('Travel')} ${opts.travelRate} · ${t('Overcut')} ${opts.overcutMm}mm`
+    + (bladeOffsetMm > 0 ? ` · ${t('blade offset')} ${bladeOffsetMm} mm` : '')
+    + (armsActive ? ` · ${t('ARMS 4-mark')}` : '');
   const cutterPressureSummaryLabel = format === 'hpgl' && opts.dialect === 'graphtec-fc'
     ? ` · ${t('Force')} ${opts.graphtecForce} · ${t('Speed')} ${opts.graphtecSpeed}`
     : '';
-  const jobSummaryLabel = `${format.toUpperCase()} · ${outputSourceLabel} · ${previewPaths.length} ${t('paths')} · ${colorSummaryLabel} · ${machineSummaryLabel} · ${materialSummaryLabel} · ${speedSummaryLabel}${cutterPressureSummaryLabel} · ~${formatDuration(stats.seconds)}`;
+  // Physics-estimate suffix: shown next to the classic `~` only when the
+  // trapezoidal model produced a number AND it disagrees with the classic
+  // estimate by more than a second — `≈` distinguishes it from `~`.
+  const physicsEtaLabel = stats.physicsSeconds !== undefined && Math.abs(stats.physicsSeconds - stats.seconds) > 1
+    ? ` · ≈${formatDuration(stats.physicsSeconds)} (${t('physics')})`
+    : '';
+  const jobSummaryLabel = `${format.toUpperCase()} · ${outputSourceLabel} · ${previewPaths.length} ${t('paths')} · ${colorSummaryLabel} · ${machineSummaryLabel} · ${materialSummaryLabel} · ${speedSummaryLabel}${cutterPressureSummaryLabel} · ~${formatDuration(stats.seconds)}${physicsEtaLabel}`;
   // Serial transfer preview at the current knobs — a 2 MB PLT at 9600 baud
   // is ~25 s of streaming before the blade moves; the operator should see
   // that coming. Uses the generated preview code when present.
@@ -729,6 +956,8 @@ export function PlotterDialog() {
 
   // Apply a material preset to the machine fields. HTV is cut face-down, so
   // selecting it auto-enables the mirror toggle — one less footgun.
+  // Overcut prefers the explicit defaultOvercutMm twin when research gave
+  // one, else the legacy overcut field.
   const applyMaterial = (id: string) => {
     setMaterialId(id);
     const m = MATERIAL_PRESETS.find(p => p.id === id);
@@ -738,15 +967,36 @@ export function PlotterDialog() {
       feedRate: m.feedRate,
       graphtecForce: m.force,
       graphtecSpeed: m.speed,
-      overcutMm: m.overcut,
+      overcutMm: m.defaultOvercutMm ?? m.overcut,
       mirror: m.mirror ? true : o.mirror,
     }));
   };
 
+  /** Auto-fill the ARMS expected-mark rectangle from the job's own tight
+   *  bounding box — the same previewPaths set the stats/preview draw, already
+   *  in mm (CutPath space). Falls back to the 200 × 150 default when there is
+   *  nothing to measure yet. */
+  const fillArmsRectFromJob = () => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of previewPaths) {
+      for (const [x, y] of p.points) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    const rectW = Number.isFinite(minX) ? Math.max(1, Math.round(maxX - minX)) : DEFAULT_ARMS.rectW;
+    const rectH = Number.isFinite(minY) ? Math.max(1, Math.round(maxY - minY)) : DEFAULT_ARMS.rectH;
+    setOpts(o => ({ ...o, arms: { ...(o.arms ?? DEFAULT_ARMS), rectW, rectH } }));
+  };
+
   // Test cut: a tiny calibration pattern on scrap to dial in force/offset.
-  // Sends when a direct path exists, otherwise saves the file.
+  // Sends when a direct path exists, otherwise saves the file. Never carries
+  // the ARMS block — calibration runs on scrap, not on printed marks.
   const testCut = async () => {
-    const out = buildTestCut(format, opts);
+    const out = safeGenerate(() => buildTestCut(format, { ...effectiveOpts, arms: undefined }));
+    if (out === null) return;
     if (!canSend) { download(stampedFileName('test-cut'), out, 'text/plain'); return; }
     setBusy(true);
     try {
@@ -757,9 +1007,11 @@ export function PlotterDialog() {
 
   // Force test strip: five squares at rising blade pressure in one pass —
   // weed them left→right and the first clean lift is the force to use.
-  // HP-GL only (pen plotters have no force concept).
+  // HP-GL only (pen plotters have no force concept). Calibration runs on
+  // scrap, so the ARMS block never rides along here either.
   const forceTest = async () => {
-    const out = buildForceTest(format, opts);
+    const out = safeGenerate(() => buildForceTest(format, { ...effectiveOpts, arms: undefined }));
+    if (out === null) return;
     if (!canSend) { download(stampedFileName('force-test'), out, 'text/plain'); return; }
     setBusy(true);
     try {
@@ -905,7 +1157,7 @@ export function PlotterDialog() {
                       >
                         <span className="block text-xs font-medium">{t(material.label)}</span>
                         <span className="mt-0.5 block text-[10px] leading-tight opacity-80">
-                          {material.feedRate} {t('Feed rate')} · {material.force} {t('Force')} · {material.speed} {t('Speed')} · {material.overcut} mm {t('Overcut')}{material.mirror ? ` · ${t('Mirror')}` : ''}
+                          {material.feedRate} {t('Feed rate')} · {material.force} {t('Force')} · {material.speed} {t('Speed')} · {material.overcut} mm {t('Overcut')}{material.mirror ? ` · ${t('Mirror')}` : ''}{material.bladeAngleDeg ? ` · ${material.bladeAngleDeg}° ${t('blade')}` : ''}{(material.passes ?? 1) > 1 ? ` · ${material.passes} ${t('passes')}` : ''}
                         </span>
                       </button>
                     );
@@ -1224,6 +1476,89 @@ export function PlotterDialog() {
                 </label>
               )}
             </div>
+            {/* ARMS optical registration (print & cut) — Graphtec FC/CE only.
+                The section stays visible on other dialects (disabled, with
+                the reason) so the feature is discoverable; generate/save
+                guard the mismatch with a toast via safeGenerate. */}
+            <div className="col-span-2 rounded border border-border bg-panel2/60 px-2 py-1.5">
+              <label
+                className={`flex items-center gap-1.5 text-[11px] ${armsAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                title={t('Emit the ARMS registration block so a Graphtec FC/CE cutter optically locates the printed marks before cutting.')}
+              >
+                <input
+                  type="checkbox"
+                  checked={armsEnabled && !!opts.arms}
+                  disabled={!armsAvailable}
+                  onChange={(e) => {
+                    setArmsEnabled(e.target.checked);
+                    setOpts(o => (e.target.checked
+                      ? { ...o, arms: o.arms ?? { ...DEFAULT_ARMS } }
+                      : { ...o, arms: undefined }));
+                  }}
+                />
+                {t('ARMS registration (print & cut)')}
+              </label>
+              {!armsAvailable && (
+                <div className="mt-1 text-[10px] text-muted leading-snug">
+                  {t('ARMS registration marks require the Graphtec dialect.')}
+                </div>
+              )}
+              {armsEnabled && opts.arms && (
+                <div className={`mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[10px] ${armsActive ? '' : 'opacity-60'}`}>
+                  <label className="flex items-center gap-1 text-muted" title={t('ARMS mark arm length in mm (4–20).')}>
+                    <span>{t('Arm')}</span>
+                    <input
+                      type="number" min={4} max={20} step={0.5} value={opts.arms.armMm} disabled={!armsActive}
+                      onChange={(e) => setOpts(o => o.arms ? { ...o, arms: { ...o.arms, armMm: Math.min(20, Math.max(4, parseFloat(e.target.value) || DEFAULT_ARMS.armMm)) } } : o)}
+                      className="input-num !w-12 !py-0.5 !text-[10px] text-center"
+                      aria-label={t('ARMS arm length (mm)')}
+                    />
+                    <span>mm</span>
+                  </label>
+                  <span className="inline-flex items-center gap-0.5" role="group" aria-label={t('ARMS mark type')}>
+                    {([1, 2] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        disabled={!armsActive}
+                        className={`rounded border px-1.5 py-0.5 text-[10px] transition-colors ${opts.arms?.type === type ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink'}`}
+                        onClick={() => setOpts(o => o.arms ? { ...o, arms: { ...o.arms, type } } : o)}
+                        aria-pressed={opts.arms?.type === type}
+                        title={type === 1 ? t('Circle marks (TB52 type 1).') : t('Square marks (TB52 type 2) — printed as four inward corner L-brackets. Default.')}
+                      >
+                        {type === 1 ? t('1 (circle)') : t('2 (square)')}
+                      </button>
+                    ))}
+                  </span>
+                  <label className="flex items-center gap-1 text-muted" title={t('Expected ARMS mark rectangle width in mm.')}>
+                    <span>{t('Rect')}</span>
+                    <input
+                      type="number" min={1} max={10000} value={opts.arms.rectW} disabled={!armsActive}
+                      onChange={(e) => setOpts(o => o.arms ? { ...o, arms: { ...o.arms, rectW: Math.max(1, parseFloat(e.target.value) || DEFAULT_ARMS.rectW) } } : o)}
+                      className="input-num !w-12 !py-0.5 !text-[10px] text-center"
+                      aria-label={t('ARMS rectangle width (mm)')}
+                    />
+                    <span>×</span>
+                    <input
+                      type="number" min={1} max={10000} value={opts.arms.rectH} disabled={!armsActive}
+                      onChange={(e) => setOpts(o => o.arms ? { ...o, arms: { ...o.arms, rectH: Math.max(1, parseFloat(e.target.value) || DEFAULT_ARMS.rectH) } } : o)}
+                      className="input-num !w-12 !py-0.5 !text-[10px] text-center"
+                      aria-label={t('ARMS rectangle height (mm)')}
+                    />
+                    <span>mm</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    onClick={fillArmsRectFromJob}
+                    disabled={!armsActive}
+                    title={t('Fill the ARMS mark rectangle from the current job bounding box.')}
+                  >
+                    {t('Auto')}
+                  </button>
+                </div>
+              )}
+            </div>
             <Field label={`${t('Overcut')} (mm)`}>
               <input
                 type="number" step={0.05} min={0} max={5} className="input-num"
@@ -1231,6 +1566,48 @@ export function PlotterDialog() {
                 onChange={(e) => setOpts({ ...opts, overcutMm: Math.max(0, parseFloat(e.target.value) || 0) })}
                 title={t('Extend closed cuts slightly past the start so corners fully release.')}
               />
+            </Field>
+            <Field label={`${t('Blade offset')} (mm)`}>
+              <input
+                type="number" step={0.05} min={0} max={5} className="input-num"
+                value={bladeOffsetMm}
+                onChange={(e) => setOpts({ ...opts, bladeOffsetMm: Math.min(5, Math.max(0, parseFloat(e.target.value) || 0)) })}
+                title={t('Drag-knife swivel compensation — 0.25 mm typical for a 45° blade')}
+              />
+              <div
+                className="grid grid-cols-3 gap-1 mt-1"
+                role="group"
+                aria-label={t('Blade offset presets')}
+                aria-describedby="plotter-blade-offset-preset-review-status"
+                title={t('Use Left/Right arrows to switch options')}
+                onKeyDown={(event) => handleSegmentKeys(event, BLADE_OFFSET_PRESETS_MM.map(String), `${bladeOffsetMm}`, (value) => setOpts({ ...opts, bladeOffsetMm: Number(value) }), (_value, button) => setReviewedBladeOffsetPreset(button?.dataset.review ?? ''))}
+              >
+                <span id="plotter-blade-offset-preset-review-status" className="sr-only" aria-live="polite">
+                  {`${t('Reviewing')} ${reviewedBladeOffsetPreset || `${t('Blade offset')} ${bladeOffsetMm} mm`}`}
+                </span>
+                {BLADE_OFFSET_PRESETS_MM.map((value) => {
+                  const active = Math.abs(bladeOffsetMm - value) < 0.001;
+                  const review = `${t('Blade offset')} ${value} mm`;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      data-value={`${value}`}
+                      data-review={review}
+                      className={`rounded border px-1 py-0.5 text-[10px] transition-colors ${active ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                      onFocus={(event) => setReviewedBladeOffsetPreset(event.currentTarget.dataset.review ?? '')}
+                      onClick={() => setOpts({ ...opts, bladeOffsetMm: value })}
+                      title={`${t('Set blade offset to')} ${value} mm`}
+                      aria-pressed={active}
+                    >
+                      {value === 0 ? '0' : `${value}`}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-1 text-[10px] text-muted leading-tight">
+                {t('Drag-knife swivel compensation — 0.25 mm typical for a 45° blade')}
+              </div>
             </Field>
             <div className="col-span-2">
               <div className="field-label !mb-1">{t('Overcut presets')}</div>
@@ -1298,6 +1675,7 @@ export function PlotterDialog() {
                 feedMmMin={opts.unit === 'mm' ? opts.feedRate : opts.feedRate * 25.4}
                 travelMmMin={opts.unit === 'mm' ? opts.travelRate : opts.travelRate * 25.4}
                 optimize={opts.optimize}
+                etaSeconds={stats.physicsSeconds ?? stats.seconds}
                 className="w-full h-56 bg-panel2 border border-border rounded-sm"
               />
 
@@ -1338,6 +1716,7 @@ export function PlotterDialog() {
                   <MachineSim run={codeRun ?? EMPTY_RUN} unit={opts.unit} />
                 )}
                 {codeView !== 'sim' && <PreflightPanel lint={lint} unit={opts.unit} />}
+                {codeView !== 'sim' && <WeedCheckPanel paths={activePaths} />}
               </div>
             )}
 
@@ -1354,7 +1733,7 @@ export function PlotterDialog() {
                 </span>
                 <span className="flex items-center gap-1" title={t('Estimated job time')}>
                   <Clock size={11} aria-hidden="true" />
-                  ~{formatDuration(stats.seconds)}
+                  ~{formatDuration(stats.seconds)}{physicsEtaLabel}
                 </span>
                 <span className="flex items-center gap-1">
                   <Scissors size={11} aria-hidden="true" />
@@ -1454,6 +1833,114 @@ export function PlotterDialog() {
                     </span>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Layers (multi-colour vinyl) — one job per colour, stacked
+                bottom-first. Shared colourless geometry (regmarks, weed
+                borders) rides every layer so the stack aligns (the
+                layerJobs subset rule); mirror defaults to the global option
+                with a per-row override (HTV carrier side per layer).
+                Hidden entirely until the job has ≥2 vinyl colours. */}
+            {layers.length >= 2 && (
+              <div
+                className="mt-2 rounded border border-border bg-panel2/60 px-2 py-1.5 text-[10px]"
+                role="region"
+                aria-label={t('Layers (multi-colour vinyl)')}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Layers size={12} aria-hidden="true" className="text-[#ff2e9a] shrink-0" />
+                  <span className="font-medium text-ink">{t('Layers (multi-colour vinyl)')}</span>
+                </div>
+                <div className="mt-1 flex flex-col gap-1">
+                  {layers.map((layer, i) => (
+                    <div key={layer.color} data-plotter-layer={layer.color} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <button
+                        type="button"
+                        className="w-4 h-4 rounded-sm border border-ink shadow-sm shrink-0"
+                        style={{ background: layer.color }}
+                        onClick={() => soloColor(layer.color)}
+                        title={`${t('Cut only')} ${layer.color}`}
+                        aria-label={`${t('Cut only')} ${layer.color}`}
+                      />
+                      <span
+                        className="px-1 rounded-sm border border-border text-muted tabular-nums"
+                        title={t('Layer stacking order — layer 1 cuts first and sits at the bottom of the stack.')}
+                      >
+                        {layer.order === 1 ? `1 = ${t('bottom')}` : `${layer.order}`}
+                      </span>
+                      <span className="text-muted tabular-nums">{layer.cutCount} {t('paths')}</span>
+                      <span className="text-muted tabular-nums">{Math.round(layer.areaMm2)} mm²</span>
+                      <label
+                        className="flex items-center gap-1 text-muted cursor-pointer"
+                        title={t('Mirror this layer only (HTV carrier side)')}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={layerMirror(layer.color)}
+                          onChange={(e) => setLayerMirrorOverrides(prev => ({ ...prev, [layer.color]: e.target.checked }))}
+                        />
+                        {t('Mirror layer')}
+                      </label>
+                      <span className="flex-1" />
+                      <button
+                        type="button"
+                        className="btn !py-0.5 !px-1.5 !text-[10px]"
+                        onClick={() => { void sendLayer(layer); }}
+                        disabled={busy}
+                        title={`${t('Send')} ${t('Layer')} ${i + 1} (${layer.color})`}
+                      >
+                        {t('Send')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn !py-0.5 !px-1.5 !text-[10px]"
+                        onClick={() => saveLayer(layer, i)}
+                        disabled={busy}
+                        title={`${t('Save')} ${t('Layer')} ${i + 1} (${layer.color})`}
+                      >
+                        {t('Save')}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-1.5 flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    onClick={() => { void sendAllLayers(); }}
+                    disabled={busy}
+                    title={t('Send every layer in stacking order, confirming between vinyl swaps.')}
+                  >
+                    {t('Send all layers')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    onClick={saveAllLayers}
+                    disabled={busy}
+                    title={t('Save every layer as its own machine file.')}
+                  >
+                    {t('Save all layers')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    onClick={() => applyLayerTrap(t, trapMm)}
+                    disabled={busy}
+                    title={t('Offset every upper layer outward for an intentional overlap, so ~1 mm misregistration shows as overlap, not a gap.')}
+                  >
+                    {t('Trap layers')}
+                  </button>
+                  <input
+                    type="number" min={0.25} max={1.5} step={0.05} value={trapMm}
+                    onChange={(e) => setTrapMm(Math.min(1.5, Math.max(0.25, parseFloat(e.target.value) || 0.5)))}
+                    className="input-num !w-11 !py-0.5 !text-[10px] text-center"
+                    aria-label={t('Trap overlap (mm)')}
+                    title={t('Trap overlap (mm)')}
+                  />
+                  <span>mm</span>
+                </div>
               </div>
             )}
 
@@ -2053,6 +2540,98 @@ function PreflightPanel({ lint, unit }: { lint: LintResult | null; unit: 'mm' | 
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+/** Weedability preflight — lints the job's cut geometry against a material
+ *  weeding profile (weedCheck: thin features, narrow gaps, small islands a
+ *  human can't weed by hand). Manual like Preflight: the operator clicks
+ *  "Check weeding" and the report persists until re-run; nothing draws on
+ *  the canvas. Collapsible; the profile segmented control follows the
+ *  house idiom (role=group + aria-pressed). */
+function WeedCheckPanel({ paths }: { paths: CutPath[] }) {
+  const t = useT();
+  const [open, setOpen] = useState(true);
+  const [profile, setProfile] = useState<WeedProfileId>('vinyl');
+  const [report, setReport] = useState<WeedReport | null>(null);
+  const run = () => setReport(weedCheck(paths, WEED_PROFILES[profile]));
+  return (
+    <div
+      className="rounded border border-border bg-panel2 px-2 py-1.5 text-[10px] leading-relaxed"
+      role="region"
+      aria-label={t('Weed check (weeding preflight)')}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="flex items-center gap-1 font-medium text-ink"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls="plotter-weed-check-body"
+        >
+          <ChevronDown
+            size={12}
+            aria-hidden="true"
+            className={`shrink-0 transition-transform ${open ? '' : '-rotate-90'}`}
+          />
+          {t('Weed check (weeding preflight)')}
+        </button>
+        <span className="flex-1" />
+        <span
+          className="inline-flex items-center gap-1"
+          role="group"
+          aria-label={t('Weed check material profile')}
+        >
+          {WEED_PROFILE_OPTIONS.map((option) => {
+            const active = profile === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                data-value={option.value}
+                className={`rounded border px-1.5 py-0.5 text-[10px] transition-colors ${active ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink'}`}
+                onClick={() => { setProfile(option.value); setReport(null); }}
+                aria-pressed={active}
+                title={`${t('Set weeding profile to')} ${t(option.label)}`}
+              >
+                {t(option.label)}
+              </button>
+            );
+          })}
+        </span>
+        <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={run}>
+          {t('Check weeding')}
+        </button>
+      </div>
+      {open && (
+        <div id="plotter-weed-check-body" className="mt-1">
+          {report && (report.skipped ? (
+            <div className="text-muted" role="status">
+              {t('Weed check skipped — too many paths to analyse.')}
+            </div>
+          ) : (
+            <div role="status" aria-live="polite">
+              <div className={`flex items-center gap-1 tabular-nums ${report.issues.length === 0 ? 'text-success' : 'text-muted'}`}>
+                <span aria-hidden="true" className="font-semibold">{report.issues.length === 0 ? '✓' : '!'}</span>
+                {report.issues.length} {t('issues')} · {report.checkedPaths} {t('paths checked')}
+              </div>
+              {report.issues.length > 0 && (
+                <ul className="mt-1 space-y-0.5">
+                  {report.issues.map((issue, i) => (
+                    <li key={i} className="flex gap-1.5 text-warning">
+                      <span aria-hidden="true" className="shrink-0 font-semibold">!</span>
+                      <span className="tabular-nums">
+                        {t(WEED_ISSUE_LABELS[issue.kind])} · {issue.metricMm.toFixed(1)} mm · {issue.pathIds.length} {t('paths')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

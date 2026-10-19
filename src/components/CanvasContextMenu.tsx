@@ -189,7 +189,7 @@ import { addSavedSwatchColor, applySwatchToSelection, collectSelectionColorsInto
 import { getFormat } from '../lib/formats';
 import { openProjectFromFile, openRecentFile, saveProjectQuick, saveProjectToFile } from '../lib/projectFile';
 import { clearRecent, subscribeRecent, type RecentFile } from '../lib/recentFiles';
-import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, savePlotterTestCut } from '../lib/cutPrepActions';
+import { addPlotterBridges, addPlotterGrommets, addPlotterRegistrationMarks, addPlotterRhinestones, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders, nestCutPathsVinyl, savePlotterTestCut } from '../lib/cutPrepActions';
 import { addPrintMarksToArtboard, clearPrintMarks } from '../lib/printMarks';
 import { expandBlendSteps, releaseBlendSteps, removeOrphanBlendSteps, relinkBlendEndpointFromSelection, reverseBlendSteps, selectAllBlendEndpoints, selectAllBlendGroups, selectBlendEndpointsFromSelection, selectBlendGroupFromSelection, selectBlendSteps, selectBlendStepsFromSelection, selectOrphanBlendSteps, updateBlendSteps } from '../lib/blend';
 
@@ -374,7 +374,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
     else toast.warn(t('Clipboard unavailable.'));
   };
 
-  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showGrommets' | 'showVariableData' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showBrightness' | 'showTransform' | 'showResize' | 'showShear' | 'showRepeat' | 'showMarginGuides' | 'showFindReplace' | 'showSingleLineText' | 'showWarp' | 'showBlend' | 'showStar' | 'showSplitGrid' | 'showPrint' | 'showTilePrint' | 'showHelpCenter' | 'showPreferences' | 'showKeymapEditor' | 'showShortcuts' | 'showDocSettings' | 'showTemplates' | 'showCommandPalette') =>
+  const openModal = (k: 'showCutContour' | 'showPlotter' | 'showOutline' | 'showRecolor' | 'showRhinestone' | 'showGrommets' | 'showMakeSticker' | 'showProductionPreview' | 'showSurfaceWrap' | 'showVariableData' | 'showSimplify' | 'showRoundCorners' | 'showOffsetPath' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showBrightness' | 'showTransform' | 'showResize' | 'showShear' | 'showRepeat' | 'showMarginGuides' | 'showFindReplace' | 'showSingleLineText' | 'showWarp' | 'showBlend' | 'showStar' | 'showSplitGrid' | 'showPrint' | 'showTilePrint' | 'showHelpCenter' | 'showPreferences' | 'showKeymapEditor' | 'showShortcuts' | 'showDocSettings' | 'showTemplates' | 'showCommandPalette') =>
     useEditor.getState().setModal(k, true);
 
   const openPrintPrep = () => {
@@ -1036,6 +1036,9 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
           <Item label={t('Custom…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRhinestone'), hasSelection)} />
         </SubMenu>
         <Item label={t('Banner Grommets…')} disabled={!hasSelection} onClick={() => run(() => openModal('showGrommets'), hasSelection)} />
+        <Item label={t('Make Sticker…')} disabled={!hasSelection} onClick={() => run(() => openModal('showMakeSticker'), hasSelection)} />
+        <Item label={t('Production Preview…')} disabled={!hasSelection} onClick={() => run(() => openModal('showProductionPreview'), hasSelection)} />
+        <Item label={t('Surface Wrap…')} onClick={() => run(() => openModal('showSurfaceWrap'), true)} />
         <Item label={t('Variable Data…')} disabled={!hasSelection} onClick={() => run(() => openModal('showVariableData'), hasSelection)} />
         <Item label={t('Auto-arrange (Nest)')} disabled={active.length < 2} onClick={() => run(() => nest(), active.length >= 2)} />
       </SubMenu>
@@ -1091,6 +1094,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Weld cut paths')} disabled={!hasSelection} onClick={() => run(() => weld(), hasSelection)} />
         <Item label={t('Stroke edges to cut paths')} disabled={!hasSelection} onClick={() => run(() => outlineStroke(), hasSelection)} />
         <Item label={t('Add positioning marks')} onClick={() => run(() => addPlotterRegistrationMarks(t), true)} />
+        <Item label={t('Nest cut paths (vinyl)')} onClick={() => run(() => { nestCutPathsVinyl(t); }, true)} />
         <Item label={t('Weed border')} onClick={() => run(() => addPlotterWeedBorder(t), true)} />
         <SubMenu label={t('Weed grid presets')} openLeft={openLeft}>
           <Item label={t('Weed rows')} onClick={() => run(() => addPlotterWeedBorder(t, 2, 0), true)} />
@@ -1129,6 +1133,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
         <Item label={t('Tile Print…')} kbd={getBinding('file.tilePrint')} onClick={() => run(() => openModal('showTilePrint'), true)} />
         <Item label={t('Auto-arrange (Nest)')} disabled={active.length < 2} onClick={() => run(() => nest(), active.length >= 2)} />
         <Item label={t('Add positioning marks')} onClick={() => run(() => addPlotterRegistrationMarks(t), true)} />
+        <Item label={t('Nest cut paths (vinyl)')} onClick={() => run(() => { nestCutPathsVinyl(t); }, true)} />
         <Item label={t('Weed border')} onClick={() => run(() => addPlotterWeedBorder(t), true)} />
         <SubMenu label={t('Weed grid presets')} openLeft={openLeft}>
           <Item label={t('Weed rows')} onClick={() => run(() => addPlotterWeedBorder(t, 2, 0), true)} />

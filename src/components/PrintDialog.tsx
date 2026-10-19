@@ -4,6 +4,7 @@ import { useEditor } from '../store/editor';
 import { PAGE_DIMS_MM, printCanvas, type PrintOptions } from '../lib/printer';
 import { exportPDFReal } from '../lib/io2';
 import { defaultPrintPrep, type PrintPrep } from '../lib/printPrep';
+import { REG_MARK_DEFAULTS, type RegMarkStyle } from '../lib/regMarkGeometry';
 import { PrintPreview } from './PrintPreview';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
@@ -25,9 +26,36 @@ const PRINT_JOB_PRESETS: Array<{ label: string; opts: PrintOptions }> = [
 const PRINT_PREP_PRESETS: Array<{ label: string; prep: PrintPrep }> = [
   { label: 'Proof prep', prep: { bleedMm: 0, cropMarks: false, registrationMarks: false, pageInfo: true } },
   { label: 'Press prep', prep: { bleedMm: 3, cropMarks: true, registrationMarks: true, pageInfo: true } },
-  { label: 'Sticker prep', prep: { bleedMm: 2, cropMarks: true, registrationMarks: false, pageInfo: false } },
+  // Sticker prep = the print-then-cut workflow, so it carries a vendor mark
+  // style (Silhouette) AND the scale-check block: the printed sticker sheet
+  // is contour-cut against the marks, which only register if the print ran
+  // at 100%. The style without registrationMarks would render nothing, so
+  // the marks toggle rides along with it.
+  { label: 'Sticker prep', prep: { bleedMm: 2, cropMarks: true, registrationMarks: true, pageInfo: false, regMarkStyle: 'silhouette', scaleCheck: true } },
   { label: 'No prep', prep: { bleedMm: 0, cropMarks: false, registrationMarks: false, pageInfo: false } },
 ];
+const REG_MARK_STYLES: Array<{ value: RegMarkStyle; label: string }> = [
+  { value: 'generic', label: 'Generic press' },
+  { value: 'graphtec-arms', label: 'Graphtec ARMS' },
+  { value: 'silhouette', label: 'Silhouette' },
+  { value: 'roland', label: 'Roland' },
+];
+
+function regMarkStyleLabelKey(style: RegMarkStyle): string {
+  return REG_MARK_STYLES.find((item) => item.value === style)?.label ?? 'Generic press';
+}
+
+/** Full prep equality (base fields + the vendor mark style / scale check) —
+ *  drives the prep-preset chip matching so a preset only lights up when the
+ *  whole bundle, new fields included, is in effect. */
+function prepMatches(a: PrintPrep, b: PrintPrep): boolean {
+  return a.bleedMm === b.bleedMm
+    && a.cropMarks === b.cropMarks
+    && a.registrationMarks === b.registrationMarks
+    && a.pageInfo === b.pageInfo
+    && (a.regMarkStyle ?? 'generic') === (b.regMarkStyle ?? 'generic')
+    && (a.scaleCheck ?? false) === (b.scaleCheck ?? false);
+}
 
 export function PrintDialog() {
   const t = useT();
@@ -37,6 +65,10 @@ export function PrintDialog() {
   const [opts, setOpts] = useState<PrintOptions>({ pageSize: 'A4', orientation: 'portrait', fit: 'fit', marginMm: 10 });
   const [prep, setPrep] = useState<PrintPrep>(defaultPrintPrep);
   const [prepOpen, setPrepOpen] = useState(false);
+  // True once the operator hand-edits the vendor arm/stroke values — style
+  // switches then keep the edited numbers instead of re-prefilling defaults
+  // (the "Style default" chip clears it again).
+  const [regMarkCustom, setRegMarkCustom] = useState(false);
   const [pageQuery, setPageQuery] = useState('');
   const [reviewedPageSearchAction, setReviewedPageSearchAction] = useReviewedAction();
   const [reviewedPrintJobPreset, setReviewedPrintJobPreset] = useReviewedAction();
@@ -68,7 +100,26 @@ export function PrintDialog() {
 
   if (!open) return null;
 
-  const prepActive = prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0;
+  // The vendor style only changes geometry when the registration marks are
+  // on; the scale-check block renders on its own. Mirrors printer.ts's
+  // hasPrep / io2.ts's wantPrep so prep flows to print/PDF exactly when the
+  // libs would draw something.
+  const regStyle: RegMarkStyle = prep.regMarkStyle ?? 'generic';
+  const prepActive = prep.cropMarks || prep.registrationMarks || prep.pageInfo || prep.bleedMm > 0 || prep.scaleCheck === true;
+
+  /** Switch the vendor mark style. Arm/stroke re-prefill from the style's
+   *  defaults on every switch until the operator edits them by hand
+   *  (regMarkCustom); switching back to Generic drops the overrides. */
+  const applyRegMarkStyle = (style: RegMarkStyle) => {
+    if (style === regStyle) return;
+    if (style === 'generic') setRegMarkCustom(false);
+    setPrep(p => style === 'generic'
+      ? { ...p, regMarkStyle: 'generic', regMarkArmMm: undefined, regMarkStrokeMm: undefined }
+      : regMarkCustom
+        ? { ...p, regMarkStyle: style }
+        : { ...p, regMarkStyle: style, regMarkArmMm: REG_MARK_DEFAULTS[style].armMm, regMarkStrokeMm: REG_MARK_DEFAULTS[style].strokeMm });
+  };
+
   const handlePrint = () => {
     printCanvas(opts, prepActive ? prep : undefined);
     close();
@@ -80,6 +131,7 @@ export function PrintDialog() {
   const resetPrintSettings = () => {
     setOpts({ pageSize: 'A4', orientation: 'portrait', fit: 'fit', marginMm: 10 });
     setPrep(defaultPrintPrep);
+    setRegMarkCustom(false);
     setPageQuery('');
     setPrepOpen(false);
     setReviewedOutputAction(t('Reset print settings'));
@@ -110,12 +162,20 @@ export function PrintDialog() {
   });
   const prepPresetKeys = makeSegmentKeys({
     values: PRINT_PREP_PRESETS.map(preset => preset.label),
-    current: PRINT_PREP_PRESETS.find((preset) => prep.bleedMm === preset.prep.bleedMm && prep.cropMarks === preset.prep.cropMarks && prep.registrationMarks === preset.prep.registrationMarks && prep.pageInfo === preset.prep.pageInfo)?.label ?? '',
+    current: PRINT_PREP_PRESETS.find((preset) => prepMatches(prep, preset.prep))?.label ?? '',
     apply: (next) => {
       const preset = PRINT_PREP_PRESETS.find((item) => item.label === next);
-      if (preset) setPrep(preset.prep);
+      if (preset) {
+        setPrep(preset.prep);
+        setRegMarkCustom(false);
+      }
     },
     onReview: (button) => setReviewedPrepPreset(button?.dataset.review ?? ''),
+  });
+  const regMarkStyleKeys = makeSegmentKeys({
+    values: REG_MARK_STYLES.map(style => style.value),
+    current: regStyle,
+    apply: applyRegMarkStyle,
   });
   const bleedPresetKeys = makeSegmentKeys({
     values: BLEED_PRESETS_MM.map(String),
@@ -150,6 +210,8 @@ export function PrintDialog() {
       prep.bleedMm > 0 ? `${t('Bleed')} ${prep.bleedMm}mm` : null,
       prep.cropMarks ? t('Crop marks') : null,
       prep.registrationMarks ? t('Registration marks') : null,
+      prep.registrationMarks && regStyle !== 'generic' ? t(regMarkStyleLabelKey(regStyle)) : null,
+      prep.scaleCheck ? t('Scale check') : null,
       prep.pageInfo ? t('Page info') : null,
     ].filter(Boolean).join(' · ')
     : t('No prep');
@@ -167,6 +229,8 @@ export function PrintDialog() {
       `${t('Bleed')} ${preset.prep.bleedMm} mm`,
       preset.prep.cropMarks ? t('Crop marks') : null,
       preset.prep.registrationMarks ? t('Registration marks') : null,
+      preset.prep.registrationMarks && (preset.prep.regMarkStyle ?? 'generic') !== 'generic' ? t(regMarkStyleLabelKey(preset.prep.regMarkStyle ?? 'generic')) : null,
+      preset.prep.scaleCheck ? t('Scale check') : null,
       preset.prep.pageInfo ? t('Page info') : null,
     ].filter(Boolean).join(' · ');
     return `${t(preset.label)} · ${marks || t('No prep')}`;
@@ -444,6 +508,11 @@ export function PrintDialog() {
           </button>
           {prepOpen && (
             <div id="print-prep-body" className="mt-2 space-y-2">
+              {(regStyle !== 'generic' || prep.scaleCheck === true) && (
+                <div className="rounded border border-warning/50 bg-warning/10 px-2 py-1.5 text-[10px] text-warning leading-snug" role="note">
+                  {t('Print at 100% / Actual size. Measure the check block before cutting.')}
+                </div>
+              )}
               <div>
                 <div className="field-label">{t('Print Prep presets')}</div>
                 <PresetRow
@@ -458,12 +527,15 @@ export function PrintDialog() {
                   fallback={prepSummaryLabel}
                   setReviewed={setReviewedPrepPreset}
                   items={PRINT_PREP_PRESETS.map((preset) => {
-                    const active = prep.bleedMm === preset.prep.bleedMm && prep.cropMarks === preset.prep.cropMarks && prep.registrationMarks === preset.prep.registrationMarks && prep.pageInfo === preset.prep.pageInfo;
+                    const active = prepMatches(prep, preset.prep);
                     return {
                       key: preset.label,
                       className: `rounded-md border px-2 py-1 text-[10px] transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`,
                       pressed: active,
-                      onClick: () => setPrep(preset.prep),
+                      onClick: () => {
+                        setPrep(preset.prep);
+                        setRegMarkCustom(false);
+                      },
                       title: t(`${preset.label} settings`),
                       data: { value: preset.label, review: formatPrepPresetReview(preset) },
                       children: t(preset.label),
@@ -521,6 +593,84 @@ export function PrintDialog() {
                 checked={prep.registrationMarks}
                 onChange={(v) => setPrep({ ...prep, registrationMarks: v })}
               />
+              <Field label={t('Registration mark style')}>
+                <div
+                  className="grid grid-cols-4 gap-1"
+                  role="group"
+                  aria-label={t('Registration mark style')}
+                  onKeyDown={regMarkStyleKeys}
+                  title={t('Use Left/Right arrows to switch options')}
+                >
+                  {REG_MARK_STYLES.map((style) => {
+                    const active = regStyle === style.value;
+                    return (
+                      <button
+                        key={style.value}
+                        type="button"
+                        data-value={style.value}
+                        aria-pressed={active}
+                        className={`rounded-md border px-1 py-1 text-[10px] leading-tight transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                        onClick={() => applyRegMarkStyle(style.value)}
+                        title={`${t('Set registration mark style to')} ${t(style.label)}`}
+                      >
+                        {t(style.label)}
+                      </button>
+                    );
+                  })}
+                </div>
+                {regStyle !== 'generic' && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={2}
+                      max={40}
+                      step={0.5}
+                      className="input-num !w-16 !py-0.5 text-center"
+                      value={prep.regMarkArmMm ?? REG_MARK_DEFAULTS[regStyle].armMm}
+                      onChange={(e) => {
+                        setRegMarkCustom(true);
+                        setPrep(p => ({ ...p, regMarkArmMm: Math.min(40, Math.max(2, parseFloat(e.target.value) || REG_MARK_DEFAULTS[regStyle].armMm)) }));
+                      }}
+                      aria-label={t('Registration mark arm (mm)')}
+                      title={t('L-arm length in mm — follows the style default until edited.')}
+                    />
+                    <span className="text-[10px] text-muted">mm</span>
+                    <input
+                      type="number"
+                      min={0.05}
+                      max={2}
+                      step={0.05}
+                      className="input-num !w-16 !py-0.5 text-center"
+                      value={prep.regMarkStrokeMm ?? REG_MARK_DEFAULTS[regStyle].strokeMm}
+                      onChange={(e) => {
+                        setRegMarkCustom(true);
+                        setPrep(p => ({ ...p, regMarkStrokeMm: Math.min(2, Math.max(0.05, parseFloat(e.target.value) || REG_MARK_DEFAULTS[regStyle].strokeMm)) }));
+                      }}
+                      aria-label={t('Registration mark stroke (mm)')}
+                      title={t('Stroke width in mm — follows the style default until edited.')}
+                    />
+                    <span className="text-[10px] text-muted">mm</span>
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted hover:text-ink underline-offset-2 hover:underline transition-colors"
+                      onClick={() => {
+                        setRegMarkCustom(false);
+                        const base = REG_MARK_DEFAULTS[regStyle];
+                        setPrep(p => ({ ...p, regMarkArmMm: base.armMm, regMarkStrokeMm: base.strokeMm }));
+                      }}
+                      title={t('Reset arm and stroke to the style defaults.')}
+                    >
+                      {t('Style default')}
+                    </button>
+                  </div>
+                )}
+              </Field>
+              <ToggleRow
+                label={t('Scale check')}
+                checked={prep.scaleCheck === true}
+                onChange={(v) => setPrep({ ...prep, scaleCheck: v })}
+                hint={t('Prints a 50 × 9 mm block — measure it to verify 100% scale before cutting')}
+              />
               <ToggleRow
                 label={t('Page info')}
                 checked={prep.pageInfo}
@@ -576,11 +726,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block mb-2"><div className="field-label">{label}</div>{children}</label>;
 }
 
-function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ label, checked, onChange, title, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; title?: string; hint?: string }) {
   return (
-    <label className="flex items-center justify-between text-xs cursor-pointer">
-      <span>{label}</span>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    </label>
+    <div>
+      <label className="flex items-center justify-between text-xs cursor-pointer" title={title}>
+        <span>{label}</span>
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      </label>
+      {hint && <div className="mt-0.5 text-[10px] text-muted leading-snug">{hint}</div>}
+    </div>
   );
 }

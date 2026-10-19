@@ -330,3 +330,148 @@ describe('generateRegMarks styles', () => {
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(10, 3);
   });
 });
+
+describe('offsetPolyline round joins', () => {
+  const TOL = 1e-6;
+
+  /** Min distance from p to a ring treated as a closed segment cycle. */
+  const distToRing = (p: [number, number], ring: Array<[number, number]>): number => {
+    let best = Infinity;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const len2 = dx * dx + dy * dy;
+      let t = len2 > 0 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      best = Math.min(best, Math.hypot(a[0] + t * dx - p[0], a[1] + t * dy - p[1]));
+    }
+    return best;
+  };
+
+  const shoelace = (ring: Array<[number, number]>): number => {
+    let area = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      area += a[0] * b[1] - b[0] * a[1];
+    }
+    return area / 2;
+  };
+
+  it('rounds rectangle corners with arc points at |d| from the source corner', () => {
+    const d = 5;
+    const rect: Array<[number, number]> = [[0, 0], [100, 0], [100, 50], [0, 50]];
+    const out = offsetPolyline(rect, d, true, { join: 'round' });
+    expect(out).toHaveLength(1);
+    const ring = out[0];
+    // Sane point count, closed, no NaN.
+    expect(ring.length).toBeGreaterThanOrEqual(40);
+    expect(ring.length).toBeLessThan(200);
+    expect(ring[0][0]).toBeCloseTo(ring[ring.length - 1][0], 9);
+    expect(ring[0][1]).toBeCloseTo(ring[ring.length - 1][1], 9);
+    for (const [x, y] of ring) expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+    // Every point sits exactly |d| off the source rectangle boundary.
+    for (const p of ring) {
+      expect(distToRing(p, rect)).toBeGreaterThanOrEqual(d - TOL);
+      expect(distToRing(p, rect)).toBeLessThanOrEqual(d + TOL);
+    }
+    // Each corner carries an arc: the two offset-segment endpoints plus
+    // at least 2 intermediate points, all within |d| of the corner.
+    for (const corner of rect) {
+      const near = ring.filter(p => Math.hypot(p[0] - corner[0], p[1] - corner[1]) <= d + TOL);
+      expect(near.length).toBeGreaterThanOrEqual(4);
+    }
+    // Bounding box grows by exactly |d| on each side.
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [x, y] of ring) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    expect(minX).toBeCloseTo(-d, 6);
+    expect(maxX).toBeCloseTo(100 + d, 6);
+    expect(minY).toBeCloseTo(-d, 6);
+    expect(maxY).toBeCloseTo(50 + d, 6);
+    // No spike: everything within half-diagonal + d of the centre.
+    const halfDiag = Math.hypot(50, 25);
+    for (const [x, y] of ring) {
+      expect(Math.hypot(x - 50, y - 25)).toBeLessThanOrEqual(halfDiag + d + TOL);
+    }
+    // Winding/area sane: the ring grew, orientation preserved.
+    expect(Math.sign(shoelace(ring))).toBe(Math.sign(shoelace(rect)));
+    expect(Math.abs(shoelace(ring))).toBeGreaterThan(5000);
+  });
+
+  it('suppresses star-tip spikes vs miter and stays a simple ring', () => {
+    // 5-point star, tips at r=100, inner corners at r=40.
+    const star: Array<[number, number]> = [];
+    for (let k = 0; k < 10; k++) {
+      const r = k % 2 === 0 ? 100 : 40;
+      const a = (k * Math.PI) / 5;
+      star.push([r * Math.cos(a), r * Math.sin(a)]);
+    }
+    const miterOut = offsetPolyline(star, 5, true);
+    const roundOut = offsetPolyline(star, 5, true, { join: 'round' });
+    expect(miterOut).toHaveLength(1);
+    expect(roundOut).toHaveLength(1);
+    const maxR = (ring: Array<[number, number]>) =>
+      Math.max(...ring.map(([x, y]) => Math.hypot(x, y)));
+    const miterR = maxR(miterOut[0]);
+    const roundR = maxR(roundOut[0]);
+    expect(miterR).toBeGreaterThan(105); // tip miters survive under the limit
+    expect(roundR).toBeLessThanOrEqual(105 + TOL); // arcs never exceed tip + d
+    expect(miterR).toBeGreaterThanOrEqual(roundR);
+    const ring = roundOut[0];
+    expect(ring[0][0]).toBeCloseTo(ring[ring.length - 1][0], 9);
+    expect(ring[0][1]).toBeCloseTo(ring[ring.length - 1][1], 9);
+    for (const [x, y] of ring) expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+  });
+
+  it('inward round offset returns a valid ring or vanishes per the guards', () => {
+    const octa: Array<[number, number]> = [];
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4;
+      octa.push([50 * Math.cos(a), 50 * Math.sin(a)]);
+    }
+    const small = offsetPolyline(octa, -3, true, { join: 'round' });
+    expect(small).toHaveLength(1);
+    for (const [x, y] of small[0]) expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+    let minX = Infinity, maxX = -Infinity;
+    for (const [x] of small[0]) { if (x < minX) minX = x; if (x > maxX) maxX = x; }
+    // Corner miters recede d/sin(half the 135° interior angle) — the axis
+    // vertices bound the ring, so the shrink is 3/sin(67.5°) per side.
+    expect(maxX - minX).toBeCloseTo(100 - 6 / Math.sin((3 * Math.PI) / 8), 6);
+    expect(offsetPolyline(octa, -1000, true, { join: 'round' })).toEqual([]);
+  });
+
+  it('round-joins the reflex corners an inward offset grows (notch)', () => {
+    const notched: Array<[number, number]> = [
+      [0, 0], [100, 0], [100, 100], [60, 100], [60, 40], [40, 40], [40, 100], [0, 100],
+    ];
+    const miter = offsetPolyline(notched, -2, true);
+    const round = offsetPolyline(notched, -2, true, { join: 'round' });
+    expect(miter).toHaveLength(1);
+    expect(round).toHaveLength(1);
+    // Arcs added at the two notch corners the inward offset widens.
+    expect(round[0].length).toBeGreaterThan(miter[0].length);
+    // Every point stays at >= |d| from the source boundary (overflow guard intact).
+    for (const p of round[0]) {
+      expect(distToRing(p, notched)).toBeGreaterThanOrEqual(2 - TOL);
+    }
+  });
+
+  it('default join (option absent) is byte-identical to explicit miter', () => {
+    const tri: Array<[number, number]> = [[0, 0], [10, 0], [0, 10]];
+    const open = offsetPolyline(tri, 2, false);
+    expect(open).toHaveLength(1);
+    expect(open[0]).toHaveLength(3);
+    // Pinned expected coordinates for today's miter output.
+    expect(open[0][0][0]).toBeCloseTo(0, 9);
+    expect(open[0][0][1]).toBeCloseTo(-2, 9);
+    expect(open[0][1][0]).toBeCloseTo(12 + 2 * Math.SQRT2, 9);
+    expect(open[0][1][1]).toBeCloseTo(-2, 9);
+    expect(open[0][2][0]).toBeCloseTo(Math.SQRT2, 9);
+    expect(open[0][2][1]).toBeCloseTo(10 + Math.SQRT2, 9);
+    expect(offsetPolyline(tri, 2, true)).toEqual(offsetPolyline(tri, 2, true, { join: 'miter' }));
+    expect(offsetPolyline(tri, 2, false)).toEqual(offsetPolyline(tri, 2, false, { join: 'miter' }));
+  });
+});
