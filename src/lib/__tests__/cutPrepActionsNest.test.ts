@@ -110,7 +110,7 @@ function lCutPath(id: string, x: number, y: number): CutPath {
 }
 
 describe('nestCutPathsRaster', () => {
-  it('packs three L cut paths by true shape, appends the regmark unchanged, and pushes history once', () => {
+  it('packs three L cut paths by true shape, appends the regmark unchanged, and pushes history once', async () => {
     const pushHistory = vi.spyOn(canvasEngine, 'pushHistory').mockImplementation(() => {});
     const warn = vi.spyOn(toast, 'warn').mockImplementation(() => '');
     const success = vi.spyOn(toast, 'success').mockImplementation(() => '');
@@ -128,7 +128,7 @@ describe('nestCutPathsRaster', () => {
       regmark,
     ]);
 
-    expect(nestCutPathsRaster(t, { sheetWidthMm: 100, gapMm: 2 })).toBe(3);
+    expect(await nestCutPathsRaster(t, { sheetWidthMm: 100, gapMm: 2 })).toBe(3);
     expect(warn).not.toHaveBeenCalled();
     expect(success).toHaveBeenCalledOnce();
     // 3 × 500 mm² of L fill over the 100 × 30 mm used band = exactly 50 %
@@ -155,17 +155,17 @@ describe('nestCutPathsRaster', () => {
     expect(pushHistory).toHaveBeenCalledOnce();
   });
 
-  it('warns and returns 0 when there is nothing to nest, leaving the store untouched', () => {
+  it('warns and returns 0 when there is nothing to nest, leaving the store untouched', async () => {
     vi.spyOn(canvasEngine, 'pushHistory').mockImplementation(() => {});
     const warn = vi.spyOn(toast, 'warn').mockImplementation(() => '');
 
     useEditor.getState().setCutPaths([]);
-    expect(nestCutPathsRaster(t)).toBe(0);
+    expect(await nestCutPathsRaster(t)).toBe(0);
     expect(useEditor.getState().cutPaths).toEqual([]);
 
     const single = lCutPath('only', 0, 0);
     useEditor.getState().setCutPaths([single]);
-    expect(nestCutPathsRaster(t)).toBe(0);
+    expect(await nestCutPathsRaster(t)).toBe(0);
     expect(useEditor.getState().cutPaths).toEqual([single]);
 
     expect(warn).toHaveBeenCalledTimes(2);

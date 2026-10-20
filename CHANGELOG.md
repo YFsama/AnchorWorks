@@ -6,6 +6,14 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — sticker / decal / print-and-cut suite (waves 1–5)
 
+### Added (wave 6)
+- **Data-Link network handoff (TCP 9100)**: four Tauri Rust commands (tcp_connect/write/read/close — cargo-check clean) + a pure protocol library (ESC.d1–d6 framing, job-list/selection/registration-vector parsing, byte-pinned against open-graphtec-server protocol.py) + a Data-Link section in the Plotter dialog (host/port/job name with live validation, handshake log, Tauri-only gating). Hardware validation on a real networked cutter remains the open item.
+- **Part-in-hole nesting**: RasterNestItem.holes — a frame with a cut-out nests smaller parts inside its hole (occupancy grid marks holes free; the EDT fit test keeps the gap from the hole walls automatically).
+- Pinch localization for ≥3-lobe thin features now scans all lobe pairs (≤10 lobes) so the flag lands on the true bottleneck.
+
+### Changed (wave 6)
+- rasterNest lazy-loads behind its one-click action (−1 kB gzip warm graph; the entry was already clean — honest numbers in the wave log).
+
 Five research-grounded waves (vendor specs + hardware-validated open-source cutter stacks; full findings and spec tables in docs/research-sticker-printcut-2026-10.md).
 
 ### Added

@@ -4072,4 +4072,25 @@ export const zhDict: Record<string, string> = {
   "Link info (9 chars, not starting with G)": "链接信息（9 字符，不以 G 开头）",
   "Data-Link link info": "Data-Link 链接信息",
   "Link info must not start with G (reserved).": "链接信息不能以 G 开头（系统保留）。",
+
+  // Wave 6 — Data-Link TCP handoff, part-in-hole, perf (2026-10)
+  "Data-Link (network cutter)": "Data-Link（网络刻字机）",
+  "Enter the cutter’s host or IP address first.": "请先输入刻字机的主机名或 IP 地址。",
+  "Data-Link requires the desktop (Tauri) build.": "Data-Link 需要桌面版（Tauri）。",
+  "✅ Sent over Data-Link": "✅ 已通过 Data-Link 发送",
+  "No job selected on the cutter — scan the printed barcode band (or pick the job on the machine panel) and try again.": "刻字机上未选择作业——请扫描打印的条码带（或在机器面板上选择作业）后重试。",
+  "Graphtec barcode handoff over TCP 9100 — print the barcode band, connect, then let the cutter scan.": "通过 TCP 9100 的 Graphtec 条码交接——先打印条码带、连接，再由刻字机扫描。",
+  "Cutter host or IP": "刻字机主机或 IP",
+  "Host name or IP address of the networked cutter (TCP 9100).": "网络刻字机的主机名或 IP 地址（TCP 9100）。",
+  "Port": "端口",
+  "Job name": "作业名",
+  "1–25 printable characters, first character not ‘G’. Match the printed barcode band’s link info.": "1–25 个可打印字符，首字符不能是“G”。需与打印条码带的链接信息一致。",
+  "Connect to the cutter and run the barcode handoff.": "连接刻字机并执行条码交接。",
+  "Connect & send": "连接并发送",
+  "Data-Link handshake log": "Data-Link 握手日志",
+
+  "Job name must not be empty.": "作业名不能为空。",
+  "Job name must not start with 'G' (reserved prefix).": "作业名不能以“G”开头（保留前缀）。",
+  "Job name must contain only printable ASCII characters.": "作业名只能包含可打印 ASCII 字符。",
+
 };

@@ -131,9 +131,21 @@ function erodedWhole(edt: Float32Array, w: number, h: number, r: number): boolea
   return componentsAt(edt, w, h, r, 2).length === 1;
 }
 
+/** Lobe bound for the all-pairs pinch scan: at or below it every eroded-lobe
+ *  centroid pair is probed (10 lobes → 45 pairs, each a bounded segment
+ *  walk); above it the scan falls back to the two largest lobes only (the
+ *  historic behaviour), so a pathological many-lobe ring can never make the
+ *  localization step blow up. */
+const PINCH_MAX_LOBES = 10;
+
 /** Flat index of the pinch pixel: the shallowest-EDT inside pixel on the
- *  segment joining the two largest eroded lobes. Null when the erosion
- *  simply emptied (uniformly thin — no neck to localize). */
+ *  straight segments joining eroded-lobe centroid PAIRS — every pair while
+ *  the lobe count stays ≤ PINCH_MAX_LOBES, else only the two largest. With
+ *  ≥3 near-equal lobes the two-largest line alone can miss the true
+ *  bottleneck (a multi-bar shape's spine feeds every lobe, but a particular
+ *  pair's line may cross only wide corridors), so all pairs' crossings are
+ *  probed and the global minimum reported. Null when the erosion simply
+ *  emptied (uniformly thin — no neck to localize). */
 function pinchPixel(
   edt: Float32Array,
   mask: Uint8Array,
@@ -148,18 +160,23 @@ function pinchPixel(
     for (const p of comp) { sx += p % w; sy += Math.floor(p / w); }
     return [sx / comp.length, sy / comp.length];
   };
-  const [cax, cay] = centre(comps[0]);
-  const [cbx, cby] = centre(comps[1]);
-  const steps = Math.max(1, Math.ceil(2 * Math.hypot(cbx - cax, cby - cay)));
+  const n = comps.length <= PINCH_MAX_LOBES ? comps.length : 2;
   let best = -1;
   let bestEdt = Infinity;
-  for (let s = 0; s <= steps; s++) {
-    const x = Math.round(cax + ((cbx - cax) * s) / steps);
-    const y = Math.round(cay + ((cby - cay) * s) / steps);
-    const p = y * w + x;
-    if (mask[p] === 1 && edt[p] < bestEdt) {
-      bestEdt = edt[p];
-      best = p;
+  for (let a = 0; a < n; a++) {
+    const [cax, cay] = centre(comps[a]);
+    for (let b = a + 1; b < n; b++) {
+      const [cbx, cby] = centre(comps[b]);
+      const steps = Math.max(1, Math.ceil(2 * Math.hypot(cbx - cax, cby - cay)));
+      for (let s = 0; s <= steps; s++) {
+        const x = Math.round(cax + ((cbx - cax) * s) / steps);
+        const y = Math.round(cay + ((cby - cay) * s) / steps);
+        const p = y * w + x;
+        if (mask[p] === 1 && edt[p] < bestEdt) {
+          bestEdt = edt[p];
+          best = p;
+        }
+      }
     }
   }
   return best >= 0 ? best : null;

@@ -6,7 +6,6 @@ import { getCanvas, pushHistory } from './canvasEngine';
 import { rhinestoneFromSelection } from './rhinestone';
 import { download, exportSVG } from './io';
 import { nestPolygons } from './nesting';
-import { nestPolygonsRaster } from './rasterNest';
 import { buildTestCut, defaultPlotterOptions } from './plotter';
 import { toast } from './toast';
 
@@ -288,8 +287,15 @@ export function nestCutPathsVinyl(t: T, opts?: { sheetWidthMm?: number; gapMm?: 
  * Sheet width defaults to the document width in mm (but at least 150 mm —
  * the narrowest common plotter/transfer-tape span); the 2 mm default gap
  * sits in the kiss-cut sweet spot (sheets 2–3 mm, rolls 1–2 mm).
+ *
+ * The packer module (`./rasterNest` and its `./rasterEdt` distance
+ * transform) is click-only code, so it is dynamically imported here instead
+ * of statically — it never loads with the palette/context-menu warm chunks,
+ * only when this action actually runs. The action is therefore async; all
+ * call sites (MenuBar / CommandPalette / CanvasContextMenu run wrappers)
+ * already tolerate a promise return.
  */
-export function nestCutPathsRaster(t: T, opts?: { sheetWidthMm?: number; gapMm?: number }): number {
+export async function nestCutPathsRaster(t: T, opts?: { sheetWidthMm?: number; gapMm?: number }): Promise<number> {
   const editor = useEditor.getState();
   const packable = editor.cutPaths.filter(p => p.kind !== 'regmark');
   if (packable.length < 2) {
@@ -299,6 +305,7 @@ export function nestCutPathsRaster(t: T, opts?: { sheetWidthMm?: number; gapMm?:
 
   const sheetWidthMm = opts?.sheetWidthMm ?? Math.max(150, editor.doc.width / MM_TO_PX);
   const gapMm = opts?.gapMm ?? 2;
+  const { nestPolygonsRaster } = await import('./rasterNest');
   const nest = nestPolygonsRaster(packable.map(p => ({ id: p.id, points: p.points })), sheetWidthMm, gapMm);
 
   // Rebuild every packable path at its placement — the SAME transform

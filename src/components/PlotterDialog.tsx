@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers } from 'lucide-react';
+import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network } from 'lucide-react';
 import { useEditor, type CutPath } from '../store/editor';
 import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
+import { connectDataLink, dataLinkHandshake, validateJobName, type DataLinkHandle } from '../lib/dataLink';
 import { buildAbortSnippet, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
 import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSpeed } from '../lib/machineProfiles';
 import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
@@ -183,6 +184,31 @@ export function PlotterDialog() {
   const profile = getMachineProfile(profileId);
   // Bumped after every job-log entry so the console's history list refetches.
   const [jobLogVersion, setJobLogVersion] = useState(0);
+  // Data-Link (network cutter, dataLink.ts): collapsed by default, native
+  // runtime only. The host and job name persist in DEDICATED localStorage
+  // keys ('vector.datalink.host' / 'vector.datalink.job') — NOT the plotter
+  // prefs blob in plotter.ts (sibling-owned file; additive fields there are
+  // the integrator's call). The job-name default would ideally come from the
+  // print-prep barcode band's linkInfo, but that lives in PrintDialog-local
+  // state with no shared store yet — 'ANCHOR01' (the print dialog's own
+  // fallback) stands in until the integrator wires a shared source.
+  const [dataLinkOpen, setDataLinkOpen] = useState(false);
+  const [dlHost, setDlHost] = useState(() => window.localStorage.getItem('vector.datalink.host') ?? '');
+  const [dlPort, setDlPort] = useState(9100);
+  const [dlJobName, setDlJobName] = useState(() => window.localStorage.getItem('vector.datalink.job') ?? 'ANCHOR01');
+  const [dlBusy, setDlBusy] = useState(false);
+  const [dlLog, setDlLog] = useState<string[]>([]);
+  // Open Data-Link handle — closed when the dialog goes away (a Graphtec
+  // accepts ONE connection at a time, so unlike the serial link this must
+  // not survive a close/reopen cycle holding the cutter's only slot).
+  const dlHandleRef = useRef<DataLinkHandle | null>(null);
+
+  useEffect(() => {
+    if (open) return;
+    dlHandleRef.current?.close();
+    dlHandleRef.current = null;
+  }, [open]);
+  useEffect(() => () => { dlHandleRef.current?.close(); }, []);
 
   // Round-trip the machine settings whenever any of them change.
   useEffect(() => {
@@ -771,6 +797,46 @@ export function PlotterDialog() {
       await streamJob(payload, t('✅ Sent to plotter'));
     } catch (e) { toast.error((e as Error).message); }
     finally { setBusy(false); }
+  };
+
+  /** Data-Link handoff (dataLink.ts): connect to the networked cutter on
+   *  TCP 9100, run the ESC.d1–d6 barcode handoff and stream the selected
+   *  job. The payload is the BARE HP-GL dialect — Data-Link speaks GP-GL /
+   *  HP-GL only, and ARMS is NOT applicable to this path (machine-side
+   *  registration comes from the printed barcode band + the d5 vector, not
+   *  from a TB block in the payload). */
+  const sendViaDataLink = async () => {
+    if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return; }
+    const nameErr = validateJobName(dlJobName);
+    if (nameErr) { toast.error(t(nameErr), { title: t('Data-Link (network cutter)') }); return; }
+    if (!dlHost.trim()) { toast.warn(t('Enter the cutter’s host or IP address first.'), { title: t('Data-Link (network cutter)') }); return; }
+    const payload = safeGenerate(() => buildPlotterOutput('hpgl', { ...effectiveOpts, dialect: 'bare', arms: undefined }, overrideCuts));
+    if (payload === null) return;
+    const handle = await connectDataLink(dlHost.trim(), dlPort);
+    if (!handle) { toast.error(t('Data-Link requires the desktop (Tauri) build.')); return; }
+    dlHandleRef.current = handle;
+    setDlBusy(true);
+    setDlLog([]);
+    window.localStorage.setItem('vector.datalink.host', dlHost.trim());
+    window.localStorage.setItem('vector.datalink.job', dlJobName);
+    try {
+      const result = await dataLinkHandshake(handle, [{ name: dlJobName, payload }], payload, {
+        pollMs: 500,
+        maxPolls: 20,
+        commandType: 1, // HP-GL — matches the bare-dialect payload above
+        onLog: (line) => setDlLog(prev => [...prev, line]),
+      });
+      if (result.sent) toast.success(t('✅ Sent over Data-Link'));
+      else toast.warn(t('No job selected on the cutter — scan the printed barcode band (or pick the job on the machine panel) and try again.'), { title: t('Data-Link (network cutter)') });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      // Release the cutter's single connection slot right after the handoff
+      // (the machine refuses a second concurrent socket).
+      handle.close();
+      if (dlHandleRef.current === handle) dlHandleRef.current = null;
+      setDlBusy(false);
+    }
   };
 
   /* ---- Layered vinyl (multi-colour) ----
@@ -2452,6 +2518,95 @@ export function PlotterDialog() {
             jobLogVersion={jobLogVersion}
             applyProfile={applyProfile}
           />
+
+          {/* Data-Link (network cutter): the Graphtec TCP-9100 barcode
+              handoff (dataLink.ts). Native-only — the web/PWA runtime has
+              no raw sockets, so the whole section is compiled out there. */}
+          {native && (
+            <div
+              className="mb-3 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px] leading-relaxed"
+              role="region"
+              aria-label={t('Data-Link (network cutter)')}
+            >
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="flex items-center gap-1 font-medium text-ink"
+                  onClick={() => setDataLinkOpen(!dataLinkOpen)}
+                  aria-expanded={dataLinkOpen}
+                  aria-controls="plotter-datalink-body"
+                >
+                  <ChevronDown
+                    size={12}
+                    aria-hidden="true"
+                    className={`shrink-0 transition-transform ${dataLinkOpen ? '' : '-rotate-90'}`}
+                  />
+                  <Network size={12} aria-hidden="true" />
+                  {t('Data-Link (network cutter)')}
+                </button>
+                <span className="text-muted">
+                  {t('Graphtec barcode handoff over TCP 9100 — print the barcode band, connect, then let the cutter scan.')}
+                </span>
+              </div>
+              {dataLinkOpen && (
+                <div id="plotter-datalink-body" className="mt-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <input
+                      type="text"
+                      className="input-num !w-36 !py-0.5 !text-[10px]"
+                      placeholder="192.168.0.100"
+                      value={dlHost}
+                      onChange={(e) => setDlHost(e.target.value)}
+                      aria-label={t('Cutter host or IP')}
+                      title={t('Host name or IP address of the networked cutter (TCP 9100).')}
+                    />
+                    <input
+                      type="number"
+                      className="input-num !w-16 !py-0.5 !text-[10px] text-center"
+                      value={dlPort}
+                      min={1}
+                      max={65535}
+                      onChange={(e) => setDlPort(Math.max(1, Math.min(65535, parseInt(e.target.value, 10) || 9100)))}
+                      aria-label={t('Port')}
+                    />
+                    <input
+                      type="text"
+                      className="input-num !w-28 !py-0.5 !text-[10px]"
+                      value={dlJobName}
+                      onChange={(e) => setDlJobName(e.target.value)}
+                      aria-label={t('Job name')}
+                      title={t('1–25 printable characters, first character not ‘G’. Match the printed barcode band’s link info.')}
+                    />
+                    <button
+                      type="button"
+                      className="btn-primary flex items-center gap-1 !py-1 !px-2 !text-[10px]"
+                      onClick={() => { void sendViaDataLink(); }}
+                      disabled={dlBusy || outputBlocked}
+                      aria-busy={dlBusy}
+                      title={outputBlocked ? outputBlockedReason : t('Connect to the cutter and run the barcode handoff.')}
+                    >
+                      {dlBusy
+                        ? <Loader2 size={11} className="animate-spin" aria-hidden="true" />
+                        : <Network size={11} aria-hidden="true" />}
+                      {dlBusy ? t('Sending…') : t('Connect & send')}
+                    </button>
+                    {validateJobName(dlJobName) && (
+                      <span className="text-danger">{t(validateJobName(dlJobName)!)}</span>
+                    )}
+                  </div>
+                  {dlLog.length > 0 && (
+                    <pre
+                      className="mt-1.5 max-h-28 overflow-y-auto rounded border border-border bg-panel px-2 py-1 text-[10px] leading-relaxed text-muted whitespace-pre-wrap"
+                      role="log"
+                      aria-label={t('Data-Link handshake log')}
+                    >
+                      {dlLog.join('\n')}
+                    </pre>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {jobProgress && (
             <div className="mb-3 flex items-center gap-2 text-[10px] text-muted tabular-nums" role="status" aria-live="polite">

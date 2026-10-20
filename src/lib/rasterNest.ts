@@ -30,6 +30,12 @@
  *     The fit test compares mask CELL CENTRES (distance-to-occupied ≥ gapPx
  *     per covered cell), so the physical edge-to-edge clearance is ≈ gap −
  *     1/k mm — one cell-centre slack versus nestPolygons' exact hull gap.
+ *   • Part-in-hole: an item may declare `holes` — rings inside `points`
+ *     whose fill is cleared from the footprint mask, so smaller parts nest
+ *     inside the cut-outs of larger placed parts (Deepnest-style). The
+ *     pairwise gap applies to the hole walls too: the EDT fit test measures
+ *     distance to the frame's own occupied cells, so a nested part
+ *     automatically keeps the gap without any special case.
  *   • At most 60 parts are PLACED per call (RASTER_NEST_MAX_PARTS); anything
  *     beyond that (or wider/taller than the sheet in both orientations) is
  *     reported unfit and overhangs from its own row at the bottom of the
@@ -49,6 +55,12 @@ export interface RasterNestItem {
   id: string;
   /** Boundary points; closure is implied (last point joins the first). */
   points: Array<[number, number]>;
+  /** Optional hole rings INSIDE `points` — masked free so smaller parts can
+   *  nest inside (part-in-hole). Rings share `points`' document-mm space and
+   *  are contractually contained by the outer ring; the prepared footprint
+   *  clears each hole's fill, and a nested part keeps the pairwise gap from
+   *  the hole walls via the same EDT fit test as any other neighbour. */
+  holes?: Array<Array<[number, number]>>;
 }
 
 /** Where a part's (possibly rotated) raster footprint landed. */
@@ -128,6 +140,79 @@ function maskRowExtents(mask: Uint8Array, w: number, h: number): { c0: Int32Arra
   return { c0, c1 };
 }
 
+/** Fill `ring` on its own bbox grid and blit the cells into the combined
+ *  `into` mask at the ring bbox's ROUNDED cell offset from (originX, originY)
+ *  — set when `clear` is false, cleared when true. Grid-aligned geometry
+ *  (integer mm at k) blits exactly; otherwise the rounding costs ≤ half a
+ *  cell, the same order as the documented cell-centre gap slack. */
+function blitFilledRing(
+  into: Uint8Array,
+  w: number,
+  h: number,
+  ring: ReadonlyArray<[number, number]>,
+  originX: number,
+  originY: number,
+  k: number,
+  clear: boolean,
+): void {
+  let rMinX = Infinity;
+  let rMinY = Infinity;
+  for (const [x, y] of ring) {
+    if (x < rMinX) rMinX = x;
+    if (y < rMinY) rMinY = y;
+  }
+  const f = fillPolygonMask(ring, k);
+  const offX = Math.round((rMinX - originX) * k);
+  const offY = Math.round((rMinY - originY) * k);
+  for (let j = 0; j < f.h; j++) {
+    const tj = j + offY;
+    if (tj < 0 || tj >= h) continue;
+    for (let i = 0; i < f.w; i++) {
+      const ti = i + offX;
+      if (ti < 0 || ti >= w) continue;
+      if (f.mask[j * f.w + i]) into[tj * w + ti] = clear ? 0 : 1;
+    }
+  }
+}
+
+/**
+ * Rasterize a part footprint WITH holes at k px/mm (part-in-hole): stamp the
+ * outer ring's fill, then CLEAR each hole ring's fill — a frame with a window
+ * (outer contour + inner contour) occupies only its walls, so smaller parts
+ * can nest inside the cut-out. Holes share the outer ring's document-mm
+ * space, so the mask's bbox spans the outer ring ∪ every hole (defensive:
+ * contractually holes sit inside, but a stray vertex must still land on the
+ * grid, not wrap the blit). `fillPolygonMask` grids each ring on its OWN
+ * bbox, hence the rounded-offset blit above.
+ */
+function fillItemMask(
+  points: ReadonlyArray<[number, number]>,
+  holes: Array<ReadonlyArray<[number, number]>>,
+  k: number,
+): { mask: Uint8Array; w: number; h: number } {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const ring of [points, ...holes]) {
+    for (const [x, y] of ring) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (points.length === 0 || maxX < minX || maxY < minY) {
+    return { mask: new Uint8Array(0), w: 0, h: 0 };
+  }
+  const w = Math.max(1, Math.ceil((maxX - minX) * k));
+  const h = Math.max(1, Math.ceil((maxY - minY) * k));
+  const mask = new Uint8Array(w * h);
+  blitFilledRing(mask, w, h, points, minX, minY, k, false);
+  for (const hole of holes) blitFilledRing(mask, w, h, hole, minX, minY, k, true);
+  return { mask, w, h };
+}
+
 /**
  * Can `m` stamp at (x, y)? Every occupied mask cell must land on a free sheet
  * cell whose distance to the nearest occupied cell is ≥ gapPx (the raster
@@ -183,7 +268,9 @@ function stamp(occ: Uint8Array, W: number, allocH: number, m: PreparedMask, x: n
  *
  * 1. Every item is rasterized with `fillPolygonMask` at k px/mm in both
  *    rotations (rotation 90 = the rotateMaskCCW bitmap of the [-y, x] point
- *    map) and sorted mask-area desc, id asc.
+ *    map) and sorted mask-area desc, id asc. Items with `holes` stamp the
+ *    outer ring's fill then clear each hole's fill (part-in-hole), and the
+ *    FFD area is the holed footprint — the true material area.
  * 2. The sheet occupancy grid (W = ceil(sheetWidth·k) px wide, generously
  *    preallocated to the worst-case vertical stack of all parts, never
  *    taller than the height cap) starts empty. After each placement the
@@ -231,8 +318,14 @@ export function nestPolygonsRaster(
 
   // Both rotations per item, rasterized once. Mask area is rotation-
   // invariant, so the FFD key (area desc, id asc) uses the rot-0 count.
+  // Items with `holes` take the part-in-hole fill (outer ring stamped, hole
+  // fills cleared — smaller parts may then nest inside the cut-outs, with
+  // the EDT fit test enforcing the gap to the hole walls); holeless items
+  // keep the plain single-ring fill, bit-identical to before.
   const prepared = items.map((item, i) => {
-    const r0 = fillPolygonMask(item.points, k);
+    const r0 = item.holes && item.holes.length > 0
+      ? fillItemMask(item.points, item.holes, k)
+      : fillPolygonMask(item.points, k);
     let area = 0;
     for (let c = 0; c < r0.mask.length; c++) area += r0.mask[c];
     const m0: PreparedMask = { mask: r0.mask, w: r0.w, h: r0.h, ext: maskRowExtents(r0.mask, r0.w, r0.h) };
@@ -292,10 +385,14 @@ export function nestPolygonsRaster(
     scan:
     for (let y = 0; y < regionH; y++) {
       for (let x = 0; x < W; x++) {
-        if (it.m0.w <= W && y + it.m0.h <= regionH && fits(occ, dist, W, it.m0, x, y, gapPx)) {
+        // x + m.w <= W guards the RIGHT edge: fits()' flat-index lookup wraps
+        // columns past W into the next row, which once "placed" a part up to
+        // a part-width off the sheet's right edge (found by the wave-6 review
+        // in a pre-existing holeless case — 29 beside 60 on a 62 sheet).
+        if (it.m0.w <= W && x + it.m0.w <= W && y + it.m0.h <= regionH && fits(occ, dist, W, it.m0, x, y, gapPx)) {
           px = x; py = y; chosen = it.m0; rot = 0; break scan;
         }
-        if (it.m1.w <= W && y + it.m1.h <= regionH && fits(occ, dist, W, it.m1, x, y, gapPx)) {
+        if (it.m1.w <= W && x + it.m1.w <= W && y + it.m1.h <= regionH && fits(occ, dist, W, it.m1, x, y, gapPx)) {
           px = x; py = y; chosen = it.m1; rot = 90; break scan;
         }
       }

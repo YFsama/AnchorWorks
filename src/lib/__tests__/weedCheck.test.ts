@@ -194,3 +194,39 @@ describe('weedCheck', () => {
     expect(issue.pathIds).toEqual(['bar']);
   });
 });
+
+describe('pinch localization for ≥3 lobes', () => {
+  it('flags a 3-lobe E bar and pins the pinch on the spine, not on an outer lobe', () => {
+    // Three 20×4 horizontal bars stacked with 4 mm gaps, joined by one
+    // centred 0.8 mm vertical spine (x 9.6–10.4): eroding at the vinyl floor
+    // kills the spine and leaves three near-equal bar lobes. Only the
+    // all-pairs centroid scan reliably walks a line that crosses the spine;
+    // the historic two-largest-only line (and the ring-centroid fallback)
+    // would mis-localize onto a bar — an outer lobe.
+    const e: CutPath = {
+      id: 'e',
+      kind: 'outline',
+      closed: true,
+      points: [
+        [0, 0], [20, 0], [20, 4], [10.4, 4], [10.4, 8], [20, 8],
+        [20, 12], [10.4, 12], [10.4, 16], [20, 16], [20, 20], [0, 20],
+        [0, 16], [9.6, 16], [9.6, 12], [0, 12], [0, 8], [9.6, 8], [9.6, 4], [0, 4],
+      ],
+    };
+    const report = weedCheck([e]);
+    expect(report.issues).toHaveLength(1);
+    const issue = report.issues[0];
+    expect(issue.kind).toBe('thin-feature');
+    expect(issue.pathIds).toEqual(['e']);
+    // True bottleneck 0.8 mm, ±0.25 mm raster slack at 4 px/mm.
+    expect(issue.metricMm).toBeGreaterThan(0.5);
+    expect(issue.metricMm).toBeLessThan(1.5);
+    // On the spine: x within 9.6–10.4 ± raster slack …
+    expect(issue.at[0]).toBeGreaterThan(9);
+    expect(issue.at[0]).toBeLessThan(11);
+    // … and in a BETWEEN-BAR band (4–8 / 12–16) — on the spine corridor, not
+    // on a bar (outer lobe, y < 4 / 8–12 / > 16) or the ring centroid (10,10).
+    const inGapBand = (y: number) => (y > 3.5 && y < 8.5) || (y > 11.5 && y < 16.5);
+    expect(inGapBand(issue.at[1])).toBe(true);
+  });
+});

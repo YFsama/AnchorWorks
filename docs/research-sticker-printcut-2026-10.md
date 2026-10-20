@@ -106,14 +106,19 @@ interleaves concave parts), CutTime radius→speed corner model replacing the tu
 proxy, per-layer DXF export + trap dry-run preview + tolerance guidance, cut-path-masked
 bleed (smear only along cut lines), Graphtec Data-Link CODE39 band print-side encoder.
 
+Wave 6 (legacy fix + completion): Data-Link TCP transport (Tauri Rust commands +
+protocol library + dialog, hardware validation pending), part-in-hole nesting
+(RasterNestItem.holes), >=3-lobe pinch localization, rasterNest lazy-loading +
+right-edge guard fix.
+
 Still open:
 
-- Data-Link network handoff: the CODE39 band prints (wave 5), but the actual job
-  handoff needs a TCP-9100 transport (`ESC.d1`–`ESC.d6` protocol) — browser-safe only
-  via a Tauri Rust command; requires real-hardware validation.
+- Data-Link hardware validation: waves 5–6 ship the full print-side band + TCP
+  transport + protocol library + dialog; what remains is running it against a real
+  networked FC/CE cutter (connection persistence semantics, d1 status values, d6
+  necessity, reg-vector pre-scan flow).
 - Full NFP+GA nesting (SVGnest-class web-worker GA) — the raster grid now covers the
   concave-shape cases; NFP would add speed at fine rotations.
-- Part-in-hole nesting (cutting inside discarded holes of a bigger part).
 
 ## Source index (primary)
 

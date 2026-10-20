@@ -164,3 +164,164 @@ describe('RASTER_NEST_MAX_PARTS cap', () => {
     expect(excluded.every(p => p.y > 0)).toBe(true);
   });
 });
+
+/** Axis-aligned rectangle ring between (x0, y0) and (x1, y1). */
+function rectRing(x0: number, y0: number, x1: number, y1: number): Array<[number, number]> {
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+}
+
+/** Sheet-space occupied cells of a placed item's SOLID footprint — the outer
+ *  ring's fill minus every hole fill, i.e. the walls a nested part must stay
+ *  clear of (part-in-hole counterpart of the plain polygonCells helper).
+ *  Holes ride the OUTER ring's transform: same rotation point map, translated
+ *  by the outer ring's rotated-bbox min to the placement — NOT their own
+ *  bbox, which would re-anchor the hole at the frame's origin. */
+function itemCells(item: RasterNestItem, p: RasterNestPlacement): Array<[number, number]> {
+  const rotate = (pts: Array<[number, number]>) =>
+    pts.map(([x, y]) => (p.rotation === 90 ? [-y, x] : [x, y]) as [number, number]);
+  const rotOuter = rotate(item.points);
+  let minX = Infinity;
+  let minY = Infinity;
+  for (const [x, y] of rotOuter) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+  }
+  const toSheet = (pts: Array<[number, number]>) =>
+    rotate(pts).map(([x, y]) => [x - minX + p.x, y - minY + p.y] as [number, number]);
+  const key = (c: [number, number]) => c[0] * 1_000_000 + c[1];
+  const cells = new Set(polygonCells(toSheet(item.points)).map(key));
+  for (const hole of item.holes ?? []) {
+    for (const c of polygonCells(toSheet(hole))) cells.delete(key(c));
+  }
+  return [...cells].map(k => [Math.floor(k / 1_000_000), k % 1_000_000] as [number, number]);
+}
+
+describe('part-in-hole nesting (RasterNestItem.holes)', () => {
+  it('nests a 24×24 part inside a 60×60 frame’s 30×30 hole', () => {
+    // A frame (sticker-sheet window) leaves only its walls occupied once the
+    // hole ring is masked free, so on a 62 mm sheet the 24 mm part has no
+    // place to go BUT the hole — beside the frame there are 2 spare mm.
+    const frameItem: RasterNestItem = {
+      id: 'frame',
+      points: rectRing(0, 0, 60, 60),
+      holes: [rectRing(15, 15, 45, 45)],
+    };
+    const part: RasterNestItem = { id: 'part', points: rectRing(0, 0, 24, 24) };
+    const r = nestPolygonsRaster([frameItem, part], 62, 2);
+
+    expect(r.unfit).toBe(0);
+    const f = r.placements.find(p => p.id === 'frame')!;
+    const q = r.placements.find(p => p.id === 'part')!;
+    expect(f.placed).toBe(true);
+    expect(q.placed).toBe(true);
+
+    // Inside the frame’s AABB (0–60) …
+    expect(q.x).toBeGreaterThanOrEqual(0);
+    expect(q.y).toBeGreaterThanOrEqual(0);
+    expect(q.x + 24).toBeLessThanOrEqual(60);
+    expect(q.y + 24).toBeLessThanOrEqual(60);
+    // … and inside the hole rect (15–45) ± 2 mm raster slack.
+    expect(q.x).toBeGreaterThanOrEqual(15 - 2);
+    expect(q.x).toBeLessThanOrEqual(45 - 24 + 2);
+    expect(q.y).toBeGreaterThanOrEqual(15 - 2);
+    expect(q.y).toBeLessThanOrEqual(45 - 24 + 2);
+
+    // Nested in the hole the part adds NO height beyond the frame itself;
+    // two parts NOT interleaved would burn ≥ 60 + 2 + 24 mm of sheet.
+    expect(r.usedHeight).toBeLessThan(62);
+    expect(r.usedHeight).toBeGreaterThan(0);
+
+    // Overlap-free against the frame’s WALLS with the same ≥ gap − 1.5 px
+    // pairwise clearance the plain overlap test demands between parts.
+    const key = (c: [number, number]) => c[0] * 1_000_000 + c[1];
+    const walls = itemCells(frameItem, f).map(key);
+    const partCells = polygonCells(rebuiltPolygon(part.points, q));
+    const wallSet = new Set(walls);
+    expect(partCells.some(c => wallSet.has(key(c)))).toBe(false);
+    let min = Infinity;
+    for (const a of partCells) {
+      for (const b of itemCells(frameItem, f)) {
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (d < min) min = d;
+      }
+    }
+    expect(min).toBeGreaterThanOrEqual(2 - 1.5);
+  });
+
+  it('keeps a holed frame at rotation 0 when the quarter-turn is wider than the sheet, and still nests in the hole', () => {
+    // 60 wide × 70 tall: the quarter-turn needs 70 mm the 62 mm sheet doesn’t
+    // have, so only rotation 0 can place — and the hole must survive that
+    // decision for the small part to nest.
+    const frameItem: RasterNestItem = {
+      id: 'frame',
+      points: rectRing(0, 0, 60, 70),
+      holes: [rectRing(15, 20, 45, 50)],
+    };
+    const part: RasterNestItem = { id: 'part', points: rectRing(0, 0, 24, 24) };
+    const r = nestPolygonsRaster([frameItem, part], 62, 2);
+
+    const f = r.placements.find(p => p.id === 'frame')!;
+    const q = r.placements.find(p => p.id === 'part')!;
+    expect(f.placed).toBe(true);
+    expect(f.rotation).toBe(0);
+    expect(q.placed).toBe(true);
+    // Part inside the hole rect (15–45) × (20–50) ± 2 mm slack.
+    expect(q.x).toBeGreaterThanOrEqual(13);
+    expect(q.x).toBeLessThanOrEqual(23);
+    expect(q.y).toBeGreaterThanOrEqual(18);
+    expect(q.y).toBeLessThanOrEqual(26);
+    expect(r.usedHeight).toBeLessThan(72); // the 70 mm frame alone; no extra row
+    expect(r.unfit).toBe(0);
+  });
+
+  it('is deterministic with holed items across runs (re-pin)', () => {
+    const items: RasterNestItem[] = [
+      { id: 'frameB', points: rectRing(9, 9, 69, 75), holes: [rectRing(20, 18, 52, 50)] },
+      { id: 'chip2', points: rectRing(-40, 300, -16, 324) }, // 24×24
+      { id: 'frameA', points: rectRing(0, 0, 60, 60), holes: [rectRing(15, 15, 45, 45)] },
+      { id: 'l', points: lPoly() },
+      { id: 'chip', points: rectRing(400, 800, 412, 824) }, // 12×24
+    ];
+    const a = nestPolygonsRaster(items, 62, 2);
+    const b = nestPolygonsRaster(items, 62, 2);
+    expect(a).toEqual(b);
+    expect(a.unfit).toBe(0);
+    expect(a.placements.every(p => p.placed)).toBe(true);
+
+    // The hole actually hosts: frameB (placed first at (0,0)) has its 32×32
+    // hole at sheet (11–43, 9–41) and the 24×24 chip2 nests inside it, while
+    // the 12×24 chip nests in frameA’s hole — no chip below the pack.
+    const frameB = a.placements.find(p => p.id === 'frameB')!;
+    const chip2 = a.placements.find(p => p.id === 'chip2')!;
+    expect(frameB.x).toBeCloseTo(0, 6);
+    expect(frameB.y).toBeCloseTo(0, 6);
+    expect(chip2.x).toBeGreaterThanOrEqual(11 - 2);
+    expect(chip2.x).toBeLessThanOrEqual(43 - 24 + 2);
+    expect(chip2.y).toBeGreaterThanOrEqual(9 - 2);
+    expect(chip2.y).toBeLessThanOrEqual(41 - 24 + 2);
+  });
+});
+
+describe('right-edge guard (wave-6 review regression)', () => {
+  it('never places a part whose mask would cross the sheet\'s right edge', () => {
+    // 60 mm frame on a 62 mm sheet leaves a 2 mm strip; the 29 mm part must
+    // NOT "fit" there via the flat-index wraparound that existed at HEAD.
+    const frame: Array<[number, number]> =
+      [[0, 0], [60, 0], [60, 60], [0, 60], [0, 0]];
+    const chip: Array<[number, number]> =
+      [[0, 0], [29, 0], [29, 29], [0, 29], [0, 0]];
+    const result = nestPolygonsRaster(
+      [{ id: 'frame', points: frame }, { id: 'chip', points: chip }],
+      62, 2, { pxPerMm: 1 },
+    );
+    for (const p of result.placements) {
+      if (!p.placed) continue;
+      const w = p.rotation === 90 ? 29 : (p.id === 'frame' ? 60 : 29);
+      expect(p.x + w).toBeLessThanOrEqual(62 + 1e-9);
+    }
+    // The chip lands BELOW the frame (no wraparound spot), or is unfit.
+    const chipP = result.placements.find(p => p.id === 'chip')!;
+    const frameP = result.placements.find(p => p.id === 'frame')!;
+    expect(chipP.placed ? chipP.y : Infinity).toBeGreaterThanOrEqual(frameP.y + 60 - 0.1);
+  });
+});

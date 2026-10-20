@@ -536,3 +536,131 @@ describe('PlotterDialog per-layer DXF + trap preview', () => {
     expect(useEditor.getState().cutPaths[1]!.points).toHaveLength(2);
   });
 });
+
+/* ---- Data-Link (network cutter) ----
+ * The TCP-9100 barcode-handoff section (dataLink.ts / tcp_* Rust commands)
+ * is native-only: hidden under the web/PWA runtime, visible under Tauri,
+ * and its Connect & send runs the handshake over a mocked connection —
+ * with log lines in the dialog and NONE of the serial/download paths used.
+ *
+ * runtime.isTauri is wrapped in a passthrough vi.fn (default behaviour
+ * unchanged for the suites above); connectDataLink is mocked to a fake
+ * handle so the REAL dataLinkHandshake runs end-to-end against scripted
+ * cutter replies. Toasts become spies because no ToastHost is mounted. */
+
+vi.mock('../../lib/runtime', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/runtime')>();
+  return { ...actual, isTauri: vi.fn(actual.isTauri) };
+});
+vi.mock('../../lib/dataLink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/dataLink')>();
+  return { ...actual, connectDataLink: vi.fn() };
+});
+vi.mock('../../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/toast')>();
+  return {
+    ...actual,
+    toast: {
+      ...actual.toast,
+      success: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+    },
+  };
+});
+
+import { isTauri } from '../../lib/runtime';
+import { connectDataLink, type DataLinkHandle } from '../../lib/dataLink';
+import { toast } from '../../lib/toast';
+
+/** Scriptable fake cutter connection for connectDataLink (see the real
+ *  handshake's own FakeHandle in dataLink.test.ts). */
+class FakeCutterLink implements DataLinkHandle {
+  readonly sent: string[] = [];
+  private queue: string[];
+  constructor(replies: string[]) {
+    this.queue = [...replies];
+  }
+  async send(data: string): Promise<void> {
+    this.sent.push(data);
+  }
+  async read(): Promise<string> {
+    return this.queue.shift() ?? '';
+  }
+  close(): void { /* no-op in tests */ }
+}
+
+/** Type into a controlled React input (native setter + input event). */
+function setInputValue(input: HTMLInputElement, value: string): void {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!;
+    setter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+const dataLinkHeader = (c: HTMLElement) =>
+  c.querySelector<HTMLButtonElement>('button[aria-controls="plotter-datalink-body"]')!;
+
+describe('PlotterDialog Data-Link (network cutter)', () => {
+  afterEach(() => {
+    vi.mocked(isTauri).mockRestore();
+  });
+
+  it('is hidden when the native runtime is inactive', () => {
+    vi.mocked(isTauri).mockReturnValue(false);
+    useEditor.setState({ cutPaths: layeredJob() });
+    const c = mountDialog();
+    expect(c.textContent).not.toContain('Data-Link (network cutter)');
+  });
+
+  it('is visible (collapsed) when the native runtime is active', () => {
+    vi.mocked(isTauri).mockReturnValue(true);
+    useEditor.setState({ cutPaths: layeredJob() });
+    const c = mountDialog();
+    expect(c.textContent).toContain('Data-Link (network cutter)');
+    expect(dataLinkHeader(c).getAttribute('aria-expanded')).toBe('false');
+    expect(c.querySelector('#plotter-datalink-body')).toBeNull();
+  });
+
+  it('Connect & send runs the handshake, shows log lines and toasts success — never the serial/download paths', async () => {
+    vi.mocked(isTauri).mockReturnValue(true);
+    useEditor.setState({ cutPaths: layeredJob() });
+    const c = mountDialog();
+    click(dataLinkHeader(c)); // expand
+
+    // Default job name 'ANCHOR01' is pre-filled; the host starts empty and
+    // must be typed in before the send.
+    const host = c.querySelector<HTMLInputElement>('input[aria-label="Cutter host or IP"]')!;
+    expect(c.querySelector<HTMLInputElement>('input[aria-label="Job name"]')!.value).toBe('ANCHOR01');
+    setInputValue(host, '192.168.0.42');
+
+    // Scripted cutter: ready → scanned ANCHOR01 → list ok → picks index 0
+    // → accepts d5-less flow (no reg vector supplied by the dialog) → d6 ok.
+    vi.mocked(connectDataLink).mockResolvedValue(new FakeCutterLink([
+      '2\x03', 'ANCHOR01\x03', '0\x03', '0\x03', '0\x03',
+    ]));
+    vi.mocked(download).mockClear();
+    vi.mocked(sendOverSerial).mockClear();
+    vi.mocked(toast.success).mockClear();
+
+    const sendButton = Array.from(c.querySelectorAll('button')).find(b => b.textContent === 'Connect & send')!;
+    await clickAsync(sendButton);
+    await flush();
+
+    expect(vi.mocked(connectDataLink)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(connectDataLink)).toHaveBeenCalledWith('192.168.0.42', 9100);
+    // Success toast + the handshake log rendered line by line.
+    expect(vi.mocked(toast.success)).toHaveBeenCalledWith(expect.stringContaining('Data-Link'));
+    const log = c.querySelector('#plotter-datalink-body pre[role="log"]');
+    expect(log).not.toBeNull();
+    expect(log!.textContent).toContain('d1 status');
+    expect(log!.textContent).toContain('payload');
+    // The handoff never touched the USB-serial stream or a file download.
+    expect(vi.mocked(sendOverSerial)).not.toHaveBeenCalled();
+    expect(vi.mocked(download)).not.toHaveBeenCalled();
+    // Host persisted for the next open.
+    expect(window.localStorage.getItem('vector.datalink.host')).toBe('192.168.0.42');
+  });
+});

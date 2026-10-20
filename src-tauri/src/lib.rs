@@ -10,7 +10,11 @@
 // codebase boots in both shells.
 
 use serde::Serialize;
+use std::io::{ErrorKind, Read, Write};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use tauri::menu::{Menu, MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
@@ -199,6 +203,149 @@ async fn fs_open_project<R: Runtime>(
 /// link commands (`serial_open` / `serial_write` / `serial_read` /
 /// `serial_close`) and the legacy one-shot `serial_send`.
 
+// TCP Data-Link to a networked Graphtec cutter (src/lib/dataLink.ts).
+//
+// The cutter is the listener on TCP 9100 and answers the ESC.d1–d6
+// Data-Link protocol (docs/research-sticker-printcut-2026-10.md §2,
+// open-graphtec-server `protocol.py`). One persistent connection: the
+// machine refuses a second concurrent socket, so a single
+// `Option<TcpStream>` behind a mutex matches the single-cutter reality —
+// same OnceLock-global hold pattern as `serial.rs`'s port registry, just
+// without the id indirection because there is exactly one slot.
+//
+// Like the serial link commands, everything blocking runs on
+// `spawn_blocking`; the stream's own read timeout stays SHORT (the mutex
+// is held per read syscall) and `tcp_read` loops on its own deadline.
+
+fn tcp_link() -> &'static Mutex<Option<TcpStream>> {
+    static LINK: OnceLock<Mutex<Option<TcpStream>>> = OnceLock::new();
+    LINK.get_or_init(|| Mutex::new(None))
+}
+
+/// Per-syscall read timeout — see `serial.rs`'s `PORT_READ_TIMEOUT_MS`
+/// for why this must stay small (`tcp_read` loops on its own deadline).
+const TCP_READ_SLICE_MS: u64 = 10;
+/// Write stall budget — matches the legacy `serial_send` port timeout.
+const TCP_WRITE_TIMEOUT_MS: u64 = 5000;
+
+/// Connect to `host:port`, replacing any existing connection. `host` may
+/// be an IP or a hostname (resolved here, then `connect_timeout` per
+/// address until one answers).
+#[tauri::command]
+async fn tcp_connect(host: String, port: u16, timeout_ms: u64) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        // Drop any previous link first — the cutter accepts one connection.
+        if let Some(old) = tcp_link().lock().map_err(|e| e.to_string())?.take() {
+            drop(old);
+        }
+        let addrs: Vec<SocketAddr> = (host.as_str(), port)
+            .to_socket_addrs()
+            .map_err(|e| e.to_string())?
+            .collect();
+        if addrs.is_empty() {
+            return Err(format!("host {host} did not resolve"));
+        }
+        let budget = Duration::from_millis(timeout_ms.max(1));
+        let deadline = Instant::now() + budget;
+        let mut last_err = String::new();
+        let mut stream = None;
+        for addr in &addrs {
+            let now = Instant::now();
+            if now >= deadline {
+                break;
+            }
+            match TcpStream::connect_timeout(addr, deadline - now) {
+                Ok(s) => {
+                    stream = Some(s);
+                    break;
+                }
+                Err(e) => last_err = e.to_string(),
+            }
+        }
+        let stream = stream.ok_or_else(|| format!("connect {host}:{port} failed: {last_err}"))?;
+        stream
+            .set_read_timeout(Some(Duration::from_millis(TCP_READ_SLICE_MS)))
+            .map_err(|e| e.to_string())?;
+        stream
+            .set_write_timeout(Some(Duration::from_millis(TCP_WRITE_TIMEOUT_MS)))
+            .map_err(|e| e.to_string())?;
+        *tcp_link().lock().map_err(|e| e.to_string())? = Some(stream);
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Write the whole payload and flush. Bytes arrive as a JSON number array
+/// (same IPC shape as `fs_save_bytes`) — HP-GL/GP-GL jobs are ASCII, so
+/// the one-shot encode cost on an explicit user action is fine.
+#[tauri::command]
+async fn tcp_write(data: Vec<u8>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut link = tcp_link().lock().map_err(|e| e.to_string())?;
+        let stream = link.as_mut().ok_or("tcp link is not open")?;
+        stream.write_all(&data).map_err(|e| e.to_string())?;
+        stream.flush().map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Read whatever the cutter sent. Waits up to `timeout_ms` overall, then
+/// returns what arrived. An EMPTY vec on silence is not an error — the JS
+/// poll loop treats it as a no-op, mirroring `serial_read`.
+#[tauri::command]
+async fn tcp_read(timeout_ms: u64, max_bytes: usize) -> Result<Vec<u8>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let deadline = Instant::now() + Duration::from_millis(timeout_ms.max(1));
+        let mut out: Vec<u8> = Vec::with_capacity(256);
+        let mut buf = [0u8; 512];
+        loop {
+            if out.len() >= max_bytes || Instant::now() >= deadline {
+                break;
+            }
+            let n = {
+                let mut link = tcp_link().lock().map_err(|e| e.to_string())?;
+                let stream = link.as_mut().ok_or("tcp link is not open")?;
+                match stream.read(&mut buf) {
+                    Ok(0) => return Err("tcp link closed by the cutter".into()),
+                    Ok(n) => n,
+                    Err(e) if e.kind() == ErrorKind::TimedOut || e.kind() == ErrorKind::WouldBlock => 0,
+                    Err(e) => return Err(e.to_string()),
+                }
+            };
+            if n == 0 {
+                // Data-Link replies end with ETX — stop as soon as we see one.
+                if out.last() == Some(&0x03) {
+                    break;
+                }
+                if !out.is_empty() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(TCP_READ_SLICE_MS));
+                continue;
+            }
+            out.extend_from_slice(&buf[..n]);
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Close the link (drop = shutdown + close). Idempotent.
+#[tauri::command]
+async fn tcp_close() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let closed = tcp_link().lock().map_err(|e| e.to_string())?.take();
+        drop(closed);
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Trigger the OS print dialog for the current webview. The webview itself
 /// rasterises its DOM to a print surface — same code path used by
 /// `window.print()` in the web build, but routed through Tauri's native
@@ -369,6 +516,10 @@ pub fn run() {
             serial::serial_read,
             serial::serial_set_control,
             serial::serial_close,
+            tcp_connect,
+            tcp_write,
+            tcp_read,
+            tcp_close,
             epsonprint::epson_list_printers,
             epsonprint::epson_raw_transact,
             epsonprint::epson_raw_script,
