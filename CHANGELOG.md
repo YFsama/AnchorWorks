@@ -6,6 +6,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — sticker / decal / print-and-cut suite (waves 1–5)
 
+### Added (wave 7)
+- Help Center coverage for the whole suite: 12 new topics (8 in a new "Stickers & cutting" category + 4 in "Plotter & cutter"), every number mined from the live dialogs/libs; titles and search keywords fully bilingual (89 topics total).
+- e2e regression net for the flagship dialogs: makesticker / surfacewrap / productionpreview specs (7 tests) — guard toasts, preset roving, Apply end-to-end incl. undo of cut-path changes, lazy-chunk loads; suite now 56 specs.
+
 ### Added (wave 6)
 - **Data-Link network handoff (TCP 9100)**: four Tauri Rust commands (tcp_connect/write/read/close — cargo-check clean) + a pure protocol library (ESC.d1–d6 framing, job-list/selection/registration-vector parsing, byte-pinned against open-graphtec-server protocol.py) + a Data-Link section in the Plotter dialog (host/port/job name with live validation, handshake log, Tauri-only gating). Hardware validation on a real networked cutter remains the open item.
 - **Part-in-hole nesting**: RasterNestItem.holes — a frame with a cut-out nests smaller parts inside its hole (occupancy grid marks holes free; the EDT fit test keeps the gap from the hole walls automatically).

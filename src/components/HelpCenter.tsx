@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   X, Search, Sparkles, Compass, MousePointer2, PenTool, Layers as LayersIcon,
   Palette, Type, Wand2, Image as ImageIcon, FileText, Send, Printer, Save,
-  Keyboard, Accessibility, BookOpen, Settings, Eye, Cloud,
+  Keyboard, Accessibility, BookOpen, Settings, Eye, Cloud, Sticker,
   type LucideIcon,
 } from 'lucide-react';
 import { useEditor } from '../store/editor';
@@ -2611,6 +2611,385 @@ function buildTopics(t: (k: string) => string): Topic[] {
         </>
       ),
     },
+
+    // ------------- Stickers & cutting (new category, print-cut waves) -------------
+    {
+      id: 'make-sticker',
+      category: t('Stickers & cutting'),
+      title: t('Make Sticker'),
+      keywords: t('sticker die cut kiss perf border underlay weld offset white preset cricut stickermule'),
+      body: () => (
+        <>
+          <P>
+            <strong>Make Sticker…</strong> (Document menu, or
+            <Kbd>Ctrl</Kbd><Kbd>Alt</Kbd><Kbd>K</Kbd> — plain
+            <Kbd>Ctrl</Kbd><Kbd>K</Kbd> stays the Command Palette) turns the selection
+            into a print-then-cut sticker in one pass: the art is welded, the silhouette
+            is offset outward with round joins by the border width, the offset ring
+            prints as an underlay beneath the art, and the same ring becomes the cut
+            contour. It needs a selection — an empty-canvas press toasts
+            <em> Select something first.</em> and re-closes.
+          </P>
+          <H>Options</H>
+          <UL>
+            <li><strong>Border</strong> — 0–20 mm, default 2.54 mm (the Sticker Mule white-border standard)</li>
+            <li><strong>Underlay</strong> — White / None / Custom colour, printed behind the art</li>
+            <li><strong>Passes</strong> — 1–5 replays of the contour for stubborn material</li>
+            <li><strong>Bleed</strong> — 0–5 mm of ink smear (see <strong>Auto bleed</strong>)</li>
+          </UL>
+          <H>Cut types</H>
+          <P>
+            <strong>Die-cut</strong> cuts through the full stack along the offset
+            contour; <strong>Kiss-cut</strong> cuts the sticker layer only — the
+            carrier sheet stays intact; <strong>Perf border</strong> adds a through-cut
+            border released last so the sheet stays anchored. Presets cover Sticker
+            Mule white 2.54 mm, Minimum white 1.59 mm, Wide white 4 mm, Full bleed
+            (no border) and Black 2.54 mm. The contour lands in the store's cut
+            paths — <strong>Cut kinds &amp; ordering</strong> explains what happens
+            next.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'auto-bleed',
+      category: t('Stickers & cutting'),
+      title: t('Auto bleed'),
+      keywords: t('bleed smear ring nearest colour edge pixels print then cut cricut'),
+      body: () => (
+        <>
+          <P>
+            Print-then-cut rarely registers perfectly — if the ink ends exactly at the
+            cut line, a hair of misalignment leaves a white sliver. <strong>Auto
+            bleed</strong> grows the ink past the contour so the blade always lands on
+            colour: the artwork is rasterized and its edge pixels smeared outward,
+            Cricut-style. Make Sticker exposes it as <em>Bleed (mm)</em> (0–5);
+            <strong> Production Preview</strong> bakes the same smear into every copy
+            (default 1.6 mm).
+          </P>
+          <H>Ring vs nearest</H>
+          <UL>
+            <li><strong>Ring smear</strong> (default) redraws the edge outward in sampled rings — works everywhere, including headless rendering.</li>
+            <li><strong>Nearest</strong> (HQ) gives every transparent pixel within the bleed the colour of its nearest opaque source pixel — sharper colour continuity, but it needs real canvas pixels and falls back when they aren't there.</li>
+          </UL>
+          <P>
+            In Production Preview the proposed cut paths ride along so the smear is
+            masked back down to the cut lines — bleed from neighbouring copies never
+            bridges the gap between them. On canvas the stacking is bleed raster,
+            then underlay ring, then the original art on top.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'surface-wrap',
+      category: t('Stickers & cutting'),
+      title: t('Surface Wrap'),
+      keywords: t('wrap cylinder cone frustum gore sphere unwrap tumbler bottle label decal development'),
+      body: () => (
+        <>
+          <P>
+            <strong>Surface Wrap…</strong> (Document menu) unrolls a surface into the
+            flat development you actually cut — added as a dashed guide outline on the
+            canvas, a manual cut path, or both (both on by default).
+          </P>
+          <UL>
+            <li><strong>Cylinder</strong> — a strip π·D wide × the height, plus 0–30 mm overlap. Defaults Ø 70 × 160 mm ("Straight bottle label").</li>
+            <li><strong>Cone (frustum)</strong> — an annular sector with R = L·D/(D−d), r = L·d/(D−d) and θ = 360°·(D−d)/(2L), plus optional 0–30° overlap. Defaults 95 → 82 mm over a 110 mm slant (30 oz tumbler); the bottom diameter must exceed the top.</li>
+            <li><strong>Sphere gore</strong> — one lune of a 4–24-segment sphere; defaults Ø 80 mm with 12 gores. The live readout reports gore height and max width.</li>
+          </UL>
+          <P>
+            Presets cover the straight-bottle label, the 30 oz tumbler 95→82 taper, a
+            wedding-cup 82→55 taper and the 80 mm sphere ornament.
+          </P>
+          <Note>
+            Vinyl stretches and seams drift — the dialog's own advice for cones holds
+            for every kind: cut test-fit vinyl before the final wrap.
+          </Note>
+        </>
+      ),
+    },
+    {
+      id: 'production-preview',
+      category: t('Stickers & cutting'),
+      title: t('Production Preview'),
+      keywords: t('production preview imposition sheet copies nest bleed registration marks roll material'),
+      body: () => (
+        <>
+          <P>
+            <strong>Production Preview…</strong> (Document menu) imposes the selection
+            onto a printable sheet: copies nested true-shape (90° turns allowed), ink
+            bleed baked in, a magenta cut-line overlay and four corner L registration
+            marks. The preview rebuilds live about 250 ms after any change and reports
+            copies, sheet size and material used.
+          </P>
+          <H>Sheets &amp; copies</H>
+          <P>
+            Sheet presets: A4 (210×297), A3 (297×420), Letter (216×279), Roll 300 mm
+            and Roll 600 mm; height 0 means roll — it grows to whatever the nesting
+            consumes. Gap 0–10 mm (default 2), copies 1–200 (default 50), bleed 0–5 mm
+            in Ring or Nearest mode (see <strong>Auto bleed</strong>).
+          </P>
+          <P>
+            <strong>Apply</strong> inserts the composed sheet as one image at the
+            document origin and <strong>replaces</strong> the cut paths with the
+            imposed per-copy contours plus marks — what you previewed is exactly what
+            prints and cuts, as a single undo step. A design with no cut paths yields a
+            sheet that carries only registration marks. Print it at 100% and continue
+            with <strong>Print-then-cut marks</strong>.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'print-cut-marks',
+      category: t('Stickers & cutting'),
+      title: t('Print-then-cut marks'),
+      keywords: t('registration marks graphtec arms silhouette roland arm stroke scale check print prep'),
+      body: () => (
+        <>
+          <P>
+            The Print dialog's <strong>Print Prep</strong> section styles the
+            registration marks a cutter will look for. The <em>Sticker prep</em> preset
+            sets 2 mm bleed, crop marks, Silhouette-style registration marks and the
+            scale check in one click; <em>Press prep</em> (3 mm bleed) and
+            <em> Proof prep</em> cover plain printing.
+          </P>
+          <H>Mark styles</H>
+          <UL>
+            <li><strong>Graphtec ARMS</strong> — 20 mm arms, 0.7 mm stroke, marks point inward</li>
+            <li><strong>Silhouette</strong> — 10 mm arms, 0.25 mm stroke, offset 3 mm</li>
+            <li><strong>Roland</strong> — 25 mm arms, 0.5 mm stroke, offset 3 mm</li>
+            <li><strong>Generic press</strong> — plain corner marks offset 4 mm</li>
+          </UL>
+          <P>
+            Arm and stroke follow the style's defaults until you edit them;
+            <em> Style default</em> resets. <strong>Scale check</strong> prints a
+            50 × 9 mm block — measure it before cutting. The marks only register if the
+            print ran at 100% / Actual size, so never let the print driver scale the
+            page.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'data-link',
+      category: t('Stickers & cutting'),
+      title: t('Data-Link handoff'),
+      keywords: t('data link barcode code39 network cutter tcp 9100 tauri graphtec handshake job'),
+      body: () => (
+        <>
+          <P>
+            <strong>Data-Link</strong> hands a job to a networked Graphtec cutter by
+            barcode. In Print Prep, the <em>Data-Link barcode</em> toggle prints a
+            roll-media CODE39 band plus a 50 × 9 mm Start Mark; the band carries a link
+            info of up to 9 characters that must not start with <code>G</code>
+            (reserved) — <code>ANCHOR01</code> seeds it.
+          </P>
+          <P>
+            In the Plotter dialog, the <strong>Data-Link (network cutter)</strong>
+            section is desktop-build only (Tauri) — the web runtime has no raw sockets.
+            Enter the cutter's host or IP, the port (Graphtec listens on raw TCP 9100)
+            and a job name of 1–25 printable characters (first not <code>G</code>) that
+            matches the printed band's link info.
+          </P>
+          <H>The handshake</H>
+          <P>
+            <em>Connect &amp; send</em> runs the ESC.d sequence: d1 polls status, d2
+            reads the barcode the operator scanned, d3 offers the job list (at most 8
+            names), d4 reads the picked job, d5 transfers the registration vector in
+            0.1 mm units, d6 declares the command type, then the bare HP-GL payload
+            streams. Every step lands in the on-screen log. If the cutter reports no
+            job selected, scan the printed band — or pick the job on the machine panel
+            — and send again.
+          </P>
+          <Note>
+            The exchange mirrors the FC9000-validated open-graphtec-server reference,
+            but this implementation's behaviour against real cutters is still
+            validation-pending — persistent connections especially.
+          </Note>
+        </>
+      ),
+    },
+    {
+      id: 'cut-layer-exports',
+      category: t('Stickers & cutting'),
+      title: t('Cut-layer exports'),
+      keywords: t('export svg pdf cut layer cutcontour perfcutcontour magenta spot colour rip versaworks rasterlink iso 19593'),
+      body: () => (
+        <>
+          <P>
+            <em>File → Export SVG (with cut layer)</em> and
+            <em> File → Export PDF (with cut layer)</em> append the store's cut paths
+            to the artwork for RIPs that drive print-and-cut machines.
+          </P>
+          <UL>
+            <li><strong>SVG</strong> — a <code>&lt;g id="cut-layer"&gt;</code> with one path per contour, class <code>CutContour</code> (or <code>PerfCutContour</code> for kiss / perf cuts), stroked 100% magenta <code>#FF00FF</code> hairline, 0.25 mm by default — the spot-colour convention Roland VersaWorks and Mimaki RasterLink7 recognize.</li>
+            <li><strong>PDF</strong> — vector PDF with the magenta overlay wrapped in ISO 19593-1:2018 processing-steps optional content groups (Cutting vs PartialCutting), so compliant prepress tools can show or hide the cut layer.</li>
+            <li><strong>DXF</strong> — per-layer DXF from the Plotter dialog's Layers section, for lasers and CAD (see <strong>Layered vinyl</strong>).</li>
+          </UL>
+          <P>
+            The SVG paths carry <code>data-cut-kind</code> so downstream tooling can
+            recover the cut kind. VersaWorks / RasterLink7 users assign the magenta as
+            the cut line in the RIP; the ISO OCG path suits newer preflight workflows.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'layered-vinyl',
+      category: t('Stickers & cutting'),
+      title: t('Layered vinyl'),
+      keywords: t('layered vinyl multi colour layer mirror trap dxf marks stacking alignment'),
+      body: () => (
+        <>
+          <P>
+            When the cut job holds two or more vinyl colours, the Plotter dialog grows
+            a <strong>Layers (multi-colour vinyl)</strong> section: one job per colour,
+            stacked bottom-first with the largest layer at the bottom.
+          </P>
+          <UL>
+            <li><strong>Shared marks</strong> — colourless geometry (registration marks, weed borders) is cut identically into every layer, so the stack aligns by matching the same marks.</li>
+            <li><strong>Per-layer mirror</strong> — each row can override the global mirror (the HTV carrier side differs per layer).</li>
+            <li><strong>Per-layer send</strong> — send-all pauses between layers for the vinyl swap and stops cleanly if you decline.</li>
+            <li><strong>Per-layer save</strong> — a plotter file or a DXF per colour (<code>layer-2-ff9a1f</code>-style names), or all of them staggered about 300 ms apart.</li>
+          </UL>
+          <P>
+            Layer alignment tolerance is ~0.5 mm — design a 0.5–1 mm trap so
+            misregistration shows as overlap, not a gap. <em>Trap layers</em> grows
+            every layer except the bottom outward to exactly that (0.5 mm default,
+            with a dry-run count of how many paths would move).
+          </P>
+        </>
+      ),
+    },
+
+    // ------------- Plotter & cutter (print-cut waves) -------------
+    {
+      id: 'weed-check',
+      category: t('Plotter & cutter'),
+      title: t('Weed check'),
+      keywords: t('weed weeding preflight thin feature narrow gap small island vinyl htv glitter profile'),
+      body: () => (
+        <>
+          <P>
+            The Plotter dialog's Code tab carries a <strong>Weed check (weeding
+            preflight)</strong> panel that lints the job against a material profile
+            before any vinyl is wasted:
+          </P>
+          <UL>
+            <li><strong>Vinyl</strong> — strokes ≥ 1.5 mm, gaps ≥ 1 mm, islands ≥ 4 mm², cap height ≥ 5 mm</li>
+            <li><strong>HTV</strong> — same floors, islands ≥ 6 mm²</li>
+            <li><strong>Glitter HTV</strong> — 3 mm / 2.5 mm / 12 mm² / 10 mm; glitter flakes demand roughly twice everything</li>
+            <li><strong>Sticker paper</strong> — 1.59 mm (1/16") floors throughout</li>
+          </UL>
+          <P>
+            Three issue kinds are reported with the offending measurement: <strong>thin
+            feature</strong> (a stroke's narrowest waist, pinch necks included),
+            <strong> narrow gap</strong> (two cuts too close — weed pull bridges them)
+            and <strong>small island</strong> (enclosed detail that won't lift out
+            cleanly). Jobs with more than 400 paths skip the run rather than stall.
+          </P>
+          <Note>
+            Measurements within about half a millimetre of the floor are flagged on
+            purpose: the raster probe carries ±0.25 mm of pixel quantization, so
+            borderline widths are surfaced instead of silently cleared.
+          </Note>
+        </>
+      ),
+    },
+    {
+      id: 'cut-kinds',
+      category: t('Plotter & cutter'),
+      title: t('Cut kinds & ordering'),
+      keywords: t('cut kind outline trace manual kiss perf through ordering rank persistence'),
+      body: () => (
+        <>
+          <P>
+            Every cut path carries a kind: <strong>outline</strong> (offset contour from
+            vector art), <strong>trace</strong> (raster-traced edge), <strong>manual</strong>
+            (drawn geometry — Surface Wrap uses it), <strong>regmark</strong>,
+            <strong> kiss</strong> and <strong>perf</strong>. Outline and trace contours
+            remember the source object's colour; that colour drives Cut by colour and
+            the Layers section, while colourless geometry (regmarks, weed borders)
+            always cuts.
+          </P>
+          <H>Ordering</H>
+          <P>
+            Emission order is a hard constraint: all through-cuts first, then
+            kiss-cuts, then the perf border — released last so the sheet stays anchored
+            to the carrier while everything else is cut. Travel optimisation can only
+            reorder paths within a kind group, so optimising for speed never breaks the
+            sequence.
+          </P>
+          <H>Persistence &amp; cleanup</H>
+          <P>
+            Cut paths serialise with project files (schema v2; older v1 files simply
+            load with none) and ride autosave. The Document menu's Clear items remove
+            them by kind — contour, trace, regmarks — or all at once.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'cut-path-nesting',
+      category: t('Plotter & cutter'),
+      title: t('Cut-path nesting'),
+      keywords: t('nest packer hull true shape raster part in hole vinyl sheet gap material'),
+      body: () => (
+        <>
+          <P>
+            Three packers, two of which move only the cut geometry — the printed art
+            stays exactly where it is.
+          </P>
+          <UL>
+            <li><strong>Objects</strong> — <em>Nest (rotation-aware)</em> packs canvas objects on a sheet; see <strong>Rotation-aware nesting</strong>.</li>
+            <li><strong>Vinyl hull</strong> — <em>File → Nest cut paths (vinyl)</em>: a convex-hull skyline packer, the right cheap fit for blob-like decals.</li>
+            <li><strong>Raster true-shape</strong> — <em>File → Nest cut paths (raster true-shape)</em>: an occupancy-grid packer (2 px/mm) that interlocks Ls, C-channels and lettering counters into each other's concavities — including part-in-hole, where smaller parts drop inside larger parts' cut-outs with the same gap kept to the hole walls. At most 60 parts place per run.</li>
+          </UL>
+          <P>
+            Sheet width defaults to the document width in mm (at least 150 mm);
+            regmarks are excluded from the packing and appended unchanged. The gap
+            defaults to 2 mm — figure 2–3 mm for kiss-cut sheets and 1–2 mm on rolls.
+            Each run reports pieces nested and material used, and lands as one undo
+            step.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'arms-blade-offset',
+      category: t('Plotter & cutter'),
+      title: t('ARMS & blade offset'),
+      keywords: t('arms blade offset corner loop overcut graphtec tb registration fc dialect drag knife'),
+      body: () => (
+        <>
+          <P>
+            Two cutter-side corrections live in the Plotter dialog.
+          </P>
+          <H>ARMS registration (print &amp; cut)</H>
+          <P>
+            Emittable only on HP-GL with the <em>Graphtec FC (FS / VS)</em> dialect.
+            The toggle prepends the GP-GL TB registration block — TB99 enters setup,
+            TB51 arm length, TB52 mark type, TB54 sensor origin, TB55 search
+            direction, TB24 search area — and TB0 after the footer leaves ARMS mode.
+            Defaults: 20 mm arms (4–20), type-2 square marks (four inward corner
+            L-brackets; type 1 is circle) and a 200 × 150 mm search rectangle, with
+            <em> Auto</em> filling it from the job bounding box. Pair it with the
+            Graphtec ARMS style under <strong>Print-then-cut marks</strong>.
+          </P>
+          <H>Blade offset &amp; overcut</H>
+          <P>
+            A drag knife swivels behind its shank, so the tip trails a small loop at
+            every corner. <strong>Blade offset</strong> compensates — 0.25 mm is
+            typical for a 45° blade (presets 0 / 0.25 / 0.5 mm) and the generator
+            inserts the corner loops for you. <strong>Overcut</strong> extends each
+            closed cut slightly past its start point so corners fully release
+            (presets from 0 to 1 mm).
+          </P>
+        </>
+      ),
+    },
   ];
 }
 
@@ -2635,6 +3014,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   'Platform': Cloud,
   'Keyboard shortcuts': Keyboard,
   'Accessibility': Accessibility,
+  'Stickers & cutting': Sticker,
 };
 
 export function HelpCenter() {
@@ -2671,11 +3051,12 @@ export function HelpCenter() {
     map.set(t('Platform'), 'Platform');
     map.set(t('Keyboard shortcuts'), 'Keyboard shortcuts');
     map.set(t('Accessibility'), 'Accessibility');
+    map.set(t('Stickers & cutting'), 'Stickers & cutting');
     return map;
   }, [t]);
 
   // Fuzzy filter — substring match against title, category and keywords.
-  // Cheap and predictable; we have ~50 topics, not 50,000.
+  // Cheap and predictable; we have ~90 topics, not 50,000.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return topics;
