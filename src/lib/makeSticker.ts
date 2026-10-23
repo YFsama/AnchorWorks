@@ -77,6 +77,13 @@ export function makeSticker(
 
   const cutPaths: CutPath[] = [];
   const underlayRings: Array<Array<[number, number]>> = [];
+  // Single-object stickers stamp the source object's fabric id so downstream
+  // per-object tooling (Production Preview's multi-item partition, cut-by
+  // colour grouping) can attribute the contour. A multi-object weld has no
+  // single owner and stays unstamped — previews then union the selection.
+  const sourceId = objects.length === 1
+    ? (objects[0] as fabric.FabricObject & { _id?: string })._id
+    : undefined;
   for (const src of sources) {
     const offs = offsetPolyline(src.points, borderMm, src.closed, { join: 'round' });
     for (const ring of offs) {
@@ -87,6 +94,7 @@ export function makeSticker(
         closed: src.closed,
         kind: cutKind,
         passes,
+        ...(sourceId ? { sourceObjectId: sourceId } : {}),
       });
       underlayRings.push(ring);
     }

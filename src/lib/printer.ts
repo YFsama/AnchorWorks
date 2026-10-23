@@ -253,3 +253,40 @@ export function printCanvas(opts: PrintOptions, prep?: PrintPrep) {
     body: `<div class="page">${svg}</div>`,
   });
 }
+
+/** Print an already-composed image (PNG data URL) at an EXACT physical size —
+ *  the production-sheet hand-off: buildProductionPreview composes the imposed
+ *  sheet at sheetW×sheetH mm and this sends it to the printer 1:1 (@page
+ *  sized to the sheet with margin 0, the img at the same W×H mm), so the
+ *  OS dialog's 100% / Actual-size setting is the only correct one and the
+ *  registration marks stay dimensionally true.
+ *
+ *  Routes through the shared transport chain exactly like printCanvas
+ *  (printHtmlDocument / pickPrintTransport): hidden iframe + window.print()
+ *  on the web, the native PrintOperation under Tauri. Returns false WITHOUT
+ *  printing when the arguments are unusable (empty URL, non-finite or ≤0
+ *  size) or when no transport can run in this environment (the DOM mount the
+ *  transport needs throws) — callers toast a fallback. */
+export function printImageAtSize(url: string, widthMm: number, heightMm: number): boolean {
+  if (!url || !Number.isFinite(widthMm) || !Number.isFinite(heightMm) || widthMm <= 0 || heightMm <= 0) {
+    return false;
+  }
+  try {
+    printHtmlDocument({
+      title: 'Print',
+      delayMs: 100,
+      // Image payloads decode slowly — keep the hidden iframe alive as long
+      // as the heavy print paths do (see PrintPayload.iframeRemovalMs).
+      iframeRemovalMs: 8000,
+      css: `@page { size: ${widthMm}mm ${heightMm}mm; margin: 0; }
+      html, body { margin: 0; padding: 0; background: white; }
+      img { display: block; width: ${widthMm}mm; height: ${heightMm}mm; }`,
+      body: `<img src="${url}" alt="">`,
+    });
+    return true;
+  } catch {
+    // No usable print transport (no DOM / blocked mount) — caller decides
+    // how to surface it.
+    return false;
+  }
+}

@@ -6,6 +6,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — sticker / decal / print-and-cut suite (waves 1–5)
 
+### Added (wave 8)
+- **Mixed-sheet imposition**: Production Preview now partitions a multi-object selection into per-object items (2–12 objects — each with its own contour via sourceObjectId, its own bleed raster, packed together in one true-shape layout; copies apply per item). Single-object runs are byte-identical; >12 objects fall back to one union item.
+- **Direct sheet output**: Save PNG (the composed sheet as a dated file) and Print (printImageAtSize — @page at exact sheet size, margin 0, web iframe + Tauri native transports) straight from the Production Preview footer — no canvas roundtrip.
+
 ### Added (wave 7)
 - Help Center coverage for the whole suite: 12 new topics (8 in a new "Stickers & cutting" category + 4 in "Plotter & cutter"), every number mined from the live dialogs/libs; titles and search keywords fully bilingual (89 topics total).
 - e2e regression net for the flagship dialogs: makesticker / surfacewrap / productionpreview specs (7 tests) — guard toasts, preset roving, Apply end-to-end incl. undo of cut-path changes, lazy-chunk loads; suite now 56 specs.

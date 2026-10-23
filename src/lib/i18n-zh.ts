@@ -4115,4 +4115,10 @@ export const zhDict: Record<string, string> = {
   "nest packer hull true shape raster part in hole vinyl sheet gap material": "嵌套 打包 凸包 真形 光栅 件中孔 刻字贴 纸张 间隙 材料",
   "arms blade offset corner loop overcut graphtec tb registration fc dialect drag knife": "对位 刀尖偏摆 转角 过切 拖刀 方言",
 
+  "Save PNG": "保存 PNG",
+  "Save the composed sheet as a PNG file": "将整版图保存为 PNG 文件",
+  "Print the sheet at exact size": "按实际尺寸打印整版",
+  "Printing is unavailable in this environment.": "当前环境无法打印。",
+  "Sheet sent to the printer — print at 100% / Actual size.": "整版已发送到打印机——请按 100% / 实际大小打印。",
+
 };

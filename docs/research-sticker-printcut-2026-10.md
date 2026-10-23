@@ -111,6 +111,9 @@ protocol library + dialog, hardware validation pending), part-in-hole nesting
 (RasterNestItem.holes), >=3-lobe pinch localization, rasterNest lazy-loading +
 right-edge guard fix.
 
+Wave 8: mixed-sheet imposition (per-object items, per-item copies) + direct
+Save PNG / Print-at-exact-size from Production Preview.
+
 Still open:
 
 - Data-Link hardware validation: waves 5–6 ship the full print-side band + TCP

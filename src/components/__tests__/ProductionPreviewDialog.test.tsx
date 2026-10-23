@@ -25,7 +25,7 @@ import type { ProductionPreviewResult } from '../../lib/productionPreview';
  * (vi.mock of the lib, keeping the real SHEET_PRESETS constant).
  */
 
-const { canvasStub, pushHistoryMock, buildPreviewMock, fromURLMock, imageStub } = vi.hoisted(() => ({
+const { canvasStub, pushHistoryMock, buildPreviewMock, fromURLMock, imageStub, downloadDataURLMock, printImageMock } = vi.hoisted(() => ({
   canvasStub: {
     getActiveObjects: vi.fn<() => unknown[]>(() => []),
     add: vi.fn(),
@@ -35,6 +35,8 @@ const { canvasStub, pushHistoryMock, buildPreviewMock, fromURLMock, imageStub } 
   buildPreviewMock: vi.fn(),
   fromURLMock: vi.fn(),
   imageStub: { set: vi.fn(), setCoords: vi.fn() },
+  downloadDataURLMock: vi.fn(),
+  printImageMock: vi.fn(),
 }));
 
 vi.mock('fabric', () => ({
@@ -43,6 +45,12 @@ vi.mock('fabric', () => ({
 vi.mock('../../lib/canvasEngine', () => ({
   getCanvas: () => canvasStub,
   pushHistory: pushHistoryMock,
+}));
+vi.mock('../../lib/io', () => ({
+  downloadDataURL: downloadDataURLMock,
+}));
+vi.mock('../../lib/printer', () => ({
+  printImageAtSize: printImageMock,
 }));
 vi.mock('../../lib/productionPreview', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/productionPreview')>();
@@ -56,7 +64,8 @@ const FIXED_A: ProductionPreviewResult = {
   pxPerMm: 11.3385, // 3 × 3.7795 (raster multiplier 3)
   sheetW: 210,
   sheetH: 297,
-  placements: [{ x: 0, y: 0, rotation: 0 }],
+  placements: [{ x: 0, y: 0, rotation: 0, itemIndex: 0 }],
+  items: [{ objectId: 'a', copies: 12 }],
   copies: 12,
   utilization: 0.78,
   cutPaths: [
@@ -127,6 +136,8 @@ beforeEach(() => {
   imageStub.set.mockClear();
   fromURLMock.mockReset().mockResolvedValue(imageStub);
   buildPreviewMock.mockReset().mockResolvedValue(FIXED_A);
+  downloadDataURLMock.mockReset();
+  printImageMock.mockReset().mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -234,5 +245,52 @@ describe('ProductionPreviewDialog apply', () => {
     });
     expect(infoSpy).toHaveBeenCalledWith('No cut paths found — sheet cut carries only registration marks.', expect.anything());
     expect(useEditor.getState().cutPaths).toBe(FIXED_A.cutPaths);
+  });
+});
+
+describe('ProductionPreviewDialog save/print', () => {
+  const savePngButton = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll<HTMLButtonElement>('button')).find(b => b.textContent?.includes('Save PNG'))!;
+  const printButton = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll<HTMLButtonElement>('button')).find(b => b.textContent?.includes('Print'))!;
+
+  it('Save PNG downloads the composed sheet under a dated production-sheet name', async () => {
+    const c = mountDialog();
+    await settlePreview();
+    click(savePngButton(c));
+    expect(downloadDataURLMock).toHaveBeenCalledTimes(1);
+    const [name, url] = downloadDataURLMock.mock.calls[0] as [string, string];
+    expect(name).toMatch(/^production-sheet-\d{4}-\d{2}-\d{2}\.png$/);
+    expect(url).toBe(FIXED_A.url);
+  });
+
+  it('Print sends the sheet at its exact size and toasts (warn when unavailable)', async () => {
+    // First click: transport unavailable → warn. Second: sent → success.
+    printImageMock.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const c = mountDialog();
+    await settlePreview();
+    const warnSpy = vi.spyOn(toast, 'warn');
+    const successSpy = vi.spyOn(toast, 'success');
+
+    click(printButton(c));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(printImageMock).toHaveBeenCalledWith(FIXED_A.url, FIXED_A.sheetW, FIXED_A.sheetH);
+    expect(warnSpy).toHaveBeenCalledWith('Printing is unavailable in this environment.', expect.anything());
+
+    click(printButton(c));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(printImageMock).toHaveBeenCalledTimes(2);
+    expect(successSpy).toHaveBeenCalledWith('Sheet sent to the printer — print at 100% / Actual size.', expect.anything());
+  });
+
+  it('keeps Save PNG and Print disabled while there is no result', async () => {
+    buildPreviewMock.mockResolvedValue(null);
+    const c = mountDialog();
+    // Pre-settle (build pending) and post-settle (build failed) both lock them.
+    expect(savePngButton(c).disabled).toBe(true);
+    expect(printButton(c).disabled).toBe(true);
+    await settlePreview();
+    expect(savePngButton(c).disabled).toBe(true);
+    expect(printButton(c).disabled).toBe(true);
   });
 });

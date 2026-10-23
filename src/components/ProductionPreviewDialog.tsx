@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as fabric from 'fabric';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, Download } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { getCanvas, pushHistory } from '../lib/canvasEngine';
 import {
@@ -9,6 +9,8 @@ import {
   SHEET_PRESETS,
   type ProductionPreviewResult,
 } from '../lib/productionPreview';
+import { printImageAtSize } from '../lib/printer';
+import { downloadDataURL } from '../lib/io';
 import { toast } from '../lib/toast';
 import { useT } from '../lib/i18n';
 import { useEscapeClose } from '../lib/hooks/useEscapeClose';
@@ -51,6 +53,7 @@ export function ProductionPreviewDialog() {
   const [building, setBuilding] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [reviewedPreset, setReviewedPreset] = useReviewedAction();
   const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   // Modal-only dismiss (zustand = external system) for the open-guard effect,
@@ -62,6 +65,7 @@ export function ProductionPreviewDialog() {
   const close = useCallback(() => {
     setApplied(false);
     setApplying(false);
+    setPrinting(false);
     useEditor.getState().setModal('showProductionPreview', false);
   }, []);
 
@@ -171,6 +175,31 @@ export function ProductionPreviewDialog() {
       setApplying(false);
       toast.error(t('Preview failed — try Ring bleed mode or a smaller sheet.'), { title: t('Production Preview') });
     }
+  };
+
+  // Save the composed sheet PNG exactly as previewed (the data URL is the
+  // final raster — no re-encode); the dated name keeps saved sheets sortable.
+  const savePng = () => {
+    if (!result) return;
+    downloadDataURL(`production-sheet-${new Date().toISOString().slice(0, 10)}.png`, result.url);
+  };
+
+  // Print the sheet at its EXACT physical size (printer.printImageAtSize:
+  // @page sheetW×sheetH mm, margin 0). Deferred one tick so the busy state
+  // paints before the iframe document mounts; the toast tells the user the
+  // only scale setting that keeps the cut marks dimensionally true.
+  const printSheet = () => {
+    if (!result || printing) return;
+    setPrinting(true);
+    window.setTimeout(() => {
+      const ok = printImageAtSize(result.url, result.sheetW, result.sheetH);
+      setPrinting(false);
+      if (ok) {
+        toast.success(t('Sheet sent to the printer — print at 100% / Actual size.'), { title: t('Production Preview') });
+      } else {
+        toast.warn(t('Printing is unavailable in this environment.'), { title: t('Production Preview') });
+      }
+    }, 0);
   };
 
   const handleFooterActionKeys = makeRovingKeys({
@@ -356,6 +385,23 @@ export function ProductionPreviewDialog() {
           actions={[
             { children: t('Cancel'), review: t('Cancel'), className: 'btn', onClick: close },
             { children: t('Reset'), review: t('Reset production preview settings'), className: 'btn', onClick: resetSettings, title: t('Reset production preview settings') },
+            {
+              children: <><Download size={12} aria-hidden="true" /> {t('Save PNG')}</>,
+              review: t('Save PNG'),
+              className: 'btn',
+              onClick: savePng,
+              title: t('Save the composed sheet as a PNG file'),
+              disabled: building || applying || applied || !result,
+            },
+            {
+              children: <><Printer size={12} aria-hidden="true" /> {t('Print')}</>,
+              review: t('Print'),
+              className: 'btn',
+              onClick: printSheet,
+              title: t('Print the sheet at exact size'),
+              disabled: building || printing || !result,
+              'aria-busy': printing,
+            },
             {
               children: t('Apply'), review: t('Apply'), className: 'btn-primary', onClick: () => { void apply(); },
               title: t('Insert the imposed sheet and replace cut paths'),

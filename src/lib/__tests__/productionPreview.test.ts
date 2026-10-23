@@ -398,4 +398,111 @@ describe('buildProductionPreview', () => {
     expect(noCuts!.utilization).toBeCloseTo(withCuts!.utilization, 9);
   });
 
+  it('multi-item: imposes each top-level object as its own item with per-item copies', async () => {
+    // Two disjoint stickers — red 30×20 at (10,10), blue 20×40 at (100,10) —
+    // each with its own source-stamped contour (fabric `_id` attribution).
+    const red = mmRect(10, 10, 30, 20, '#e11d48');
+    (red as unknown as { _id?: string })._id = 'obj-red';
+    const blue = mmRect(100, 10, 20, 40, '#2563eb');
+    (blue as unknown as { _id?: string })._id = 'obj-blue';
+    const cutRed = { ...rectCutPath('cut-red', 10, 10, 30, 20, 'outline', '#ff0000'), sourceObjectId: 'obj-red' };
+    const cutBlue = { ...rectCutPath('cut-blue', 100, 10, 20, 40, 'kiss', '#00ff00'), sourceObjectId: 'obj-blue' };
+    const opts = { sheetWidthMm: 200, gapMm: 2, copies: 2, bleedMm: 0, showMarks: false } as const;
+
+    const result = await buildProductionPreview([red, blue], [cutRed, cutBlue], opts);
+    expect(result).not.toBeNull();
+    // One item per object, `copies` PER ITEM (2 each → 4 placements total).
+    expect(result!.items.map(i => i.objectId)).toEqual(['obj-red', 'obj-blue']);
+    expect(result!.items.map(i => i.copies)).toEqual([2, 2]);
+    expect(result!.copies).toBe(4);
+    expect(result!.placements.map(p => p.itemIndex).sort()).toEqual([0, 0, 1, 1]);
+
+    // Both items' stamps present (≥4), each drawn from its OWN raster (two
+    // distinct FakeImage elements — buildBleedImage's own canvas drawImage
+    // calls are excluded by the instanceof filter).
+    const k = result!.pxPerMm;
+    const stamps = stampRects(orderedLog(mocks));
+    expect(stamps.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(drawImage.mock.calls.map(c => c[0]).filter(a => a instanceof FakeImage)).size).toBe(2);
+    const W = 200 * k;
+    const H = result!.sheetH * k;
+    for (const s of stamps) {
+      expect(s.x1).toBeGreaterThanOrEqual(-0.5);
+      expect(s.y1).toBeGreaterThanOrEqual(-0.5);
+      expect(s.x2).toBeLessThanOrEqual(W + 0.5);
+      expect(s.y2).toBeLessThanOrEqual(H + 0.5);
+    }
+
+    // Per-item cut copies: `-i<itemIndex>-c<n>` suffixes, kinds/colors kept.
+    const outlines = result!.cutPaths.filter(p => p.kind === 'outline');
+    const kisses = result!.cutPaths.filter(p => p.kind === 'kiss');
+    expect(outlines.map(p => p.id).sort()).toEqual(['cut-red-i0-c0', 'cut-red-i0-c1']);
+    expect(kisses.map(p => p.id).sort()).toEqual(['cut-blue-i1-c0', 'cut-blue-i1-c1']);
+    expect(outlines.every(p => p.color === '#ff0000')).toBe(true);
+    expect(kisses.every(p => p.color === '#00ff00')).toBe(true);
+
+    // Deterministic: identical inputs → deep-equal placements + cut paths.
+    const again = await buildProductionPreview([red, blue], [cutRed, cutBlue], opts);
+    expect(again!.placements).toEqual(result!.placements);
+    expect(again!.cutPaths).toEqual(result!.cutPaths);
+  });
+
+  it('multi-item: unstamped contours force the union fallback (cuts are never dropped)', async () => {
+    // An UNSTAMPED path (e.g. a multi-object welded Make Sticker ring, or a
+    // contour from a source this selection doesn't own) belongs to no single
+    // object — the per-item partition would silently drop it. The build must
+    // fall back to ONE union item so the contour keeps imposing.
+    const red = mmRect(10, 10, 30, 20);
+    (red as unknown as { _id?: string })._id = 'obj-red';
+    const plain = mmRect(100, 10, 20, 40);
+    (plain as unknown as { _id?: string })._id = 'obj-plain';
+    const unstamped = rectCutPath('weld-ring', 5, 5, 120, 50, 'outline');
+    const result = await buildProductionPreview([red, plain], [unstamped], {
+      sheetWidthMm: 200, gapMm: 2, copies: 1, bleedMm: 0, showMarks: false,
+    });
+    expect(result).not.toBeNull();
+    // Union fallback: one item, copies of the UNION, historical -c${n} ids.
+    expect(result!.items).toHaveLength(1);
+    expect(result!.items[0]!.objectId).toBe('obj-red');
+    expect(result!.copies).toBe(1);
+    expect(result!.cutPaths.map(p => p.id)).toEqual(['weld-ring-c0']);
+    // One raster for the union (a single distinct FakeImage source).
+    expect(new Set(drawImage.mock.calls.map(c => c[0]).filter(a => a instanceof FakeImage)).size).toBe(1);
+  });
+
+  it('single-object runs keep the historical `-c${n}` ids (no item token)', async () => {
+    const objects = [mmRect(10, 10, 60, 40)];
+    const cutPaths = [rectCutPath('outline-1', 10, 10, 60, 40, 'outline')];
+    const result = await buildProductionPreview(objects, cutPaths, {
+      sheetWidthMm: 200, gapMm: 2, copies: 3, bleedMm: 0, showMarks: false,
+    });
+    expect(result).not.toBeNull();
+    // One item, one raster: the single-item path is the historical one.
+    expect(result!.items).toHaveLength(1);
+    expect(new Set(drawImage.mock.calls.map(c => c[0]).filter(a => a instanceof FakeImage)).size).toBe(1);
+    expect(result!.placements.every(p => p.itemIndex === 0)).toBe(true);
+    const copyIds = result!.cutPaths.filter(p => p.kind !== 'regmark').map(p => p.id);
+    expect(copyIds.sort()).toEqual(['outline-1-c0', 'outline-1-c1', 'outline-1-c2']);
+    for (const id of copyIds) {
+      expect(id).toMatch(/-c\d+$/);
+      expect(id.includes('-i')).toBe(false);
+    }
+  });
+
+  it('beyond 12 objects the whole selection imposes as ONE item (fallback)', async () => {
+    // 13 disjoint 20×10 rects with no cut paths — the multi-item path would
+    // build 13 rasters; the fallback packs ONE union-footprint item instead.
+    const objects = Array.from({ length: 13 }, (_, i) => mmRect(10 + i * 25, 10, 20, 10));
+    const result = await buildProductionPreview(objects, [], {
+      sheetWidthMm: 400, gapMm: 2, copies: 2, bleedMm: 0, showMarks: false,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.items).toHaveLength(1);
+    expect(result!.placements.every(p => p.itemIndex === 0)).toBe(true);
+    // One raster stamps every placement (the union bbox raster — a
+    // per-object build would have drawn 13 distinct image elements).
+    expect(new Set(drawImage.mock.calls.map(c => c[0]).filter(a => a instanceof FakeImage)).size).toBe(1);
+    expect(result!.copies).toBe(2);
+  });
+
 });
