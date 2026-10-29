@@ -4,7 +4,7 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — sticker / decal / print-and-cut suite (waves 1–5)
+## [0.17.0] — 2026-10-29
 
 ### Added (wave 8)
 - **Mixed-sheet imposition**: Production Preview now partitions a multi-object selection into per-object items (2–12 objects — each with its own contour via sourceObjectId, its own bleed raster, packed together in one true-shape layout; copies apply per item). Single-object runs are byte-identical; >12 objects fall back to one union item.
@@ -22,7 +22,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed (wave 6)
 - rasterNest lazy-loads behind its one-click action (−1 kB gzip warm graph; the entry was already clean — honest numbers in the wave log).
 
-Five research-grounded waves (vendor specs + hardware-validated open-source cutter stacks; full findings and spec tables in docs/research-sticker-printcut-2026-10.md).
+Eight research-grounded waves (vendor specs + hardware-validated open-source cutter stacks; full findings and spec tables in docs/research-sticker-printcut-2026-10.md). All gates green at release: 2386 unit tests, tsc --strict, eslint, vite build, cargo check, 56 e2e specs.
 
 ### Added
 - **Make Sticker (Ctrl+Alt+K)** — the Sticker Mule / Cricut "Create Sticker" / Silhouette Offset-panel workflow as one command: weld the selection, round-join offset border (2.54 mm default), white/custom underlay behind the art, and a die-cut / kiss-cut / perf-border contour (own overlay colours, project persistence, through→kiss→perf ordering at the plotter, PerfCutContour export naming).
