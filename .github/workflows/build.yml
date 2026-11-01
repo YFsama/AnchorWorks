@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       # `npm install` (not `npm ci`) — works around a known npm bug
       # where the lockfile is missing transitive deps of the wasm32
@@ -48,6 +48,31 @@ jobs:
           path: dist
           retention-days: 14
 
+  # Quality gate — the PWA/native jobs prove the app BUILDS; this job proves
+  # it BEHAVES. Runs the full vitest suite (2.3k tests, jsdom — no extra
+  # system deps) and the Playwright e2e suite (the webServer in
+  # playwright.config.ts builds and previews on :4173 itself).
+  test:
+    name: Unit + e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install --no-audit --no-fund --prefer-offline
+      - run: npm test
+      # Playwright browser cache keyed on the lockfile (the @playwright/test
+      # version pins the browser build); --with-deps apt-installs the shared
+      # system libraries the chromium build needs on a bare runner.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install chromium --with-deps
+      - run: npm run e2e
+
   native:
     name: Native bundle (${{ matrix.os }})
     strategy:
@@ -59,7 +84,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # Rust toolchain + GTK / WebKit deps required by tauri-build.
