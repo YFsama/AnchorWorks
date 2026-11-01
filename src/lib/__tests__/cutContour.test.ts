@@ -401,7 +401,7 @@ describe('offsetPolyline round joins', () => {
     expect(Math.abs(shoelace(ring))).toBeGreaterThan(5000);
   });
 
-  it('suppresses star-tip spikes vs miter and stays a simple ring', () => {
+  it('suppresses star-tip spikes vs miter and stays a simple ring-3', () => {
     // 5-point star, tips at r=100, inner corners at r=40.
     const star: Array<[number, number]> = [];
     for (let k = 0; k < 10; k++) {
@@ -426,7 +426,7 @@ describe('offsetPolyline round joins', () => {
     for (const [x, y] of ring) expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
   });
 
-  it('inward round offset returns a valid ring or vanishes per the guards', () => {
+  it('inward round offset returns a valid ring-3 or vanishes per the guards', () => {
     const octa: Array<[number, number]> = [];
     for (let k = 0; k < 8; k++) {
       const a = (k * Math.PI) / 4;

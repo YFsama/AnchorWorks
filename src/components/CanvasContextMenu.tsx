@@ -498,7 +498,7 @@ export function CanvasContextMenu({ onNewDocument, onOpenFile, onImportImage, on
       ref={menuRef}
       role="menu"
       aria-label={t('Canvas')}
-      className="fixed z-[1000] bg-panel border border-border rounded-md shadow-xl py-1 text-xs max-h-[90vh] overflow-y-auto overscroll-contain"
+      className="fixed z-1000 bg-panel border border-border rounded-md shadow-xl py-1 text-xs max-h-[90vh] overflow-y-auto overscroll-contain"
       style={{ left: adjustedPos.x, top: adjustedPos.y, width: MENU_WIDTH }}
     >
       <Item
@@ -1539,7 +1539,7 @@ function SubMenu({ label, openLeft, disabled, children }: { label: string; openL
       </button>
       {!disabled && (
         <div
-          className={`absolute top-0 -mt-1 ${openLeft ? 'right-full' : 'left-full'} bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-all z-[1001] w-56 py-1 max-h-[70vh] overflow-y-auto overscroll-contain`}
+          className={`absolute top-0 -mt-1 ${openLeft ? 'right-full' : 'left-full'} bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-all z-1001 w-56 py-1 max-h-[70vh] overflow-y-auto overscroll-contain`}
           role="menu"
           aria-label={label}
         >

@@ -4,6 +4,8 @@ import './index.css'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { installGlobalErrorHandlers } from './lib/errorLog.ts'
+// Restore fabric v6 'left'/'top' origin defaults before any object is built.
+import './lib/fabricDefaults'
 
 // Global error capture must be attached BEFORE anything else runs, so
 // boot-time failures (chunk load errors, module side-effect throws) land in

@@ -172,7 +172,7 @@ function rebuildGuides(guides: GuideLine[]) {
 
 function makeGuide(from: { x: number; y: number }, to: { x: number; y: number }): GuideLine {
   const g = new fabric.Line([from.x, from.y, to.x, to.y], {
-    stroke: readToken('--color-accent2', '#5ac8d8'),
+    stroke: readToken('--accent2', '#5ac8d8'),
     strokeWidth: 1,
     strokeDashArray: [2, 3],
     selectable: false,
@@ -188,7 +188,7 @@ function makeGuide(from: { x: number; y: number }, to: { x: number; y: number })
 
 function styleAnchorSelection(handle: AnchorHandle, selected: boolean) {
   handle.set({
-    fill: selected ? '#ff2e9a' : readToken('--color-accent2', '#5ac8d8'),
+    fill: selected ? '#ff2e9a' : readToken('--accent2', '#5ac8d8'),
     strokeWidth: selected ? 2 : 1,
     radius: selected ? HANDLE_RADIUS + 1 : HANDLE_RADIUS,
   });
@@ -285,7 +285,7 @@ function makeAnchorHandle(
     left: canvasP.x,
     top: canvasP.y,
     radius: HANDLE_RADIUS,
-    fill: readToken('--color-accent2', '#5ac8d8'),
+    fill: readToken('--accent2', '#5ac8d8'),
     stroke: HANDLE_STROKE,
     strokeWidth: 1,
     originX: 'center',
@@ -352,7 +352,7 @@ function makeTangentHandle(
     width: HANDLE_RADIUS * 1.8,
     height: HANDLE_RADIUS * 1.8,
     fill: '#ffffff',
-    stroke: readToken('--color-accent2', '#5ac8d8'),
+    stroke: readToken('--accent2', '#5ac8d8'),
     strokeWidth: 1,
     originX: 'center',
     originY: 'center',

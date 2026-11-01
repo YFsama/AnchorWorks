@@ -269,7 +269,7 @@ export function PrintDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -338,7 +338,7 @@ export function PrintDialog() {
                 placeholder={t('Search page sizes…')}
                 aria-label={t('Search page sizes…')}
                 title={`${t('Press Enter to use first search result')} · ${t('Press Arrow Down to focus first page size')}`}
-                className="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70"
+                className="min-w-0 flex-1 bg-transparent outline-hidden text-xs text-ink placeholder:text-muted/70"
               />
               <span className="text-[10px] text-muted tabular-nums whitespace-nowrap" aria-live="polite">
                 {normalizedPageQuery ? `${filteredPageSizes.length} / ${PAGE_SIZES.length} ${t('matches')}` : `${PAGE_SIZES.length} ${t('sizes')}`}
@@ -412,7 +412,7 @@ export function PrintDialog() {
                 {pageQuery && (
                   <button
                     type="button"
-                    className="btn !py-1 !px-2 text-[10px]"
+                    className="btn py-1! px-2! text-[10px]"
                     onClick={() => setPageQuery('')}
                   >
                     {t('Clear search')}
@@ -508,7 +508,7 @@ export function PrintDialog() {
           <button
             type="button"
             onClick={() => setPrepOpen(o => !o)}
-            className="w-full flex items-center justify-between field-label !mb-0 text-[11px] hover:text-ink transition-colors"
+            className="w-full flex items-center justify-between field-label mb-0! text-[11px] hover:text-ink transition-colors"
             aria-expanded={prepOpen}
             aria-controls="print-prep-body"
           >
@@ -637,7 +637,7 @@ export function PrintDialog() {
                       min={2}
                       max={40}
                       step={0.5}
-                      className="input-num !w-16 !py-0.5 text-center"
+                      className="input-num w-16! py-0.5! text-center"
                       value={prep.regMarkArmMm ?? REG_MARK_DEFAULTS[regStyle].armMm}
                       onChange={(e) => {
                         setRegMarkCustom(true);
@@ -652,7 +652,7 @@ export function PrintDialog() {
                       min={0.05}
                       max={2}
                       step={0.05}
-                      className="input-num !w-16 !py-0.5 text-center"
+                      className="input-num w-16! py-0.5! text-center"
                       value={prep.regMarkStrokeMm ?? REG_MARK_DEFAULTS[regStyle].strokeMm}
                       onChange={(e) => {
                         setRegMarkCustom(true);
@@ -699,7 +699,7 @@ export function PrintDialog() {
                   <span className="text-[10px] text-muted">{t('Link info (9 chars, not starting with G)')}</span>
                   <input
                     type="text"
-                    className="input text-xs !py-0.5 !px-1.5 w-32 tabular-nums"
+                    className="input text-xs py-0.5! px-1.5! w-32 tabular-nums"
                     value={barcodeLink || prep.barcodeBand.linkInfo}
                     maxLength={9}
                     onChange={(e) => {

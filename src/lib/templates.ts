@@ -413,7 +413,7 @@ const stickerSheetKisscut: Template = {
 const laptopDecal: Template = {
   id: 'laptop-decal',
   name: 'Laptop Decal',
-  description: '300×200 mm decal with centered die-cut ellipse, 2.54 mm border ring and safe guides.',
+  description: '300×200 mm decal with centered die-cut ellipse, 2.54 mm border ring-3 and safe guides.',
   category: 'Stickers',
   thumbnail: svgThumb(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160">
     <rect width="240" height="160" fill="#fff"/>

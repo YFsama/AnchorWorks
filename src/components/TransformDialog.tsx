@@ -174,7 +174,7 @@ export function TransformDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -231,7 +231,7 @@ export function TransformDialog() {
         />
 
         <div className="mb-2">
-          <div className="field-label !mb-1">{t('Move presets')}</div>
+          <div className="field-label mb-1!">{t('Move presets')}</div>
           <PresetRow
             statusId="transform-move-preset-review-status"
             className="grid grid-cols-4 gap-1"
@@ -247,7 +247,7 @@ export function TransformDialog() {
               const active = moveMode === 'polar' ? dist === preset : dx === preset && dy === 0;
               return {
                 key: preset,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                 pressed: active,
                 onClick: () => applyMovePreset(preset),
                 title: moveMode === 'polar' ? `${t('Set distance to')} ${preset} ${unit}` : `${t('Set move X to')} ${preset} ${unit}`,
@@ -296,7 +296,7 @@ export function TransformDialog() {
         </div>
 
         <div className="mt-2">
-          <div className="field-label !mb-1">{t('Scale presets')}</div>
+          <div className="field-label mb-1!">{t('Scale presets')}</div>
           <PresetRow
             statusId="transform-scale-preset-review-status"
             className="grid grid-cols-4 gap-1"
@@ -312,7 +312,7 @@ export function TransformDialog() {
               const active = scaleX === preset && (!linkScale || scaleY === preset);
               return {
                 key: preset,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                 pressed: active,
                 onClick: () => { setScaleX(preset); if (linkScale) setScaleY(preset); },
                 title: `${t('Set scale to')} ${preset}%`,
@@ -326,7 +326,7 @@ export function TransformDialog() {
         </div>
 
         <div className="mt-2">
-          <div className="field-label !mb-1">{t('Rotate presets')}</div>
+          <div className="field-label mb-1!">{t('Rotate presets')}</div>
           <PresetRow
             statusId="transform-rotate-preset-review-status"
             className="grid grid-cols-6 gap-1"
@@ -342,7 +342,7 @@ export function TransformDialog() {
               const active = rotate === preset;
               return {
                 key: preset,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                 pressed: active,
                 onClick: () => setRotate(preset),
                 title: `${t('Set rotation to')} ${preset > 0 ? '+' : ''}${preset}°`,

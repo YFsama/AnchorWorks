@@ -17,7 +17,7 @@ test('knife tool sits on the toolbar and K activates it', async ({ page }) => {
 
   // The button exposes its localized name and the K binding separately
   // (aria-label + aria-keyshortcuts, see Toolbar.tsx).
-  const knifeBtn = toolbar.locator('button[aria-label="Knife"]');
+  const knifeBtn = toolbar.locator('button[aria-label="Knife — K"]');
   await expect(knifeBtn).toBeVisible();
   await expect(knifeBtn).toHaveAttribute('aria-keyshortcuts', 'K');
   await expect(knifeBtn).toHaveAttribute('aria-pressed', 'false');

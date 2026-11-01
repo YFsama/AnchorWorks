@@ -120,13 +120,13 @@ const TEMPLATES_BY_INDEX: Array<[name: string, description: string]> = [
   ['Sticker Pack', 'A grid of six colorful sticker discs with emoji labels.'],
   ['Flyer', 'Header strip, body block and footer info on letter-ish size.'],
   ['Sticker Sheet (Kiss-cut)', 'A4 sheet, 3×2 rounded stickers with kiss-cut outlines, perf-cut border and safe areas.'],
-  ['Laptop Decal', '300×200 mm decal with centered die-cut ellipse, 2.54 mm border ring and safe guides.'],
+  ['Laptop Decal', '300×200 mm decal with centered die-cut ellipse, 2.54 mm border ring-3 and safe guides.'],
   ['Tumbler Wrap', 'Cone-sector wrap preview for a 30 oz tumbler (95→82 mm taper) with cut guide.'],
 ];
 
 const frozenTile = (index: number, selected: boolean): string => {
   const [name, description] = TEMPLATES_BY_INDEX[index];
-  return `<button role="gridcell" data-template-index="${index}" aria-selected="${selected}" title="${name} — Press Enter to use template" class="text-left bg-panel2 border rounded-lg overflow-hidden hover:border-accent2 hover:shadow-md focus:border-accent2 focus:ring-1 focus:ring-accent2/60 outline-none transition-all group ${selected ? 'border-accent2 shadow-md ring-1 ring-accent2/40' : 'border-border'}"><div class="aspect-[4/3] bg-white flex items-center justify-center overflow-hidden"><img alt="${name}" draggable="false" class="w-full h-full object-contain group-hover:scale-[1.02] transition-transform" src="<SVG-THUMB>"></div><div class="p-3"><h4 class="text-ink text-xs font-semibold mb-0.5">${name}</h4><div class="text-muted text-[10px] leading-snug">${description}</div></div></button>`;
+  return `<button role="gridcell" data-template-index="${index}" aria-selected="${selected}" title="${name} — Press Enter to use template" class="text-left bg-panel2 border rounded-lg overflow-hidden hover:border-accent2 hover:shadow-md focus:border-accent2 focus:ring-1 focus:ring-accent2/60 outline-hidden transition-all group ${selected ? 'border-accent2 shadow-md ring-1 ring-accent2/40' : 'border-border'}"><div class="aspect-4/3 bg-white flex items-center justify-center overflow-hidden"><img alt="${name}" draggable="false" class="w-full h-full object-contain group-hover:scale-[1.02] transition-transform" src="<SVG-THUMB>"></div><div class="p-3"><h4 class="text-ink text-xs font-semibold mb-0.5">${name}</h4><div class="text-muted text-[10px] leading-snug">${description}</div></div></button>`;
 };
 
 /** `indexes` are positions in TEMPLATES_BY_INDEX (render order); `selectedIndex` is a tile position. */
@@ -139,7 +139,7 @@ const frozenGrid = (indexes: number[], selectedIndex: number): string =>
 // className AFTER the data-* attributes (legacy wrote class first). Attribute
 // order only — see the "intended kit deltas" describe at the bottom.
 const frozenCategoryButton = (name: string, count: number, pressed: boolean): string =>
-  `<button type="button" data-template-category-action="true" data-template-category="${name}" data-template-category-review="${name} ${count} templates" class="btn !py-1 !px-2 text-xs ${pressed ? 'border-accent2 text-accent2 bg-accent2/10' : ''}" aria-pressed="${pressed}" title="${name} ${count} templates">${name} <span class="text-muted tabular-nums">${count}</span></button>`;
+  `<button type="button" data-template-category-action="true" data-template-category="${name}" data-template-category-review="${name} ${count} templates" class="btn py-1! px-2! text-xs ${pressed ? 'border-accent2 text-accent2 bg-accent2/10' : ''}" aria-pressed="${pressed}" title="${name} ${count} templates">${name} <span class="text-muted tabular-nums">${count}</span></button>`;
 
 const frozenCategoryToolbar = (pressed: string, reviewText: string): string =>
   `<div class="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Template category filters" aria-describedby="template-category-action-review-status" title="Use arrow keys to review template categories"><span id="template-category-action-review-status" class="sr-only" aria-live="polite">Reviewing ${reviewText}</span>`
@@ -151,18 +151,18 @@ const frozenCategoryToolbar = (pressed: string, reviewText: string): string =>
 const frozenEmptyButton = (className: string, review: string, label: string): string =>
   `<button type="button" data-template-empty-action="true" data-template-empty-action-review="${review}" class="${className}">${label}</button>`;
 
-const EMPTY_CLEAR = frozenEmptyButton('btn !py-1.5 !px-2 text-xs', 'Clear search', 'Clear search');
-const EMPTY_ALL_CATEGORIES = frozenEmptyButton('btn !py-1.5 !px-2 text-xs', 'Show all categories', 'Show all categories');
-const EMPTY_RESET = frozenEmptyButton('btn-primary !py-1.5 !px-2 text-xs', 'Reset template filters', 'Reset filters');
+const EMPTY_CLEAR = frozenEmptyButton('btn py-1.5! px-2! text-xs', 'Clear search', 'Clear search');
+const EMPTY_ALL_CATEGORIES = frozenEmptyButton('btn py-1.5! px-2! text-xs', 'Show all categories', 'Show all categories');
+const EMPTY_RESET = frozenEmptyButton('btn-primary py-1.5! px-2! text-xs', 'Reset template filters', 'Reset filters');
 
 const frozenEmptyToolbar = (reviewText: string, buttons: string): string =>
   `<div class="flex items-center justify-center gap-2 mt-4" role="toolbar" aria-label="Template empty-result actions" aria-describedby="template-empty-action-review-status" title="Use arrow keys to review empty-result actions"><span id="template-empty-action-review-status" class="sr-only" aria-live="polite">Reviewing ${reviewText}</span>${buttons}</div>`;
 
 const frozenSearchToolbar = (reviewText: string, useFirstDisabled: boolean): string =>
-  `<div class="flex items-center gap-2 shrink-0" role="toolbar" aria-label="Template search actions" aria-describedby="template-search-action-review-status" title="Use arrow keys to review template search actions"><span id="template-search-action-review-status" class="sr-only" aria-live="polite">Reviewing ${reviewText}</span><button type="button" class="btn !py-1.5 !px-2 text-xs shrink-0" data-template-search-action="true" data-template-search-action-review="Use first search result"${useFirstDisabled ? ' disabled=""' : ''} title="Use first search result">Use First</button><button type="button" class="btn !py-1.5 !px-2 text-xs shrink-0" data-template-search-action="true" data-template-search-action-review="Clear search" title="Clear search">Clear search</button></div>`;
+  `<div class="flex items-center gap-2 shrink-0" role="toolbar" aria-label="Template search actions" aria-describedby="template-search-action-review-status" title="Use arrow keys to review template search actions"><span id="template-search-action-review-status" class="sr-only" aria-live="polite">Reviewing ${reviewText}</span><button type="button" class="btn py-1.5! px-2! text-xs shrink-0" data-template-search-action="true" data-template-search-action-review="Use first search result"${useFirstDisabled ? ' disabled=""' : ''} title="Use first search result">Use First</button><button type="button" class="btn py-1.5! px-2! text-xs shrink-0" data-template-search-action="true" data-template-search-action-review="Clear search" title="Clear search">Clear search</button></div>`;
 
 const frozenPanel = (): string =>
-  '<div class="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="templates-dialog-title">'
+  '<div class="fixed inset-0 z-90 flex items-center justify-center bg-black/60 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="templates-dialog-title">'
   + '<div class="bg-panel border border-border rounded-lg shadow-2xl w-[760px] max-h-[80vh] overflow-hidden flex flex-col">'
   + '<div class="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2"><h2 id="templates-dialog-title" class="dialog-title">New from Template</h2><button class="btn-dialog-close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>'
   + '<div class="px-5 py-3 border-b border-border bg-panel/80"><div class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search text-muted shrink-0" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg><input class="input text-sm min-w-0 flex-1" placeholder="Search templates…" aria-label="Search templates…" title="Press Enter to use first search result · Press Arrow Down to focus first template" type="search" value=""><span class="text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">9 templates</span></div></div>'
@@ -529,25 +529,25 @@ describe('TemplatesDialog migration — intended kit deltas (pinned new forms)',
     const c = await mountDialog();
     // Category button, new kit byte form (class after the data-* trio)…
     expect(categoryActions(c)[0].outerHTML).toBe(
-      '<button type="button" data-template-category-action="true" data-template-category="All" data-template-category-review="All 9 templates" class="btn !py-1 !px-2 text-xs border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" title="All 9 templates">All <span class="text-muted tabular-nums">9</span></button>',
+      '<button type="button" data-template-category-action="true" data-template-category="All" data-template-category-review="All 9 templates" class="btn py-1! px-2! text-xs border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" title="All 9 templates">All <span class="text-muted tabular-nums">9</span></button>',
     );
     // …whose attribute SET and content are exactly the legacy bytes:
     expect(attrSignature(categoryActions(c)[0].outerHTML)).toBe(attrSignature(
-      '<button type="button" class="btn !py-1 !px-2 text-xs border-accent2 text-accent2 bg-accent2/10" data-template-category-action="true" data-template-category="All" data-template-category-review="All 9 templates" aria-pressed="true" title="All 9 templates">All <span class="text-muted tabular-nums">9</span></button>',
+      '<button type="button" class="btn py-1! px-2! text-xs border-accent2 text-accent2 bg-accent2/10" data-template-category-action="true" data-template-category="All" data-template-category-review="All 9 templates" aria-pressed="true" title="All 9 templates">All <span class="text-muted tabular-nums">9</span></button>',
     ));
 
     type(searchInput(c), 'zzz');
     expect(emptyActions(c)[0].outerHTML).toBe(
-      '<button type="button" data-template-empty-action="true" data-template-empty-action-review="Clear search" class="btn !py-1.5 !px-2 text-xs">Clear search</button>',
+      '<button type="button" data-template-empty-action="true" data-template-empty-action-review="Clear search" class="btn py-1.5! px-2! text-xs">Clear search</button>',
     );
     expect(attrSignature(emptyActions(c)[0].outerHTML)).toBe(attrSignature(
-      '<button type="button" class="btn !py-1.5 !px-2 text-xs" data-template-empty-action="true" data-template-empty-action-review="Clear search">Clear search</button>',
+      '<button type="button" class="btn py-1.5! px-2! text-xs" data-template-empty-action="true" data-template-empty-action-review="Clear search">Clear search</button>',
     ));
 
     // The search toolbar (SearchableListActions) kept the legacy byte form
     // exactly — class stays before the data-* attributes there.
     type(searchInput(c), '');
     type(searchInput(c), 'a');
-    expect(searchActions(c)[0].outerHTML.startsWith('<button type="button" class="btn !py-1.5 !px-2 text-xs shrink-0" data-template-search-action="true"')).toBe(true);
+    expect(searchActions(c)[0].outerHTML.startsWith('<button type="button" class="btn py-1.5! px-2! text-xs shrink-0" data-template-search-action="true"')).toBe(true);
   });
 });

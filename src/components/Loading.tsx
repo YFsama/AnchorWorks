@@ -14,7 +14,7 @@ export function Loading({ label, overlay = false }: LoadingProps) {
   );
   if (!overlay) return inner;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
       <div className="bg-panel border border-border rounded-md px-4 py-3 shadow-xl">
         {inner}
       </div>

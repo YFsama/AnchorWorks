@@ -108,7 +108,7 @@ function LegacySimplifyPreset(props: { tolerance: number; reviewed: string }) {
             data-simplify-preset-action
             data-tolerance={value}
             data-review={review}
-            className={`btn !py-1 !px-1 !text-[10px] ${props.tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+            className={`btn py-1! px-1! text-[10px]! ${props.tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
             onClick={() => undefined}
             onFocus={(event) => setReviewed(event.currentTarget.dataset.review ?? '')}
             aria-pressed={props.tolerance === value}
@@ -136,7 +136,7 @@ function KitSimplifyPreset(props: { tolerance: number; reviewed: string }) {
       setReviewed={setReviewed}
       items={SIMPLIFY_PRESETS_PX.map((value) => ({
         key: value,
-        className: `btn !py-1 !px-1 !text-[10px] ${props.tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+        className: `btn py-1! px-1! text-[10px]! ${props.tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
         pressed: props.tolerance === value,
         onClick: () => undefined,
         data: { tolerance: value, review: `${t('Tolerance (px)')} ${value}` },
@@ -489,7 +489,7 @@ function LegacyFreeDistortPreset(props: { activePreset: string; reviewed: string
             data-free-distort-preset-action
             data-free-distort-preset-index={DISTORT_PRESETS.indexOf(preset)}
             data-review={review}
-            className={`btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+            className={`btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
             onClick={() => undefined}
             onFocus={(event) => setReviewed(event.currentTarget.dataset.review ?? '')}
             aria-pressed={active}
@@ -521,7 +521,7 @@ function KitFreeDistortPreset(props: { activePreset: string; reviewed: string })
         const review = `${t(preset.label)}: ${t(preset.title)}`;
         return {
           key: preset.label,
-          className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+          className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
           pressed: active,
           onClick: () => undefined,
           title: review,
@@ -937,7 +937,7 @@ function LegacyShortcutsRecipe(props: { query: string; reviewed: string }) {
             data-shortcut-recipe-action
             data-shortcut-recipe-action-review={`${t(recipe.label)} · ${t(recipe.title)}`}
             data-recipe-index={index}
-            className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+            className={`btn py-1! px-2! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
             onClick={() => undefined}
             onFocus={(event) => setReviewed(event.currentTarget.dataset.shortcutRecipeActionReview ?? '')}
             aria-pressed={active}
@@ -967,7 +967,7 @@ function KitShortcutsRecipe(props: { query: string; reviewed: string }) {
       setReviewed={setReviewed}
       items={SHORTCUT_SEARCH_RECIPES.map((recipe, index) => ({
         key: recipe.label,
-        className: `btn !py-1 !px-2 !text-[10px] ${props.query === recipe.query ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+        className: `btn py-1! px-2! text-[10px]! ${props.query === recipe.query ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
         pressed: props.query === recipe.query,
         onClick: () => undefined,
         title: t(recipe.title),
@@ -1075,7 +1075,7 @@ function LegacyShortcutsFooter(props: { reviewed: string }) {
         type="button"
         data-shortcut-footer-action
         data-shortcut-footer-action-review={t('Close')}
-        className="btn !py-1 !px-2 !text-[10px]"
+        className="btn py-1! px-2! text-[10px]!"
         onFocus={() => setReviewed(t('Close'))}
         onClick={() => undefined}
       >
@@ -1085,7 +1085,7 @@ function LegacyShortcutsFooter(props: { reviewed: string }) {
         type="button"
         data-shortcut-footer-action
         data-shortcut-footer-action-review={t('Customize Shortcuts…')}
-        className="btn !py-1 !px-2 !text-[10px]"
+        className="btn py-1! px-2! text-[10px]!"
         onFocus={() => setReviewed(t('Customize Shortcuts…'))}
         onClick={() => undefined}
       >
@@ -1108,8 +1108,8 @@ function KitShortcutsFooter(props: { reviewed: string }) {
       actionAttr="data-shortcut-footer-action"
       setReviewed={setReviewed}
       actions={[
-        { children: t('Close'), review: t('Close'), className: 'btn !py-1 !px-2 !text-[10px]', onClick: () => undefined },
-        { children: t('Customize Shortcuts…'), review: t('Customize Shortcuts…'), className: 'btn !py-1 !px-2 !text-[10px]', onClick: () => undefined },
+        { children: t('Close'), review: t('Close'), className: 'btn py-1! px-2! text-[10px]!', onClick: () => undefined },
+        { children: t('Customize Shortcuts…'), review: t('Customize Shortcuts…'), className: 'btn py-1! px-2! text-[10px]!', onClick: () => undefined },
       ]}
     />
   );

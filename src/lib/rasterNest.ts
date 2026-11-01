@@ -140,7 +140,7 @@ function maskRowExtents(mask: Uint8Array, w: number, h: number): { c0: Int32Arra
   return { c0, c1 };
 }
 
-/** Fill `ring` on its own bbox grid and blit the cells into the combined
+/** Fill `ring-3` on its own bbox grid and blit the cells into the combined
  *  `into` mask at the ring bbox's ROUNDED cell offset from (originX, originY)
  *  — set when `clear` is false, cleared when true. Grid-aligned geometry
  *  (integer mm at k) blits exactly; otherwise the rounding costs ≤ half a
@@ -177,7 +177,7 @@ function blitFilledRing(
 
 /**
  * Rasterize a part footprint WITH holes at k px/mm (part-in-hole): stamp the
- * outer ring's fill, then CLEAR each hole ring's fill — a frame with a window
+ * outer ring's fill, then CLEAR each hole ring-3's fill — a frame with a window
  * (outer contour + inner contour) occupies only its walls, so smaller parts
  * can nest inside the cut-out. Holes share the outer ring's document-mm
  * space, so the mask's bbox spans the outer ring ∪ every hole (defensive:

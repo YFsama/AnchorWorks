@@ -133,7 +133,7 @@ export function TemplatesDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-90 flex items-center justify-center bg-black/60 backdrop-blur-xs"
       onClick={close}
       role="dialog"
       aria-modal="true"
@@ -199,7 +199,7 @@ export function TemplatesDialog() {
                   label: t('Use First'),
                   review: t('Use first search result'),
                   title: t('Use first search result'),
-                  className: 'btn !py-1.5 !px-2 text-xs shrink-0',
+                  className: 'btn py-1.5! px-2! text-xs shrink-0',
                   onActivate: () => { if (filteredTemplates[0]) void pick(filteredTemplates[0]); },
                   disabled: filteredTemplates.length === 0,
                 }}
@@ -207,7 +207,7 @@ export function TemplatesDialog() {
                   label: t('Clear search'),
                   review: t('Clear search'),
                   title: t('Clear search'),
-                  className: 'btn !py-1.5 !px-2 text-xs shrink-0',
+                  className: 'btn py-1.5! px-2! text-xs shrink-0',
                   onActivate: () => setQuery(''),
                 }}
               />
@@ -235,7 +235,7 @@ export function TemplatesDialog() {
               const review = `${t(categoryName)} ${count} ${t('templates')}`;
               return {
                 key: categoryName,
-                className: `btn !py-1 !px-2 text-xs ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-2! text-xs ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => { setCategory(categoryName); setReviewIndex(0); },
                 title: review,
@@ -269,19 +269,19 @@ export function TemplatesDialog() {
                     ...(query ? [{
                       children: t('Clear search'),
                       review: t('Clear search'),
-                      className: 'btn !py-1.5 !px-2 text-xs',
+                      className: 'btn py-1.5! px-2! text-xs',
                       onClick: () => { setQuery(''); setReviewIndex(0); searchRef.current?.focus(); },
                     }] : []),
                     ...(category !== 'All' ? [{
                       children: t('Show all categories'),
                       review: t('Show all categories'),
-                      className: 'btn !py-1.5 !px-2 text-xs',
+                      className: 'btn py-1.5! px-2! text-xs',
                       onClick: () => { setCategory('All'); setReviewIndex(0); },
                     }] : []),
                     {
                       children: t('Reset filters'),
                       review: t('Reset template filters'),
-                      className: 'btn-primary !py-1.5 !px-2 text-xs',
+                      className: 'btn-primary py-1.5! px-2! text-xs',
                       onClick: clearTemplateFilters,
                     },
                   ]}
@@ -317,9 +317,9 @@ export function TemplatesDialog() {
                   onFocus={() => setReviewIndex(index)}
                   onClick={() => pick(tpl)}
                   title={`${t(tpl.name)} — ${t('Press Enter to use template')}`}
-                  className={`text-left bg-panel2 border rounded-lg overflow-hidden hover:border-accent2 hover:shadow-md focus:border-accent2 focus:ring-1 focus:ring-accent2/60 outline-none transition-all group ${index === currentReviewIndex ? 'border-accent2 shadow-md ring-1 ring-accent2/40' : 'border-border'}`}
+                  className={`text-left bg-panel2 border rounded-lg overflow-hidden hover:border-accent2 hover:shadow-md focus:border-accent2 focus:ring-1 focus:ring-accent2/60 outline-hidden transition-all group ${index === currentReviewIndex ? 'border-accent2 shadow-md ring-1 ring-accent2/40' : 'border-border'}`}
                 >
-                  <div className="aspect-[4/3] bg-white flex items-center justify-center overflow-hidden">
+                  <div className="aspect-4/3 bg-white flex items-center justify-center overflow-hidden">
                     <img
                       src={tpl.thumbnail}
                       alt={t(tpl.name)}

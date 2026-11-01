@@ -2371,7 +2371,7 @@ export function hasThinStroke(object: FabricObject): boolean {
   return isStrokePainted(object) && typeof object.strokeWidth === 'number' && Number.isFinite(object.strokeWidth) && object.strokeWidth > 0 && object.strokeWidth < THIN_STROKE_WIDTH;
 }
 
-/** Select every object carrying a live drop shadow/glow effect. */
+/** Select every object carrying a live drop shadow effect. */
 export function selectDropShadowObjects(): number {
   return selectMatchingObjects((o) => isSelectableArtwork(o) && !!o.shadow);
 }

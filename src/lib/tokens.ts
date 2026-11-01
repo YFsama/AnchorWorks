@@ -1,7 +1,7 @@
 /**
  * Design-token reader for `<canvas>` and other surfaces that can't reference
  * CSS custom properties directly. The editor's design tokens are defined as
- * RGB triplets (e.g. `--color-accent: 255 138 76;`) so they compose nicely
+ * RGB triplets (e.g. `--accent: rgb(255 138 76);`) so they compose nicely
  * with Tailwind's `rgb(var(--color-X) / <alpha>)` pattern. This module
  * resolves the live token value at call time so consumers (rulers, grid
  * overlay, anchor handles, preview lines) re-paint correctly when the user

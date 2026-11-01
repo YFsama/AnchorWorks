@@ -242,12 +242,12 @@ function selectResults(canvas: fabric.Canvas, objs: fabric.FabricObject[]): void
 
 function modeFill(): string {
   return eraseMode
-    ? readTokenAlpha('--color-danger', 0.35, 'rgba(224,85,107,0.35)')
-    : readTokenAlpha('--color-accent2', 0.35, 'rgba(90,200,216,0.35)');
+    ? readTokenAlpha('--danger', 0.35, 'rgba(224,85,107,0.35)')
+    : readTokenAlpha('--accent2', 0.35, 'rgba(90,200,216,0.35)');
 }
 
 function modeStroke(): string {
-  return eraseMode ? readToken('--color-danger', '#e0556b') : readToken('--color-accent2', '#5ac8d8');
+  return eraseMode ? readToken('--danger', '#e0556b') : readToken('--accent2', '#5ac8d8');
 }
 
 /** Translucent accent wash over a swept region (kept out of export + hit tests). */

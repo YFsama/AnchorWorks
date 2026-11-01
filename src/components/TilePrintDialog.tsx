@@ -326,7 +326,7 @@ export function TilePrintDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -366,7 +366,7 @@ export function TilePrintDialog() {
                     placeholder={t('Search page sizes…')}
                     aria-label={t('Search page sizes…')}
                     title={`${t('Press Enter to use first search result')} · ${t('Press Arrow Down to focus first page size')}`}
-                    className="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70"
+                    className="min-w-0 flex-1 bg-transparent outline-hidden text-xs text-ink placeholder:text-muted/70"
                   />
                   <span className="text-[10px] text-muted tabular-nums whitespace-nowrap" aria-live="polite">
                     {normalizedPageQuery ? `${filteredPageSizes.length} / ${PAGE_SIZES.length} ${t('matches')}` : `${PAGE_SIZES.length} ${t('sizes')}`}
@@ -440,7 +440,7 @@ export function TilePrintDialog() {
                     {pageQuery && (
                       <button
                         type="button"
-                        className="btn !py-1 !px-2 text-[10px]"
+                        className="btn py-1! px-2! text-[10px]"
                         onClick={() => setPageQuery('')}
                       >
                         {t('Clear search')}
@@ -529,7 +529,7 @@ export function TilePrintDialog() {
                   onChange={(e) => setManualRows(Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1)))} />
               </Field>
             </div>
-            <div className="field-label !mt-1 !mb-1">{t('Tile job presets')}</div>
+            <div className="field-label mt-1! mb-1!">{t('Tile job presets')}</div>
             <PresetRow
               statusId="tile-job-preset-review-status"
               className="grid grid-cols-3 gap-1 mb-2"
@@ -566,7 +566,7 @@ export function TilePrintDialog() {
               title={t('Use arrow keys to review tile grid presets')}
               onKeyDown={handleGridPresetKeys}
             >
-              <div className="field-label !mt-1 !mb-1">{t('Grid presets')}</div>
+              <div className="field-label mt-1! mb-1!">{t('Grid presets')}</div>
               <div id="tile-grid-preset-review-status" className="sr-only" aria-live="polite">
                 {`${t('Reviewing')} ${reviewedGridPreset || `${cols}×${rows} · ${cols * rows} ${t('pages')}`}`}
               </div>
@@ -620,7 +620,7 @@ export function TilePrintDialog() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <div className="field-label !mt-1 !mb-1">{t('Overlap presets')}</div>
+                <div className="field-label mt-1! mb-1!">{t('Overlap presets')}</div>
                 <PresetRow
                   statusId="tile-overlap-preset-review-status"
                   className="grid grid-cols-5 gap-1"
@@ -644,7 +644,7 @@ export function TilePrintDialog() {
                 />
               </div>
               <div>
-                <div className="field-label !mt-1 !mb-1">{t('Margin presets')}</div>
+                <div className="field-label mt-1! mb-1!">{t('Margin presets')}</div>
                 <PresetRow
                   statusId="tile-margin-preset-review-status"
                   className="grid grid-cols-5 gap-1"

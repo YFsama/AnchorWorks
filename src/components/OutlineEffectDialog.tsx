@@ -75,7 +75,7 @@ export function OutlineEffectDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -140,7 +140,7 @@ export function OutlineEffectDialog() {
         <div className="mt-3 space-y-1.5">
           {Array.from({ length: count }, (_, i) => (
             <label key={i} className="flex items-center justify-between text-xs">
-              <span className="text-muted">{i === 0 ? t('Inner ring') : i === count - 1 ? t('Outer ring') : `${t('Ring')} ${i + 1}`}</span>
+              <span className="text-muted">{i === 0 ? t('Inner ring-3') : i === count - 1 ? t('Outer ring-3') : `${t('Ring')} ${i + 1}`}</span>
               <input
                 type="color"
                 value={colors[i] ?? '#000000'}

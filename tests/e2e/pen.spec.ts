@@ -13,7 +13,7 @@ test('Pen + clicks + Escape commits a Path layer', async ({ page }) => {
   const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
 
-  const penBtn = toolbar.locator('button[aria-label="Pen"]');
+  const penBtn = toolbar.locator('button[aria-label="Pen — P"]');
   await page.keyboard.press('p');
   await expect(penBtn).toHaveAttribute('aria-pressed', 'true');
 

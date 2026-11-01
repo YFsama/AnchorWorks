@@ -80,10 +80,10 @@ export function ToastHost() {
 // (light-mode overrides for success / warn / danger / accent2 darken these
 // for the 3:1 graphical contrast threshold on the off-white surface).
 const KIND_COLOR: Record<ToastKind, string> = {
-  success: 'rgb(var(--color-success))',
-  warn:    'rgb(var(--color-warn))',
-  error:   'rgb(var(--color-danger))',
-  info:    'rgb(var(--color-accent2))',
+  success: 'var(--success)',
+  warn:    'var(--warn)',
+  error:   'var(--danger)',
+  info:    'var(--accent2)',
 };
 
 function KindIcon({ kind }: { kind: ToastKind }) {
@@ -130,8 +130,8 @@ function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
       className={`toast-item ${leaving ? 'toast-leaving' : 'toast-entering'}`}
       style={{
         width: 320,
-        background: 'rgb(var(--color-panel))',
-        border: '1px solid rgb(var(--color-border))',
+        background: 'var(--panel)',
+        border: '1px solid var(--border)',
         borderLeft: `3px solid ${KIND_COLOR[toast.kind]}`,
         borderRadius: 6,
         boxShadow: '0 8px 24px rgb(0 0 0 / 0.28)',
@@ -139,7 +139,7 @@ function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
         display: 'flex',
         alignItems: 'flex-start',
         gap: 10,
-        color: 'rgb(var(--color-ink))',
+        color: 'var(--ink)',
         pointerEvents: 'auto',
       }}
     >
@@ -148,11 +148,11 @@ function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         {toast.title && (
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, color: 'rgb(var(--color-ink))' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2, color: 'var(--ink)' }}>
             {toast.title}
           </div>
         )}
-        <div style={{ fontSize: 11, lineHeight: 1.4, color: 'rgb(var(--color-ink) / 0.82)', wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 11, lineHeight: 1.4, color: 'color-mix(in srgb, var(--ink) 82%, transparent)', wordBreak: 'break-word' }}>
           {toast.message}
         </div>
         {/* Progress bar — only renders when `progress` is set. Used by
@@ -168,7 +168,7 @@ function ToastItem({ toast, leaving }: { toast: Toast; leaving: boolean }) {
               marginTop: 6,
               height: 3,
               borderRadius: 2,
-              background: 'rgb(var(--color-border))',
+              background: 'var(--border)',
               overflow: 'hidden',
             }}
           >

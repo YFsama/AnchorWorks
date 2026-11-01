@@ -300,7 +300,7 @@ export function VariableDataDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -354,7 +354,7 @@ export function VariableDataDialog() {
                 />
                 {t('First row is header')}
               </label>
-              <label className="btn !py-1 !px-2 !text-[10px] cursor-pointer inline-flex items-center gap-1">
+              <label className="btn py-1! px-2! text-[10px]! cursor-pointer inline-flex items-center gap-1">
                 <FileText size={11} aria-hidden="true" />
                 {t('Load CSV file…')}
                 <input
@@ -391,7 +391,7 @@ export function VariableDataDialog() {
                 items={(csv?.columns ?? []).map((column) => ({
                   key: column,
                   children: `{{${column}}}`,
-                  className: 'btn !py-0.5 !px-1.5 !text-[10px] font-mono',
+                  className: 'btn py-0.5! px-1.5! text-[10px]! font-mono',
                   onClick: () => { void copyToken(column); },
                   title: `${t('Copy the {{token}} for this column to the clipboard.')} — {{${column}}}`,
                   data: { 'variable-data-token': column, review: `${t('Insert token')} {{${column}}}` },
@@ -401,7 +401,7 @@ export function VariableDataDialog() {
                 <div key={column} className="flex items-center gap-1 mb-1">
                   <span className="font-mono text-[10px] text-muted w-24 shrink-0 truncate" title={column}>{column}</span>
                   <input
-                    className="input-num flex-1 !py-1 !text-[11px]"
+                    className="input-num flex-1 py-1! text-[11px]!"
                     value={csvTargets[column] ?? ''}
                     onChange={(e) => setCsvTargets({ ...csvTargets, [column]: e.target.value })}
                     placeholder={t('Object name')}
@@ -469,7 +469,7 @@ export function VariableDataDialog() {
                   return {
                     key: preset.id,
                     children: t(preset.label),
-                    className: `btn !py-1 !px-1.5 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                    className: `btn py-1! px-1.5! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                     pressed: active,
                     onClick: () => applySerialPreset(preset),
                     title: `${t(preset.label)} · ${t('Start')} ${preset.start}, ${t('Step')} ${preset.step}, ${t('Count')} ${preset.count}, ${t('Pad')} ${preset.pad}`,
@@ -497,12 +497,12 @@ export function VariableDataDialog() {
               actionAttr="data-variable-data-list-action"
               setReviewed={setReviewedListAction}
               items={[
-                { key: 'sample', children: t('Sample list'), className: 'btn !py-1 !px-1.5 !text-[10px]', onClick: () => setListText(SAMPLE_LIST_VALUES.join('\n')), data: { 'variable-data-list-action-review': t('Sample list') }, focusReviewKey: 'variableDataListActionReview' },
-                { key: 'clean', children: t('Clean list'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: cleanListValues, data: { 'variable-data-list-action-review': t('Clean list') }, focusReviewKey: 'variableDataListActionReview' },
-                { key: 'dedupe', children: t('Dedupe'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: dedupeListValues, data: { 'variable-data-list-action-review': t('Dedupe') }, focusReviewKey: 'variableDataListActionReview' },
-                { key: 'sort', children: t('Sort A-Z'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: sortListValues, data: { 'variable-data-list-action-review': t('Sort A-Z') }, focusReviewKey: 'variableDataListActionReview' },
-                { key: 'reverse', children: t('Reverse'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: reverseListValues, data: { 'variable-data-list-action-review': t('Reverse') }, focusReviewKey: 'variableDataListActionReview' },
-                { key: 'clear', children: t('Clear list'), className: 'btn !py-1 !px-1.5 !text-[10px]', disabled: !listText.trim(), onClick: () => setListText(''), data: { 'variable-data-list-action-review': t('Clear list') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'sample', children: t('Sample list'), className: 'btn py-1! px-1.5! text-[10px]!', onClick: () => setListText(SAMPLE_LIST_VALUES.join('\n')), data: { 'variable-data-list-action-review': t('Sample list') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'clean', children: t('Clean list'), className: 'btn py-1! px-1.5! text-[10px]!', disabled: !listText.trim(), onClick: cleanListValues, data: { 'variable-data-list-action-review': t('Clean list') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'dedupe', children: t('Dedupe'), className: 'btn py-1! px-1.5! text-[10px]!', disabled: !listText.trim(), onClick: dedupeListValues, data: { 'variable-data-list-action-review': t('Dedupe') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'sort', children: t('Sort A-Z'), className: 'btn py-1! px-1.5! text-[10px]!', disabled: !listText.trim(), onClick: sortListValues, data: { 'variable-data-list-action-review': t('Sort A-Z') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'reverse', children: t('Reverse'), className: 'btn py-1! px-1.5! text-[10px]!', disabled: !listText.trim(), onClick: reverseListValues, data: { 'variable-data-list-action-review': t('Reverse') }, focusReviewKey: 'variableDataListActionReview' },
+                { key: 'clear', children: t('Clear list'), className: 'btn py-1! px-1.5! text-[10px]!', disabled: !listText.trim(), onClick: () => setListText(''), data: { 'variable-data-list-action-review': t('Clear list') }, focusReviewKey: 'variableDataListActionReview' },
               ]}
             />
           </>
@@ -538,7 +538,7 @@ export function VariableDataDialog() {
           <button
             type="button"
             data-variable-data-layout-action
-            className="btn !py-1 !px-2 !text-[10px]"
+            className="btn py-1! px-2! text-[10px]!"
             onClick={applyAutoGap}
           >
             {t('Auto gap')}
@@ -546,7 +546,7 @@ export function VariableDataDialog() {
           <button
             type="button"
             data-variable-data-layout-action
-            className={`btn !py-1 !px-2 !text-[10px] ${linkGaps ? 'ring-1 ring-accent' : ''}`}
+            className={`btn py-1! px-2! text-[10px]! ${linkGaps ? 'ring-1 ring-accent' : ''}`}
             aria-pressed={linkGaps}
             onClick={() => setLinkGaps((enabled) => !enabled)}
           >
@@ -571,7 +571,7 @@ export function VariableDataDialog() {
               items={COLUMN_PRESETS.map((preset) => ({
                 key: preset,
                 children: preset,
-                className: `btn !py-0.5 !px-1 !text-[10px] ${cols === preset ? 'ring-1 ring-accent' : ''}`,
+                className: `btn py-0.5! px-1! text-[10px]! ${cols === preset ? 'ring-1 ring-accent' : ''}`,
                 pressed: cols === preset,
                 onClick: () => setCols(preset),
                 data: { 'variable-data-column-preset': preset, review: `${t('Columns')} ${preset}` },
@@ -651,7 +651,7 @@ function GapField({ axis, value, linked, reviewedPreset, onChange, setReviewedPr
         items={GAP_PRESETS.map((preset) => ({
           key: preset,
           children: preset,
-          className: `btn !py-0.5 !px-1 !text-[10px] ${value === preset ? 'ring-1 ring-accent' : ''}`,
+          className: `btn py-0.5! px-1! text-[10px]! ${value === preset ? 'ring-1 ring-accent' : ''}`,
           pressed: value === preset,
           onClick: () => onChange(preset),
           data: { 'variable-data-gap-preset': preset, 'variable-data-gap-axis': axis, review: reviewFor(preset) },

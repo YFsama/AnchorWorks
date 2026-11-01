@@ -573,13 +573,13 @@ export function PlotterConsole(props: PlotterConsoleProps) {
         <div className="flex-1" />
         {canConnect && (
           connected ? (
-            <button type="button" className="btn !py-1 !px-2 !text-[10px] flex items-center gap-1" onClick={() => { void disconnect(); }} disabled={busy || sending}>
+            <button type="button" className="btn py-1! px-2! text-[10px]! flex items-center gap-1" onClick={() => { void disconnect(); }} disabled={busy || sending}>
               <Unplug size={11} aria-hidden="true" />{t('Disconnect')}
             </button>
           ) : (
             <button
               type="button"
-              className="btn !py-1 !px-2 !text-[10px] flex items-center gap-1"
+              className="btn py-1! px-2! text-[10px]! flex items-center gap-1"
               onClick={() => { void connect(); }}
               disabled={busy || sending || !canConnect || (native && nativePorts.length === 0 && !selectedPort)}
               title={native && nativePorts.length === 0 ? t('No serial ports detected — plug in the cutter and refresh.') : undefined}
@@ -596,7 +596,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
         {native ? (
           <span className="flex items-center gap-1">
             <select
-              className="input !py-0.5 !text-[10px] !w-44"
+              className="input py-0.5! text-[10px]! w-44!"
               value={selectedPort}
               onChange={(e) => setSelectedPort(e.target.value)}
               disabled={connected || portsLoading}
@@ -614,7 +614,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </select>
             <button
               type="button"
-              className="btn !py-1 !px-1.5 !text-[10px]"
+              className="btn py-1! px-1.5! text-[10px]!"
               onClick={refreshPorts}
               disabled={portsLoading || connected}
               title={t('Rescan serial ports')}
@@ -626,7 +626,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
         <label className="flex items-center gap-1 text-[10px] text-muted">
           {t('Baud')}
           <select
-            className="input !py-0.5 !text-[10px]"
+            className="input py-0.5! text-[10px]!"
             value={baud}
             onChange={(e) => setBaud(Number(e.target.value))}
             disabled={connected}
@@ -639,7 +639,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
         <label className="flex items-center gap-1 text-[10px] text-muted">
           {t('Flow control')}
           <select
-            className="input !py-0.5 !text-[10px]"
+            className="input py-0.5! text-[10px]!"
             value={flow}
             onChange={(e) => setFlow(e.target.value as FlowControl)}
             disabled={connected}
@@ -653,7 +653,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
           <span className="flex items-center gap-1" role="group" aria-label={t('Control lines & poll')}>
             <button
               type="button"
-              className={`btn !py-0.5 !px-1.5 !text-[10px] ${signals.dtr ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+              className={`btn py-0.5! px-1.5! text-[10px]! ${signals.dtr ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
               onClick={() => { void toggleSignal('dtr'); }}
               disabled={sending}
               aria-pressed={signals.dtr}
@@ -663,7 +663,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </button>
             <button
               type="button"
-              className={`btn !py-0.5 !px-1.5 !text-[10px] ${signals.rts ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+              className={`btn py-0.5! px-1.5! text-[10px]! ${signals.rts ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
               onClick={() => { void toggleSignal('rts'); }}
               disabled={sending}
               aria-pressed={signals.rts}
@@ -673,7 +673,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </button>
             <button
               type="button"
-              className={`btn !py-0.5 !px-1.5 !text-[10px] ${autoPoll ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+              className={`btn py-0.5! px-1.5! text-[10px]! ${autoPoll ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
               onClick={() => { setPollStats({ n: 0, min: Infinity, avg: 0, max: 0 }); setAutoPoll(!autoPoll); }}
               disabled={sending}
               aria-pressed={autoPoll}
@@ -710,7 +710,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               <button
                 key={cmd.id}
                 type="button"
-                className="btn !py-0.5 !px-1.5 !text-[10px]"
+                className="btn py-0.5! px-1.5! text-[10px]!"
                 onClick={() => runQuick(cmd)}
                 disabled={!connected || sending}
                 title={`${t(cmd.description)}${cmd.expectsReply ? ` ${t('(awaits reply)')}` : ''}`}
@@ -720,7 +720,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             ))}
             <button
               type="button"
-              className={`btn !py-0.5 !px-1 !text-[10px] ${refOpen ? 'border-accent2 text-accent2' : ''}`}
+              className={`btn py-0.5! px-1! text-[10px]! ${refOpen ? 'border-accent2 text-accent2' : ''}`}
               onClick={() => setRefOpen(!refOpen)}
               aria-pressed={refOpen}
               aria-expanded={refOpen}
@@ -761,7 +761,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             <span className="text-[10px] text-muted">{t('Diagnostics')}</span>
             <button
               type="button"
-              className="btn !py-0.5 !px-1.5 !text-[10px]"
+              className="btn py-0.5! px-1.5! text-[10px]!"
               onClick={() => { void selfTest(); }}
               disabled={!connected || sending || busy}
               title={t('Ping the machine with harmless status queries and measure round-trip latency.')}
@@ -770,7 +770,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </button>
             <button
               type="button"
-              className="btn !py-0.5 !px-1.5 !text-[10px]"
+              className="btn py-0.5! px-1.5! text-[10px]!"
               onClick={() => { void detectBaud(); }}
               disabled={sending || busy || !canConnect}
               title={t('Reconnect at each common baud rate and watch for a reply. The link is restored afterwards.')}
@@ -779,7 +779,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </button>
             <button
               type="button"
-              className="btn !py-0.5 !px-1.5 !text-[10px]"
+              className="btn py-0.5! px-1.5! text-[10px]!"
               onClick={() => { void identify(); }}
               disabled={sending || busy}
               title={t('Ask the machine for its model (OI;) or scan ports for a cutter, then suggest the right profile.')}
@@ -791,7 +791,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             )}
             <button
               type="button"
-              className="btn !py-0.5 !px-1.5 !text-[10px]"
+              className="btn py-0.5! px-1.5! text-[10px]!"
               onClick={downloadReport}
               title={t('Download a plain-text bundle: connection state, serial knobs, throughput, job history and the traffic log.')}
             >
@@ -813,7 +813,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               {t('Saved machines')}
             </span>
             <select
-              className="input !py-0.5 !text-[10px] !w-40"
+              className="input py-0.5! text-[10px]! w-40!"
               value={selectedMachineId}
               onChange={(e) => loadMachine(e.target.value)}
               aria-label={t('Saved machines')}
@@ -823,15 +823,15 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </select>
             <input
               type="text"
-              className="input !py-0.5 !text-[10px] !w-28"
+              className="input py-0.5! text-[10px]! w-28!"
               value={machineName}
               onChange={(e) => setMachineName(e.target.value)}
               placeholder={t('Machine name')}
               aria-label={t('Machine name')}
             />
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={saveMachineAsNew} title={t('Save the current setup as a new machine.')}>{t('Save machine')}</button>
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={updateSelectedMachine} disabled={!selectedMachine} title={t('Overwrite the selected machine with the current setup.')}>{t('Update machine')}</button>
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={removeSelectedMachine} disabled={!selectedMachine} title={t('Delete the selected machine record.')}>{t('Delete machine')}</button>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={saveMachineAsNew} title={t('Save the current setup as a new machine.')}>{t('Save machine')}</button>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={updateSelectedMachine} disabled={!selectedMachine} title={t('Overwrite the selected machine with the current setup.')}>{t('Update machine')}</button>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={removeSelectedMachine} disabled={!selectedMachine} title={t('Delete the selected machine record.')}>{t('Delete machine')}</button>
           </div>
 
           {/* Jog pad */}
@@ -854,19 +854,19 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             </span>
             <span className="grid grid-cols-3 gap-0.5" role="group" aria-label={t('Jog controls')}>
               <span />
-              <button type="button" className="btn !p-1 flex items-center justify-center" onClick={() => jog(0, 1)} disabled={!connected || sending} title={t('Move up')} aria-label={t('Move up')}><ArrowUp size={11} aria-hidden="true" /></button>
+              <button type="button" className="btn p-1! flex items-center justify-center" onClick={() => jog(0, 1)} disabled={!connected || sending} title={t('Move up')} aria-label={t('Move up')}><ArrowUp size={11} aria-hidden="true" /></button>
               <span />
-              <button type="button" className="btn !p-1 flex items-center justify-center" onClick={() => jog(-1, 0)} disabled={!connected || sending} title={t('Move left')} aria-label={t('Move left')}><ArrowLeft size={11} aria-hidden="true" /></button>
-              <button type="button" className="btn !p-1 flex items-center justify-center" onClick={() => { void exec(buildSetOrigin(format)); }} disabled={!connected || sending} title={t('Set the current carriage position as origin')} aria-label={t('Set origin')}><Crosshair size={11} aria-hidden="true" /></button>
-              <button type="button" className="btn !p-1 flex items-center justify-center" onClick={() => jog(1, 0)} disabled={!connected || sending} title={t('Move right')} aria-label={t('Move right')}><ArrowRight size={11} aria-hidden="true" /></button>
+              <button type="button" className="btn p-1! flex items-center justify-center" onClick={() => jog(-1, 0)} disabled={!connected || sending} title={t('Move left')} aria-label={t('Move left')}><ArrowLeft size={11} aria-hidden="true" /></button>
+              <button type="button" className="btn p-1! flex items-center justify-center" onClick={() => { void exec(buildSetOrigin(format)); }} disabled={!connected || sending} title={t('Set the current carriage position as origin')} aria-label={t('Set origin')}><Crosshair size={11} aria-hidden="true" /></button>
+              <button type="button" className="btn p-1! flex items-center justify-center" onClick={() => jog(1, 0)} disabled={!connected || sending} title={t('Move right')} aria-label={t('Move right')}><ArrowRight size={11} aria-hidden="true" /></button>
               <span />
-              <button type="button" className="btn !p-1 flex items-center justify-center" onClick={() => jog(0, -1)} disabled={!connected || sending} title={t('Move down')} aria-label={t('Move down')}><ArrowDown size={11} aria-hidden="true" /></button>
+              <button type="button" className="btn p-1! flex items-center justify-center" onClick={() => jog(0, -1)} disabled={!connected || sending} title={t('Move down')} aria-label={t('Move down')}><ArrowDown size={11} aria-hidden="true" /></button>
               <span />
             </span>
             <span className="flex items-center gap-1">
               <input
                 type="text"
-                className="input !py-0.5 !text-[10px] font-mono !w-20"
+                className="input py-0.5! text-[10px]! font-mono w-20!"
                 value={moveTo}
                 onChange={(e) => setMoveTo(e.target.value)}
                 onKeyDown={(e) => {
@@ -879,7 +879,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               />
               <button
                 type="button"
-                className="btn !py-0.5 !px-1.5 !text-[10px]"
+                className="btn py-0.5! px-1.5! text-[10px]!"
                 onClick={submitMoveTo}
                 disabled={!connected || sending || !moveTo.trim()}
                 title={t('Move the carriage to the X,Y coordinates.')}
@@ -888,7 +888,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               </button>
               <button
                 type="button"
-                className="btn !py-0.5 !px-1.5 !text-[10px]"
+                className="btn py-0.5! px-1.5! text-[10px]!"
                 onClick={() => { void exec(buildMoveTo(format, 0, 0, unit, feedRate)); }}
                 disabled={!connected || sending}
                 title={t('Return the carriage to the origin (0,0).')}
@@ -918,7 +918,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
               <button
                 key={f}
                 type="button"
-                className={`btn !py-0.5 !px-1 !text-[10px] ${dirFilter === f ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                className={`btn py-0.5! px-1! text-[10px]! ${dirFilter === f ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                 onClick={() => setDirFilter(f)}
                 aria-pressed={dirFilter === f}
                 title={t('Filter the traffic log by direction.')}
@@ -926,11 +926,11 @@ export function PlotterConsole(props: PlotterConsoleProps) {
                 {t(f === 'all' ? 'All' : f === 'tx' ? 'TX' : f === 'rx' ? 'RX' : 'Notices')}
               </button>
             ))}
-            <button type="button" className={`btn !py-0.5 !px-1.5 !text-[10px] ${hexView ? 'border-accent2 text-accent2' : ''}`} onClick={() => setHexView(!hexView)} aria-pressed={hexView} title={t('Toggle HEX / ASCII view')}>HEX</button>
-            <button type="button" className={`btn !py-0.5 !px-1.5 !text-[10px] ${autoScroll ? 'border-accent2 text-accent2' : ''}`} onClick={() => setAutoScroll(!autoScroll)} aria-pressed={autoScroll} title={t('Follow new traffic automatically')}>{t('Auto')}</button>
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={() => { void copyLog(); }} title={t('Copy console log')}><Copy size={11} aria-hidden="true" /></button>
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={() => download('plotter-console.log', plainLog(), 'text/plain')} title={t('Download console log')}><Download size={11} aria-hidden="true" /></button>
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={() => setEntries([])} title={t('Clear console')}><Trash2 size={11} aria-hidden="true" /></button>
+            <button type="button" className={`btn py-0.5! px-1.5! text-[10px]! ${hexView ? 'border-accent2 text-accent2' : ''}`} onClick={() => setHexView(!hexView)} aria-pressed={hexView} title={t('Toggle HEX / ASCII view')}>HEX</button>
+            <button type="button" className={`btn py-0.5! px-1.5! text-[10px]! ${autoScroll ? 'border-accent2 text-accent2' : ''}`} onClick={() => setAutoScroll(!autoScroll)} aria-pressed={autoScroll} title={t('Follow new traffic automatically')}>{t('Auto')}</button>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={() => { void copyLog(); }} title={t('Copy console log')}><Copy size={11} aria-hidden="true" /></button>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={() => download('plotter-console.log', plainLog(), 'text/plain')} title={t('Download console log')}><Download size={11} aria-hidden="true" /></button>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={() => setEntries([])} title={t('Clear console')}><Trash2 size={11} aria-hidden="true" /></button>
           </div>
           {/* Timeline strip — TX above / RX below the axis, errors full
               height; a glance at reply latency and burst patterns. */}
@@ -993,7 +993,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
           <div className="mt-1.5 flex items-center gap-1.5">
             <input
               type="text"
-              className="input !py-1 !text-[10px] font-mono flex-1"
+              className="input py-1! text-[10px]! font-mono flex-1"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -1012,7 +1012,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             />
             <button
               type="button"
-              className="btn !py-1 !px-2 !text-[10px]"
+              className="btn py-1! px-2! text-[10px]!"
               onClick={submitInput}
               disabled={!connected || !input.trim()}
               title={t('Send raw machine text. Query commands (OE;, ?, $I…) automatically await the reply.')}
@@ -1058,7 +1058,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
                     </div>
                     <button
                       type="button"
-                      className="btn !py-0.5 !px-1.5 !text-[10px] mt-1"
+                      className="btn py-0.5! px-1.5! text-[10px]! mt-1"
                       onClick={() => { clearJobLog(); setLogRefresh(v => v + 1); }}
                       title={t('Delete all job history entries.')}
                     >

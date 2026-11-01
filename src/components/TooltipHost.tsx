@@ -123,9 +123,9 @@ export function TooltipHost() {
         // (dark mode: near-white pill on dark UI; light mode: near-black pill
         // on light UI). Previous hard-coded #0e0e12 / #e7e7ea looked stuck-in-
         // dark-mode on the light theme.
-        background: 'rgb(var(--color-ink))',
-        color: 'rgb(var(--color-panel))',
-        border: '1px solid rgb(var(--color-ink))',
+        background: 'var(--ink)',
+        color: 'var(--panel)',
+        border: '1px solid var(--ink)',
         borderRadius: 4,
         padding: '4px 8px',
         fontSize: 11,

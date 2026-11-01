@@ -69,19 +69,22 @@ export function Toolbar() {
             if (!handler?.icon) return null;
             const Icon = handler.icon;
             const shortcut = getBinding(`tool.${id}`);
-            // aria-label carries the localized tool name only; the shortcut
-            // metadata lives in aria-keyshortcuts so screen readers can
-            // announce it separately ("Rectangle, keyboard shortcut R").
-            // Visible title keeps the inline "(R)" for sighted hover.
+            // aria-label embeds the visible shortcut chip text after an em
+            // dash (WCAG 2.5.3 Label in Name — voice-control users say
+            // "Shift M" / "R" and must hit this button; axe curates
+            // parenthesised fragments OUT of the name, so parentheses
+            // can't carry it). aria-keyshortcuts still announces the
+            // binding as a separate property.
             const localized = t(handler.label);
             const title = shortcut ? `${localized} (${shortcut})` : localized;
+            const name = shortcut ? `${localized} — ${shortcut}` : localized;
             const active = tool === id;
             return (
               <button
                 key={id}
                 data-tool={id}
                 title={title}
-                aria-label={localized}
+                aria-label={name}
                 aria-keyshortcuts={ariaKeyshortcuts(shortcut) || undefined}
                 aria-pressed={active}
                 tabIndex={active ? 0 : -1}

@@ -500,7 +500,7 @@ describe('layer stack operations', () => {
   });
 
 
-  it('sets and clears shadow on matching layer objects', () => {
+  it('sets and clears shadow-sm on matching layer objects', () => {
     const objects: fabric.FabricObject[] = [rect('a'), rect('b'), rect('c')];
     objects[0].shadow = null;
     objects[1].shadow = new fabric.Shadow({ color: '#000000', blur: 2, offsetX: 1, offsetY: 1 });
@@ -2206,7 +2206,7 @@ describe('layer stack operations', () => {
   });
 
 
-  it('selects same miter constant stroke and shadow within filtered layer ids', () => {
+  it('selects same miter constant stroke and shadow-sm within filtered layer ids', () => {
     const objects: fabric.FabricObject[] = [rect('a'), rect('b'), rect('c'), rect('d')];
     objects[0].set({ strokeMiterLimit: 8, strokeUniform: true });
     objects[1].set({ strokeMiterLimit: 8, strokeUniform: false });

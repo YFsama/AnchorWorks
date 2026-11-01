@@ -144,65 +144,65 @@ const review = (name: string, index: number, size: string) =>
 
 const FROZEN_ORDER_TOOLBAR_HTML =
   '<div class="grid grid-cols-4 gap-1" role="toolbar" aria-label="Artboard order" aria-describedby="artboard-row-action-review-ab-1" title="Use arrow keys to review artboard row actions">'
-  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard to first" class="btn !py-1 !px-1.5 !text-[10px]" title="Move this artboard to first">First</button>'
-  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard earlier" class="btn !py-1 !px-1.5 !text-[10px]" title="Move this artboard earlier">Earlier</button>'
-  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard later" class="btn !py-1 !px-1.5 !text-[10px]" title="Move this artboard later">Later</button>'
-  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard to last" class="btn !py-1 !px-1.5 !text-[10px]" title="Move this artboard to last">Last</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard to first" class="btn py-1! px-1.5! text-[10px]!" title="Move this artboard to first">First</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard earlier" class="btn py-1! px-1.5! text-[10px]!" title="Move this artboard earlier">Earlier</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard later" class="btn py-1! px-1.5! text-[10px]!" title="Move this artboard later">Later</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Move this artboard to last" class="btn py-1! px-1.5! text-[10px]!" title="Move this artboard to last">Last</button>'
   + '</div>';
 
 const FROZEN_PRESET_TOOLBAR_HTML =
   '<div class="flex flex-wrap gap-1" role="toolbar" aria-label="Artboard size presets" aria-describedby="artboard-row-action-review-ab-1" title="Use arrow keys to review artboard row actions">'
   + '<span id="artboard-row-action-review-ab-1" class="sr-only" aria-live="polite">Reviewing Artboard size presets</span>'
-  + '<button type="button" data-artboard-action="true" data-artboard-size-preset-action="true" data-size-preset="A4" data-artboard-action-review="Apply artboard size preset A4" class="btn !py-1 !px-1.5 !text-[10px]" title="Apply artboard size preset">A4</button>'
-  + '<button type="button" data-artboard-action="true" data-artboard-size-preset-action="true" data-size-preset="Letter" data-artboard-action-review="Apply artboard size preset Letter" class="btn !py-1 !px-1.5 !text-[10px]" title="Apply artboard size preset">Letter</button>'
-  + '<button type="button" data-artboard-action="true" data-artboard-size-preset-action="true" data-size-preset="24×12 in" data-artboard-action-review="Apply artboard size preset 24×12 in" class="btn !py-1 !px-1.5 !text-[10px]" title="Apply artboard size preset">24×12 in</button>'
-  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Swap artboard width and height" class="btn !py-1 !px-1.5 !text-[10px] flex items-center gap-1" title="Swap artboard width and height"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg> Swap W/H</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-size-preset-action="true" data-size-preset="A4" data-artboard-action-review="Apply artboard size preset A4" class="btn py-1! px-1.5! text-[10px]!" title="Apply artboard size preset">A4</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-size-preset-action="true" data-size-preset="Letter" data-artboard-action-review="Apply artboard size preset Letter" class="btn py-1! px-1.5! text-[10px]!" title="Apply artboard size preset">Letter</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-size-preset-action="true" data-size-preset="24×12 in" data-artboard-action-review="Apply artboard size preset 24×12 in" class="btn py-1! px-1.5! text-[10px]!" title="Apply artboard size preset">24×12 in</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Swap artboard width and height" class="btn py-1! px-1.5! text-[10px]! flex items-center gap-1" title="Swap artboard width and height"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg> Swap W/H</button>'
   + '</div>';
 
 const FROZEN_FIT_TOOLBAR_HTML =
   '<div class="grid grid-cols-2 gap-1" role="toolbar" aria-label="Fit artboard" aria-describedby="artboard-row-action-review-ab-1" title="Use arrow keys to review artboard row actions">'
-  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Fit this artboard to selection" class="btn !py-1 !px-1.5 !text-[10px]" title="Fit this artboard to selection">Fit Selection</button>'
-  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Fit this artboard to artwork" class="btn !py-1 !px-1.5 !text-[10px]" title="Fit this artboard to artwork">Fit Artwork</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Fit this artboard to selection" class="btn py-1! px-1.5! text-[10px]!" title="Fit this artboard to selection">Fit Selection</button>'
+  + '<button type="button" data-artboard-action="true" data-artboard-action-review="Fit this artboard to artwork" class="btn py-1! px-1.5! text-[10px]!" title="Fit this artboard to artwork">Fit Artwork</button>'
   + '</div>';
 
 const frozenSearchToolbar = (targetFirstDisabled: boolean): string =>
   '<div class="flex items-center gap-1.5 shrink-0" role="toolbar" aria-label="Artboard search actions" aria-describedby="artboard-search-action-review-status" title="Use arrow keys to review artboard search actions">'
   + '<span id="artboard-search-action-review-status" class="sr-only" aria-live="polite">Reviewing Artboard search actions</span>'
-  + '<button type="button" class="btn !py-1 !px-1.5 !text-[10px] shrink-0" data-artboard-search-action="true" data-artboard-search-action-review="Zoom to first search result"'
+  + '<button type="button" class="btn py-1! px-1.5! text-[10px]! shrink-0" data-artboard-search-action="true" data-artboard-search-action-review="Zoom to first search result"'
   + (targetFirstDisabled ? ' disabled=""' : '')
   + ' title="Zoom to first search result">Target First</button>'
-  + '<button type="button" class="btn !py-1 !px-1.5 !text-[10px] shrink-0" data-artboard-search-action="true" data-artboard-search-action-review="Clear search" title="Clear search">Clear search</button>'
+  + '<button type="button" class="btn py-1! px-1.5! text-[10px]! shrink-0" data-artboard-search-action="true" data-artboard-search-action-review="Clear search" title="Clear search">Clear search</button>'
   + '</div>';
 
 // One full frozen row, parameterized exactly as the legacy bytes came out.
 const frozenRow = (a: Artboard, selected: boolean): string => {
   const rowClass = selected
-    ? 'border-accent2 bg-accent/10 shadow-[0_0_0_1px_rgba(var(--color-accent2),0.25)]'
+    ? 'border-accent2 bg-accent/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent2)_25%,transparent)]'
     : 'border-border bg-panel2';
   const icon = (name: string, size: number, inner: string): string =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-${name}" aria-hidden="true">${inner}</svg>`;
-  return `<div class="rounded border p-2 space-y-1.5 focus-within:border-accent2 focus:outline-none focus:ring-1 focus:ring-accent2/60 transition-colors ${rowClass}" tabindex="0" data-artboard-row="true" role="listitem"${selected ? ' aria-current="true"' : ''} aria-label="Artboard row: ${a.name}" aria-keyshortcuts="Enter Control+D Meta+D Delete Backspace R">`
+  return `<div class="rounded border p-2 space-y-1.5 focus-within:border-accent2 focus:outline-hidden focus:ring-1 focus:ring-accent2/60 transition-colors ${rowClass}" tabindex="0" data-artboard-row="true" role="listitem"${selected ? ' aria-current="true"' : ''} aria-label="Artboard row: ${a.name}" aria-keyshortcuts="Enter Control+D Meta+D Delete Backspace R">`
     + '<div class="flex items-center gap-1">'
     + `<input class="shrink-0" aria-label="Select artboard ${a.name}" title="Select artboard" type="checkbox">`
-    + '<input class="flex-1 bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-none focus:border-accent2 transition-colors" aria-label="Artboard name" value="' + a.name + '">'
+    + '<input class="flex-1 bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-hidden focus:border-accent2 transition-colors" aria-label="Artboard name" value="' + a.name + '">'
     + `<button class="p-1 text-muted hover:text-ink transition-colors" title="Focus this artboard" aria-label="Focus this artboard">${icon('target', 12, '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>')}</button>`
     + `<button class="p-1 text-muted hover:text-ink transition-colors" title="Duplicate this artboard" aria-label="Duplicate this artboard">${icon('copy', 12, '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>')}</button>`
     + `<button class="p-1 text-muted hover:text-ink transition-colors" title="Duplicate this artboard frame only" aria-label="Duplicate this artboard frame only">${icon('frame', 12, '<line x1="22" x2="2" y1="6" y2="6"></line><line x1="22" x2="2" y1="18" y2="18"></line><line x1="6" x2="6" y1="2" y2="22"></line><line x1="18" x2="18" y1="2" y2="22"></line>')}</button>`
-    + `<button class="p-1 text-muted hover:text-danger transition-colors" title="Delete artboard" aria-label="Delete artboard">${icon('trash2 lucide-trash-2', 12, '<path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>')}</button>`
+    + `<button class="p-1 text-muted hover:text-danger transition-colors" title="Delete artboard" aria-label="Delete artboard">${icon('trash lucide-trash-2', 12, '<path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>')}</button>`
     + '</div>'
     + '<div class="grid grid-cols-4 gap-1 items-center">'
-    + `<label class="flex flex-col gap-0.5"><span class="field-label !mb-0">X</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-none focus:border-accent2 transition-colors w-full" type="number" value="${a.x}"></label>`
-    + `<label class="flex flex-col gap-0.5"><span class="field-label !mb-0">Y</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-none focus:border-accent2 transition-colors w-full" type="number" value="${a.y}"></label>`
-    + `<label class="flex flex-col gap-0.5"><span class="field-label !mb-0">W</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-none focus:border-accent2 transition-colors w-full" type="number" value="${a.width}"></label>`
-    + `<label class="flex flex-col gap-0.5"><span class="field-label !mb-0">H</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-none focus:border-accent2 transition-colors w-full" type="number" value="${a.height}"></label>`
+    + `<label class="flex flex-col gap-0.5"><span class="field-label mb-0!">X</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-hidden focus:border-accent2 transition-colors w-full" type="number" value="${a.x}"></label>`
+    + `<label class="flex flex-col gap-0.5"><span class="field-label mb-0!">Y</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-hidden focus:border-accent2 transition-colors w-full" type="number" value="${a.y}"></label>`
+    + `<label class="flex flex-col gap-0.5"><span class="field-label mb-0!">W</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-hidden focus:border-accent2 transition-colors w-full" type="number" value="${a.width}"></label>`
+    + `<label class="flex flex-col gap-0.5"><span class="field-label mb-0!">H</span><input class="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-hidden focus:border-accent2 transition-colors w-full" type="number" value="${a.height}"></label>`
     + '</div>'
-    + '<div><div class="field-label !mb-1">Artboard order</div>'
+    + '<div><div class="field-label mb-1!">Artboard order</div>'
     + FROZEN_ORDER_TOOLBAR_HTML.replace(/artboard-row-action-review-ab-1/g, `artboard-row-action-review-${a.id}`)
     + '</div>'
-    + '<div><div class="field-label !mb-1">Artboard size presets</div>'
+    + '<div><div class="field-label mb-1!">Artboard size presets</div>'
     + FROZEN_PRESET_TOOLBAR_HTML.replace(/artboard-row-action-review-ab-1/g, `artboard-row-action-review-${a.id}`)
     + '</div>'
-    + '<div><div class="field-label !mb-1">Fit artboard</div>'
+    + '<div><div class="field-label mb-1!">Fit artboard</div>'
     + FROZEN_FIT_TOOLBAR_HTML.replace(/artboard-row-action-review-ab-1/g, `artboard-row-action-review-${a.id}`)
     + '</div>'
     + '<div class="flex gap-1">'

@@ -17,6 +17,7 @@
  */
 
 import * as fabric from 'fabric';
+import './fabricDefaults';
 import { History } from './history';
 import { useEditor } from '../store/editor';
 import type { ToolId } from '../types';
@@ -46,7 +47,7 @@ export function getHistory() { return history; }
 // lives in fabricBootstrap.ts. Imported here for the side-effect that flips
 // `objectCaching` to false at module load; `ensureWebGLFilterBackend()` is
 // called at the top of initCanvas. resolveAccent2 was removed in favour of
-// `readToken('--color-accent2', '#5ac8d8')` from src/lib/tokens.ts.
+// `readToken('--accent2', '#5ac8d8')` from src/lib/tokens.ts.
 // `syncObjectCaching` is the P2-4 escape valve state machine (see that file
 // for the trade-off documentation) — driven by refreshObjectCaching below.
 import { ensureWebGLFilterBackend, syncObjectCaching } from './fabricBootstrap';

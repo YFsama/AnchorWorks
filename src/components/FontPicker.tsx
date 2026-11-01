@@ -102,7 +102,7 @@ export function FontPicker() {
   return (
     <div className="panel-section p-3">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="field-label !mb-0">{t('Font')}</h3>
+        <h3 className="field-label mb-0!">{t('Font')}</h3>
         <button
           className="btn flex items-center gap-1"
           onClick={() => fileRef.current?.click()}
@@ -144,7 +144,7 @@ export function FontPicker() {
           placeholder={t('Search fonts…')}
           aria-label={t('Search fonts…')}
           title={`${t('Press Enter to apply first search result')} · ${t('Press Arrow Down to focus first font')}`}
-          className="flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70 min-w-0"
+          className="flex-1 bg-transparent outline-hidden text-xs text-ink placeholder:text-muted/70 min-w-0"
         />
         <span className="text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">
           {normalizedFilter ? `${matchingFonts.length} / ${ALL_FONTS.length} ${t('matches')}` : `${ALL_FONTS.length} ${t('fonts')}`}
@@ -234,10 +234,10 @@ export function FontPicker() {
           // bug rather than a designed state when search returned zero hits.
           <div className="px-3 py-4 flex flex-col items-center text-center">
             {/* "Aa" letterform with a magnifier sweep — search-with-no-match idea. */}
-            <svg width="40" height="32" viewBox="0 0 40 32" fill="none" className="mb-1.5 opacity-70" aria-hidden="true" style={{ color: 'rgb(var(--color-muted))' }}>
+            <svg width="40" height="32" viewBox="0 0 40 32" fill="none" className="mb-1.5 opacity-70" aria-hidden="true" style={{ color: 'var(--muted)' }}>
               <text x="6" y="22" fontFamily="ui-serif, Georgia, serif" fontSize="18" fontWeight="600" fill="currentColor" fillOpacity="0.75">Aa</text>
-              <circle cx="29" cy="14" r="6" stroke="rgb(var(--color-accent2))" strokeOpacity="0.7" strokeWidth="1.2" />
-              <path d="M33.5 18.5 L 37 22" stroke="rgb(var(--color-accent2))" strokeOpacity="0.7" strokeWidth="1.2" strokeLinecap="round" />
+              <circle cx="29" cy="14" r="6" stroke="var(--accent2)" strokeOpacity="0.7" strokeWidth="1.2" />
+              <path d="M33.5 18.5 L 37 22" stroke="var(--accent2)" strokeOpacity="0.7" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
             <div className="text-xs text-ink/90 mb-0.5">{filter ? t('No matching fonts') : t('No fonts available')}</div>
             <div className="type-caption leading-relaxed max-w-[200px]">
@@ -248,7 +248,7 @@ export function FontPicker() {
             {filter && (
               <button
                 type="button"
-                className="btn !py-1 !px-2 text-[10px] mt-2"
+                className="btn py-1! px-2! text-[10px] mt-2"
                 onClick={() => setFilter('')}
               >
                 {t('Clear search')}

@@ -105,12 +105,12 @@ export function AlignPanel() {
         <div id="align-panel-body" className="px-3 pb-3 space-y-3">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <h4 className="field-label !mb-0">{t('Align')}</h4>
+              <h4 className="field-label mb-0!">{t('Align')}</h4>
               <div className="flex items-center gap-1">
                 {alignRef === 'key' && (
                   <button
                     type="button"
-                    className="input-num !h-6 !py-0 !px-1.5 !text-[10px] !w-auto hover:text-ink"
+                    className="input-num h-6! py-0! px-1.5! text-[10px]! w-auto! hover:text-ink"
                     onClick={() => { if (setKeyObject()) { setKeyed(true); toast.success(t('Key object set')); } else toast.warn(t('Select a single object first.')); }}
                     title={t('Set the selected object as the alignment key')}
                   >
@@ -118,7 +118,7 @@ export function AlignPanel() {
                   </button>
                 )}
                 <select
-                  className="input-num !h-6 !py-0 !text-[10px] !w-auto"
+                  className="input-num h-6! py-0! text-[10px]! w-auto!"
                   value={alignRef}
                   onChange={(e) => setAlignRef(e.target.value as 'selection' | 'artboard' | 'key')}
                   title={t('Align to')}
@@ -209,7 +209,7 @@ export function AlignPanel() {
                 type="number" min={0} step={0.5}
                 value={spacing}
                 onChange={(e) => setSpacing(Math.max(0, parseFloat(e.target.value) || 0))}
-                className="input-num !h-6 !py-0 !text-[10px] w-14"
+                className="input-num h-6! py-0! text-[10px]! w-14"
                 aria-label={`${t('Spacing')} (${dimUnit})`}
                 title={`${t('Exact gap between objects')} (${dimUnit})`}
               />
@@ -221,7 +221,7 @@ export function AlignPanel() {
               </Btn>
             </div>
             <div className="mt-1">
-              <div className="field-label !mb-1">{t('Spacing presets')}</div>
+              <div className="field-label mb-1!">{t('Spacing presets')}</div>
               <div
                 className="grid grid-cols-6 gap-1"
                 role="group"
@@ -243,7 +243,7 @@ export function AlignPanel() {
                   </button>
                 ))}
               </div>
-              <div className="field-label !mt-2 !mb-1">{t('Apply spacing preset')}</div>
+              <div className="field-label mt-2! mb-1!">{t('Apply spacing preset')}</div>
               <div
                 className="grid grid-cols-6 gap-1"
                 role="group"

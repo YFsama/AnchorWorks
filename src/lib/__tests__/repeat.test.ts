@@ -120,7 +120,7 @@ describe('repeatGrid', () => {
 /* --------------------------------- radial ---------------------------------- */
 
 describe('repeatRadial', () => {
-  it('arranges count−1 clones on a closed ring with 0° pointing up', async () => {
+  it('arranges count−1 clones on a closed ring-3 with 0° pointing up', async () => {
     const src = tile(); // bbox centre (50,50)
     const { c, history } = makeCanvas(src);
 

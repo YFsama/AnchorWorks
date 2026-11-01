@@ -1128,7 +1128,7 @@ export function PlotterDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -1155,7 +1155,7 @@ export function PlotterDialog() {
                   <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
                   <input
                     type="search"
-                    className="flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70 min-w-0"
+                    className="flex-1 bg-transparent outline-hidden text-xs text-ink placeholder:text-muted/70 min-w-0"
                     placeholder={t('Search materials…')}
                     value={materialQuery}
                     onChange={(e) => setMaterialQuery(e.target.value)}
@@ -1264,7 +1264,7 @@ export function PlotterDialog() {
                     <span>{t('No materials found.')}</span>
                     <button
                       type="button"
-                      className="btn !py-1 !px-2 text-[10px]"
+                      className="btn py-1! px-2! text-[10px]"
                       onClick={() => setMaterialQuery('')}
                     >
                       {t('Clear search')}
@@ -1497,7 +1497,7 @@ export function PlotterDialog() {
               </div>
             </Field>
             <div className="col-span-2">
-              <div className="field-label !mb-1">{t('Origin')}</div>
+              <div className="field-label mb-1!">{t('Origin')}</div>
               <div
                 className="grid grid-cols-2 gap-1"
                 role="group"
@@ -1527,7 +1527,7 @@ export function PlotterDialog() {
               </div>
             </div>
             <div className="col-span-2">
-              <div className="field-label !mb-1">{t('Cut strategy')}</div>
+              <div className="field-label mb-1!">{t('Cut strategy')}</div>
               <div
                 className="grid grid-cols-4 gap-1"
                 role="group"
@@ -1606,7 +1606,7 @@ export function PlotterDialog() {
                     <input
                       type="number" min={4} max={20} step={0.5} value={opts.arms.armMm} disabled={!armsActive}
                       onChange={(e) => setOpts(o => o.arms ? { ...o, arms: { ...o.arms, armMm: Math.min(20, Math.max(4, parseFloat(e.target.value) || DEFAULT_ARMS.armMm)) } } : o)}
-                      className="input-num !w-12 !py-0.5 !text-[10px] text-center"
+                      className="input-num w-12! py-0.5! text-[10px]! text-center"
                       aria-label={t('ARMS arm length (mm)')}
                     />
                     <span>mm</span>
@@ -1631,21 +1631,21 @@ export function PlotterDialog() {
                     <input
                       type="number" min={1} max={10000} value={opts.arms.rectW} disabled={!armsActive}
                       onChange={(e) => setOpts(o => o.arms ? { ...o, arms: { ...o.arms, rectW: Math.max(1, parseFloat(e.target.value) || DEFAULT_ARMS.rectW) } } : o)}
-                      className="input-num !w-12 !py-0.5 !text-[10px] text-center"
+                      className="input-num w-12! py-0.5! text-[10px]! text-center"
                       aria-label={t('ARMS rectangle width (mm)')}
                     />
                     <span>×</span>
                     <input
                       type="number" min={1} max={10000} value={opts.arms.rectH} disabled={!armsActive}
                       onChange={(e) => setOpts(o => o.arms ? { ...o, arms: { ...o.arms, rectH: Math.max(1, parseFloat(e.target.value) || DEFAULT_ARMS.rectH) } } : o)}
-                      className="input-num !w-12 !py-0.5 !text-[10px] text-center"
+                      className="input-num w-12! py-0.5! text-[10px]! text-center"
                       aria-label={t('ARMS rectangle height (mm)')}
                     />
                     <span>mm</span>
                   </label>
                   <button
                     type="button"
-                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    className="btn py-0.5! px-1.5! text-[10px]!"
                     onClick={fillArmsRectFromJob}
                     disabled={!armsActive}
                     title={t('Fill the ARMS mark rectangle from the current job bounding box.')}
@@ -1706,7 +1706,7 @@ export function PlotterDialog() {
               </div>
             </Field>
             <div className="col-span-2">
-              <div className="field-label !mb-1">{t('Overcut presets')}</div>
+              <div className="field-label mb-1!">{t('Overcut presets')}</div>
               <div
                 className="grid grid-cols-6 gap-1"
                 role="group"
@@ -1726,7 +1726,7 @@ export function PlotterDialog() {
                     type="button"
                     data-value={`${value}`}
                     data-review={review}
-                    className={`btn !py-1 !px-1 !text-[10px] ${Math.abs(opts.overcutMm - value) < 0.001 ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                    className={`btn py-1! px-1! text-[10px]! ${Math.abs(opts.overcutMm - value) < 0.001 ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                     onFocus={(event) => setReviewedOvercutPreset(event.currentTarget.dataset.review ?? '')}
                     onClick={() => setOpts({ ...opts, overcutMm: value })}
                     aria-pressed={Math.abs(opts.overcutMm - value) < 0.001}
@@ -1863,7 +1863,7 @@ export function PlotterDialog() {
                     type="button"
                     data-value="all"
                     data-review={`${t('All colors')} · ${colors.length}/${colors.length} ${t('colors active')}`}
-                    className={`btn !px-1.5 !py-0.5 !text-[10px] ${allColorsVisible ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                    className={`btn px-1.5! py-0.5! text-[10px]! ${allColorsVisible ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                     onFocus={(event) => setReviewedColorAction(event.currentTarget.dataset.review ?? '')}
                     onClick={showAllColors}
                     aria-pressed={allColorsVisible}
@@ -1874,7 +1874,7 @@ export function PlotterDialog() {
                     type="button"
                     data-value="none"
                     data-review={`${t('No colors')} · 0/${colors.length} ${t('colors active')}`}
-                    className={`btn !px-1.5 !py-0.5 !text-[10px] ${noColorsVisible ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                    className={`btn px-1.5! py-0.5! text-[10px]! ${noColorsVisible ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                     onFocus={(event) => setReviewedColorAction(event.currentTarget.dataset.review ?? '')}
                     onClick={muteAllColors}
                     aria-pressed={noColorsVisible}
@@ -1885,7 +1885,7 @@ export function PlotterDialog() {
                     type="button"
                     data-value="invert"
                     data-review={`${t('Invert')} · ${colors.length - visibleColors.length}/${colors.length} ${t('colors active')}`}
-                    className="btn !px-1.5 !py-0.5 !text-[10px]"
+                    className="btn px-1.5! py-0.5! text-[10px]!"
                     onFocus={(event) => setReviewedColorAction(event.currentTarget.dataset.review ?? '')}
                     onClick={invertColors}
                   >
@@ -1895,7 +1895,7 @@ export function PlotterDialog() {
                     type="button"
                     data-value="next"
                     data-review={`${t('Next color')} · ${nextColorLabel || t('None')}`}
-                    className={`btn !px-1.5 !py-0.5 !text-[10px] ${activeSoloColor ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                    className={`btn px-1.5! py-0.5! text-[10px]! ${activeSoloColor ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                     onFocus={(event) => setReviewedColorAction(event.currentTarget.dataset.review ?? '')}
                     onClick={nextColor}
                     aria-pressed={!!activeSoloColor}
@@ -1914,7 +1914,7 @@ export function PlotterDialog() {
                         onClick={() => toggleColor(c)}
                         aria-pressed={!muted}
                         title={`${c}${muted ? ` (${t('muted')})` : ''}`}
-                        className={`w-4 h-4 rounded-sm border transition-opacity ${muted ? 'opacity-25 border-border' : 'border-ink shadow-sm'}`}
+                        className={`w-4 h-4 rounded-sm border transition-opacity ${muted ? 'opacity-25 border-border' : 'border-ink shadow-xs'}`}
                         style={{ background: c }}
                       />
                       <button
@@ -1956,7 +1956,7 @@ export function PlotterDialog() {
                     <div key={layer.color} data-plotter-layer={layer.color} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <button
                         type="button"
-                        className="w-4 h-4 rounded-sm border border-ink shadow-sm shrink-0"
+                        className="w-4 h-4 rounded-sm border border-ink shadow-xs shrink-0"
                         style={{ background: layer.color }}
                         onClick={() => soloColor(layer.color)}
                         title={`${t('Cut only')} ${layer.color}`}
@@ -1984,7 +1984,7 @@ export function PlotterDialog() {
                       <span className="flex-1" />
                       <button
                         type="button"
-                        className="btn !py-0.5 !px-1.5 !text-[10px]"
+                        className="btn py-0.5! px-1.5! text-[10px]!"
                         onClick={() => { void sendLayer(layer); }}
                         disabled={busy}
                         title={`${t('Send')} ${t('Layer')} ${i + 1} (${layer.color})`}
@@ -1993,7 +1993,7 @@ export function PlotterDialog() {
                       </button>
                       <button
                         type="button"
-                        className="btn !py-0.5 !px-1.5 !text-[10px]"
+                        className="btn py-0.5! px-1.5! text-[10px]!"
                         onClick={() => saveLayer(layer, i)}
                         disabled={busy}
                         title={`${t('Save')} ${t('Layer')} ${i + 1} (${layer.color})`}
@@ -2002,7 +2002,7 @@ export function PlotterDialog() {
                       </button>
                       <button
                         type="button"
-                        className="btn !py-0.5 !px-1.5 !text-[10px]"
+                        className="btn py-0.5! px-1.5! text-[10px]!"
                         onClick={() => saveLayerDxf(layer, i)}
                         disabled={busy}
                         title={`${t('DXF')} ${t('Layer')} ${i + 1} (${layer.color})`}
@@ -2015,7 +2015,7 @@ export function PlotterDialog() {
                 <div className="mt-1.5 flex items-center gap-1">
                   <button
                     type="button"
-                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    className="btn py-0.5! px-1.5! text-[10px]!"
                     onClick={() => { void sendAllLayers(); }}
                     disabled={busy}
                     title={t('Send every layer in stacking order, confirming between vinyl swaps.')}
@@ -2024,7 +2024,7 @@ export function PlotterDialog() {
                   </button>
                   <button
                     type="button"
-                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    className="btn py-0.5! px-1.5! text-[10px]!"
                     onClick={saveAllLayers}
                     disabled={busy}
                     title={t('Save every layer as its own machine file.')}
@@ -2033,7 +2033,7 @@ export function PlotterDialog() {
                   </button>
                   <button
                     type="button"
-                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    className="btn py-0.5! px-1.5! text-[10px]!"
                     onClick={saveAllLayersDxf}
                     disabled={busy}
                     title={t('Save every layer as its own DXF file.')}
@@ -2042,7 +2042,7 @@ export function PlotterDialog() {
                   </button>
                   <button
                     type="button"
-                    className="btn !py-0.5 !px-1.5 !text-[10px]"
+                    className="btn py-0.5! px-1.5! text-[10px]!"
                     onClick={() => applyLayerTrap(t, trapMm)}
                     disabled={busy || trapPreviewCount === 0}
                     title={t('Offset every upper layer outward for an intentional overlap, so ~1 mm misregistration shows as overlap, not a gap.')}
@@ -2055,7 +2055,7 @@ export function PlotterDialog() {
                   <input
                     type="number" min={0.25} max={1.5} step={0.05} value={trapMm}
                     onChange={(e) => setTrapMm(Math.min(1.5, Math.max(0.25, parseFloat(e.target.value) || 0.5)))}
-                    className="input-num !w-11 !py-0.5 !text-[10px] text-center"
+                    className="input-num w-11! py-0.5! text-[10px]! text-center"
                     aria-label={t('Trap overlap (mm)')}
                     title={t('Trap overlap (mm)')}
                   />
@@ -2155,10 +2155,10 @@ export function PlotterDialog() {
               )}
               {previewMode === 'code' && (
                 <>
-                  <button type="button" className="btn !py-1 !text-[10px]" onClick={generate}>{t('Generate Preview')}</button>
+                  <button type="button" className="btn py-1! text-[10px]!" onClick={generate}>{t('Generate Preview')}</button>
                   <button
                     type="button"
-                    className={`btn !py-1 !text-[10px] ${lint && !lint.ok ? 'border-warning text-warning' : lint ? 'border-success text-success' : ''}`}
+                    className={`btn py-1! text-[10px]! ${lint && !lint.ok ? 'border-warning text-warning' : lint ? 'border-success text-success' : ''}`}
                     onClick={() => runPreflight()}
                     title={t('Dry-run check of the machine code — catches empty jobs, plots taller than the page, negative coordinates, missing feed rates.')}
                   >
@@ -2166,7 +2166,7 @@ export function PlotterDialog() {
                   </button>
                   <button
                     type="button"
-                    className="btn !py-1 !text-[10px]"
+                    className="btn py-1! text-[10px]!"
                     onClick={() => { void loadCodeFile(); }}
                     title={t('Load an existing .plt / .hpgl / .gcode file to preflight, explain and replay it here — debug a third-party file before it touches the machine.')}
                   >
@@ -2193,14 +2193,14 @@ export function PlotterDialog() {
                 <input
                   type="number" min={0} max={20} value={weedRows}
                   onChange={(e) => setWeedRows(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="input-num !w-9 !py-0.5 !text-[10px] text-center"
+                  className="input-num w-9! py-0.5! text-[10px]! text-center"
                   aria-label={t('Weed grid rows')}
                 />
                 <span>×</span>
                 <input
                   type="number" min={0} max={20} value={weedCols}
                   onChange={(e) => setWeedCols(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="input-num !w-9 !py-0.5 !text-[10px] text-center"
+                  className="input-num w-9! py-0.5! text-[10px]! text-center"
                   aria-label={t('Weed grid columns')}
                 />
               </span>
@@ -2224,7 +2224,7 @@ export function PlotterDialog() {
                       type="button"
                       data-value={preset.value}
                       data-review={review}
-                      className={`btn !py-1 !px-1.5 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                      className={`btn py-1! px-1.5! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                       onFocus={(event) => setReviewedWeedPreset(event.currentTarget.dataset.review ?? '')}
                       onClick={() => applyWeedGridPreset(preset.value)}
                       aria-pressed={active}
@@ -2259,7 +2259,7 @@ export function PlotterDialog() {
                   <input
                     type="number" min={2} max={40} value={markArm}
                     onChange={(e) => setMarkArm(Math.max(2, Math.min(40, parseFloat(e.target.value) || 10)))}
-                    className="input-num !w-10 !py-0.5 !text-[10px] text-center"
+                    className="input-num w-10! py-0.5! text-[10px]! text-center"
                     aria-label={t('Mark size (mm)')}
                     title={t('Arm length for L/cross marks, side/diameter for square/circle marks.')}
                   />
@@ -2268,7 +2268,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={t('Weed border')}
-                  className="btn !py-1 !text-[10px] flex items-center gap-1"
+                  className="btn py-1! text-[10px]! flex items-center gap-1"
                   onClick={addWeedBorder}
                   onFocus={() => setReviewedPrepAction(t('Weed border'))}
                   title={t('Add a rectangular weed border around the whole job.')}
@@ -2280,7 +2280,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={hasRegmarks ? t('Redo marks') : t('Add positioning marks')}
-                  className={`btn !py-1 !text-[10px] flex items-center gap-1 ${hasRegmarks ? '' : 'text-[#ff9a1f]'}`}
+                  className={`btn py-1! text-[10px]! flex items-center gap-1 ${hasRegmarks ? '' : 'text-[#ff9a1f]'}`}
                   onClick={addRegMarks}
                   onFocus={(event) => setReviewedPrepAction(event.currentTarget.dataset.plotterPrepActionReview ?? '')}
                   title={t('Add 4-corner positioning marks around the artwork.')}
@@ -2292,7 +2292,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={t('Clear weed borders')}
-                  className="btn !py-1 !text-[10px] flex items-center gap-1"
+                  className="btn py-1! text-[10px]! flex items-center gap-1"
                   onClick={clearWeedBorders}
                   onFocus={() => setReviewedPrepAction(t('Clear weed borders'))}
                   title={t('Clear weed borders')}
@@ -2304,7 +2304,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={t('Clear positioning marks')}
-                  className="btn !py-1 !text-[10px] flex items-center gap-1"
+                  className="btn py-1! text-[10px]! flex items-center gap-1"
                   onClick={clearRegMarks}
                   onFocus={() => setReviewedPrepAction(t('Clear positioning marks'))}
                   title={t('Clear positioning marks')}
@@ -2317,7 +2317,7 @@ export function PlotterDialog() {
                     type="button"
                     data-plotter-prep-action
                     data-plotter-prep-action-review={t('Clear contour')}
-                    className="btn !py-1 !text-[10px]"
+                    className="btn py-1! text-[10px]!"
                     onClick={() => clearCutPaths('outline')}
                     onFocus={() => setReviewedPrepAction(t('Clear contour'))}
                     title={t('Clear contour cut paths')}
@@ -2330,7 +2330,7 @@ export function PlotterDialog() {
                     type="button"
                     data-plotter-prep-action
                     data-plotter-prep-action-review={t('Clear trace')}
-                    className="btn !py-1 !text-[10px]"
+                    className="btn py-1! text-[10px]!"
                     onClick={() => clearCutPaths('trace')}
                     onFocus={() => setReviewedPrepAction(t('Clear trace'))}
                     title={t('Clear traced cut paths')}
@@ -2343,7 +2343,7 @@ export function PlotterDialog() {
                     type="button"
                     data-plotter-prep-action
                     data-plotter-prep-action-review={t('Clear regmarks')}
-                    className="btn !py-1 !text-[10px]"
+                    className="btn py-1! text-[10px]!"
                     onClick={() => clearCutPaths('regmark')}
                     onFocus={() => setReviewedPrepAction(t('Clear regmarks'))}
                     title={t('Clear registration marks')}
@@ -2355,7 +2355,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={t('Clear cut paths')}
-                  className="btn !py-1 !text-[10px]"
+                  className="btn py-1! text-[10px]!"
                   onClick={() => clearCutPaths()}
                   onFocus={() => setReviewedPrepAction(t('Clear cut paths'))}
                   disabled={cutPathCount === 0}
@@ -2367,7 +2367,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={t('Reset output settings')}
-                  className="btn !py-1 !text-[10px]"
+                  className="btn py-1! text-[10px]!"
                   onClick={resetOutputSettings}
                   onFocus={() => setReviewedPrepAction(t('Reset output settings'))}
                   title={t('Reset output settings')}
@@ -2401,7 +2401,7 @@ export function PlotterDialog() {
                       type="button"
                       data-value={preset.value}
                       data-review={review}
-                      className={`btn !py-1 !px-1.5 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                      className={`btn py-1! px-1.5! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                       onFocus={(event) => setReviewedBridgePreset(event.currentTarget.dataset.review ?? '')}
                       onClick={() => applyBridgePreset(preset.value)}
                       aria-pressed={active}
@@ -2415,14 +2415,14 @@ export function PlotterDialog() {
               <input
                 type="number" min={0} max={20} value={bridgeCount}
                 onChange={(e) => setBridgeCount(Math.max(0, Math.min(20, parseInt(e.target.value, 10) || 0)))}
-                className="input-num !w-9 !py-0.5 !text-[10px] text-center"
+                className="input-num w-9! py-0.5! text-[10px]! text-center"
                 aria-label={t('Bridge count')}
               />
               <span>×</span>
               <input
                 type="number" min={0.2} max={10} step={0.2} value={bridgeGap}
                 onChange={(e) => setBridgeGap(Math.max(0.2, parseFloat(e.target.value) || 0.2))}
-                className="input-num !w-10 !py-0.5 !text-[10px] text-center"
+                className="input-num w-10! py-0.5! text-[10px]! text-center"
                 aria-label={t('Bridge gap (mm)')}
               />
               <span>mm</span>
@@ -2438,7 +2438,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={t('Add bridges')}
-                  className="btn !py-1 !text-[10px] flex items-center gap-1"
+                  className="btn py-1! text-[10px]! flex items-center gap-1"
                   onClick={applyBridges}
                   onFocus={() => setReviewedPrepAction(t('Add bridges'))}
                   disabled={bridgeCount < 1}
@@ -2451,7 +2451,7 @@ export function PlotterDialog() {
                   type="button"
                   data-plotter-prep-action
                   data-plotter-prep-action-review={t('Clear bridges')}
-                  className="btn !py-1 !text-[10px] flex items-center gap-1"
+                  className="btn py-1! text-[10px]! flex items-center gap-1"
                   onClick={clearBridges}
                   onFocus={() => setReviewedPrepAction(t('Clear bridges'))}
                   title={t('Clear bridges')}
@@ -2553,7 +2553,7 @@ export function PlotterDialog() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <input
                       type="text"
-                      className="input-num !w-36 !py-0.5 !text-[10px]"
+                      className="input-num w-36! py-0.5! text-[10px]!"
                       placeholder="192.168.0.100"
                       value={dlHost}
                       onChange={(e) => setDlHost(e.target.value)}
@@ -2562,7 +2562,7 @@ export function PlotterDialog() {
                     />
                     <input
                       type="number"
-                      className="input-num !w-16 !py-0.5 !text-[10px] text-center"
+                      className="input-num w-16! py-0.5! text-[10px]! text-center"
                       value={dlPort}
                       min={1}
                       max={65535}
@@ -2571,7 +2571,7 @@ export function PlotterDialog() {
                     />
                     <input
                       type="text"
-                      className="input-num !w-28 !py-0.5 !text-[10px]"
+                      className="input-num w-28! py-0.5! text-[10px]!"
                       value={dlJobName}
                       onChange={(e) => setDlJobName(e.target.value)}
                       aria-label={t('Job name')}
@@ -2579,7 +2579,7 @@ export function PlotterDialog() {
                     />
                     <button
                       type="button"
-                      className="btn-primary flex items-center gap-1 !py-1 !px-2 !text-[10px]"
+                      className="btn-primary flex items-center gap-1 py-1! px-2! text-[10px]!"
                       onClick={() => { void sendViaDataLink(); }}
                       disabled={dlBusy || outputBlocked}
                       aria-busy={dlBusy}
@@ -2621,13 +2621,13 @@ export function PlotterDialog() {
               </div>
               <button
                 type="button"
-                className="btn !py-1 !px-2 !text-[10px] shrink-0"
+                className="btn py-1! px-2! text-[10px]! shrink-0"
                 onClick={() => { void togglePauseJob(); }}
                 title={t('Hold the stream between chunks — the machine drains its buffer and stops. grbl also gets a feed hold.')}
               >
                 {jobPaused ? t('Resume') : t('Pause')}
               </button>
-              <button type="button" className="btn !py-1 !px-2 !text-[10px] text-danger shrink-0" onClick={cancelJob}>
+              <button type="button" className="btn py-1! px-2! text-[10px]! text-danger shrink-0" onClick={cancelJob}>
                 {t('Stop job')}
               </button>
             </div>
@@ -2810,7 +2810,7 @@ function WeedCheckPanel({ paths }: { paths: CutPath[] }) {
             );
           })}
         </span>
-        <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={run}>
+        <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={run}>
           {t('Check weeding')}
         </button>
       </div>

@@ -55,7 +55,7 @@ export function OffsetPathDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -78,7 +78,7 @@ export function OffsetPathDialog() {
           />
         </label>
         <div className="mb-2">
-          <div className="field-label !mb-1">{t('Offset presets')}</div>
+          <div className="field-label mb-1!">{t('Offset presets')}</div>
           <PresetRow
             statusId="offset-preset-review-status"
             className="grid grid-cols-6 gap-1"
@@ -92,7 +92,7 @@ export function OffsetPathDialog() {
             setReviewed={setReviewedPreset}
             items={OFFSET_PRESETS_MM.map((value) => ({
               key: value,
-              className: `btn !py-1 !px-1 !text-[10px] ${offset === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+              className: `btn py-1! px-1! text-[10px]! ${offset === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
               pressed: offset === value,
               onClick: () => setOffset(value),
               data: { offset: value, review: `${t('Offset (mm)')} ${value > 0 ? '+' : ''}${value}` },

@@ -139,7 +139,7 @@ export function SeparationsDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -155,8 +155,8 @@ export function SeparationsDialog() {
         <p className="text-[10px] text-muted mb-2">{t('Each color prints its own plate: preview isolates the ink on canvas, export writes one file per plate.')}</p>
 
         <div className="flex items-center justify-between mb-1">
-          <div className="field-label !mb-0">{plates.length} {t('plates')}</div>
-          <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={rescan} title={t('Rescan')}>
+          <div className="field-label mb-0!">{plates.length} {t('plates')}</div>
+          <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={rescan} title={t('Rescan')}>
             <span className="flex items-center gap-1"><RotateCw size={10} aria-hidden="true" /> {t('Rescan')}</span>
           </button>
         </div>
@@ -188,7 +188,7 @@ export function SeparationsDialog() {
                 data-review={review}
                 onClick={() => togglePreview(plate)}
                 onFocus={(event) => { setReviewedPlate(event.currentTarget.dataset.review ?? ''); setSelectedKey(plate.key); }}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 text-left border-b border-border last:border-b-0 transition-colors ${previewing ? 'bg-accent2/10' : 'hover:bg-panel3'} ${selectedKey === plate.key ? 'outline outline-1 outline-accent2' : ''}`}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 text-left border-b border-border last:border-b-0 transition-colors ${previewing ? 'bg-accent2/10' : 'hover:bg-panel3'} ${selectedKey === plate.key ? 'outline-solid outline-1 outline-accent2' : ''}`}
                 title={review}
               >
                 <span className="w-4 h-4 rounded-sm border border-border shrink-0" style={{ backgroundColor: plate.hex }} aria-hidden="true" />
@@ -205,7 +205,7 @@ export function SeparationsDialog() {
         </div>
 
         <div className="mt-2">
-          <div className="field-label !mb-1">{t('Export format')}</div>
+          <div className="field-label mb-1!">{t('Export format')}</div>
           <ActionToolbar
             statusId="separations-format-review-status"
             className="flex gap-1"

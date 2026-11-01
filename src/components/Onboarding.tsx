@@ -145,7 +145,7 @@ export function Onboarding({ open, onClose }: Props) {
   const currentReview = focusedReview || `${t('Slide')} ${i + 1} ${t('of')} ${SLIDES.length}: ${s.title}`;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={close}>
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs" onClick={close}>
       <div
         className="w-[460px] max-w-[95vw] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -156,7 +156,7 @@ export function Onboarding({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2">
           <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded bg-gradient-to-br from-accent to-accent2 flex items-center justify-center text-[10px] font-bold" aria-hidden="true">V</span>
+            <span className="w-5 h-5 rounded bg-linear-to-br from-accent to-accent2 flex items-center justify-center text-[10px] font-bold" aria-hidden="true">V</span>
             <h2 id="onboarding-title" className="text-xs font-semibold text-ink m-0">{t('Getting Started')}</h2>
           </div>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>

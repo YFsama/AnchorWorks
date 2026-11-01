@@ -217,12 +217,12 @@ const FROZEN_PATTERN_KIND =
 const FROZEN_PATTERN_SIZE =
   '<div class="grid grid-cols-6 gap-1" role="group" aria-label="Pattern size presets" aria-describedby="properties-pattern-size-preset-review-status" title="Use Left/Right arrows to switch options">'
   + '<span id="properties-pattern-size-preset-review-status" class="sr-only" aria-live="polite">Reviewing Pattern size presets</span>'
-  + '<button type="button" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" data-value="8" title="Apply pattern size preset">8</button>'
-  + '<button type="button" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" data-value="12" title="Apply pattern size preset">12</button>'
-  + '<button type="button" class="btn !py-1 !px-1 !text-[10px] border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" data-value="16" title="Apply pattern size preset">16</button>'
-  + '<button type="button" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" data-value="24" title="Apply pattern size preset">24</button>'
-  + '<button type="button" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" data-value="32" title="Apply pattern size preset">32</button>'
-  + '<button type="button" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" data-value="48" title="Apply pattern size preset">48</button>'
+  + '<button type="button" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" data-value="8" title="Apply pattern size preset">8</button>'
+  + '<button type="button" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" data-value="12" title="Apply pattern size preset">12</button>'
+  + '<button type="button" class="btn py-1! px-1! text-[10px]! border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" data-value="16" title="Apply pattern size preset">16</button>'
+  + '<button type="button" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" data-value="24" title="Apply pattern size preset">24</button>'
+  + '<button type="button" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" data-value="32" title="Apply pattern size preset">32</button>'
+  + '<button type="button" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" data-value="48" title="Apply pattern size preset">48</button>'
   + '</div>';
 
 const FROZEN_SHADOW_PRESETS =
@@ -389,7 +389,7 @@ describe('PropertiesPanel migration — frozen DOM (canonical state, zero deltas
     expect(region(mountPanel(), 'properties-pattern-size-preset-review-status').outerHTML).toBe(FROZEN_PATTERN_SIZE);
   });
 
-  it('shadow preset group serializes byte-identically (shadow enabled)', () => {
+  it('shadow-sm preset group serializes byte-identically (shadow enabled)', () => {
     expect(groupByLabel(mountPanel(), 'Shadow presets').outerHTML).toBe(FROZEN_SHADOW_PRESETS);
   });
 
@@ -397,7 +397,7 @@ describe('PropertiesPanel migration — frozen DOM (canonical state, zero deltas
     expect(groupByLabel(mountPanel(), 'Blend mode').outerHTML).toBe(FROZEN_BLEND_MODE);
   });
 
-  it('blur preset group serializes byte-identically', () => {
+  it('blur-sm preset group serializes byte-identically', () => {
     expect(region(mountPanel(), 'properties-blur-preset-review-status').outerHTML).toBe(FROZEN_BLUR);
   });
 
@@ -647,7 +647,7 @@ describe('shadowPreset — focus-indexed wrap roving (no state fallback)', () =>
     expect(buttons[1].getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('ArrowRight onto Clear Shadow disables the whole shadow section', async () => {
+  it('ArrowRight onto Clear Shadow disables the whole shadow-sm section', async () => {
     const panel = mountPanel();
     const reg = groupByLabel(panel, 'Shadow presets');
     const buttons = valueButtons(reg);

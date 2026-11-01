@@ -88,7 +88,7 @@ export function knifeCancel(): void {
 
 function updatePreview(canvas: fabric.Canvas): void {
   if (points.length < 2) return;
-  const stroke = readToken('--color-accent2', '#5ac8d8');
+  const stroke = readToken('--accent2', '#5ac8d8');
   let d = `M ${points[0][0]} ${points[0][1]}`;
   for (let i = 1; i < points.length; i++) d += ` L ${points[i][0]} ${points[i][1]}`;
   if (!preview) {

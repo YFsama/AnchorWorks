@@ -110,7 +110,7 @@ export function FindReplaceDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -167,7 +167,7 @@ export function FindReplaceDialog() {
         </div>
 
         <div className="mt-3">
-          <div className="field-label !mb-1">{t('Find replace recipes')}</div>
+          <div className="field-label mb-1!">{t('Find replace recipes')}</div>
           <PresetRow
             statusId="find-replace-recipe-review-status"
             className="grid grid-cols-2 gap-1"
@@ -184,7 +184,7 @@ export function FindReplaceDialog() {
               const active = find === recipe.find && replace === recipe.replace && matchCase === recipe.matchCase;
               return {
                 key: recipe.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => { setReviewedRecipeIndex(String(index)); applyRecipe(recipe); },
                 title: t(recipe.title),

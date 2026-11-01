@@ -64,7 +64,7 @@ describe('makeSticker', () => {
     expect(cp.points.length).toBeGreaterThan(4);
   });
 
-  it('keeps every cut point at ≥ borderMm − 0.01 from the union ring', () => {
+  it('keeps every cut point at ≥ borderMm − 0.01 from the union ring-3', () => {
     const objects = overlappingSquares();
     const borderMm = 2;
     const res = makeSticker(objects, { borderMm });

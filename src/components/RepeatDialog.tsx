@@ -194,7 +194,7 @@ export function RepeatDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={close}
       role="dialog"
       aria-modal="true"
@@ -249,7 +249,7 @@ export function RepeatDialog() {
             {tab === 'grid' && (
               <div className="space-y-3 text-xs">
                 <div>
-                  <div className="field-label !mb-1">{t('Repeat grid presets')}</div>
+                  <div className="field-label mb-1!">{t('Repeat grid presets')}</div>
                   <PresetRow
                     statusId="repeat-grid-preset-review-status"
                     className="grid grid-cols-4 gap-1"
@@ -265,7 +265,7 @@ export function RepeatDialog() {
                       const active = cols === preset.cols && rows === preset.rows;
                       return {
                         key: preset.id,
-                        className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                        className: `btn py-1! px-1! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                         pressed: active,
                         onClick: () => applyGridPreset(preset),
                         title: `${t(preset.label)} · ${preset.cols}×${preset.rows}`,
@@ -289,7 +289,7 @@ export function RepeatDialog() {
             {tab === 'radial' && (
               <div className="space-y-3 text-xs">
                 <div>
-                  <div className="field-label !mb-1">{t('Repeat radial presets')}</div>
+                  <div className="field-label mb-1!">{t('Repeat radial presets')}</div>
                   <PresetRow
                     statusId="repeat-radial-preset-review-status"
                     className="grid grid-cols-3 gap-1"
@@ -309,7 +309,7 @@ export function RepeatDialog() {
                         && rotateInstances === preset.rotateInstances;
                       return {
                         key: preset.id,
-                        className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                        className: `btn py-1! px-1! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                         pressed: active,
                         onClick: () => applyRadialPreset(preset),
                         title: `${t(preset.label)} · ${preset.count} ${t('copies')} · ${preset.radius}px`,
@@ -337,7 +337,7 @@ export function RepeatDialog() {
             )}
             {tab === 'mirror' && (
               <div className="space-y-2 text-xs">
-                <div className="field-label !mb-1">{t('Mirror axis presets')}</div>
+                <div className="field-label mb-1!">{t('Mirror axis presets')}</div>
                 <PresetRow
                   statusId="repeat-mirror-preset-review-status"
                   className="grid grid-cols-3 gap-1"
@@ -353,7 +353,7 @@ export function RepeatDialog() {
                     const active = axis === preset.value;
                     return {
                       key: preset.value,
-                      className: `btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                      className: `btn py-1! px-1! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                       pressed: active,
                       onClick: () => setAxis(preset.value),
                       title: t(preset.label),
@@ -519,8 +519,8 @@ function Preview({ tab, grid, radial, mirror }: PreviewProps) {
               width={14}
               height={10}
               rx={1}
-              fill={isOrigin ? 'rgb(var(--color-accent2))' : 'rgb(var(--color-accent2) / 0.27)'}
-              stroke="rgb(var(--color-accent2))"
+              fill={isOrigin ? 'var(--accent2)' : 'rgb(var(--accent2) / 0.27)'}
+              stroke="var(--accent2)"
               strokeWidth={1}
             />
             {p.flipX && (

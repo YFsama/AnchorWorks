@@ -20,7 +20,7 @@ test('width tool sits on the toolbar and Shift+W activates it', async ({ page })
   // (aria-label + aria-keyshortcuts, see Toolbar.tsx). The registry label is
   // "Width Tool" — keep the aria-label exact, not a prefix match, so a future
   // "Width" rename shows up as a deliberate spec change.
-  const widthBtn = toolbar.locator('button[aria-label="Width Tool"]');
+  const widthBtn = toolbar.locator('button[aria-label="Width Tool — Shift+W"]');
   await expect(widthBtn).toBeVisible();
   await expect(widthBtn).toHaveAttribute('aria-keyshortcuts', 'Shift+W');
   await expect(widthBtn).toHaveAttribute('aria-pressed', 'false');

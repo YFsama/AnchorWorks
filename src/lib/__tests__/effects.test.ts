@@ -113,7 +113,7 @@ describe('flatten transparency', () => {
     vi.restoreAllMocks();
   });
 
-  it('bakes object opacity into solid fill, stroke, and shadow alpha', () => {
+  it('bakes object opacity into solid fill, stroke, and shadow-sm alpha', () => {
     const rect = new fabric.Rect({ fill: '#336699', stroke: 'rgba(255, 0, 0, 0.5)', opacity: 0.5 });
     rect.globalCompositeOperation = 'multiply';
     rect.shadow = new fabric.Shadow({ color: '#000000', blur: 4, offsetX: 1, offsetY: 2 });

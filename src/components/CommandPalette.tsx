@@ -1044,10 +1044,10 @@ export function CommandPalette({
     { id: 'edit.selectSameAnyArtboardPlacementActiveArtboard', label: t('Select Same Any-Artboard Placement Active Artboard Objects'), category: t('Edit'), keywords: 'select same any all artboards placement current active artboard page inside outside overflowing trim multi artboard preflight batch', icon: MousePointerClick, run: () => { const n = selectSameActiveArtboard('artboardAnyPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
     { id: 'edit.selectSameName', label: t('Select Same Name'), category: t('Edit'), keywords: 'select same name layer object named labels imported artwork batch', icon: MousePointerClick, run: () => { const n = selectSame('name'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a named object first.')); } },
     { id: 'edit.selectSameNameActiveArtboard', label: t('Select Same Name Active Artboard Objects'), category: t('Edit'), keywords: 'select same name current active artboard page layer object named labels imported artwork batch', icon: MousePointerClick, run: () => { const n = selectSameActiveArtboard('name'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-    { id: 'edit.selectSameAppearance', label: t('Select Same Appearance'), category: t('Edit'), keywords: 'select same appearance graphic style fill stroke opacity shadow pattern blend batch', icon: MousePointerClick, run: () => { const n = selectSame('appearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
+    { id: 'edit.selectSameAppearance', label: t('Select Same Appearance'), category: t('Edit'), keywords: 'select same appearance graphic style fill stroke opacity shadow-sm pattern blend batch', icon: MousePointerClick, run: () => { const n = selectSame('appearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
     { id: 'edit.selectSameAppearanceActiveArtboard', label: t('Select Same Appearance Active Artboard Objects'), category: t('Edit'), keywords: 'select same appearance current active artboard page graphic style cleanup batch', icon: MousePointerClick, run: () => { const n = selectSameActiveArtboard('appearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
     { id: 'edit.selectSameShadow', label: t('Select Same Shadow'), category: t('Edit'), keywords: 'select same drop shadow appearance effect batch', icon: MousePointerClick, run: () => { const n = selectSame('shadow'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a drop shadow first.')); } },
-    { id: 'edit.selectSameShadowActiveArtboard', label: t('Select Same Shadow Active Artboard Objects'), category: t('Edit'), keywords: 'select same shadow current active artboard page drop shadow appearance effect batch', icon: MousePointerClick, run: () => { const n = selectSameActiveArtboard('shadow'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+    { id: 'edit.selectSameShadowActiveArtboard', label: t('Select Same Shadow Active Artboard Objects'), category: t('Edit'), keywords: 'select same shadow-sm current active artboard page drop shadow appearance effect batch', icon: MousePointerClick, run: () => { const n = selectSameActiveArtboard('shadow'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
     { id: 'edit.selectSamePattern', label: t('Select Same Pattern Fill'), category: t('Edit'), keywords: 'select same pattern fill appearance texture batch', icon: MousePointerClick, run: () => { const n = selectSame('patternSpec'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a pattern fill first.')); } },
     { id: 'edit.selectSamePatternActiveArtboard', label: t('Select Same Pattern Fill Active Artboard Objects'), category: t('Edit'), keywords: 'select same pattern fill current active artboard page appearance texture batch', icon: MousePointerClick, run: () => { const n = selectSameActiveArtboard('patternSpec'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
     { id: 'edit.selectSameGradient', label: t('Select Same Gradient Fill'), category: t('Edit'), keywords: 'select same gradient fill appearance color stops batch', icon: MousePointerClick, run: () => { const n = selectSame('gradientFill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a gradient fill first.')); } },
@@ -1143,9 +1143,9 @@ export function CommandPalette({
     { id: 'color.hue',         label: t('Adjust Hue…'),        category: t('Arrange'), keywords: 'hue shift rotate colour wheel recolor edit colors', icon: Palette, run: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showHue', true); } },
     { id: 'color.brightness',  label: t('Adjust Brightness…'), category: t('Arrange'), keywords: 'brightness lighten darken lightness value edit colors', icon: Palette, run: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showBrightness', true); } },
     { id: 'color.defaultColors',  label: t('Default Fill / Stroke'), category: t('Arrange'), shortcut: getBinding('edit.defaultColors'), keywords: 'default colours reset white fill black stroke', icon: Palette, run: () => defaultColors() },
-    { id: 'appearance.clearAppearance', label: t('Clear Appearance'), category: t('Arrange'), keywords: 'clear appearance reset style effects shadow opacity dash blend default', icon: Palette, run: () => { const n = clearAppearanceFromSelection(); if (n) toast.success(`${n} ${t('appearances cleared')}`); else toast.warn(t('Select something first.')); } },
+    { id: 'appearance.clearAppearance', label: t('Clear Appearance'), category: t('Arrange'), keywords: 'clear appearance reset style effects shadow-sm opacity dash blend default', icon: Palette, run: () => { const n = clearAppearanceFromSelection(); if (n) toast.success(`${n} ${t('appearances cleared')}`); else toast.warn(t('Select something first.')); } },
     { id: 'appearance.flattenTransparency', label: t('Flatten Transparency'), category: t('Arrange'), keywords: 'flatten transparency opacity blend mode appearance illustrator', icon: Palette, run: () => { const n = flattenTransparencySelection(); if (n) toast.success(`${n} ${t('objects flattened')}`); else toast.warn(t('Select transparent or blended objects first.')); } },
-    { id: 'appearance.expandAppearance', label: t('Expand Appearance'), category: t('Arrange'), keywords: 'expand appearance shadow pattern transparency flatten illustrator', icon: Palette, run: () => { void expandAppearanceSelection().then((n) => { if (n) toast.success(`${n} ${t('appearances expanded')}`); else toast.warn(t('Select objects with expandable appearance first.')); }); } },
+    { id: 'appearance.expandAppearance', label: t('Expand Appearance'), category: t('Arrange'), keywords: 'expand appearance shadow-sm pattern transparency flatten illustrator', icon: Palette, run: () => { void expandAppearanceSelection().then((n) => { if (n) toast.success(`${n} ${t('appearances expanded')}`); else toast.warn(t('Select objects with expandable appearance first.')); }); } },
     { id: 'appearance.overprintFill', label: t('Overprint Fill'), category: t('Arrange'), keywords: 'overprint fill print separations trapping appearance preflight', icon: Palette, run: () => { const n = applyOverprintToSelection('fill', true); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); } },
     { id: 'appearance.overprintStroke', label: t('Overprint Stroke'), category: t('Arrange'), keywords: 'overprint stroke print separations trapping appearance preflight', icon: Palette, run: () => { const n = applyOverprintToSelection('stroke', true); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); } },
     { id: 'appearance.clearOverprint', label: t('Clear Overprint'), category: t('Arrange'), keywords: 'clear remove overprint fill stroke print separations preflight appearance', icon: Palette, run: () => { const n = applyOverprintToSelection('both', false); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); } },
@@ -1431,7 +1431,7 @@ export function CommandPalette({
     { id: 'pattern.expand', label: t('Expand Pattern Fill'), category: t('Arrange'), keywords: 'expand appearance pattern fill editable tiles illustrator', icon: Palette, run: () => { const n = expandPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills expanded')}`); else toast.warn(t('Select objects with pattern fills first.')); } },
     { id: 'shadow.soft', label: `${t('Drop shadow')} — ${t('Soft Shadow')}`, category: t('Arrange'), keywords: 'drop shadow soft blur appearance depth', icon: Palette, run: () => runWithSelection(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.35)', blur: 12, offsetX: 4, offsetY: 6 })) },
     { id: 'shadow.hard', label: `${t('Drop shadow')} — ${t('Hard Shadow')}`, category: t('Arrange'), keywords: 'drop shadow hard offset sign vinyl appearance', icon: Palette, run: () => runWithSelection(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.45)', blur: 0, offsetX: 5, offsetY: 5 })) },
-    { id: 'shadow.glow', label: `${t('Drop shadow')} — ${t('Glow')}`, category: t('Arrange'), keywords: 'glow shadow neon halo appearance', icon: Palette, run: () => runWithSelection(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 })) },
+    { id: 'shadow.glow', label: `${t('Drop shadow')} — ${t('Glow')}`, category: t('Arrange'), keywords: 'glow shadow-sm neon halo appearance', icon: Palette, run: () => runWithSelection(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 })) },
     { id: 'shadow.clear', label: t('Clear Shadow'), category: t('Arrange'), keywords: 'remove clear drop shadow appearance', icon: Palette, run: () => runWithSelection(() => applyShadowToSelection(null)) },
     { id: 'shadow.expand', label: t('Expand Drop Shadow'), category: t('Arrange'), keywords: 'expand appearance drop shadow separate editable object illustrator', icon: Palette, run: () => { void expandDropShadowSelection().then((n) => { if (n) toast.success(`${n} ${t('drop shadows expanded')}`); else toast.warn(t('Select objects with drop shadows first.')); }); } },
     { id: 'opacity.100', label: `${t('Opacity')} — 100%`, category: t('Arrange'), keywords: 'opacity transparency alpha solid full appearance', icon: Palette, run: () => runWithSelection(() => applyStyleToSelection({ opacity: 1 })) },
@@ -1615,7 +1615,7 @@ export function CommandPalette({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center"
       style={{ paddingTop: '18vh' }}
       onClick={close}
       role="dialog"
@@ -1643,7 +1643,7 @@ export function CommandPalette({
             aria-label={t('Command Palette')}
             aria-controls="command-palette-list"
             aria-activedescendant={filtered[safeActive] ? `cmd-${filtered[safeActive].id}` : undefined}
-            className="flex-1 bg-transparent outline-none text-sm text-ink placeholder:text-muted"
+            className="flex-1 bg-transparent outline-hidden text-sm text-ink placeholder:text-muted"
           />
           {query && (
             <div
@@ -1659,7 +1659,7 @@ export function CommandPalette({
               </span>
               <button
                 type="button"
-                className="btn !py-1 !px-2 text-[10px] shrink-0"
+                className="btn py-1! px-2! text-[10px] shrink-0"
                 data-command-search-action
                 data-command-search-action-review={t('Run first search result')}
                 onFocus={() => setReviewedSearchAction(t('Run first search result'))}
@@ -1674,7 +1674,7 @@ export function CommandPalette({
               </button>
               <button
                 type="button"
-                className="btn !py-1 !px-2 text-[10px] shrink-0"
+                className="btn py-1! px-2! text-[10px] shrink-0"
                 data-command-search-action
                 data-command-search-action-review={t('Clear search')}
                 onFocus={() => setReviewedSearchAction(t('Clear search'))}
@@ -1708,9 +1708,9 @@ export function CommandPalette({
             <div className="flex flex-col items-center text-center px-4 py-8" role="presentation">
               {/* Search-glass with empty inner — consistent line-art style with
                   the other empty states (Layers / Assets / Symbols / Artboards). */}
-              <svg width="44" height="44" viewBox="0 0 44 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'rgb(var(--color-muted))' }}>
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'var(--muted)' }}>
                 <circle cx="19" cy="19" r="11" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1.2" />
-                <line x1="27" y1="27" x2="36" y2="36" stroke="rgb(var(--color-accent2))" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="27" y1="27" x2="36" y2="36" stroke="var(--accent2)" strokeWidth="1.5" strokeLinecap="round" />
                 <line x1="14" y1="19" x2="24" y2="19" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" strokeLinecap="round" />
                 <line x1="14" y1="14" x2="20" y2="14" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" strokeLinecap="round" />
                 <line x1="14" y1="24" x2="22" y2="24" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" strokeLinecap="round" />
@@ -1722,7 +1722,7 @@ export function CommandPalette({
               {query && (
                 <button
                   type="button"
-                  className="btn !py-1 !px-2 text-[10px] mt-2"
+                  className="btn py-1! px-2! text-[10px] mt-2"
                   onClick={() => { setQuery(''); setActive(0); inputRef.current?.focus(); }}
                 >
                   {t('Clear search')}
@@ -1740,7 +1740,11 @@ export function CommandPalette({
                   data-idx={idx}
                   role="option"
                   aria-selected={isActive}
-                  aria-label={cmd.label}
+                  // No explicit aria-label: the accessible name computes from
+                  // the visible row content (label + category + kbd chip), so
+                  // it always matches what sighted users see (WCAG 2.5.3
+                  // Label in Name) and voice-control queries on any visible
+                  // fragment hit the row.
                   aria-keyshortcuts={ariaKeyshortcuts(cmd.shortcut)}
                   onClick={() => run(cmd)}
                   onMouseEnter={() => setActive(idx)}
@@ -1750,7 +1754,7 @@ export function CommandPalette({
                 >
                   <Icon size={14} aria-hidden="true" />
                   <span className="flex-1 truncate">{cmd.label}</span>
-                  <span className="field-label !mb-0 text-[9px]">
+                  <span className="field-label mb-0! text-[9px]">
                     {cmd.category}
                   </span>
                   {cmd.shortcut && (

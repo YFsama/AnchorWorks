@@ -191,7 +191,7 @@ const FROZEN_PLATE_SELECTED_HTML =
   '<div class="max-h-[260px] overflow-y-auto rounded border border-border" role="listbox" aria-label="Separations plates" aria-describedby="separations-plate-review-status" title="Use arrow keys to review separations plates">'
   + '<div id="separations-plate-review-status" class="sr-only" aria-live="polite">Reviewing Separations plates'
   + '</div>'
-  + '<button type="button" role="option" aria-selected="true" aria-pressed="true" data-separations-plate-action="true" data-review="PANTONE 185 C · Spot · 3 objects" class="w-full flex items-center gap-2 px-2 py-1.5 text-left border-b border-border last:border-b-0 transition-colors bg-accent2/10 outline outline-1 outline-accent2" title="PANTONE 185 C · Spot · 3 objects">'
+  + '<button type="button" role="option" aria-selected="true" aria-pressed="true" data-separations-plate-action="true" data-review="PANTONE 185 C · Spot · 3 objects" class="w-full flex items-center gap-2 px-2 py-1.5 text-left border-b border-border last:border-b-0 transition-colors bg-accent2/10 outline-solid outline-1 outline-accent2" title="PANTONE 185 C · Spot · 3 objects">'
   + '<span class="w-4 h-4 rounded-sm border border-border shrink-0" style="background-color: rgb(255, 46, 154);" aria-hidden="true">'
   + '</span>'
   + '<span class="flex-1 min-w-0 truncate text-[11px] text-ink">PANTONE 185 C'

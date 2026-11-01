@@ -105,7 +105,7 @@ export function SplitGridDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -135,7 +135,7 @@ export function SplitGridDialog() {
         </label>
 
         <div className="mt-2">
-          <div className="field-label !mb-1">{t('Split recipes')}</div>
+          <div className="field-label mb-1!">{t('Split recipes')}</div>
           <PresetRow
             statusId="split-grid-recipe-review-status"
             className="grid grid-cols-2 gap-1"
@@ -151,7 +151,7 @@ export function SplitGridDialog() {
               const active = activeRecipe === preset.label;
               return {
                 key: preset.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => applyRecipePreset(preset),
                 title: `${t(preset.title)} ${preset.rows} ${t('Rows')} × ${preset.cols} ${t('Columns')}, ${preset.gutter.toFixed(1)} ${t('Gutter (mm)')}`,
@@ -163,7 +163,7 @@ export function SplitGridDialog() {
         </div>
 
         <div className="mt-2">
-          <div className="field-label !mb-1">{t('Grid presets')}</div>
+          <div className="field-label mb-1!">{t('Grid presets')}</div>
           <PresetRow
             statusId="split-grid-preset-review-status"
             className="grid grid-cols-5 gap-1"
@@ -179,7 +179,7 @@ export function SplitGridDialog() {
               const active = rows === preset.rows && cols === preset.cols;
               return {
                 key: preset.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => applyPreset(preset),
                 title: `${preset.rows} ${t('Rows')} × ${preset.cols} ${t('Columns')}`,

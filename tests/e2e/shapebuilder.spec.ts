@@ -18,7 +18,7 @@ test('shape builder sits on the toolbar and Shift+M activates it', async ({ page
 
   // The button exposes its localized name and the Shift+M binding separately
   // (aria-label + aria-keyshortcuts, see Toolbar.tsx).
-  const builderBtn = toolbar.locator('button[aria-label="Shape Builder"]');
+  const builderBtn = toolbar.locator('button[aria-label="Shape Builder — Shift+M"]');
   await expect(builderBtn).toBeVisible();
   await expect(builderBtn).toHaveAttribute('aria-keyshortcuts', 'Shift+M');
   await expect(builderBtn).toHaveAttribute('aria-pressed', 'false');

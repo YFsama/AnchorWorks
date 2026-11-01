@@ -29,7 +29,7 @@ async function drawOneText(page: Page, content: string): Promise<void> {
   const toolbar = toolsToolbar(page);
   await expect(toolbar).toBeVisible();
   await page.keyboard.press('t');
-  await expect(toolbar.getByRole('button', { name: 'Text', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(toolbar.getByRole('button', { name: 'Text — T', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
   const canvas = page.locator('#main-canvas');
   const box = await canvas.boundingBox();

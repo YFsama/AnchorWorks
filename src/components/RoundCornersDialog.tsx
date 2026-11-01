@@ -54,7 +54,7 @@ export function RoundCornersDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -82,7 +82,7 @@ export function RoundCornersDialog() {
           />
         </label>
         <div className="mb-2">
-          <div className="field-label !mb-1">{t('Radius presets')}</div>
+          <div className="field-label mb-1!">{t('Radius presets')}</div>
           <PresetRow
             statusId="round-corners-preset-review-status"
             className="grid grid-cols-6 gap-1"
@@ -96,7 +96,7 @@ export function RoundCornersDialog() {
             setReviewed={setReviewedPreset}
             items={RADIUS_PRESETS_MM.map((value) => ({
               key: value,
-              className: `btn !py-1 !px-1 !text-[10px] ${radius === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+              className: `btn py-1! px-1! text-[10px]! ${radius === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
               pressed: radius === value,
               onClick: () => setRadius(value),
               data: { radius: value, review: `${t('Radius (mm)')} ${value}` },

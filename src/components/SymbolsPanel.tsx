@@ -228,12 +228,12 @@ export function SymbolsPanel() {
             <div className="flex flex-col items-center text-center px-2 py-3">
               {/* Three-tile mini-grid suggests "reusable instances". One filled tile is the
                   master, the other two are the dim/dashed instances. */}
-              <svg width="56" height="44" viewBox="0 0 56 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'rgb(var(--color-muted))' }}>
-                <rect x="6.5" y="7.5" width="13" height="13" rx="1.5" fill="rgb(var(--color-accent2))" fillOpacity="0.18" stroke="rgb(var(--color-accent2))" strokeWidth="1.2" />
+              <svg width="56" height="44" viewBox="0 0 56 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'var(--muted)' }}>
+                <rect x="6.5" y="7.5" width="13" height="13" rx="1.5" fill="var(--accent2)" fillOpacity="0.18" stroke="var(--accent2)" strokeWidth="1.2" />
                 <rect x="22.5" y="7.5" width="13" height="13" rx="1.5" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1" strokeDasharray="2 2" />
                 <rect x="38.5" y="7.5" width="13" height="13" rx="1.5" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1" strokeDasharray="2 2" />
-                <path d="M19 28 L 13 33 M27 28 L 29 33 M43 28 L 45 33" stroke="rgb(var(--color-accent2))" strokeOpacity="0.45" strokeWidth="1" strokeLinecap="round" />
-                <circle cx="13" cy="33" r="1.5" fill="rgb(var(--color-accent))" />
+                <path d="M19 28 L 13 33 M27 28 L 29 33 M43 28 L 45 33" stroke="var(--accent2)" strokeOpacity="0.45" strokeWidth="1" strokeLinecap="round" />
+                <circle cx="13" cy="33" r="1.5" fill="var(--accent)" />
               </svg>
               <div className="text-xs text-ink/90 mb-1">{t('No symbols yet')}</div>
               <div className="type-caption leading-relaxed max-w-[200px]">
@@ -249,7 +249,7 @@ export function SymbolsPanel() {
               {query && (
                 <button
                   type="button"
-                  className="btn !py-1 !px-2 text-[10px] mt-2"
+                  className="btn py-1! px-2! text-[10px] mt-2"
                   onClick={() => { setQuery(''); setReviewIndex(0); }}
                 >
                   {t('Clear search')}
@@ -324,7 +324,7 @@ function LibrarySearch({
       <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
       <input
         type="search"
-        className="input !py-1 !px-2 text-xs min-w-0 flex-1"
+        className="input py-1! px-2! text-xs min-w-0 flex-1"
         placeholder={placeholder}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
@@ -363,7 +363,7 @@ function LibrarySearch({
             label: t('Insert First'),
             review: t('Insert first search result'),
             title: t('Insert first search result'),
-            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            className: 'btn py-1! px-1.5! text-[10px]! shrink-0',
             onActivate: () => { onInsertFirst?.(); },
             disabled: !onInsertFirst,
           }}
@@ -371,7 +371,7 @@ function LibrarySearch({
             label: t('Clear search'),
             review: t('Clear search'),
             title: t('Clear search'),
-            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            className: 'btn py-1! px-1.5! text-[10px]! shrink-0',
             onActivate: () => setQuery(''),
           }}
         />
@@ -494,7 +494,7 @@ function SymbolTile({
           <input
             ref={inputRef}
             type="text"
-            className="w-full bg-panel2 border border-accent2 rounded-sm px-1 py-0.5 text-[9px] text-ink outline-none"
+            className="w-full bg-panel2 border border-accent2 rounded-sm px-1 py-0.5 text-[9px] text-ink outline-hidden"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}

@@ -80,7 +80,7 @@ export function MarginGuidesDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -99,7 +99,7 @@ export function MarginGuidesDialog() {
           <input type="number" min={0} step={0.5} autoFocus value={margin} onChange={(e) => setMargin(Math.max(0, +e.target.value || 0))} className="input-num w-full" aria-label={t('Margin (mm)')} />
         </label>
         <div className="mt-2">
-          <div className="field-label !mb-1">{t('Margin guide recipes')}</div>
+          <div className="field-label mb-1!">{t('Margin guide recipes')}</div>
           <PresetRow
             statusId="margin-guides-job-preset-review-status"
             className="grid grid-cols-2 gap-1"
@@ -116,7 +116,7 @@ export function MarginGuidesDialog() {
               const review = `${t(preset.label)}: ${t(preset.title)} ${preset.margin} mm`;
               return {
                 key: preset.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => setMargin(preset.margin),
                 title: review,
@@ -127,7 +127,7 @@ export function MarginGuidesDialog() {
           />
         </div>
         <div className="mt-2">
-          <div className="field-label !mb-1">{t('Margin presets')}</div>
+          <div className="field-label mb-1!">{t('Margin presets')}</div>
           <PresetRow
             statusId="margin-guides-preset-review-status"
             className="grid grid-cols-6 gap-1"

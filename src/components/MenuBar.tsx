@@ -318,7 +318,8 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         onClick={() => setShowAbout(true)}
         className="flex items-center rounded-sm px-1 -mx-1 hover:bg-panel2 transition-colors"
         title={t('About')}
-        aria-label={t('About')}
+        // Embeds the visible wordmark (WCAG 2.5.3 Label in Name).
+        aria-label={`${t('About')} Anchorworks`}
       >
         <Logo size={20} variant="full" />
       </button>
@@ -1601,13 +1602,13 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Cut Contour…')} (${getBinding('window.cutContour')})`} aria-label={t('Cut Contour…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('window.cutContour'))} onClick={() => openWithSelection('showCutContour')}>
             <Target size={12} aria-hidden="true" />{t('Contour')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Add positioning marks')} aria-label={t('Add positioning marks')} onClick={async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t)}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Add positioning marks')} aria-label={`${t('Reg')} — ${t('Add positioning marks')}`} onClick={async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t)}>
             <Target size={12} aria-hidden="true" />{t('Reg')}
           </button>
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Weed border')} aria-label={t('Weed border')} onClick={async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t)}>
             <Grid3X3 size={12} aria-hidden="true" />{t('Weed')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Bridges')} — ${t('Standard')}`} aria-label={`${t('Bridges')} — ${t('Standard')}`} onClick={async () => { (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1); }}>
+          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Bridges')} — ${t('Standard')}`} aria-label={`${t('Bridge')} — ${t('Standard')}`} onClick={async () => { (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1); }}>
             <Grid3X3 size={12} aria-hidden="true" />{t('Bridge')}
           </button>
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Clear bridges')} aria-label={t('Clear bridges')} onClick={async () => { (await import('../lib/cutPrepActions')).clearPlotterBridges(t); }}>
@@ -1657,7 +1658,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       <input ref={pdfRef} type="file" accept=".pdf,application/pdf" hidden onChange={onPdf} />
 
       {showAbout && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowAbout(false)}>
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 backdrop-blur-xs" onClick={() => setShowAbout(false)}>
           <div
             className="w-[380px] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
@@ -1679,7 +1680,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
                 <span className="inline-flex items-center gap-1">
                   <span
                     className="w-1.5 h-1.5 rounded-full inline-block"
-                    style={{ background: isTauri() ? 'rgb(var(--color-success))' : 'rgb(var(--color-accent2))' }}
+                    style={{ background: isTauri() ? 'var(--success)' : 'var(--accent2)' }}
                     aria-hidden="true"
                   />
                   {isTauri() ? t('Native shell (Tauri)') : t('Web / PWA')}
@@ -1794,7 +1795,7 @@ function buildRecentFilesItems(recent: RecentFile[]): MenuItem[] {
   const items: MenuItem[] = [{ sep: true }];
   items.push({
     node: (
-      <div className="px-3 pt-1.5 pb-1 field-label !mb-0 text-muted/80">
+      <div className="px-3 pt-1.5 pb-1 field-label mb-0! text-muted/80">
         {tStatic('Recent Files')}
       </div>
     ),
@@ -1815,7 +1816,7 @@ function buildRecentFilesItems(recent: RecentFile[]): MenuItem[] {
               is the whole point of having a preview at all. The menu-row
               height (px-3 py-1.5 ≈ 28px) accommodates it without changing. */}
           <span
-            className="w-4 h-4 rounded-sm border border-border bg-panel2 flex-shrink-0 overflow-hidden flex items-center justify-center"
+            className="w-4 h-4 rounded-sm border border-border bg-panel2 shrink-0 overflow-hidden flex items-center justify-center"
             aria-hidden="true"
           >
             {f.preview ? (
@@ -1834,7 +1835,7 @@ function buildRecentFilesItems(recent: RecentFile[]): MenuItem[] {
             )}
           </span>
           <span className="flex-1 min-w-0 truncate text-ink/90">{f.name}</span>
-          <span className="text-[10px] text-muted tabular-nums flex-shrink-0">
+          <span className="text-[10px] text-muted tabular-nums shrink-0">
             {formatRelativeTime(f.ts)}
           </span>
         </button>
@@ -1908,7 +1909,7 @@ function ZoomChip({ zoom, t }: { zoom: number; t: (k: string) => string }) {
           ref={inputRef}
           type="text"
           inputMode="decimal"
-          className="w-12 bg-transparent outline-none text-ink text-right"
+          className="w-12 bg-transparent outline-hidden text-ink text-right"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}

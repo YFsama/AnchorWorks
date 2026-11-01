@@ -79,7 +79,7 @@ export function ShearDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -99,7 +99,7 @@ export function ShearDialog() {
         </label>
 
         <div className="mt-3">
-          <div className="field-label !mb-1">{t('Shear angle presets')}</div>
+          <div className="field-label mb-1!">{t('Shear angle presets')}</div>
           <PresetRow
             statusId="shear-angle-preset-review-status"
             className="grid grid-cols-5 gap-1"
@@ -113,7 +113,7 @@ export function ShearDialog() {
             setReviewed={setReviewedAnglePreset}
             items={SHEAR_ANGLE_PRESETS.map((preset) => ({
               key: preset,
-              className: `btn !py-1 !px-1 !text-[10px] ${angle === preset ? 'ring-1 ring-accent' : ''}`,
+              className: `btn py-1! px-1! text-[10px]! ${angle === preset ? 'ring-1 ring-accent' : ''}`,
               pressed: angle === preset,
               onClick: () => setAngle(preset),
               title: `${t('Set shear angle to')} ${preset > 0 ? '+' : ''}${preset}°`,

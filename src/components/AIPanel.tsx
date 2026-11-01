@@ -268,7 +268,7 @@ export function AIPanel({ onClose }: Props) {
         {history.length === 0 && (
           <div className="flex flex-col items-center text-center px-2 pt-6">
             {/* Chat bubble + spark — "AI conversation" without sparkle clichés. */}
-            <svg width="64" height="56" viewBox="0 0 64 56" fill="none" className="mb-3 opacity-80" aria-hidden="true" style={{ color: 'rgb(var(--color-muted))' }}>
+            <svg width="64" height="56" viewBox="0 0 64 56" fill="none" className="mb-3 opacity-80" aria-hidden="true" style={{ color: 'var(--muted)' }}>
               <path
                 d="M10.5 12.5 L 41.5 12.5 Q 45.5 12.5 45.5 16.5 L 45.5 32.5 Q 45.5 36.5 41.5 36.5 L 22 36.5 L 14 43 L 14 36.5 L 10.5 36.5 Q 6.5 36.5 6.5 32.5 L 6.5 16.5 Q 6.5 12.5 10.5 12.5 Z"
                 stroke="currentColor" strokeOpacity="0.6" strokeWidth="1" fill="none"
@@ -279,9 +279,9 @@ export function AIPanel({ onClose }: Props) {
               {/* Spark element — a small four-point star nudged off-corner. */}
               <path
                 d="M52 14 L 53 18 L 57 19 L 53 20 L 52 24 L 51 20 L 47 19 L 51 18 Z"
-                fill="rgb(var(--color-accent))"
+                fill="var(--accent)"
               />
-              <circle cx="56" cy="10" r="1.3" fill="rgb(var(--color-accent2))" />
+              <circle cx="56" cy="10" r="1.3" fill="var(--accent2)" />
             </svg>
             <div className="type-title mb-1">{t('Design with Claude')}</div>
             <div className="type-caption leading-relaxed max-w-[260px] mb-4">
@@ -385,7 +385,7 @@ export function AIPanel({ onClose }: Props) {
           rows={2} placeholder={t('Describe an edit or design…')}
           aria-label={t('Describe an edit or design…')}
           disabled={busy}
-          className="flex-1 bg-panel2 border border-border rounded p-2 text-xs outline-none focus:border-accent2 resize-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors" />
+          className="flex-1 bg-panel2 border border-border rounded p-2 text-xs outline-hidden focus:border-accent2 resize-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors" />
         <ActionButton
           actionAttr="data-ai-action"
           onClick={send}
@@ -489,7 +489,7 @@ export function AIPanel({ onClose }: Props) {
             </>
           )}
           <div className="flex items-center justify-between mb-2">
-            <h3 className="field-label !mb-0">{t('MCP Servers')}</h3>
+            <h3 className="field-label mb-0!">{t('MCP Servers')}</h3>
             <div
               className="flex items-center gap-1"
               role="toolbar"
@@ -536,7 +536,7 @@ export function AIPanel({ onClose }: Props) {
               />
               <input
                 type="url"
-                className="input-num flex-[2]"
+                className="input-num flex-2"
                 value={srv.url}
                 onChange={(e) => updateServer(i, { url: e.target.value })}
                 aria-label={t('Server URL')}
@@ -608,7 +608,7 @@ function Modal({ children, title, onClose }: { children: React.ReactNode; title:
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       role="dialog"
       aria-modal="true"

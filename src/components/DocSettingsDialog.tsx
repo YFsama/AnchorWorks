@@ -142,7 +142,7 @@ export function DocSettingsDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -159,7 +159,7 @@ export function DocSettingsDialog() {
             <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
             <input
               type="search"
-              className="flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70 min-w-0"
+              className="flex-1 bg-transparent outline-hidden text-xs text-ink placeholder:text-muted/70 min-w-0"
               placeholder={t('Search preset sizes…')}
               value={presetSearch}
               onChange={(e) => setPresetSearch(e.target.value)}
@@ -242,7 +242,7 @@ export function DocSettingsDialog() {
               <span>{t('No preset sizes found.')}</span>
               <button
                 type="button"
-                className="btn !py-1 !px-2 text-[10px]"
+                className="btn py-1! px-2! text-[10px]"
                 onClick={() => setPresetSearch('')}
               >
                 {t('Clear search')}

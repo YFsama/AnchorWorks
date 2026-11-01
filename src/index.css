@@ -1,323 +1,241 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-:root {
-  /* Standardised radii — small for inputs, default for buttons/cards, large for dialogs. */
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-lg: 10px;
-
-  /* ---------------------------------------------------------------------
-   * Default (dark) theme tokens. Each is an `R G B` triplet so Tailwind's
-   * `rgb(var(--color-x) / <alpha-value>)` colour entries can compose with
-   * the `/<n>` alpha modifier (e.g. `text-ink/90`).
-   *
-   * To override for light mode, see `:root[data-theme="light"]` below.
-   * ------------------------------------------------------------------- */
-  /* Surface ladder — slight warm tint (R one notch above G/B) so the
-   * dark UI doesn't feel "blue-cold" against the warm brand orange.
-   * Difference is sub-perceptual at any single surface but cumulative
-   * across the whole chrome it reads cohesive. */
-  --color-panel: 30 28 33;
-  --color-panel2: 38 36 42;
-  --color-panel3: 47 45 53;
-  --color-border: 58 56 66;
-  --color-ink: 231 231 234;
-  --color-muted: 163 163 176;
-  --color-accent: 255 138 76;
-  --color-accent2: 90 200 216;
-  --color-success: 95 179 124;
-  --color-danger: 224 85 107;
-  --color-warn: 231 184 90;
-
-  /* App chrome / body backdrop (one step darker than `panel`).
-   * Surfaced as a var so the light theme + focus ring track it.            */
-  --color-app-bg: 23 21 26;        /* slightly warm dark, matches panel ladder */
-  /* Canvas scratch backdrop — used OUTSIDE the artboards. Sits below the
-   * artboard's bright "paper" fill so the user sees the page float vs the
-   * dim workspace. ~3 stops darker than panel for clear separation. */
-  --color-canvas-bg: 18 18 22;     /* #121216 — canvas-host backdrop */
-  --color-canvas-check: 26 26 31;  /* #1a1a1f — checkerboard squares */
-  /* Artboard "paper" surface — what the page actually IS, drawn by
-   * ArtboardLayer. Distinct from --color-panel so users get instant
-   * inside-vs-outside-artboard parsing. Slightly off-white in dark mode
-   * (#ffffff would burn the eyes against the dark scratch backdrop). */
-  --color-artboard-fill: 244 244 247;     /* dark mode: bright paper */
-  --color-artboard-shadow: 0 0 0;         /* drop shadow under each artboard */
-  /* Floating-element tokens — popovers, dropdown menus, hovering
-   * tooltips. One step brighter than panel so they pop above without
-   * having to draw a heavy border. */
-  --color-elevated: 42 40 48;             /* between panel2 and panel3 */
-  --color-shadow: 0 0 0;                  /* base for box-shadow rgba(var(...)/X) */
-
-  /* Hover / active surface tokens — formal names for the "+5/+10 lightness"
-   * effects scattered across components. Centralise here so the dark→light
-   * hover swap stays consistent. */
-  --color-panel-hover: 51 49 59;          /* panel3 + ~3 */
-  --color-panel-active: 60 58 70;         /* one more step */
-
-  --color-scrollbar-track: 26 26 31;
-  --color-scrollbar-thumb: 58 56 66;
-  --color-scrollbar-thumb-hover: 76 74 85;
-
-  /* `color-scheme: dark` tells the browser to render native form widgets
-   * (checkboxes, radios, scrollbars, date pickers) in their dark variant.
-   * Without it, PreferencesDialog's plain `<input type="checkbox">` toggles
-   * render as bright white squares stranded against the dark panel. The
-   * light theme overrides this to `light` below. */
-  color-scheme: dark;
+/*
+ * Theme colours ride runtime-switchable vars (dark `:root` + light
+ * `data-theme` blocks below hold full `rgb(R G B)` values), declared
+ * `inline` so utilities embed `var(--panel)` directly and follow the
+ * var at render time. Opacity modifiers (`text-ink/90`) compile to
+ * color-mix() over the same var, so theme switching keeps working.
+ */
+@theme inline {
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-panel3: var(--panel3);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent2: var(--accent2);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
 }
 
-/* ---------------------------------------------------------------------
- * Light theme — toggled by store.setTheme('light'), which writes
- * `data-theme="light"` on <html>. Brand colours (accent/accent2/semantics)
- * stay the same so the visual identity is preserved; only the surface
- * ladder + ink + muted invert.
- * ------------------------------------------------------------------- */
-:root[data-theme="light"] {
-  --color-panel: 247 247 249;       /* #f7f7f9 */
-  --color-panel2: 237 238 241;      /* #edeef1 */
-  --color-panel3: 227 228 233;      /* #e3e4e9 */
-  --color-border: 212 213 219;      /* #d4d5db */
-  --color-ink: 28 28 33;            /* #1c1c21 — dark text */
-  --color-muted: 92 92 104;         /* #5c5c68 — bumped from #6a6a76 so 9-10px
-                                       muted text clears 4.5:1 even on the
-                                       panel3 (active palette row) surface. */
+@theme {
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', Menlo, monospace;
 
-  --color-app-bg: 237 238 241;      /* matches panel2 — soft off-white */
-  --color-canvas-bg: 206 207 213;   /* darker than dark-mode equivalent: in
-                                       light mode the scratch needs to be
-                                       MID-gray so artboard white pops, not
-                                       compete with the chrome's off-white. */
-  --color-canvas-check: 195 196 202; /* darker check squares for light mode */
-  /* Light-mode artboard fill = pure white. Page is page; chrome is chrome. */
-  --color-artboard-fill: 255 255 255;
-  --color-artboard-shadow: 0 0 0;
-  /* Floating elevation — soft white that's brighter than panel so it
-   * separates from the chrome without a heavy border. */
-  --color-elevated: 252 252 253;
-  --color-shadow: 0 0 0;
-  /* Hover / active surface tokens for light mode — slightly darker
-   * than panel3 so the press-down feedback registers. */
-  --color-panel-hover: 217 218 224;
-  --color-panel-active: 207 208 215;
-
-  --color-scrollbar-track: 226 227 232;
-  --color-scrollbar-thumb: 190 191 200;
-  --color-scrollbar-thumb-hover: 160 161 170;
-
-  /* Light variant of the native-control color-scheme — see :root block above. */
-  color-scheme: light;
-
-  /* Semantic warn is golden #e7b85a in dark, which only reaches ~2.5:1 on
-   * the light panel surface — `text-warn` body copy fails WCAG AA there.
-   * Darken to amber-700 (~5.5:1) for light. `bg-warn` / `border-warn` get
-   * the same shift but stay close enough to "yellow warning" that the
-   * semantic still reads correctly. */
-  --color-warn: 180 83 9;            /* #b45309 — dark amber */
-  /* Same contrast issue with danger: pink-red #e0556b only hits ~3:1 against
-   * the light surface. red-700 #b91c1c reaches ~6:1 while still reading
-   * unambiguously as "destructive red". */
-  --color-danger: 185 28 28;         /* #b91c1c — dark red */
-  /* Same story for success: mid-green #5fb37c lands at ~2.4:1 on the light
-   * surface. Drop to green-700 for ~5.5:1 while keeping the "success" hue. */
-  --color-success: 21 128 61;        /* #15803d — dark green */
-  /* Brand cyan #5ac8d8 only hits ~1.8:1 on the light surface, so
-   * `border-accent2` indicators, `text-accent2`, and `bg-accent2/X` tints
-   * all under-perform here. Darken to the same teal that .badge-active /
-   * focus halo / skip-link border / drop affordance already adopt for
-   * light. Brand identity for cyan now is "dark-teal accent" in light. */
-  --color-accent2: 26 98 109;        /* #1a626d — dark teal */
+  --radius-sm: var(--radius-sm);
+  --radius: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
 }
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  background: rgb(var(--color-app-bg));
-  color: rgb(var(--color-ink));
-  font-family: Inter, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-}
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
 
-button { font-family: inherit; }
-
-/* scrollbar */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: rgb(var(--color-scrollbar-track)); }
-::-webkit-scrollbar-thumb { background: rgb(var(--color-scrollbar-thumb)); border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-scrollbar-thumb-hover)); }
-
-/* Fabric canvas wrapper */
-.canvas-host {
-  background:
-    linear-gradient(45deg, rgb(var(--color-canvas-check)) 25%, transparent 25%),
-    linear-gradient(-45deg, rgb(var(--color-canvas-check)) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgb(var(--color-canvas-check)) 75%),
-    linear-gradient(-45deg, transparent 75%, rgb(var(--color-canvas-check)) 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
-  background-color: rgb(var(--color-canvas-bg));
-}
-/* File drop affordance — dashed accent2 ring + faint tint appears whenever a
- * file drag enters the canvas. Toggled by io3.ts attachDragDrop. */
-.canvas-host.dragging-files::after {
-  content: '';
-  position: absolute;
-  inset: 10px;
-  border: 2px dashed rgb(var(--color-accent2));
-  background: rgb(var(--color-accent2) / 0.05);
-  border-radius: 8px;
-  pointer-events: none;
-  z-index: 50;
-  animation: drop-pulse 1200ms ease-in-out infinite;
-}
-@keyframes drop-pulse {
-  0%, 100% { opacity: 0.7; }
-  50%      { opacity: 1; }
-}
-
-@layer components {
-  /* ----- form controls ----- */
-  .input-num {
-    @apply bg-panel2 border border-border rounded-sm px-2 py-1 text-xs text-ink w-full outline-none transition-colors;
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
   }
+}
+
+@utility input-num {
+  /* ----- form controls ----- */
+  @apply bg-panel2 border border-border rounded-sm px-2 py-1 text-xs text-ink w-full outline-hidden transition-colors;
   /* Hover lifts the border one notch toward ink so the field reads as
    * "interactive" without going full focus-blue. Hard-coded #4a4a55 used to
    * land too dark on the light theme (almost ink-grey on a near-white
    * field, looking like an error). color-mix interpolates 25% ink into the
    * resting border in either theme — subtle but visible bump. */
-  .input-num:hover {
-    border-color: color-mix(in srgb, rgb(var(--color-border)), rgb(var(--color-ink)) 25%);
+  &:hover {
+    border-color: color-mix(
+      in srgb,
+      var(--border),
+      var(--ink) 25%
+    );
   }
-  .input-num:focus { @apply border-accent2; }
+  &:focus {
+    @apply border-accent2;
+  }
   /* Disabled state — the previous default looked identical to an enabled
    * input, so the only signal was the keyboard refusing focus. Dim opacity +
    * `not-allowed` cursor matches the .btn / .btn-primary disabled treatment
    * (defined inline via `disabled:opacity-50 disabled:cursor-not-allowed`),
    * keeping the form-control family visually consistent when read-only. */
-  .input-num:disabled {
+  &:disabled {
     @apply opacity-50 cursor-not-allowed;
   }
-  .input-num:disabled:hover {
+  &:disabled:hover {
     /* Override the live hover-border bump so disabled fields don't tease an
      * interactive affordance. */
-    border-color: rgb(var(--color-border));
+    border-color: var(--border);
   }
+}
 
+@utility btn {
   /* ----- buttons -----
      Three variants, all share px-2 py-1 height to align in toolbars. The primary
      is a single-step button (px-3 py-1.5) to read as a primary CTA at form footers
      and the AI button. Ghost is for low-emphasis actions. */
-  .btn {
-    @apply px-2 py-1 rounded-sm text-xs bg-panel2 border border-border text-ink/90 transition-all duration-150;
-  }
+  @apply px-2 py-1 rounded-sm text-xs bg-panel2 border border-border text-ink/90 transition-all duration-150;
   /* Hover lifts to the formal `panel-hover` token (introduced in the
    * 2026-05 palette refinement). One step warmer than panel3 so the
    * tactile feedback registers; border tightens toward ink for an
    * outlined feel on the hovered control. */
-  .btn:hover {
-    background: rgb(var(--color-panel-hover));
-    border-color: color-mix(in oklab, rgb(var(--color-border)) 70%, rgb(var(--color-ink)));
-    color: rgb(var(--color-ink));
+  &:hover {
+    background: rgb(var(--panel-hover));
+    border-color: color-mix(
+      in oklab,
+      var(--border) 70%,
+      var(--ink)
+    );
+    color: var(--ink);
   }
-  .btn:active {
-    background: rgb(var(--color-panel-active));
+  &:active {
+    background: rgb(var(--panel-active));
     transform: translateY(0.5px);
   }
-  .btn:disabled { @apply opacity-40 cursor-not-allowed; }
-  .btn:disabled:hover {
-    background: rgb(var(--color-panel2));
-    border-color: rgb(var(--color-border));
+  &:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+  &:disabled:hover {
+    background: var(--panel2);
+    border-color: var(--border);
   }
   /* Async-in-progress buttons set `disabled + aria-busy="true"` together so
    * the click is blocked while the request flies. The :disabled dim would
    * then read as "unavailable" — contradicting the spinner spinning beside
    * it. Restore full opacity + swap the cursor to `progress` (OS waiting
    * glyph) so the visual matches the semantic. */
-  .btn[aria-busy="true"]:disabled,
-  .btn-primary[aria-busy="true"]:disabled,
-  .btn-danger[aria-busy="true"]:disabled {
+  &[aria-busy='true']:disabled {
+    opacity: 1;
+    cursor: progress;
+  }
+}
+
+@utility btn-primary {
+  &[aria-busy='true']:disabled {
+    opacity: 1;
+    cursor: progress;
+  }
+  /* White-on-#ff8a4c only hits ~2.33:1, well under AA. Darken the
+       background just enough that white text reaches the 4.5:1 threshold —
+       #b8541d on white text computes to ~5.0:1. The hover/active steps mirror
+       the deeper shade so the visual rhythm is preserved. */
+  @apply px-3 py-1.5 rounded-sm text-xs text-white transition-all duration-150 border;
+  background: #b8541d;
+  border-color: #b8541d;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 1px 2px rgba(0, 0, 0, 0.25);
+  &:hover {
+    background: #c75d22;
+    border-color: #c75d22;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.1) inset,
+      0 2px 6px rgba(184, 84, 29, 0.25);
+  }
+  &:active {
+    background: #a44a1a;
+    border-color: #a44a1a;
+    transform: translateY(0.5px);
+  }
+  /* Disabled flattens the shadow so the button reads as "off" without
+   * waiting for a hover to remove the lift. */
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  &:disabled:hover {
+    background: #b8541d;
+    border-color: #b8541d;
+    box-shadow: none;
+  }
+}
+
+@utility btn-danger {
+  &[aria-busy='true']:disabled {
     opacity: 1;
     cursor: progress;
   }
 
-  .btn-primary {
-    /* White-on-#ff8a4c only hits ~2.33:1, well under AA. Darken the
-       background just enough that white text reaches the 4.5:1 threshold —
-       #b8541d on white text computes to ~5.0:1. The hover/active steps mirror
-       the deeper shade so the visual rhythm is preserved. */
-    @apply px-3 py-1.5 rounded-sm text-xs text-white transition-all duration-150 border;
-    background: #b8541d;
-    border-color: #b8541d;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 1px 2px rgba(0, 0, 0, 0.25);
-  }
-  .btn-primary:hover {
-    background: #c75d22;
-    border-color: #c75d22;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 2px 6px rgba(184, 84, 29, 0.25);
-  }
-  .btn-primary:active { background: #a44a1a; border-color: #a44a1a; transform: translateY(0.5px); }
-  /* Disabled flattens the shadow so the button reads as "off" without
-   * waiting for a hover to remove the lift. */
-  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
-  .btn-primary:disabled:hover { background: #b8541d; border-color: #b8541d; box-shadow: none; }
-
   /* Destructive primary action — same shape as .btn-primary but driven by the
-   * `--color-danger` token (auto-adapts to the light-theme darker red).
+   * `--danger` token (auto-adapts to the light-theme darker red).
    * Used by ConfirmHost when the caller passes `danger: true` (deletion
    * dialogs, "Discard changes?", etc.). The previous approach overrode
    * `.btn-primary`'s background via an inline `style` prop, which won the
    * specificity war but defeated the :hover and :active animations — the
    * destructive button sat static while the regular primary button next
    * to it lifted and depressed. */
-  .btn-danger {
-    @apply px-3 py-1.5 rounded-sm text-xs text-white border transition-all duration-150;
-    background: rgb(var(--color-danger));
-    border-color: rgb(var(--color-danger));
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 2px 6px rgb(var(--color-danger) / 0.25);
-  }
-  .btn-danger:hover {
+  @apply px-3 py-1.5 rounded-sm text-xs text-white border transition-all duration-150;
+  background: var(--danger);
+  border-color: var(--danger);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 2px 6px rgb(var(--danger) / 0.25);
+  &:hover {
     /* Lift toward white using color-mix (oklab gives perceptually-cleaner
      * brightening than RGB blending). */
-    background: color-mix(in oklab, rgb(var(--color-danger)) 88%, white);
-    border-color: color-mix(in oklab, rgb(var(--color-danger)) 88%, white);
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 2px 8px rgb(var(--color-danger) / 0.32);
+    background: color-mix(in oklab, var(--danger) 88%, white);
+    border-color: color-mix(in oklab, var(--danger) 88%, white);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.12) inset,
+      0 2px 8px rgb(var(--danger) / 0.32);
   }
-  .btn-danger:active {
-    background: color-mix(in oklab, rgb(var(--color-danger)) 88%, black);
-    border-color: color-mix(in oklab, rgb(var(--color-danger)) 88%, black);
+  &:active {
+    background: color-mix(in oklab, var(--danger) 88%, black);
+    border-color: color-mix(in oklab, var(--danger) 88%, black);
     transform: translateY(0.5px);
   }
-  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
   /* Disabled + hover: hold the resting palette so a greyed-out danger button
    * doesn't visually lift on cursor proximity (matches the .btn-primary
    * disabled:hover treatment defined above). */
-  .btn-danger:disabled:hover {
-    background: rgb(var(--color-danger));
-    border-color: rgb(var(--color-danger));
+  &:disabled:hover {
+    background: var(--danger);
+    border-color: var(--danger);
     box-shadow: none;
   }
+}
 
-  .btn-ghost {
-    /* `transition-all` (was `transition-colors`) so the :active press's
+@utility btn-ghost {
+  /* `transition-all` (was `transition-colors`) so the :active press's
      * `translateY(0.5px)` animates smoothly to match .btn / .btn-primary /
      * .btn-danger. Without it the ghost variant snapped on press while the
      * others depressed gently — a tiny rhythm break across the button family. */
-    @apply px-2 py-1 rounded-sm text-xs text-muted bg-transparent border border-transparent transition-all duration-150;
+  @apply px-2 py-1 rounded-sm text-xs text-muted bg-transparent border border-transparent transition-all duration-150;
+  &:hover {
+    color: var(--ink);
+    background: rgb(var(--panel-hover));
   }
-  .btn-ghost:hover {
-    color: rgb(var(--color-ink));
-    background: rgb(var(--color-panel-hover));
-  }
-  .btn-ghost:active {
-    background: rgb(var(--color-panel-active));
+  &:active {
+    background: rgb(var(--panel-active));
     transform: translateY(0.5px);
   }
-  .btn-ghost:disabled { @apply opacity-40 cursor-not-allowed; }
-  .btn-ghost:disabled:hover { @apply bg-transparent text-muted; }
+  &:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+  &:disabled:hover {
+    @apply bg-transparent text-muted;
+  }
+}
 
+@utility kbd-inline {
   /* ----- inline keyboard shortcut chip -----
    * Used for `<kbd>` elements inline with running text — Onboarding slides,
    * ShortcutsDialog footer hint, KeymapEditor cancel hint. Padding kept tight
@@ -325,9 +243,10 @@ button { font-family: inherit; }
    * surrounding line-height when it sits between words. The 1:1 mapping to a
    * tan-cssn-style chrome chip means every place we hint a key looks the same.
    * The large list-style chips in ShortcutsDialog use their own bigger rule. */
-  .kbd-inline {
-    @apply inline-flex items-center px-1.5 py-0.5 rounded bg-panel3 border border-border text-[10px] font-mono text-ink leading-none;
-  }
+  @apply inline-flex items-center px-1.5 py-0.5 rounded bg-panel3 border border-border text-[10px] font-mono text-ink leading-none;
+}
+
+@utility kbd-menu {
   /* ----- menu-row keyboard shortcut chip -----
    * Used inside dropdown / command-palette / context-menu rows where the row
    * itself has hover:bg-panel3 — so the chip's resting bg sits one step
@@ -335,66 +254,111 @@ button { font-family: inherit; }
    * surfaces. Smaller font (9px) + fixed 16×16 floor matches the dense
    * menu-row rhythm. Three sites used identical inline strings before this
    * class landed (MenuBar Kbd, CommandPalette Kbd, CanvasContextMenu Kbd). */
-  .kbd-menu {
-    @apply inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-sm bg-panel2 border border-border text-[9px] font-medium font-mono text-muted leading-none tabular-nums;
-  }
+  @apply inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-sm bg-panel2 border border-border text-[9px] font-medium font-mono text-muted leading-none tabular-nums;
+}
 
+@utility toolbar-vertical {
   /* ----- toolbar tool buttons ----- */
-  .toolbar-vertical {
-    max-height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 
-  .tool-btn {
-    @apply w-10 h-10 flex items-center justify-center rounded text-muted transition-all duration-150;
+@utility tool-btn {
+  @apply w-10 h-10 flex items-center justify-center rounded text-muted transition-all duration-150;
+  &:hover {
+    @apply text-ink bg-panel2;
   }
-  .tool-btn:hover { @apply text-ink bg-panel2; }
-  .tool-btn.active {
+  &.active {
     @apply text-white;
-    background: rgb(var(--color-accent));
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 2px 6px rgb(var(--color-accent) / 0.18);
+    background: var(--accent);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 2px 6px color-mix(in srgb, var(--accent) 18%, transparent);
   }
   /* Hover on an already-active button: lift the orange one notch using
    * color-mix toward white. Falls back to the un-mixed accent in browsers
    * without color-mix (Safari <16.3) which still reads as a hover because
    * the press-feedback transform fires. */
-  .tool-btn.active:hover {
-    background: color-mix(in oklab, rgb(var(--color-accent)) 88%, white);
+  &.active:hover {
+    background: color-mix(in oklab, var(--accent) 88%, white);
   }
   /* Press feedback — mirrors .btn / .btn-primary / .btn-ghost so all four
    * button variants share the same tactile 0.5px depress on click. */
-  .tool-btn:active { transform: translateY(0.5px); }
+  &:active {
+    transform: translateY(0.5px);
+  }
+}
 
+@utility active {
+  &.tool-btn {
+    @apply text-white;
+    background: var(--accent);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 2px 6px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  /* Hover on an already-active button: lift the orange one notch using
+   * color-mix toward white. Falls back to the un-mixed accent in browsers
+   * without color-mix (Safari <16.3) which still reads as a hover because
+   * the press-feedback transform fires. */
+  &.tool-btn:hover {
+    background: color-mix(in oklab, var(--accent) 88%, white);
+  }
+}
+
+@utility panel-section {
   /* ----- panel chrome ----- */
-  .panel-section { @apply border-b border-border; }
+  @apply border-b border-border;
+}
+
+@utility panel-header {
   /* Uppercase + letter-spacing reads well for caps (EN, FR, etc.) but turns
    * CJK into uncomfortable "对 象" gaps. Apply the typographic dressing in
    * the lang-scoped rules below; keep the base class neutral. */
-  .panel-header {
-    @apply flex items-center justify-between px-3 py-2 text-[10px] font-medium text-muted;
+  @apply flex items-center justify-between px-3 py-2 text-[10px] font-medium text-muted;
+  /* EN-only typographic dressing — uppercase + breathing room reads as
+   * "section heading" for Latin caps but breaks CJK. Scoped by <html data-lang="en">,
+   * which the boot script in index.html sets at first paint. */
+  :root[data-lang='en'] & {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
   }
+}
+
+@utility panel-count {
   /* The numeric count badge on the right of each panel-header (artboards
    * count, layers count, etc.). Always tabular-nums so a digit-jump from 9
    * to 10 doesn't shift the alignment, and `normal-case tracking-normal`
    * cancels the panel-header's uppercase/letter-spacing for the digits. */
-  .panel-count {
-    @apply text-ink/70 tabular-nums normal-case tracking-normal;
-  }
+  @apply text-ink/70 tabular-nums normal-case tracking-normal;
+}
+
+@utility btn-dialog-close {
   /* Dialog Close (×) button — 15+ sites in the app used the same 6-utility
    * inline string. Pull into one rule so the muted → ink hover, panel2
    * background bump, and 150ms transition stay synchronised across the
    * Onboarding, Templates, About, Help, Preferences, Plotter, Print,
    * Recovery, Shortcuts, Keymap, Repeat dialogs and the AIPanel header. */
-  .btn-dialog-close {
-    @apply p-1.5 rounded text-muted hover:text-ink hover:bg-panel2 transition-colors;
-  }
+  @apply p-1.5 rounded text-muted hover:text-ink hover:bg-panel2 transition-colors;
+}
 
+@utility dialog-title {
   /* ----- dialog / field typography ----- */
-  .dialog-title { @apply text-sm font-medium text-ink; }
-  .field-label  { @apply text-[10px] font-medium text-muted mb-1; }
+  @apply text-sm font-medium text-ink;
+}
 
+@utility field-label {
+  @apply text-[10px] font-medium text-muted mb-1;
+
+  :root[data-lang='en'] & {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+}
+
+@utility type-display {
   /* ----- semantic typography scale (use these instead of ad-hoc text-[Npx]) ----
    * The vector editor's chrome runs at three sizes, all keyed to body 13px / 11px
    * caption / 10px label. Tailwind utilities still work, but reaching for these
@@ -405,51 +369,275 @@ button { font-family: inherit; }
    *   .type-body      13px  default body / paragraph copy
    *   .type-caption   11px  inline metadata, segmented-control labels
    *   .type-label     10px  panel headers, field labels (uppercase via lang scope) */
-  .type-display { @apply text-[18px] font-semibold text-ink; }
-  .type-title   { @apply text-sm font-medium text-ink; }
-  .type-body    { @apply text-[13px] text-ink; }
-  .type-caption { @apply text-[11px] text-muted; }
-  .type-label   { @apply text-[10px] font-medium text-muted; }
-  /* EN-only typographic dressing — uppercase + breathing room reads as
-   * "section heading" for Latin caps but breaks CJK. Scoped by <html data-lang="en">,
-   * which the boot script in index.html sets at first paint. */
-  :root[data-lang="en"] .panel-header,
-  :root[data-lang="en"] .field-label {
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
+  @apply text-[18px] font-semibold text-ink;
+}
 
+@utility type-title {
+  @apply text-sm font-medium text-ink;
+}
+
+@utility type-body {
+  @apply text-[13px] text-ink;
+}
+
+@utility type-caption {
+  @apply text-[11px] text-muted;
+}
+
+@utility type-label {
+  @apply text-[10px] font-medium text-muted;
+}
+
+@utility segmented {
   /* ----- segmented control ----- */
-  .segmented {
-    @apply inline-flex items-center rounded-sm bg-panel2 border border-border p-0.5 gap-0.5;
-  }
-  .segmented > button {
+  @apply inline-flex items-center rounded-sm bg-panel2 border border-border p-0.5 gap-0.5;
+  & > button {
     @apply px-2 py-1 rounded-sm text-[11px] text-muted transition-colors flex items-center gap-1;
   }
-  .segmented > button:hover { @apply text-ink; }
-  /* Active segmented pill — teal accent. `--color-accent2` is brand cyan in
+  & > button:hover {
+    @apply text-ink;
+  }
+  /* Active segmented pill — teal accent. `--accent2` is brand cyan in
      dark and dark teal in light (defined in :root[data-theme="light"]), so a
      single declaration works for both themes. */
-  .segmented > button[aria-pressed="true"] {
-    background: rgb(var(--color-accent2) / 0.12);
-    color: rgb(var(--color-accent2));
+  & > button[aria-pressed='true'] {
+    background: rgb(var(--accent2) / 0.12);
+    color: var(--accent2);
   }
+}
 
+@utility badge-active {
   /* ----- StatusBar badges (GRID / SNAP / GUIDES / ANCHOR pips) -----
-     Active uses --color-accent2 (cyan in dark, dark teal in light) so both
+     Active uses --accent2 (cyan in dark, dark teal in light) so both
      themes hit AA. Inactive uses the full muted token (no opacity-60 dimming)
      so it still reads at 5:1+ contrast. */
-  .badge-active {
-    color: rgb(var(--color-accent2));
-  }
+  color: var(--accent2);
+}
+
+@utility badge-inactive {
   /* Dark theme: keep the original dimmed feel — muted @ 0.6 is ~4.6:1 against
      panel `#1c1c21`. Light theme: drop opacity and use the full muted token. */
-  .badge-inactive {
-    color: rgb(var(--color-muted));
-    opacity: 0.6;
-  }
-  :root[data-theme="light"] .badge-inactive {
+  color: var(--muted);
+  opacity: 0.6;
+  :root[data-theme='light'] & {
     opacity: 1;
+  }
+}
+
+@layer utilities {
+  :root {
+    /* Standardised radii — small for inputs, default for buttons/cards, large for dialogs. */
+    --radius-sm: 4px;
+    --radius: 6px;
+    --radius-lg: 10px;
+
+    /* ---------------------------------------------------------------------
+   * Default (dark) theme tokens. Each is an `R G B` triplet so Tailwind's
+   * `rgb(var(--color-x) / <alpha-value>)` colour entries can compose with
+   * the `/<n>` alpha modifier (e.g. `text-ink/90`).
+   *
+   * To override for light mode, see `:root[data-theme="light"]` below.
+   * ------------------------------------------------------------------- */
+    /* Surface ladder — slight warm tint (R one notch above G/B) so the
+   * dark UI doesn't feel "blue-cold" against the warm brand orange.
+   * Difference is sub-perceptual at any single surface but cumulative
+   * across the whole chrome it reads cohesive. */
+    --panel: rgb(30 28 33);
+    --panel2: rgb(38 36 42);
+    --panel3: rgb(47 45 53);
+    --border: rgb(58 56 66);
+    --ink: rgb(231 231 234);
+    --muted: rgb(163 163 176);
+    --accent: rgb(255 138 76);
+    --accent2: rgb(90 200 216);
+    --success: rgb(95 179 124);
+    --danger: rgb(224 85 107);
+    --warn: rgb(231 184 90);
+
+    /* App chrome / body backdrop (one step darker than `panel`).
+   * Surfaced as a var so the light theme + focus ring track it.            */
+    --color-app-bg: 23 21 26; /* slightly warm dark, matches panel ladder */
+    /* Canvas scratch backdrop — used OUTSIDE the artboards. Sits below the
+   * artboard's bright "paper" fill so the user sees the page float vs the
+   * dim workspace. ~3 stops darker than panel for clear separation. */
+    --color-canvas-bg: 18 18 22; /* #121216 — canvas-host backdrop */
+    --color-canvas-check: 26 26 31; /* #1a1a1f — checkerboard squares */
+    /* Artboard "paper" surface — what the page actually IS, drawn by
+   * ArtboardLayer. Distinct from --panel so users get instant
+   * inside-vs-outside-artboard parsing. Slightly off-white in dark mode
+   * (#ffffff would burn the eyes against the dark scratch backdrop). */
+    --color-artboard-fill: 244 244 247; /* dark mode: bright paper */
+    --color-artboard-shadow: 0 0 0; /* drop shadow under each artboard */
+    /* Floating-element tokens — popovers, dropdown menus, hovering
+   * tooltips. One step brighter than panel so they pop above without
+   * having to draw a heavy border. */
+    --color-elevated: 42 40 48; /* between panel2 and panel3 */
+    --color-shadow: 0 0 0; /* base for box-shadow rgba(var(...)/X) */
+
+    /* Hover / active surface tokens — formal names for the "+5/+10 lightness"
+   * effects scattered across components. Centralise here so the dark→light
+   * hover swap stays consistent. */
+    --panel-hover: 51 49 59; /* panel3 + ~3 */
+    --panel-active: 60 58 70; /* one more step */
+
+    --color-scrollbar-track: 26 26 31;
+    --color-scrollbar-thumb: 58 56 66;
+    --color-scrollbar-thumb-hover: 76 74 85;
+
+    /* `color-scheme: dark` tells the browser to render native form widgets
+   * (checkboxes, radios, scrollbars, date pickers) in their dark variant.
+   * Without it, PreferencesDialog's plain `<input type="checkbox">` toggles
+   * render as bright white squares stranded against the dark panel. The
+   * light theme overrides this to `light` below. */
+    color-scheme: dark;
+  }
+
+  /* ---------------------------------------------------------------------
+ * Light theme — toggled by store.setTheme('light'), which writes
+ * `data-theme="light"` on <html>. Brand colours (accent/accent2/semantics)
+ * stay the same so the visual identity is preserved; only the surface
+ * ladder + ink + muted invert.
+ * ------------------------------------------------------------------- */
+  :root[data-theme='light'] {
+    --panel: rgb(247 247 249); /* #f7f7f9 */
+    --panel2: rgb(237 238 241); /* #edeef1 */
+    --panel3: rgb(227 228 233); /* #e3e4e9 */
+    --border: rgb(212 213 219); /* #d4d5db */
+    --ink: rgb(28 28 33); /* #1c1c21 — dark text */
+    --muted: rgb(92 92 104); /* #5c5c68 — bumped from #6a6a76 so 9-10px
+                                       muted text clears 4.5:1 even on the
+                                       panel3 (active palette row) surface. */
+
+    --color-app-bg: 237 238 241; /* matches panel2 — soft off-white */
+    --color-canvas-bg: 206 207 213; /* darker than dark-mode equivalent: in
+                                       light mode the scratch needs to be
+                                       MID-gray so artboard white pops, not
+                                       compete with the chrome's off-white. */
+    --color-canvas-check: 195 196 202; /* darker check squares for light mode */
+    /* Light-mode artboard fill = pure white. Page is page; chrome is chrome. */
+    --color-artboard-fill: 255 255 255;
+    --color-artboard-shadow: 0 0 0;
+    /* Floating elevation — soft white that's brighter than panel so it
+   * separates from the chrome without a heavy border. */
+    --color-elevated: 252 252 253;
+    --color-shadow: 0 0 0;
+    /* Hover / active surface tokens for light mode — slightly darker
+   * than panel3 so the press-down feedback registers. */
+    --panel-hover: 217 218 224;
+    --panel-active: 207 208 215;
+
+    --color-scrollbar-track: 226 227 232;
+    --color-scrollbar-thumb: 190 191 200;
+    --color-scrollbar-thumb-hover: 160 161 170;
+
+    /* Light variant of the native-control color-scheme — see :root block above. */
+    color-scheme: light;
+
+    /* Semantic warn is golden #e7b85a in dark, which only reaches ~2.5:1 on
+   * the light panel surface — `text-warn` body copy fails WCAG AA there.
+   * Darken to amber-700 (~5.5:1) for light. `bg-warn` / `border-warn` get
+   * the same shift but stay close enough to "yellow warning" that the
+   * semantic still reads correctly. */
+    --warn: rgb(180 83 9); /* #b45309 — dark amber */
+    /* Same contrast issue with danger: pink-red #e0556b only hits ~3:1 against
+   * the light surface. red-700 #b91c1c reaches ~6:1 while still reading
+   * unambiguously as "destructive red". */
+    --danger: rgb(185 28 28); /* #b91c1c — dark red */
+    /* Same story for success: mid-green #5fb37c lands at ~2.4:1 on the light
+   * surface. Drop to green-700 for ~5.5:1 while keeping the "success" hue. */
+    --success: rgb(21 128 61); /* #15803d — dark green */
+    /* Brand cyan #5ac8d8 only hits ~1.8:1 on the light surface, so
+   * `border-accent2` indicators, `text-accent2`, and `bg-accent2/X` tints
+   * all under-perform here. Darken to the same teal that .badge-active /
+   * focus halo / skip-link border / drop affordance already adopt for
+   * light. Brand identity for cyan now is "dark-teal accent" in light. */
+    --accent2: rgb(26 98 109); /* #1a626d — dark teal */
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    background: rgb(var(--color-app-bg));
+    color: var(--ink);
+    font-family: Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  button {
+    font-family: inherit;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: rgb(var(--color-scrollbar-track));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--color-scrollbar-thumb));
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--color-scrollbar-thumb-hover));
+  }
+
+  /* Fabric canvas wrapper */
+  .canvas-host {
+    background:
+      linear-gradient(
+        45deg,
+        rgb(var(--color-canvas-check)) 25%,
+        transparent 25%
+      ),
+      linear-gradient(
+        -45deg,
+        rgb(var(--color-canvas-check)) 25%,
+        transparent 25%
+      ),
+      linear-gradient(
+        45deg,
+        transparent 75%,
+        rgb(var(--color-canvas-check)) 75%
+      ),
+      linear-gradient(
+        -45deg,
+        transparent 75%,
+        rgb(var(--color-canvas-check)) 75%
+      );
+    background-size: 20px 20px;
+    background-position:
+      0 0,
+      0 10px,
+      10px -10px,
+      -10px 0;
+    background-color: rgb(var(--color-canvas-bg));
+  }
+  /* File drop affordance — dashed accent2 ring + faint tint appears whenever a
+ * file drag enters the canvas. Toggled by io3.ts attachDragDrop. */
+  .canvas-host.dragging-files::after {
+    content: '';
+    position: absolute;
+    inset: 10px;
+    border: 2px dashed var(--accent2);
+    background: rgb(var(--accent2) / 0.05);
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 50;
+    animation: drop-pulse 1200ms ease-in-out infinite;
+  }
+  @keyframes drop-pulse {
+    0%,
+    100% {
+      opacity: 0.7;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 }
 
@@ -467,7 +655,7 @@ button { font-family: inherit; }
   [role="button"]:focus-visible,
   [tabindex]:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgb(var(--color-app-bg)), 0 0 0 4px rgb(var(--color-accent2));
+    box-shadow: 0 0 0 2px rgb(var(--color-app-bg)), 0 0 0 4px var(--accent2);
     border-radius: 4px;
   }
 
@@ -478,9 +666,9 @@ button { font-family: inherit; }
     top: -100px;
     z-index: 100;
     background: rgb(var(--color-app-bg));
-    color: rgb(var(--color-ink));
+    color: var(--ink);
     padding: 8px 14px;
-    border: 2px solid rgb(var(--color-accent2));
+    border: 2px solid var(--accent2);
     border-radius: 6px;
     font-size: 13px;
     transition: top 150ms ease;
@@ -563,7 +751,7 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   padding: 6px;
   border: none;
   background: transparent;
-  color: rgb(var(--color-muted));
+  color: var(--muted);
   cursor: pointer;
   margin-top: -4px;
   margin-right: -6px;
@@ -573,7 +761,7 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
    * coordinated UI rather than several. */
   transition: color 150ms ease, background-color 150ms ease;
 }
-.toast-dismiss:hover { color: rgb(var(--color-ink)); background: rgb(var(--color-panel2)); }
+.toast-dismiss:hover { color: var(--ink); background: var(--panel2); }
 /* Focus: handled by the global button:focus-visible halo (box-shadow rule
  * in @layer base, line ~212). No local override — adding one stacks an
  * outline on top of the halo and looks doubled-up. */
@@ -666,14 +854,14 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
 .topbar {
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, rgb(var(--color-panel)) 92%, white 8%) 0%,
-    rgb(var(--color-panel)) 100%
+    color-mix(in oklab, var(--panel) 92%, white 8%) 0%,
+    var(--panel) 100%
   );
-  border-bottom: 1px solid rgb(var(--color-border));
+  border-bottom: 1px solid var(--border);
   /* Hairline below to read as elevation over the canvas without a heavy
    * drop shadow. Driven by the border token so it stays AA-safe across
    * themes. */
-  box-shadow: 0 1px 0 0 color-mix(in oklab, rgb(var(--color-border)) 60%, transparent);
+  box-shadow: 0 1px 0 0 color-mix(in oklab, var(--border) 60%, transparent);
 }
 
 .output-actions-toolbar {
@@ -697,8 +885,8 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgb(var(--color-border)) 30%,
-    rgb(var(--color-border)) 70%,
+    var(--border) 30%,
+    var(--border) 70%,
     transparent 100%
   );
   margin: 0 8px;
@@ -706,11 +894,11 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
 .statusbar {
   background: linear-gradient(
     180deg,
-    rgb(var(--color-panel)) 0%,
-    color-mix(in oklab, rgb(var(--color-panel)) 92%, black 8%) 100%
+    var(--panel) 0%,
+    color-mix(in oklab, var(--panel) 92%, black 8%) 100%
   );
-  border-top: 1px solid rgb(var(--color-border));
-  box-shadow: 0 -1px 0 0 color-mix(in oklab, rgb(var(--color-border)) 60%, transparent);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -1px 0 0 color-mix(in oklab, var(--border) 60%, transparent);
 }
 .statusbar-sep {
   display: inline-block;
@@ -719,8 +907,8 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgb(var(--color-border)) 25%,
-    rgb(var(--color-border)) 75%,
+    var(--border) 25%,
+    var(--border) 75%,
     transparent 100%
   );
   margin: 0 4px;
@@ -738,14 +926,14 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   transition: background 120ms ease;
   /* Border lines up with the aside's `border-l` so the divider looks
    * continuous at rest — the handle is the divider, not a sibling beside it. */
-  border-left: 1px solid rgb(var(--color-border));
+  border-left: 1px solid var(--border);
   margin-right: -1px; /* swallow the aside's own left border to avoid a double line */
   position: relative;
   z-index: 1;
 }
 .aside-resize-handle:hover,
 .aside-resize-handle:active {
-  background: color-mix(in oklab, rgb(var(--color-accent)) 40%, transparent);
+  background: color-mix(in oklab, var(--accent) 40%, transparent);
 }
 
 @media (max-width: 900px) {
@@ -774,22 +962,22 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
     padding: 10px 16px;
     font-size: 12px;
     font-weight: 600;
-    /* Driven by the --color-accent token so a future accent change flows
+    /* Driven by the --accent token so a future accent change flows
      * through. Mixed 30% with black for AA-safe white-text contrast —
      * raw #ff8a4c with white text reads ≈ 2.33:1 (well below WCAG 1.4.3's
      * 4.5:1 for normal text); the darkened mix lands around 5:1, the same
      * recipe .btn-primary uses for the same reason (see the inline
      * comment block above the .btn-primary class). */
-    background: color-mix(in oklab, rgb(var(--color-accent)) 70%, black);
+    background: color-mix(in oklab, var(--accent) 70%, black);
     color: #fff;
-    border: 1px solid color-mix(in oklab, rgb(var(--color-accent)) 60%, black);
+    border: 1px solid color-mix(in oklab, var(--accent) 60%, black);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
     transition: background 150ms ease, transform 100ms ease;
   }
   /* Match the tactile feel of other buttons — brighten on hover, press on
    * tap. Mobile-only; the toggle is hidden outside of ≤ 900px. */
   .aside-mobile-toggle:hover {
-    background: color-mix(in oklab, rgb(var(--color-accent)) 78%, black);
+    background: color-mix(in oklab, var(--accent) 78%, black);
   }
   .aside-mobile-toggle:active { transform: translateY(0.5px); }
   /* Toolbar: horizontal, full-width, at the bottom of the canvas column. */
@@ -799,7 +987,7 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
     height: 48px;
     max-height: none;
     border-right: none !important;
-    border-top: 1px solid rgb(var(--color-border));
+    border-top: 1px solid var(--border);
     padding: 4px 8px;
     overflow-x: auto;
     overflow-y: hidden;
@@ -816,7 +1004,7 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
 .toolbar-sep {
   width: 28px;
   height: 1px;
-  background: rgb(var(--color-border));
+  background: var(--border);
   margin: 2px 0;
   flex: none;
 }
@@ -836,14 +1024,14 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   height: 32px;
   border-radius: 9999px;
   background: rgb(var(--color-elevated));
-  color: rgb(var(--color-muted));
-  border: 1px solid rgb(var(--color-border));
+  color: var(--muted);
+  border: 1px solid var(--border);
   box-shadow: 0 2px 8px rgb(var(--color-shadow) / 0.25);
   transition: color 150ms, background 150ms, transform 150ms;
 }
 .quick-help-fab:hover {
-  color: rgb(var(--color-ink));
-  background: rgb(var(--color-panel-hover));
+  color: var(--ink);
+  background: rgb(var(--panel-hover));
   transform: translateY(-1px);
 }
 .quick-help-fab:active {
@@ -853,7 +1041,7 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   outline: none;
   box-shadow:
     0 0 0 2px rgb(var(--color-app-bg)),
-    0 0 0 4px rgb(var(--color-accent2));
+    0 0 0 4px var(--accent2);
 }
 
 .quick-help-card {
@@ -864,7 +1052,7 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   width: 280px;
   padding: 12px;
   background: rgb(var(--color-elevated));
-  border: 1px solid rgb(var(--color-border));
+  border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgb(var(--color-shadow) / 0.35);
   animation: quick-help-pop 180ms cubic-bezier(0.16, 1, 0.3, 1);

@@ -44,8 +44,8 @@ function art(): fabric.Rect {
   return new fabric.Rect({ left: 0, top: 0, width: 100, height: 100, fill: '#ffffff', strokeWidth: 0 });
 }
 
-describe('addOutlineEffectToCanvas — ring stacking math', () => {
-  it('one colour, uniform width: a single ring grown by widthMm outward', async () => {
+describe('addOutlineEffectToCanvas — ring-3 stacking math', () => {
+  it('one colour, uniform width: a single ring-3 grown by widthMm outward', async () => {
     const { c, added, history } = makeCanvas();
     const src = art();
     const n = await addOutlineEffectToCanvas(c as unknown as fabric.Canvas, [src], ['#ff0000'], 2);

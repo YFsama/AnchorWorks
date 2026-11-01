@@ -98,7 +98,7 @@ export function FreeDistortDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -117,7 +117,7 @@ export function FreeDistortDialog() {
         </p>
 
         <div className="mb-3">
-          <div className="field-label !mb-1">{t('Distort presets')}</div>
+          <div className="field-label mb-1!">{t('Distort presets')}</div>
           <PresetRow
             statusId="free-distort-preset-review-status"
             className="grid grid-cols-3 gap-1"
@@ -134,7 +134,7 @@ export function FreeDistortDialog() {
               const review = `${t(preset.label)}: ${t(preset.title)}`;
               return {
                 key: preset.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => applyPreset(preset),
                 title: review,
@@ -147,8 +147,8 @@ export function FreeDistortDialog() {
 
         <div className="grid grid-cols-[48px_1fr_1fr] gap-2 items-center text-xs">
           <div />
-          <div className="field-label !mb-0">ΔX {t('(mm)')}</div>
-          <div className="field-label !mb-0">ΔY {t('(mm)')}</div>
+          <div className="field-label mb-0!">ΔX {t('(mm)')}</div>
+          <div className="field-label mb-0!">ΔY {t('(mm)')}</div>
           {CORNERS.map(corner => (
             <div key={corner.id} className="contents">
               <div className="text-muted font-mono">{corner.label}</div>
@@ -173,7 +173,7 @@ export function FreeDistortDialog() {
         </div>
 
         <div className="mt-3 pt-3 border-t border-border">
-          <div className="field-label !mb-1">{t('Envelope (top object)')}</div>
+          <div className="field-label mb-1!">{t('Envelope (top object)')}</div>
           <p className="text-xs text-muted leading-relaxed mb-2">
             {t('Reshape the other selected objects to fill the top-most shape. The top object is consumed, as in Illustrator.')}
           </p>

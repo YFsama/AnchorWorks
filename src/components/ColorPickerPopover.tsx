@@ -172,7 +172,7 @@ export function ColorPickerPopover({ value, anchor, onChange, onClose }: Popover
       ref={ref}
       role="dialog"
       aria-label={t('Color picker')}
-      className="fixed z-[200] bg-panel border border-border rounded-lg shadow-2xl p-3 w-[260px] text-xs"
+      className="fixed z-200 bg-panel border border-border rounded-lg shadow-2xl p-3 w-[260px] text-xs"
       style={{ left: x, top: y }}
     >
       <div className="flex items-center gap-2 mb-3">

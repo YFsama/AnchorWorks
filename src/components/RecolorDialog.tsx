@@ -100,7 +100,7 @@ export function RecolorDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -185,7 +185,7 @@ export function RecolorDialog() {
               </button>
             </div>
             <div className="mb-3">
-              <div className="field-label !mb-1">{t('Recolor palette recipes')}</div>
+              <div className="field-label mb-1!">{t('Recolor palette recipes')}</div>
               <PresetRow
                 statusId="recolor-palette-recipe-review-status"
                 className="grid grid-cols-2 gap-1"
@@ -202,7 +202,7 @@ export function RecolorDialog() {
                   const review = `${t(preset.label)}: ${t(preset.title)} ${preset.colors.length} ${t('Color')}`;
                   return {
                     key: preset.label,
-                    className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                    className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                     pressed: active,
                     onClick: () => applyPalettePreset(preset.colors),
                     title: review,
@@ -243,7 +243,7 @@ export function RecolorDialog() {
             type="button"
             data-recolor-action
             data-recolor-action-review={t('Reset')}
-            className="btn flex items-center gap-1 !text-[11px]"
+            className="btn flex items-center gap-1 text-[11px]!"
             onClick={resetAll}
             onFocus={() => setReviewedFooterAction(t('Reset'))}
             disabled={!sources.length}

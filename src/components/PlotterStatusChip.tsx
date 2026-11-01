@@ -236,11 +236,11 @@ export function PlotterStatusChip() {
             <span className="flex-1" />
             {canConnect && (
               connected ? (
-                <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px] flex items-center gap-1" onClick={() => { void link.close(); }} disabled={busy || !!job}>
+                <button type="button" className="btn py-0.5! px-1.5! text-[10px]! flex items-center gap-1" onClick={() => { void link.close(); }} disabled={busy || !!job}>
                   <Unplug size={10} aria-hidden="true" />{t('Disconnect')}
                 </button>
               ) : (
-                <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px] flex items-center gap-1" onClick={() => { void connect(); }} disabled={busy || !canConnect}>
+                <button type="button" className="btn py-0.5! px-1.5! text-[10px]! flex items-center gap-1" onClick={() => { void connect(); }} disabled={busy || !canConnect}>
                   <Plug size={10} aria-hidden="true" />{t('Connect')}
                 </button>
               )
@@ -266,7 +266,7 @@ export function PlotterStatusChip() {
                 <span className="flex-1" />
                 <button
                   type="button"
-                  className="btn !py-0.5 !px-1.5 !text-[10px]"
+                  className="btn py-0.5! px-1.5! text-[10px]!"
                   onClick={togglePause}
                   title={t('Hold the stream between chunks — the machine drains its buffer and stops.')}
                 >
@@ -274,7 +274,7 @@ export function PlotterStatusChip() {
                 </button>
                 <button
                   type="button"
-                  className="btn !py-0.5 !px-1.5 !text-[10px] text-danger"
+                  className="btn py-0.5! px-1.5! text-[10px]! text-danger"
                   onClick={stopJob}
                   title={t('Abort the transfer and lift the blade.')}
                 >
@@ -289,12 +289,12 @@ export function PlotterStatusChip() {
 
           {/* Quick ops */}
           <span className="mt-1.5 flex flex-wrap items-center gap-1" role="toolbar" aria-label={t('Quick operations')}>
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px] flex items-center gap-1" onClick={() => { void bladeUp(); }} disabled={!connected} title={t('Raise the pen / blade immediately.')}>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]! flex items-center gap-1" onClick={() => { void bladeUp(); }} disabled={!connected} title={t('Raise the pen / blade immediately.')}>
               <ArrowUp size={10} aria-hidden="true" />{t('Pen up')}
             </button>
             <button
               type="button"
-              className="btn !py-0.5 !px-1.5 !text-[10px] flex items-center gap-1"
+              className="btn py-0.5! px-1.5! text-[10px]! flex items-center gap-1"
               onClick={() => { setOpen(false); openDialog(); }}
               title={t('Open the full dialog for test cuts, jog, and the console.')}
             >

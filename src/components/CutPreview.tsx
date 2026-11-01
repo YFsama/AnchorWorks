@@ -485,7 +485,7 @@ function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, svg, className 
     <div className={`relative ${className ?? ''}`}>
       <div className="absolute inset-0 [&>svg]:w-full [&>svg]:h-full">{svg(overlay)}</div>
       <div
-        className="absolute inset-x-1 bottom-1 flex items-center gap-1 rounded border border-border bg-panel/90 backdrop-blur px-1.5 py-1 text-[10px]"
+        className="absolute inset-x-1 bottom-1 flex items-center gap-1 rounded border border-border bg-panel/90 backdrop-blur-sm px-1.5 py-1 text-[10px]"
         role="toolbar"
         aria-label={t('Simulation controls')}
         aria-describedby="cut-sim-control-review-status"
@@ -499,7 +499,7 @@ function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, svg, className 
           type="button"
           data-sim-control
           data-sim-review={playing ? t('Pause simulation') : t('Play simulation')}
-          className="btn !px-1.5 !py-0.5 flex items-center gap-1"
+          className="btn px-1.5! py-0.5! flex items-center gap-1"
           onClick={togglePlay}
           onFocus={(event) => setReviewedControl(event.currentTarget.dataset.simReview ?? '')}
           aria-label={playing ? t('Pause simulation') : t('Play simulation')}
@@ -511,7 +511,7 @@ function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, svg, className 
           type="button"
           data-sim-control
           data-sim-review={t('Restart simulation')}
-          className="btn !px-1.5 !py-0.5 flex items-center gap-1"
+          className="btn px-1.5! py-0.5! flex items-center gap-1"
           onClick={restart}
           onFocus={(event) => setReviewedControl(event.currentTarget.dataset.simReview ?? '')}
           aria-label={t('Restart simulation')}
@@ -529,7 +529,7 @@ function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, svg, className 
                 type="button"
                 data-sim-control
                 data-sim-review={review}
-                className={`btn !px-1 !py-0.5 ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                className={`btn px-1! py-0.5! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                 aria-pressed={active}
                 onClick={() => setSpeed(value)}
                 onFocus={(event) => setReviewedControl(event.currentTarget.dataset.simReview ?? '')}

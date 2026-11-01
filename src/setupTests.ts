@@ -13,6 +13,11 @@
  * environment exists, so it only fills the gap — it never replaces a working
  * implementation.
  */
+
+// Must run before any test module constructs fabric objects: restores the
+// v6 'left'/'top' origin defaults that fabric v7 flipped to 'center'.
+import './lib/fabricDefaults';
+
 class MemoryStorage implements Storage {
   private map = new Map<string, string>();
 

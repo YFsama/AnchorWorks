@@ -65,10 +65,10 @@ export function ArtboardLayer() {
       lctx.clearRect(0, 0, cw, ch);
 
       const DIM = cssVarA('--color-canvas-bg', 0.55, 'rgba(0, 0, 0, 0.55)');
-      const STROKE = cssVarA('--color-accent2', 0.5, 'rgba(120, 160, 220, 0.5)');
+      const STROKE = cssVarA('--accent2', 0.5, 'rgba(120, 160, 220, 0.5)');
       const SHADOW = cssVarA('--color-artboard-shadow', 0.45, 'rgba(0, 0, 0, 0.45)');
-      const LABEL_BG = cssVarA('--color-ink', 0.88, 'rgba(15, 15, 18, 0.88)');
-      const LABEL_FG = cssVar('--color-panel', '#e6e8eb');
+      const LABEL_BG = cssVarA('--ink', 0.88, 'rgba(15, 15, 18, 0.88)');
+      const LABEL_FG = cssVar('--panel', '#e6e8eb');
 
       // No artboards yet → no dim, no labels. Empty doc looks normal.
       if (artboards.length === 0) return;

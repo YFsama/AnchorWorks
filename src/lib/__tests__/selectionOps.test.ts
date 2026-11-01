@@ -9234,7 +9234,7 @@ describe('selection operation signatures', () => {
     }
   });
 
-  it('selects same shadow only on the active artboard', async () => {
+  it('selects same shadow-sm only on the active artboard', async () => {
     const canvasEngine = await import('../canvasEngine');
     const previousArtboards = useEditor.getState().artboards;
     useEditor.getState().setArtboards([

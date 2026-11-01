@@ -414,7 +414,7 @@ export default function EpsonMaintDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -489,7 +489,7 @@ export default function EpsonMaintDialog() {
                 <button
                   key={action.id}
                   type="button"
-                  className="btn !justify-start flex items-center gap-1.5 text-left"
+                  className="btn justify-start! flex items-center gap-1.5 text-left"
                   onClick={() => runAction(action)}
                   disabled={busy || !printer || snmpBlocked}
                   title={snmpBlocked
@@ -503,7 +503,7 @@ export default function EpsonMaintDialog() {
             })}
             <button
               type="button"
-              className="btn !justify-start flex items-center gap-1.5 text-left"
+              className="btn justify-start! flex items-center gap-1.5 text-left"
               onClick={() => { void runCartridges(); }}
               disabled={busy || !printer}
               title={t('Queries cartridge slots 1-8 in sequence, stopping at the first empty or unknown slot.')}
@@ -587,29 +587,29 @@ export default function EpsonMaintDialog() {
               </div>
             )}
             <div className="mt-1.5 grid grid-cols-3 gap-1">
-              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runWasteRead(); }}>
+              <button type="button" className="btn justify-start! flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runWasteRead(); }}>
                 <HardDriveDownload size={12} aria-hidden="true" className="text-success" />
                 <span className="truncate">{t('Read counters')}</span>
               </button>
-              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer} onClick={() => { void runTempReset(); }} title={t('Clears the error until power-off; needs only the serial')}>
+              <button type="button" className="btn justify-start! flex items-center gap-1.5 text-left" disabled={busy || !printer} onClick={() => { void runTempReset(); }} title={t('Clears the error until power-off; needs only the serial')}>
                 <Timer size={12} aria-hidden="true" className="text-warning" />
                 <span className="truncate">{t('Temporary reset')}</span>
               </button>
-              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left !border-danger/40 hover:!border-danger" disabled={busy || !printer || !modelEntry} onClick={() => { void runFactoryReset(); }} title={t('Rewrites the EEPROM counters to factory state')}>
+              <button type="button" className="btn justify-start! flex items-center gap-1.5 text-left border-danger/40! hover:border-danger!" disabled={busy || !printer || !modelEntry} onClick={() => { void runFactoryReset(); }} title={t('Rewrites the EEPROM counters to factory state')}>
                 <Recycle size={12} aria-hidden="true" className="text-danger" />
                 <span className="truncate">{t('Factory reset')}</span>
               </button>
             </div>
             <div className="mt-1 grid grid-cols-3 gap-1">
-              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runBackup(); }} title={t('Reads the EEPROM counters and saves a JSON backup you can restore later')}>
+              <button type="button" className="btn justify-start! flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runBackup(); }} title={t('Reads the EEPROM counters and saves a JSON backup you can restore later')}>
                 <Save size={12} aria-hidden="true" className="text-[#5b9cff]" />
                 <span className="truncate">{t('Back up EEPROM')}</span>
               </button>
-              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => restoreInputRef.current?.click()} title={t('Writes a previously saved backup back to the EEPROM')}>
+              <button type="button" className="btn justify-start! flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => restoreInputRef.current?.click()} title={t('Writes a previously saved backup back to the EEPROM')}>
                 <Upload size={12} aria-hidden="true" className="text-[#5b9cff]" />
                 <span className="truncate">{t('Restore backup')}</span>
               </button>
-              <button type="button" className="btn !justify-start flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runStats(); }} title={t('Page, cleaning and usage counters from the EEPROM')}>
+              <button type="button" className="btn justify-start! flex items-center gap-1.5 text-left" disabled={busy || !printer || !modelEntry} onClick={() => { void runStats(); }} title={t('Page, cleaning and usage counters from the EEPROM')}>
                 <BarChart3 size={12} aria-hidden="true" className="text-[#5b9cff]" />
                 <span className="truncate">{t('Read statistics')}</span>
               </button>
@@ -650,7 +650,7 @@ export default function EpsonMaintDialog() {
             )}
             {stats && stats.length > 0 && (
               <div className="mt-1.5 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px]" role="status">
-                <div className="field-label !mb-1">{t('Statistics')}</div>
+                <div className="field-label mb-1!">{t('Statistics')}</div>
                 {stats.map((s, i) => (
                   <div key={i} className="flex items-center justify-between gap-2">
                     <span className="truncate text-muted">{s.name}</span>
@@ -664,7 +664,7 @@ export default function EpsonMaintDialog() {
           {/* Structured readout card — parsed from the last status action. */}
           {(st2 || identity || oldInk || (cartridges?.length ?? 0) > 0) && (
             <div className="mt-2 rounded border border-border bg-panel2 px-2 py-1.5 text-[10px]" role="status">
-              <div className="field-label !mb-1">{t('Printer readout')}</div>
+              <div className="field-label mb-1!">{t('Printer readout')}</div>
               {identity && (
                 <div className="mb-1 font-mono text-ink/90 break-all">{identity}</div>
               )}
@@ -711,7 +711,7 @@ export default function EpsonMaintDialog() {
               )}
               {cartridges && cartridges.length > 0 && (
                 <div className="mt-1">
-                  <div className="field-label !mb-1">{t('Cartridge chips')}</div>
+                  <div className="field-label mb-1!">{t('Cartridge chips')}</div>
                   {cartridges.map((c, i) => c.kind === 'cartridge' ? (
                     <div key={`ci${i}`} className="mb-0.5 flex items-baseline justify-between gap-2">
                       <span className="truncate">
@@ -801,7 +801,7 @@ export default function EpsonMaintDialog() {
           <div className="mt-3 flex items-center gap-1 text-[10px] text-muted">
             <span className="uppercase tracking-wide">{t('Console')}</span>
             <div className="flex-1" />
-            <button type="button" className="btn !py-0.5 !px-1.5 !text-[10px]" onClick={() => setEntries([])} title={t('Clear console')}>
+            <button type="button" className="btn py-0.5! px-1.5! text-[10px]!" onClick={() => setEntries([])} title={t('Clear console')}>
               <Trash2 size={11} aria-hidden="true" />
             </button>
           </div>

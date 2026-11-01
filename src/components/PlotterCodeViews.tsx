@@ -179,7 +179,7 @@ export function MachineSim({ run, unit }: { run: MachineRun; unit: 'mm' | 'in' }
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
-          className="btn !py-1 !px-2 !text-[10px] flex items-center gap-1"
+          className="btn py-1! px-2! text-[10px]! flex items-center gap-1"
           onClick={() => {
             if (played >= total) seek(0);
             setPlaying(!playing);
@@ -192,7 +192,7 @@ export function MachineSim({ run, unit }: { run: MachineRun; unit: 'mm' | 'in' }
         </button>
         <button
           type="button"
-          className="btn !py-1 !px-1.5 !text-[10px]"
+          className="btn py-1! px-1.5! text-[10px]!"
           onClick={() => { setPlaying(false); seek(0); }}
           disabled={total <= 0}
           title={t('Back to the first statement')}
@@ -201,7 +201,7 @@ export function MachineSim({ run, unit }: { run: MachineRun; unit: 'mm' | 'in' }
         </button>
         <label className="flex items-center gap-1 text-muted">
           {t('Speed')}
-          <select className="input !py-0.5 !text-[10px]" value={speed} onChange={e => setSpeed(Number(e.target.value))} aria-label={t('Speed')}>
+          <select className="input py-0.5! text-[10px]!" value={speed} onChange={e => setSpeed(Number(e.target.value))} aria-label={t('Speed')}>
             {[0.25, 0.5, 1, 2, 4, 8].map(s => <option key={s} value={s}>{s}×</option>)}
           </select>
         </label>

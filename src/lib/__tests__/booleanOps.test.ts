@@ -212,7 +212,7 @@ function mockCanvas(c: ReturnType<typeof makeCanvas>) {
 /* ------------------------------ objectToRings ------------------------------ */
 
 describe('objectToRings', () => {
-  it('flattens a rect into one closed absolute-space ring with exact area and corners', () => {
+  it('flattens a rect into one closed absolute-space ring-3 with exact area and corners', () => {
     const r = rect(10, 20);
     const rings = objectToRings(r)!;
     expect(rings).toHaveLength(1);
@@ -229,7 +229,7 @@ describe('objectToRings', () => {
     expect(Math.max(...ys)).toBeCloseTo(120, 6);
   });
 
-  it('flattens an ellipse/circle into a ring of area ≈ π·r²', () => {
+  it('flattens an ellipse/circle into a ring-3 of area ≈ π·r²', () => {
     const circle = new fabric.Circle({ left: 0, top: 0, radius: 50, originX: 'left', originY: 'top' });
     const rings = objectToRings(circle)!;
     expect(rings).toHaveLength(1);
@@ -238,7 +238,7 @@ describe('objectToRings', () => {
     expect(ringArea(rings[0])).toBeLessThan(Math.PI * 50 * 50 * 1.01);
   });
 
-  it('maps a polygon through its transform into an exact-area ring', () => {
+  it('maps a polygon through its transform into an exact-area ring-3', () => {
     const tri = new fabric.Polygon([{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 0, y: 100 }], {
       left: 0,
       top: 0,
@@ -254,7 +254,7 @@ describe('objectToRings', () => {
     expect(objectToRings(duo)).toBeNull();
   });
 
-  it('flattens a path with bezier segments into a dense closed ring', () => {
+  it('flattens a path with bezier segments into a dense closed ring-3', () => {
     // A quad bump on a 100-wide baseline: the curve peaks at y=50 (midpoint of
     // a quadratic is the average of the three points' y: (0+2·100+0)/4=50),
     // so the exact enclosed area is the parabola segment 2/3·w·h ≈ 3333.
@@ -279,7 +279,7 @@ describe('objectToRings', () => {
     expect(ring[0][1]).toBeCloseTo(ring[ring.length - 1][1], 6);
   });
 
-  it('falls back to a bounding-box ring for foreign object types with size', () => {
+  it('falls back to a bounding-box ring-3 for foreign object types with size', () => {
     const foreign = {
       type: 'image',
       width: 40,
@@ -344,7 +344,7 @@ describe('multiPolygonToPathD', () => {
 /* ------------------- P1-7: seam-corner refit hair ------------------- */
 
 describe('multiPolygonToPathD — duplicated closing vertex is dropped (P1-7)', () => {
-  it('exact batch repro: the union ring of rects (0,0)+(50,0) refits to a clean rectangle', () => {
+  it('exact batch repro: the union ring-3 of rects (0,0)+(50,0) refits to a clean rectangle', () => {
     // polygon-clipping closes rings by repeating the first vertex. This is
     // the ring the union of two 100×100 rects at (0,0) and (50,0) produces;
     // the refit used to emit `C 0 -33.33 -50 0 0 0` at the seam — a ~15px

@@ -107,7 +107,7 @@ describe('buildOutlineCutPaths — scene-space geometry (P1-6 outline shift)', (
     expectPolylineMatch(out[0].points, expectedScene(OFF_ORIGIN_PTS, centerOf(path), [50, 10.25]));
   });
 
-  it('rebuilds a scaled + rotated closed ring at its scene position (knife-style input)', () => {
+  it('rebuilds a scaled + rotated closed ring-3 at its scene position (knife-style input)', () => {
     const path = new fabric.Path(OFF_SQUARE);
     path.set({ scaleX: 2, scaleY: 1.5 });
     path.rotate(37);

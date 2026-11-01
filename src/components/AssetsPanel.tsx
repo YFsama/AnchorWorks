@@ -191,10 +191,10 @@ export function AssetsPanel() {
           {assets.length === 0 ? (
             <div className="flex flex-col items-center text-center px-2 py-3">
               {/* Picture frame + corner star — "drop images here" idea, kept line-art. */}
-              <svg width="56" height="44" viewBox="0 0 56 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'rgb(var(--color-muted))' }}>
+              <svg width="56" height="44" viewBox="0 0 56 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'var(--muted)' }}>
                 <rect x="6.5" y="6.5" width="43" height="31" rx="2" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1" strokeDasharray="3 3" />
-                <path d="M14 30 L 22 22 L 28 27 L 36 18 L 42 24" stroke="rgb(var(--color-accent2))" strokeOpacity="0.7" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="20" cy="16" r="2" fill="rgb(var(--color-accent))" />
+                <path d="M14 30 L 22 22 L 28 27 L 36 18 L 42 24" stroke="var(--accent2)" strokeOpacity="0.7" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="20" cy="16" r="2" fill="var(--accent)" />
               </svg>
               <div className="text-xs text-ink/90 mb-1">{t('No assets yet')}</div>
               <div className="type-caption leading-relaxed">
@@ -210,7 +210,7 @@ export function AssetsPanel() {
               {query && (
                 <button
                   type="button"
-                  className="btn !py-1 !px-2 text-[10px] mt-2"
+                  className="btn py-1! px-2! text-[10px] mt-2"
                   onClick={() => { setQuery(''); setReviewIndex(0); }}
                 >
                   {t('Clear search')}
@@ -293,7 +293,7 @@ function LibrarySearch({
       <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
       <input
         type="search"
-        className="input !py-1 !px-2 text-xs min-w-0 flex-1"
+        className="input py-1! px-2! text-xs min-w-0 flex-1"
         placeholder={placeholder}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
@@ -332,7 +332,7 @@ function LibrarySearch({
             label: t('Insert First'),
             review: t('Insert first search result'),
             title: t('Insert first search result'),
-            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            className: 'btn py-1! px-1.5! text-[10px]! shrink-0',
             onActivate: () => { onInsertFirst?.(); },
             disabled: !onInsertFirst,
           }}
@@ -340,7 +340,7 @@ function LibrarySearch({
             label: t('Clear search'),
             review: t('Clear search'),
             title: t('Clear search'),
-            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            className: 'btn py-1! px-1.5! text-[10px]! shrink-0',
             onActivate: () => setQuery(''),
           }}
         />

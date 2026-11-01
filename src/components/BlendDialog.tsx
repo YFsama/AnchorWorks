@@ -81,7 +81,7 @@ export function BlendDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -140,7 +140,7 @@ export function BlendDialog() {
         </label>
 
         <div className="mt-3">
-          <div className="field-label !mb-1">{t('Blend step presets')}</div>
+          <div className="field-label mb-1!">{t('Blend step presets')}</div>
           <div
             className="grid grid-cols-4 gap-1"
             role="toolbar"
@@ -162,7 +162,7 @@ export function BlendDialog() {
                   data-blend-step-preset-action
                   data-review={review}
                   data-value={preset}
-                  className={`btn !py-1 !px-1 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
+                  className={`btn py-1! px-1! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`}
                   disabled={spacingMode !== 'specifiedSteps'}
                   onClick={() => setSteps(preset)}
                   onFocus={(event) => setReviewedPreset(event.currentTarget.dataset.review ?? '')}

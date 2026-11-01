@@ -34,7 +34,7 @@ export function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-3 left-3 z-40 select-none rounded-full border border-warn/40 bg-warn/15 px-3 py-1 text-xs font-medium text-ink/90 shadow-md backdrop-blur-sm"
+      className="fixed bottom-3 left-3 z-40 select-none rounded-full border border-warn/40 bg-warn/15 px-3 py-1 text-xs font-medium text-ink/90 shadow-md backdrop-blur-xs"
     >
       <span
         aria-hidden="true"

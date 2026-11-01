@@ -1027,7 +1027,7 @@ export function PropertiesPanel() {
                 <button
                   key={size}
                   type="button"
-                  className={`btn !py-1 !px-1 !text-[10px] ${patternSize === size ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                  className={`btn py-1! px-1! text-[10px]! ${patternSize === size ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                   onClick={() => applyPatternPreset(patternKind, size)}
                   onFocus={() => setReviewedPatternSizePreset(`${t('Pattern size')} ${size}`)}
                   aria-pressed={patternSize === size}
@@ -1594,7 +1594,7 @@ export function PropertiesPanel() {
               <button
                 key={profile}
                 type="button"
-                className="btn !py-1 !px-1 !text-[10px]"
+                className="btn py-1! px-1! text-[10px]!"
                 title={widthProfileLabel(profile, t)}
                 onClick={() => applyWidthProfileToSelection(profile)}
               >

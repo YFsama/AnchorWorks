@@ -242,7 +242,7 @@ export function StatusBar() {
           onClick={() => useEditor.getState().setModal('showHelpCenter', true)}
           className="tabular-nums text-muted hover:text-ink transition-colors"
           title={`Anchorworks v${__APP_VERSION__}`}
-          aria-label={`Anchorworks ${t('Version')} ${__APP_VERSION__}`}
+          aria-label={`Anchorworks ${t('Version')} v${__APP_VERSION__}`}
         >
           v{__APP_VERSION__}
         </button>
@@ -301,7 +301,7 @@ function ZoomField({ zoom, label }: { zoom: number; label: string }) {
           if (e.key === 'Enter') { e.preventDefault(); commit(); }
           else if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
         }}
-        className="w-12 px-1 text-[10px] tabular-nums text-ink bg-panel2 border border-accent rounded outline-none"
+        className="w-12 px-1 text-[10px] tabular-nums text-ink bg-panel2 border border-accent rounded outline-hidden"
         aria-label={t('Set zoom percentage')}
       />
     );

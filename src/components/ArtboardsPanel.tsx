@@ -202,7 +202,7 @@ export function ArtboardsPanel() {
               <div className="grid grid-cols-2 gap-1">
                 <button
                   type="button"
-                  className="btn !py-1 !px-1.5 !text-[10px] flex items-center justify-center gap-1"
+                  className="btn py-1! px-1.5! text-[10px]! flex items-center justify-center gap-1"
                   onClick={exportSelectedArtboardsAsPNG}
                   disabled={validSelectedArtboardIds.length === 0}
                   title={t('Export selected artboards as PNG')}
@@ -211,7 +211,7 @@ export function ArtboardsPanel() {
                 </button>
                 <button
                   type="button"
-                  className="btn !py-1 !px-1.5 !text-[10px] flex items-center justify-center gap-1"
+                  className="btn py-1! px-1.5! text-[10px]! flex items-center justify-center gap-1"
                   onClick={exportSelectedArtboardsAsSVG}
                   disabled={validSelectedArtboardIds.length === 0}
                   title={t('Export selected artboards as SVG')}
@@ -225,11 +225,11 @@ export function ArtboardsPanel() {
           {artboards.length === 0 ? (
             <div className="flex flex-col items-center text-center px-2 py-3">
               {/* Two overlapping artboard rectangles — the canonical "multi-page" idea. */}
-              <svg width="56" height="44" viewBox="0 0 56 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'rgb(var(--color-muted))' }}>
+              <svg width="56" height="44" viewBox="0 0 56 44" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'var(--muted)' }}>
                 <rect x="6.5" y="10.5" width="30" height="22" rx="1.5" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1" />
-                <rect x="20.5" y="6.5" width="30" height="22" rx="1.5" stroke="rgb(var(--color-accent2))" strokeWidth="1.2" />
-                <line x1="20.5" y1="13" x2="50.5" y2="13" stroke="rgb(var(--color-accent2))" strokeWidth="1" strokeOpacity="0.5" />
-                <circle cx="24" cy="9.5" r="0.8" fill="rgb(var(--color-accent))" />
+                <rect x="20.5" y="6.5" width="30" height="22" rx="1.5" stroke="var(--accent2)" strokeWidth="1.2" />
+                <line x1="20.5" y1="13" x2="50.5" y2="13" stroke="var(--accent2)" strokeWidth="1" strokeOpacity="0.5" />
+                <circle cx="24" cy="9.5" r="0.8" fill="var(--accent)" />
               </svg>
               <div className="text-xs text-ink/90 mb-1">{t('No artboards yet')}</div>
               <div className="type-caption leading-relaxed max-w-[200px]">
@@ -245,7 +245,7 @@ export function ArtboardsPanel() {
               {query && (
                 <button
                   type="button"
-                  className="btn !py-1 !px-2 text-[10px] mt-2"
+                  className="btn py-1! px-2! text-[10px] mt-2"
                   onClick={() => setQuery('')}
                 >
                   {t('Clear search')}
@@ -326,7 +326,7 @@ function PanelSearch({
       <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
       <input
         type="search"
-        className="input !py-1 !px-2 text-xs min-w-0 flex-1"
+        className="input py-1! px-2! text-xs min-w-0 flex-1"
         placeholder={placeholder}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
@@ -369,7 +369,7 @@ function PanelSearch({
             label: t('Target First'),
             review: t('Zoom to first search result'),
             title: t('Zoom to first search result'),
-            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            className: 'btn py-1! px-1.5! text-[10px]! shrink-0',
             onActivate: onTargetFirst ?? (() => {}),
             disabled: !onTargetFirst,
           }}
@@ -377,7 +377,7 @@ function PanelSearch({
             label: t('Clear search'),
             review: t('Clear search'),
             title: t('Clear search'),
-            className: 'btn !py-1 !px-1.5 !text-[10px] shrink-0',
+            className: 'btn py-1! px-1.5! text-[10px]! shrink-0',
             onActivate: () => setQuery(''),
           }}
         />
@@ -530,7 +530,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
   return (
     <div
       ref={rowRef}
-      className={`rounded border p-2 space-y-1.5 focus-within:border-accent2 focus:outline-none focus:ring-1 focus:ring-accent2/60 transition-colors ${selected ? 'border-accent2 bg-accent/10 shadow-[0_0_0_1px_rgba(var(--color-accent2),0.25)]' : 'border-border bg-panel2'}`}
+      className={`rounded border p-2 space-y-1.5 focus-within:border-accent2 focus:outline-hidden focus:ring-1 focus:ring-accent2/60 transition-colors ${selected ? 'border-accent2 bg-accent/10 shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent2)_25%,transparent)]' : 'border-border bg-panel2'}`}
       tabIndex={0}
       data-artboard-row
       // Rows are editor cards (name/X/Y/W/H inputs + per-row actions), not
@@ -568,7 +568,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
               (e.target as HTMLInputElement).blur();
             }
           }}
-          className="flex-1 bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-none focus:border-accent2 transition-colors"
+          className="flex-1 bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-hidden focus:border-accent2 transition-colors"
           aria-label={t('Artboard name')}
         />
         <button
@@ -613,7 +613,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
       </div>
 
       <div>
-        <div className="field-label !mb-1">{t('Artboard order')}</div>
+        <div className="field-label mb-1!">{t('Artboard order')}</div>
         {/* The row's three toolbars share ONE review live region, rendered by
             the presets toolbar below — order/fit opt out of the built-in
             region via externalStatus and keep pointing aria-describedby at
@@ -632,7 +632,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
             type="button"
             data-artboard-action
             data-artboard-action-review={t('Move this artboard to first')}
-            className="btn !py-1 !px-1.5 !text-[10px]"
+            className="btn py-1! px-1.5! text-[10px]!"
             onClick={() => moveThisArtboardOrder('first')}
             onFocus={() => setReviewedRowAction(t('Move this artboard to first'))}
             title={t('Move this artboard to first')}
@@ -643,7 +643,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
             type="button"
             data-artboard-action
             data-artboard-action-review={t('Move this artboard earlier')}
-            className="btn !py-1 !px-1.5 !text-[10px]"
+            className="btn py-1! px-1.5! text-[10px]!"
             onClick={() => moveThisArtboardOrder('previous')}
             onFocus={() => setReviewedRowAction(t('Move this artboard earlier'))}
             title={t('Move this artboard earlier')}
@@ -654,7 +654,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
             type="button"
             data-artboard-action
             data-artboard-action-review={t('Move this artboard later')}
-            className="btn !py-1 !px-1.5 !text-[10px]"
+            className="btn py-1! px-1.5! text-[10px]!"
             onClick={() => moveThisArtboardOrder('next')}
             onFocus={() => setReviewedRowAction(t('Move this artboard later'))}
             title={t('Move this artboard later')}
@@ -665,7 +665,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
             type="button"
             data-artboard-action
             data-artboard-action-review={t('Move this artboard to last')}
-            className="btn !py-1 !px-1.5 !text-[10px]"
+            className="btn py-1! px-1.5! text-[10px]!"
             onClick={() => moveThisArtboardOrder('last')}
             onFocus={() => setReviewedRowAction(t('Move this artboard to last'))}
             title={t('Move this artboard to last')}
@@ -676,7 +676,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
       </div>
 
       <div>
-        <div className="field-label !mb-1">{t('Artboard size presets')}</div>
+        <div className="field-label mb-1!">{t('Artboard size presets')}</div>
         <ActionToolbar
           statusId={`artboard-row-action-review-${artboard.id}`}
           className="flex flex-wrap gap-1"
@@ -696,7 +696,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
               data-artboard-size-preset-action
               data-size-preset={preset.label}
               data-artboard-action-review={`${t('Apply artboard size preset')} ${preset.label}`}
-              className="btn !py-1 !px-1.5 !text-[10px]"
+              className="btn py-1! px-1.5! text-[10px]!"
               onClick={() => applySizePreset(preset.wMm, preset.hMm)}
               onFocus={() => setReviewedRowAction(`${t('Apply artboard size preset')} ${preset.label}`)}
               title={t('Apply artboard size preset')}
@@ -708,7 +708,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
             type="button"
             data-artboard-action
             data-artboard-action-review={t('Swap artboard width and height')}
-            className="btn !py-1 !px-1.5 !text-[10px] flex items-center gap-1"
+            className="btn py-1! px-1.5! text-[10px]! flex items-center gap-1"
             onClick={swapOrientation}
             onFocus={() => setReviewedRowAction(t('Swap artboard width and height'))}
             title={t('Swap artboard width and height')}
@@ -719,7 +719,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
       </div>
 
       <div>
-        <div className="field-label !mb-1">{t('Fit artboard')}</div>
+        <div className="field-label mb-1!">{t('Fit artboard')}</div>
         <ActionToolbar
           statusId={`artboard-row-action-review-${artboard.id}`}
           externalStatus
@@ -734,7 +734,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
             type="button"
             data-artboard-action
             data-artboard-action-review={t('Fit this artboard to selection')}
-            className="btn !py-1 !px-1.5 !text-[10px]"
+            className="btn py-1! px-1.5! text-[10px]!"
             onClick={() => fitThisArtboard('selection')}
             onFocus={() => setReviewedRowAction(t('Fit this artboard to selection'))}
             title={t('Fit this artboard to selection')}
@@ -745,7 +745,7 @@ function ArtboardRow({ artboard, dpi, rowRef, selected, checked, onToggleChecked
             type="button"
             data-artboard-action
             data-artboard-action-review={t('Fit this artboard to artwork')}
-            className="btn !py-1 !px-1.5 !text-[10px]"
+            className="btn py-1! px-1.5! text-[10px]!"
             onClick={() => fitThisArtboard('all')}
             onFocus={() => setReviewedRowAction(t('Fit this artboard to artwork'))}
             title={t('Fit this artboard to artwork')}
@@ -797,14 +797,14 @@ function Field({
        *  the chrome (10px is the scale's small floor; 9px was a one-off
        *  for "save 1px of vertical space" that the row layout doesn't
        *  actually need). */}
-      <span className="field-label !mb-0">{label}</span>
+      <span className="field-label mb-0!">{label}</span>
       <input
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onCommit}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-        className="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-none focus:border-accent2 transition-colors w-full"
+        className="bg-panel border border-border rounded px-1.5 py-0.5 text-xs text-ink outline-hidden focus:border-accent2 transition-colors w-full"
       />
     </label>
   );

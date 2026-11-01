@@ -183,56 +183,56 @@ const FROZEN_FILL_TABLIST =
 const FROZEN_SERIAL_TOOLBAR =
   '<div class="grid grid-cols-4 gap-1" role="toolbar" aria-label="Variable Data serial presets" aria-describedby="variable-data-serial-preset-review-status" title="Use arrow keys to review serial presets">'
   + '<span id="variable-data-serial-preset-review-status" class="sr-only" aria-live="polite">Reviewing Serial presets</span>'
-  + '<button type="button" data-variable-data-preset="badges-10" class="btn !py-1 !px-1.5 !text-[10px] " aria-pressed="false" title="Badges 10 · Start 1, Step 1, Count 10, Pad 2">Badges 10</button>'
-  + '<button type="button" data-variable-data-preset="badges-50" class="btn !py-1 !px-1.5 !text-[10px] " aria-pressed="false" title="Badges 50 · Start 1, Step 1, Count 50, Pad 3">Badges 50</button>'
-  + '<button type="button" data-variable-data-preset="odds-25" class="btn !py-1 !px-1.5 !text-[10px] " aria-pressed="false" title="Odd 25 · Start 1, Step 2, Count 25, Pad 2">Odd 25</button>'
-  + '<button type="button" data-variable-data-preset="tickets-100" class="btn !py-1 !px-1.5 !text-[10px] " aria-pressed="false" title="Tickets 100 · Start 1, Step 1, Count 100, Pad 3">Tickets 100</button>'
+  + '<button type="button" data-variable-data-preset="badges-10" class="btn py-1! px-1.5! text-[10px]! " aria-pressed="false" title="Badges 10 · Start 1, Step 1, Count 10, Pad 2">Badges 10</button>'
+  + '<button type="button" data-variable-data-preset="badges-50" class="btn py-1! px-1.5! text-[10px]! " aria-pressed="false" title="Badges 50 · Start 1, Step 1, Count 50, Pad 3">Badges 50</button>'
+  + '<button type="button" data-variable-data-preset="odds-25" class="btn py-1! px-1.5! text-[10px]! " aria-pressed="false" title="Odd 25 · Start 1, Step 2, Count 25, Pad 2">Odd 25</button>'
+  + '<button type="button" data-variable-data-preset="tickets-100" class="btn py-1! px-1.5! text-[10px]! " aria-pressed="false" title="Tickets 100 · Start 1, Step 1, Count 100, Pad 3">Tickets 100</button>'
   + '</div>';
 
 const FROZEN_COLUMN_TOOLBAR =
   '<div class="mt-1 grid grid-cols-5 gap-1" role="toolbar" aria-label="Variable Data column presets" aria-describedby="variable-data-column-preset-review-status" title="Use arrow keys to review column presets">'
   + '<span id="variable-data-column-preset-review-status" class="sr-only" aria-live="polite">Reviewing Variable Data column presets</span>'
-  + '<button type="button" data-variable-data-column-preset="2" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">2</button>'
-  + '<button type="button" data-variable-data-column-preset="3" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">3</button>'
-  + '<button type="button" data-variable-data-column-preset="4" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">4</button>'
-  + '<button type="button" data-variable-data-column-preset="5" class="btn !py-0.5 !px-1 !text-[10px] ring-1 ring-accent" aria-pressed="true">5</button>'
-  + '<button type="button" data-variable-data-column-preset="10" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">10</button>'
+  + '<button type="button" data-variable-data-column-preset="2" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">2</button>'
+  + '<button type="button" data-variable-data-column-preset="3" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">3</button>'
+  + '<button type="button" data-variable-data-column-preset="4" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">4</button>'
+  + '<button type="button" data-variable-data-column-preset="5" class="btn py-0.5! px-1! text-[10px]! ring-1 ring-accent" aria-pressed="true">5</button>'
+  + '<button type="button" data-variable-data-column-preset="10" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">10</button>'
   + '</div>';
 
 const FROZEN_GAP_X_TOOLBAR =
   '<div class="mt-1 grid grid-cols-5 gap-1" role="toolbar" aria-label="Variable Data gap X presets" aria-describedby="variable-data-gap-x-preset-review-status" title="Use arrow keys to review gap presets">'
   + '<span id="variable-data-gap-x-preset-review-status" class="sr-only" aria-live="polite">Reviewing Variable Data gap X presets</span>'
-  + '<button type="button" data-variable-data-gap-preset="5" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">5</button>'
-  + '<button type="button" data-variable-data-gap-preset="10" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">10</button>'
-  + '<button type="button" data-variable-data-gap-preset="20" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">20</button>'
-  + '<button type="button" data-variable-data-gap-preset="40" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] ring-1 ring-accent" aria-pressed="true">40</button>'
-  + '<button type="button" data-variable-data-gap-preset="80" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">80</button>'
+  + '<button type="button" data-variable-data-gap-preset="5" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">5</button>'
+  + '<button type="button" data-variable-data-gap-preset="10" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">10</button>'
+  + '<button type="button" data-variable-data-gap-preset="20" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">20</button>'
+  + '<button type="button" data-variable-data-gap-preset="40" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! ring-1 ring-accent" aria-pressed="true">40</button>'
+  + '<button type="button" data-variable-data-gap-preset="80" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">80</button>'
   + '</div>';
 
 const FROZEN_GAP_X_TOOLBAR_LINKED =
   '<div class="mt-1 grid grid-cols-5 gap-1" role="toolbar" aria-label="Variable Data gap X presets" aria-describedby="variable-data-gap-x-preset-review-status" title="Linked gaps: presets update both axes">'
   + '<span id="variable-data-gap-x-preset-review-status" class="sr-only" aria-live="polite">Reviewing Variable Data gap X presets</span>'
-  + '<button type="button" data-variable-data-gap-preset="5" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">5</button>'
-  + '<button type="button" data-variable-data-gap-preset="10" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">10</button>'
-  + '<button type="button" data-variable-data-gap-preset="20" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">20</button>'
-  + '<button type="button" data-variable-data-gap-preset="40" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] ring-1 ring-accent" aria-pressed="true">40</button>'
-  + '<button type="button" data-variable-data-gap-preset="80" data-variable-data-gap-axis="X" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">80</button>'
+  + '<button type="button" data-variable-data-gap-preset="5" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">5</button>'
+  + '<button type="button" data-variable-data-gap-preset="10" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">10</button>'
+  + '<button type="button" data-variable-data-gap-preset="20" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">20</button>'
+  + '<button type="button" data-variable-data-gap-preset="40" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! ring-1 ring-accent" aria-pressed="true">40</button>'
+  + '<button type="button" data-variable-data-gap-preset="80" data-variable-data-gap-axis="X" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">80</button>'
   + '</div>';
 
 const FROZEN_GAP_Y_TOOLBAR =
   '<div class="mt-1 grid grid-cols-5 gap-1" role="toolbar" aria-label="Variable Data gap Y presets" aria-describedby="variable-data-gap-y-preset-review-status" title="Use arrow keys to review gap presets">'
   + '<span id="variable-data-gap-y-preset-review-status" class="sr-only" aria-live="polite">Reviewing Variable Data gap Y presets</span>'
-  + '<button type="button" data-variable-data-gap-preset="5" data-variable-data-gap-axis="Y" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">5</button>'
-  + '<button type="button" data-variable-data-gap-preset="10" data-variable-data-gap-axis="Y" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">10</button>'
-  + '<button type="button" data-variable-data-gap-preset="20" data-variable-data-gap-axis="Y" class="btn !py-0.5 !px-1 !text-[10px] ring-1 ring-accent" aria-pressed="true">20</button>'
-  + '<button type="button" data-variable-data-gap-preset="40" data-variable-data-gap-axis="Y" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">40</button>'
-  + '<button type="button" data-variable-data-gap-preset="80" data-variable-data-gap-axis="Y" class="btn !py-0.5 !px-1 !text-[10px] " aria-pressed="false">80</button>'
+  + '<button type="button" data-variable-data-gap-preset="5" data-variable-data-gap-axis="Y" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">5</button>'
+  + '<button type="button" data-variable-data-gap-preset="10" data-variable-data-gap-axis="Y" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">10</button>'
+  + '<button type="button" data-variable-data-gap-preset="20" data-variable-data-gap-axis="Y" class="btn py-0.5! px-1! text-[10px]! ring-1 ring-accent" aria-pressed="true">20</button>'
+  + '<button type="button" data-variable-data-gap-preset="40" data-variable-data-gap-axis="Y" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">40</button>'
+  + '<button type="button" data-variable-data-gap-preset="80" data-variable-data-gap-axis="Y" class="btn py-0.5! px-1! text-[10px]! " aria-pressed="false">80</button>'
   + '</div>';
 
 const FROZEN_LAYOUT_TOOLBAR =
   '<div class="mt-2 flex justify-end gap-1" role="toolbar" aria-label="Variable Data layout actions" title="Use arrow keys to review layout actions">'
-  + '<button type="button" data-variable-data-layout-action="true" class="btn !py-1 !px-2 !text-[10px]">Auto gap</button>'
-  + '<button type="button" data-variable-data-layout-action="true" class="btn !py-1 !px-2 !text-[10px] " aria-pressed="false">Link gaps</button>'
+  + '<button type="button" data-variable-data-layout-action="true" class="btn py-1! px-2! text-[10px]!">Auto gap</button>'
+  + '<button type="button" data-variable-data-layout-action="true" class="btn py-1! px-2! text-[10px]! " aria-pressed="false">Link gaps</button>'
   + '</div>';
 
 const FROZEN_FOOTER =
@@ -245,30 +245,30 @@ const FROZEN_FOOTER =
 const FROZEN_LIST_TOOLBAR_EMPTY =
   '<div class="grid grid-cols-3 gap-1 mt-1 mb-2" role="toolbar" aria-label="Variable Data list actions" aria-describedby="variable-data-list-action-review-status" title="Use arrow keys to review list actions">'
   + '<span id="variable-data-list-action-review-status" class="sr-only" aria-live="polite">Reviewing Variable Data list actions</span>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sample list" class="btn !py-1 !px-1.5 !text-[10px]">Sample list</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clean list" class="btn !py-1 !px-1.5 !text-[10px]" disabled="">Clean list</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Dedupe" class="btn !py-1 !px-1.5 !text-[10px]" disabled="">Dedupe</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sort A-Z" class="btn !py-1 !px-1.5 !text-[10px]" disabled="">Sort A-Z</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Reverse" class="btn !py-1 !px-1.5 !text-[10px]" disabled="">Reverse</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clear list" class="btn !py-1 !px-1.5 !text-[10px]" disabled="">Clear list</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sample list" class="btn py-1! px-1.5! text-[10px]!">Sample list</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clean list" class="btn py-1! px-1.5! text-[10px]!" disabled="">Clean list</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Dedupe" class="btn py-1! px-1.5! text-[10px]!" disabled="">Dedupe</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sort A-Z" class="btn py-1! px-1.5! text-[10px]!" disabled="">Sort A-Z</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Reverse" class="btn py-1! px-1.5! text-[10px]!" disabled="">Reverse</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clear list" class="btn py-1! px-1.5! text-[10px]!" disabled="">Clear list</button>'
   + '</div>';
 
 const FROZEN_LIST_TOOLBAR_FILLED =
   '<div class="grid grid-cols-3 gap-1 mt-1 mb-2" role="toolbar" aria-label="Variable Data list actions" aria-describedby="variable-data-list-action-review-status" title="Use arrow keys to review list actions">'
   + '<span id="variable-data-list-action-review-status" class="sr-only" aria-live="polite">Reviewing Variable Data list actions</span>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sample list" class="btn !py-1 !px-1.5 !text-[10px]">Sample list</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clean list" class="btn !py-1 !px-1.5 !text-[10px]">Clean list</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Dedupe" class="btn !py-1 !px-1.5 !text-[10px]">Dedupe</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sort A-Z" class="btn !py-1 !px-1.5 !text-[10px]">Sort A-Z</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Reverse" class="btn !py-1 !px-1.5 !text-[10px]">Reverse</button>'
-  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clear list" class="btn !py-1 !px-1.5 !text-[10px]">Clear list</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sample list" class="btn py-1! px-1.5! text-[10px]!">Sample list</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clean list" class="btn py-1! px-1.5! text-[10px]!">Clean list</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Dedupe" class="btn py-1! px-1.5! text-[10px]!">Dedupe</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Sort A-Z" class="btn py-1! px-1.5! text-[10px]!">Sort A-Z</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Reverse" class="btn py-1! px-1.5! text-[10px]!">Reverse</button>'
+  + '<button type="button" data-variable-data-list-action="true" data-variable-data-list-action-review="Clear list" class="btn py-1! px-1.5! text-[10px]!">Clear list</button>'
   + '</div>';
 
 const FROZEN_CHIPS_TOOLBAR =
   '<div class="flex flex-wrap gap-1 mb-1.5" role="toolbar" aria-label="Column token chips" aria-describedby="variable-data-token-review-status" title="Use arrow keys to review token chips">'
   + '<span id="variable-data-token-review-status" class="sr-only" aria-live="polite">Reviewing Column token chips</span>'
-  + '<button type="button" data-variable-data-token="Name" data-review="Insert token {{Name}}" class="btn !py-0.5 !px-1.5 !text-[10px] font-mono" title="Copy the {{token}} for this column to the clipboard. — {{Name}}">{{Name}}</button>'
-  + '<button type="button" data-variable-data-token="Room" data-review="Insert token {{Room}}" class="btn !py-0.5 !px-1.5 !text-[10px] font-mono" title="Copy the {{token}} for this column to the clipboard. — {{Room}}">{{Room}}</button>'
+  + '<button type="button" data-variable-data-token="Name" data-review="Insert token {{Name}}" class="btn py-0.5! px-1.5! text-[10px]! font-mono" title="Copy the {{token}} for this column to the clipboard. — {{Name}}">{{Name}}</button>'
+  + '<button type="button" data-variable-data-token="Room" data-review="Insert token {{Room}}" class="btn py-0.5! px-1.5! text-[10px]! font-mono" title="Copy the {{token}} for this column to the clipboard. — {{Room}}">{{Room}}</button>'
   + '</div>';
 
 const FROZEN_CHIPS_TOOLBAR_EMPTY =
@@ -806,7 +806,7 @@ describe('action wiring across the migration', () => {
     expect(overlay.querySelector<HTMLTextAreaElement>('textarea')!.value).toContain('Alice Chen');
   });
 
-  it('Link gaps toggles aria-pressed and its ring class', async () => {
+  it('Link gaps toggles aria-pressed and its ring-3 class', async () => {
     const overlay = await openDialog();
     const linkGaps = layoutButtons(overlay)[1];
     expect(linkGaps.getAttribute('aria-pressed')).toBe('false');

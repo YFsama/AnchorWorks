@@ -168,7 +168,7 @@ describe('offsetPathObject', () => {
     expect(out.opacity).toBeCloseTo(0.7, 6);
   });
 
-  it('stroke-width interplay: a stroked rect still offsets to a closed ring ~2·offset wider', () => {
+  it('stroke-width interplay: a stroked rect still offsets to a closed ring-3 ~2·offset wider', () => {
     // The outline extraction reads the stroked bounding box, so the base
     // outline can sit up to strokeWidth/2 off the raw geometry (placement
     // depends on the contour extraction under repair). Pin only the robust
@@ -314,13 +314,13 @@ describe('offsetPolyline — inward-overflow inversion (P1-8)', () => {
     expect(offsetPolyline(SQ, -50, true)).toEqual([]);
   });
 
-  it('still returns the correct smaller ring for a normal inward offset', () => {
+  it('still returns the correct smaller ring-3 for a normal inward offset', () => {
     const rings = offsetPolyline(SQ, -10, true);
     expect(rings).toHaveLength(1);
     expect(span(rings[0])).toBeCloseTo(80, 6);
   });
 
-  it('still returns the larger ring for an outward offset', () => {
+  it('still returns the larger ring-3 for an outward offset', () => {
     const rings = offsetPolyline(SQ, 10, true);
     expect(rings).toHaveLength(1);
     expect(span(rings[0])).toBeCloseTo(120, 6);

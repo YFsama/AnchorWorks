@@ -111,7 +111,7 @@ export function QuickHelp() {
           className="quick-help-card"
         >
           <div className="flex items-center justify-between mb-2">
-            <h3 className="field-label !mb-0">{t('Quick help')}</h3>
+            <h3 className="field-label mb-0!">{t('Quick help')}</h3>
             <button
               type="button"
               onClick={() => setOpen(false)}

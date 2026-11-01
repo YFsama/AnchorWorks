@@ -59,10 +59,10 @@ function CrashScreen({ error }: { error: Error }) {
   };
 
   return (
-    // z-[200]: above every dialog layer (ToastHost is z-110) — the crash
+    // z-200: above every dialog layer (ToastHost is z-110) — the crash
     // screen must own the viewport or the user can't recover.
     <div
-      className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-200 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="error-boundary-title"
@@ -75,7 +75,7 @@ function CrashScreen({ error }: { error: Error }) {
           </p>
         </div>
         <div className="px-4 py-3 overflow-auto">
-          <div className="text-danger text-xs font-medium break-words">{error.message}</div>
+          <div className="text-danger text-xs font-medium wrap-break-word">{error.message}</div>
           <details className="mt-2">
             <summary className="text-xs text-muted cursor-pointer select-none">{t('Stack')}</summary>
             <pre className="mt-2 text-[10px] leading-tight font-mono whitespace-pre-wrap break-all text-ink/85 bg-panel2 border border-border rounded p-2">

@@ -119,7 +119,7 @@ export function StarDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -146,7 +146,7 @@ export function StarDialog() {
         </div>
 
         <div className="mb-3">
-          <div className="field-label !mb-1">{t('Shape presets')}</div>
+          <div className="field-label mb-1!">{t('Shape presets')}</div>
           <PresetRow
             statusId="star-shape-preset-review-status"
             className="grid grid-cols-4 gap-1"
@@ -162,7 +162,7 @@ export function StarDialog() {
               const active = mode === preset.mode && points === preset.points && (preset.mode === 'polygon' || Math.abs(ratio - (preset.ratio ?? ratio)) < 0.001);
               return {
                 key: preset.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => applyPreset(preset),
                 title: preset.mode === 'star' ? `${t(preset.label)}: ${preset.points} ${t('Points')} / ${Math.round((preset.ratio ?? 0) * 100)}%` : `${t(preset.label)}: ${preset.points} ${t('Sides')}`,
@@ -202,7 +202,7 @@ export function StarDialog() {
               </label>
             </div>
             <div className="mt-2">
-              <div className="field-label !mb-1">{t('Spiral presets')}</div>
+              <div className="field-label mb-1!">{t('Spiral presets')}</div>
               <PresetRow
                 statusId="star-spiral-preset-review-status"
                 className="grid grid-cols-3 gap-1"
@@ -218,7 +218,7 @@ export function StarDialog() {
                   const active = turns === preset.turns && Math.abs(decay - preset.decay) < 0.001;
                   return {
                     key: preset.label,
-                    className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                    className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                     pressed: active,
                     onClick: () => applySpiralPreset(preset),
                     title: `${t(preset.label)}: ${preset.turns} ${t('Winds')} / ${Math.round(preset.decay * 100)}%`,

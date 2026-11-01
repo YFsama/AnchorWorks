@@ -76,7 +76,7 @@ describe('knifeSplitRingByCorridor', () => {
     expect(total).toBeLessThan(10000);
   });
 
-  it('returns the ring untouched when the corridor misses it entirely', () => {
+  it('returns the ring-3 untouched when the corridor misses it entirely', () => {
     const corridor = buildCutCorridor([[-50, -50], [-50, 150]], 1);
     const areas = polygonAreas(knifeSplitRingByCorridor(square, corridor));
     expect(areas).toHaveLength(1);

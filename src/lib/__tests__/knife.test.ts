@@ -17,14 +17,14 @@ function areas(result: ReturnType<typeof knifeSplitRingAtCenter>): number[] {
 }
 
 describe('knife split helpers', () => {
-  it('splits a closed ring horizontally through its center', () => {
+  it('splits a closed ring-3 horizontally through its center', () => {
     const result = knifeSplitRingAtCenter(square, 'horizontal');
 
     expect(result).toHaveLength(2);
     expect(areas(result)).toEqual([50, 50]);
   });
 
-  it('splits a closed ring vertically through its center', () => {
+  it('splits a closed ring-3 vertically through its center', () => {
     const result = knifeSplitRingAtCenter(square, 'vertical');
 
     expect(result).toHaveLength(2);

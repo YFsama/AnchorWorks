@@ -325,7 +325,7 @@ const FROZEN_STATUS_TOOLBAR =
   + badge('GUIDES', true, 'crosshair', '<circle cx="12" cy="12" r="10"></circle><line x1="22" x2="18" y1="12" y2="12"></line><line x1="6" x2="2" y1="12" y2="12"></line><line x1="12" x2="12" y1="6" y2="2"></line><line x1="12" x2="12" y1="22" y2="18"></line>')
   + badge('ANCHOR', true, 'target', '<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>')
   + '<span class="statusbar-sep" aria-hidden="true"></span>'
-  + '<button type="button" data-status-action="true" class="tabular-nums text-muted hover:text-ink transition-colors" title="Anchorworks v9.9.9" aria-label="Anchorworks Version 9.9.9">v9.9.9</button>'
+  + '<button type="button" data-status-action="true" class="tabular-nums text-muted hover:text-ink transition-colors" title="Anchorworks v9.9.9" aria-label="Anchorworks Version v9.9.9">v9.9.9</button>'
   + '</div>';
 
 // ---- CharacterPanel --------------------------------------------------------------

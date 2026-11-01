@@ -18,6 +18,11 @@ import { getCanvas, pushHistory } from './canvasEngine';
 
 type FabricObject = fabric.FabricObject;
 
+// fabric v7 narrowed IText's fontStyle from `string` to this union but does
+// not re-export it from the package root. Mirrored here; tsc flags the
+// IText call sites if the upstream union ever changes.
+type FontStyle = '' | 'normal' | 'italic' | 'oblique';
+
 interface Sample {
   x: number;
   y: number;
@@ -78,7 +83,7 @@ export function applyTextOnArc(flip = false): boolean {
 
   const t = text as unknown as {
     fontSize?: number; fontFamily?: string; fontWeight?: string | number;
-    fontStyle?: string; text?: string;
+    fontStyle?: FontStyle; text?: string;
   };
   const fontSize = t.fontSize ?? 32;
   const fontFamily = t.fontFamily ?? 'Inter, sans-serif';
@@ -195,7 +200,7 @@ export function applyTextOnPath(): boolean {
   const fontFamily = (text as unknown as { fontFamily?: string }).fontFamily ?? 'Inter, sans-serif';
   const fill = (text.fill as string) ?? '#000000';
   const fontWeight = (text as unknown as { fontWeight?: string | number }).fontWeight ?? 'normal';
-  const fontStyle = (text as unknown as { fontStyle?: string }).fontStyle ?? 'normal';
+  const fontStyle = (text as unknown as { fontStyle?: FontStyle }).fontStyle ?? 'normal';
   const str = ((text as unknown as { text?: string }).text ?? '').replace(/\n/g, ' ');
   if (!str) return false;
 

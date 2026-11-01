@@ -70,7 +70,7 @@ beforeEach(() => {
   installGlobalErrorHandlers();
 });
 
-describe('errorLog ring buffer + capture', () => {
+describe('errorLog ring-3 buffer + capture', () => {
   it('caps at 200 entries, dropping the oldest', () => {
     for (let i = 0; i < 205; i++) fireError(`boom-${i}`);
     const log = getErrors();

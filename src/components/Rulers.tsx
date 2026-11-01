@@ -133,22 +133,22 @@ export function Rulers() {
         style={{
           width: RULER_SIZE,
           height: RULER_SIZE,
-          background: 'rgb(var(--color-panel2))',
-          borderRight: '1px solid rgb(var(--color-border))',
-          borderBottom: '1px solid rgb(var(--color-border))',
+          background: 'var(--panel2)',
+          borderRight: '1px solid var(--border)',
+          borderBottom: '1px solid var(--border)',
         }}
       />
       <canvas
         ref={topRef}
         onPointerDown={startGuide('h')}
         className="absolute top-0 z-10"
-        style={{ left: RULER_SIZE, borderBottom: '1px solid rgb(var(--color-border))', cursor: 'row-resize' }}
+        style={{ left: RULER_SIZE, borderBottom: '1px solid var(--border)', cursor: 'row-resize' }}
       />
       <canvas
         ref={leftRef}
         onPointerDown={startGuide('v')}
         className="absolute left-0 z-10"
-        style={{ top: RULER_SIZE, borderRight: '1px solid rgb(var(--color-border))', cursor: 'col-resize' }}
+        style={{ top: RULER_SIZE, borderRight: '1px solid var(--border)', cursor: 'col-resize' }}
       />
     </>
   );
@@ -159,10 +159,10 @@ function drawTop(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom:
   if (!ctx) return;
   // Resolve theme-aware colours fresh each frame so toggling theme repaints
   // correctly on the next viewport tick.
-  const BG = cssVar('--color-panel3', '#1a1a1f');
-  const TICK_COLOR = cssVar('--color-border', '#3a3a44');
-  const TICK_COLOR_MAJOR = cssVarA('--color-ink', 0.55, '#5a5a66');
-  const LABEL_COLOR = cssVar('--color-muted', '#9a9aa6');
+  const BG = cssVar('--panel3', '#1a1a1f');
+  const TICK_COLOR = cssVar('--border', '#3a3a44');
+  const TICK_COLOR_MAJOR = cssVarA('--ink', 0.55, '#5a5a66');
+  const LABEL_COLOR = cssVar('--muted', '#9a9aa6');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = BG;
@@ -202,10 +202,10 @@ function drawTop(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom:
 function drawLeft(el: HTMLCanvasElement, dpr: number, w: number, h: number, zoom: number, panY: number, unitPx: number) {
   const ctx = el.getContext('2d');
   if (!ctx) return;
-  const BG = cssVar('--color-panel3', '#1a1a1f');
-  const TICK_COLOR = cssVar('--color-border', '#3a3a44');
-  const TICK_COLOR_MAJOR = cssVarA('--color-ink', 0.55, '#5a5a66');
-  const LABEL_COLOR = cssVar('--color-muted', '#9a9aa6');
+  const BG = cssVar('--panel3', '#1a1a1f');
+  const TICK_COLOR = cssVar('--border', '#3a3a44');
+  const TICK_COLOR_MAJOR = cssVarA('--ink', 0.55, '#5a5a66');
+  const LABEL_COLOR = cssVar('--muted', '#9a9aa6');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = BG;

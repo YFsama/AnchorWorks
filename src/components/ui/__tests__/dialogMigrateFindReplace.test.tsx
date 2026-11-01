@@ -80,7 +80,7 @@ function press(el: Element, key: string): boolean {
 // ---- frozen DOM (captured from the legacy implementation) ----------------------
 
 const FROZEN_PANEL_INITIAL =
-  '<div class="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="findreplace-title">'
+  '<div class="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="findreplace-title">'
   + '<div class="bg-panel border border-border rounded-lg w-[340px] p-4 shadow-2xl">'
   + '<div class="flex items-center justify-between mb-3">'
   + '<h2 id="findreplace-title" class="dialog-title flex items-center gap-2">'
@@ -89,13 +89,13 @@ const FROZEN_PANEL_INITIAL =
   + '<label class="block mb-2"><div class="field-label">Find</div><input class="input-num w-full" aria-label="Find" title="Press Enter to replace all matches · Press Arrow Down to focus Replace" type="text" value=""></label>'
   + '<label class="block mb-2"><div class="field-label">Replace with</div><input class="input-num w-full" aria-label="Replace with" title="Press Enter to replace all matches · Press Arrow Up to focus Find" type="text" value=""></label>'
   + '<div class="flex items-center justify-between mt-1"><label class="flex items-center gap-2 text-xs text-muted cursor-pointer"><input type="checkbox"><span>Match case</span></label><span class="text-xs text-muted tabular-nums" aria-live="polite"></span></div>'
-  + '<div class="mt-3"><div class="field-label !mb-1">Find replace recipes</div>'
+  + '<div class="mt-3"><div class="field-label mb-1!">Find replace recipes</div>'
   + '<div class="grid grid-cols-2 gap-1" role="toolbar" aria-label="Find replace recipe actions" aria-describedby="find-replace-recipe-review-status" title="Use arrow keys to review find replace recipes">'
   + '<div id="find-replace-recipe-review-status" class="sr-only" aria-live="polite">Reviewing Double spaces 1 / 4. Collapse accidental double spaces in imported copy.</div>'
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="0" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Collapse accidental double spaces in imported copy.">Double spaces</button>'
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="1" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Convert double hyphens into an em dash.">Dash cleanup</button>'
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="2" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Replace serial placeholders with a starting number.">Number token</button>'
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="3" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Convert typed trademark markers into the symbol.">Brand mark</button></div></div>'
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="0" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Collapse accidental double spaces in imported copy.">Double spaces</button>'
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="1" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Convert double hyphens into an em dash.">Dash cleanup</button>'
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="2" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Replace serial placeholders with a starting number.">Number token</button>'
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="3" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Convert typed trademark markers into the symbol.">Brand mark</button></div></div>'
   + '<div class="mt-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Find &amp; Replace field actions" aria-describedby="find-replace-field-action-review-status" title="Use arrow keys to review find and replace field actions">'
   + '<span id="find-replace-field-action-review-status" class="sr-only" aria-live="polite">Reviewing Find &amp; Replace field actions</span>'
   + '<button type="button" data-find-replace-field-action="true" data-find-replace-field-action-review="Clear fields" class="btn flex items-center gap-1" disabled="">'
@@ -110,22 +110,22 @@ const FROZEN_PANEL_INITIAL =
   + '</div></div>';
 
 const RECIPE_BUTTONS_TAIL =
-  '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="0" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Collapse accidental double spaces in imported copy.">Double spaces</button>'
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="1" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Convert double hyphens into an em dash.">Dash cleanup</button>';
+  '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="0" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Collapse accidental double spaces in imported copy.">Double spaces</button>'
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="1" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Convert double hyphens into an em dash.">Dash cleanup</button>';
 
 const FROZEN_RECIPE_INITIAL =
   '<div class="grid grid-cols-2 gap-1" role="toolbar" aria-label="Find replace recipe actions" aria-describedby="find-replace-recipe-review-status" title="Use arrow keys to review find replace recipes">'
   + '<div id="find-replace-recipe-review-status" class="sr-only" aria-live="polite">Reviewing Double spaces 1 / 4. Collapse accidental double spaces in imported copy.</div>'
   + RECIPE_BUTTONS_TAIL
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="2" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Replace serial placeholders with a starting number.">Number token</button>'
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="3" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Convert typed trademark markers into the symbol.">Brand mark</button></div>';
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="2" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Replace serial placeholders with a starting number.">Number token</button>'
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="3" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Convert typed trademark markers into the symbol.">Brand mark</button></div>';
 
 const FROZEN_RECIPE_INDEX2_ACTIVE =
   '<div class="grid grid-cols-2 gap-1" role="toolbar" aria-label="Find replace recipe actions" aria-describedby="find-replace-recipe-review-status" title="Use arrow keys to review find replace recipes">'
   + '<div id="find-replace-recipe-review-status" class="sr-only" aria-live="polite">Reviewing Number token 3 / 4. Replace serial placeholders with a starting number.</div>'
   + RECIPE_BUTTONS_TAIL
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="2" class="btn !py-1 !px-1 !text-[10px] border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" title="Replace serial placeholders with a starting number.">Number token</button>'
-  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="3" class="btn !py-1 !px-1 !text-[10px] " aria-pressed="false" title="Convert typed trademark markers into the symbol.">Brand mark</button></div>';
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="2" class="btn py-1! px-1! text-[10px]! border-accent2 text-accent2 bg-accent2/10" aria-pressed="true" title="Replace serial placeholders with a starting number.">Number token</button>'
+  + '<button type="button" data-find-replace-recipe-action="true" data-recipe-index="3" class="btn py-1! px-1! text-[10px]! " aria-pressed="false" title="Convert typed trademark markers into the symbol.">Brand mark</button></div>';
 
 const FIELD_BUTTONS =
   '<button type="button" data-find-replace-field-action="true" data-find-replace-field-action-review="Clear fields" class="btn flex items-center gap-1"<DISABLED>>'

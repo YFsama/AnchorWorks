@@ -396,7 +396,7 @@ registerSkill({
     if (!c.getActiveObjects().length) return 'no selection';
     if (input.remove) {
       applyShadowToSelection(null);
-      return 'shadow removed';
+      return 'shadow-sm removed';
     }
     const { color, blur, offsetX, offsetY } = input as { color?: string; blur?: number; offsetX?: number; offsetY?: number };
     if (typeof color !== 'string' || typeof blur !== 'number' || typeof offsetX !== 'number' || typeof offsetY !== 'number') {
@@ -1542,7 +1542,13 @@ export default function App() {
         />
       </Suspense>
       <div className="flex-1 flex overflow-hidden">
-        <Toolbar />
+        {/* Named section = landmark wrapper: the toolbar itself is only
+            role="toolbar" (not a landmark), which axe's `region` rule flags
+            as page content outside landmarks. display:contents keeps the
+            flex layout untouched. */}
+        <section aria-label={t('Tools')} className="contents">
+          <Toolbar />
+        </section>
         <main className="flex-1 flex flex-col relative" aria-label={t('Canvas workspace')}>
           <CanvasView />
           <QuickHelp />
@@ -1558,20 +1564,24 @@ export default function App() {
             don't bleed into the aside content. Hidden on mobile (≤ 900px)
             where the slide-over takes over. Focusable separators are window
             splitters in ARIA terms, so they must expose their value range
-            (axe aria-required-attr) — the px width matches the aside below. */}
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={t('Resize right panel')}
-          aria-valuemin={240}
-          aria-valuemax={560}
-          aria-valuenow={rightPanelWidth}
-          tabIndex={-1}
-          className="aside-resize-handle"
-          onMouseDown={onRightPanelResizeStart}
-          onDoubleClick={resetRightPanelWidth}
-          title={t('Drag to resize · double-click to reset')}
-        />
+            (axe aria-required-attr) — the px width matches the aside below.
+            The named section is a landmark wrapper (axe `region`); display:
+            contents preserves the sibling positioning. */}
+        <section aria-label={t('Resize right panel')} className="contents">
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={t('Resize right panel')}
+            aria-valuemin={240}
+            aria-valuemax={560}
+            aria-valuenow={rightPanelWidth}
+            tabIndex={-1}
+            className="aside-resize-handle"
+            onMouseDown={onRightPanelResizeStart}
+            onDoubleClick={resetRightPanelWidth}
+            title={t('Drag to resize · double-click to reset')}
+          />
+        </section>
         <aside
           className="aside-right shrink-0 bg-panel border-l border-border overflow-y-auto flex flex-col"
           style={{ width: `${rightPanelWidth}px` }}

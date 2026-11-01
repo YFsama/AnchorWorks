@@ -21,9 +21,9 @@ import { getCanvas, subscribeViewport } from './canvasEngine';
 import { useEditor } from '../store/editor';
 import { readToken } from './tokens';
 
-// Read the live `--color-accent2` token instead of hardcoding so the wireframe
+// Read the live `--accent2` token instead of hardcoding so the wireframe
 // stays readable in both dark (cyan) and light (dark-teal) themes.
-const outlineStroke = () => readToken('--color-accent2', '#5ac8d8');
+const outlineStroke = () => readToken('--accent2', '#5ac8d8');
 const TEXT_OUTLINE_OPACITY = 0.85; // text stays readable but de-emphasised
 
 type Stashable = {

@@ -256,7 +256,7 @@ export function PreferencesDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center"
       onClick={close}
       role="dialog"
       aria-modal="true"
@@ -281,7 +281,7 @@ export function PreferencesDialog() {
         {/* Body: vertical tabs + form */}
         <div className="px-4 py-2 border-b border-border bg-panel2/40">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="field-label !mb-0">{t('Preference recipes')}</span>
+            <span className="field-label mb-0!">{t('Preference recipes')}</span>
             <PresetRow
               statusId="preferences-recipe-action-review-status"
               className="flex flex-wrap items-center gap-1"
@@ -298,7 +298,7 @@ export function PreferencesDialog() {
                 const active = recipeActive(recipe.patch);
                 return {
                   key: recipe.label,
-                  className: `btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                  className: `btn py-1! px-2! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                   pressed: active,
                   onClick: () => applyRecipe(recipe.patch),
                   title: t(recipe.title),
@@ -325,7 +325,7 @@ export function PreferencesDialog() {
                 <input
                   ref={searchRef}
                   type="search"
-                  className="flex-1 min-w-0 bg-transparent outline-none text-[11px] text-ink placeholder:text-muted/70"
+                  className="flex-1 min-w-0 bg-transparent outline-hidden text-[11px] text-ink placeholder:text-muted/70"
                   placeholder={t('Search preferences…')}
                   value={prefQuery}
                   onChange={(e) => {
@@ -415,7 +415,7 @@ export function PreferencesDialog() {
                 {prefQuery && (
                   <button
                     type="button"
-                    className="btn !py-1 !px-2 text-[10px] mt-2"
+                    className="btn py-1! px-2! text-[10px] mt-2"
                     onClick={() => setPrefQuery('')}
                   >
                     {t('Clear search')}
@@ -461,7 +461,7 @@ export function PreferencesDialog() {
             role="tabpanel"
             aria-labelledby={activeTab ? `pref-tab-${activeTab}` : undefined}
             tabIndex={0}
-            className="flex-1 overflow-y-auto px-5 py-4 min-w-0 focus:outline-none"
+            className="flex-1 overflow-y-auto px-5 py-4 min-w-0 focus:outline-hidden"
           >
             {activeTab === 'general' && <GeneralTab draft={draft} patch={patch} />}
             {activeTab === 'ai' && <AITab draft={draft} patch={patch} />}
@@ -473,7 +473,7 @@ export function PreferencesDialog() {
                 {prefQuery && (
                   <button
                     type="button"
-                    className="btn !py-1 !px-2 text-[10px] mt-2"
+                    className="btn py-1! px-2! text-[10px] mt-2"
                     onClick={() => setPrefQuery('')}
                   >
                     {t('Clear search')}
@@ -721,7 +721,7 @@ function EditorTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
               <button
                 key={mode}
                 type="button"
-                className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                className={`btn py-1! px-2! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                 aria-pressed={active}
                 title={mode === 'pan' ? t('Wheel scrolls, Ctrl/Cmd+wheel zooms (Figma-style)') : t('Wheel zooms at the cursor, Ctrl/Cmd+wheel scrolls (Illustrator-style)')}
                 onClick={() => patch.prefs({ wheelMode: mode })}
@@ -747,7 +747,7 @@ function EditorTab({ draft, patch }: { draft: DraftState; patch: PatchAPI }) {
               <button
                 key={mode}
                 type="button"
-                className={`btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                className={`btn py-1! px-2! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
                 aria-pressed={active}
                 title={mode === 'off'
                   ? t('Re-render every path each frame: crisp at any zoom, but heavy documents may drag slowly on low-end machines (default)')

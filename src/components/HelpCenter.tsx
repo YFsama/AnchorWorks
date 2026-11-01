@@ -59,10 +59,12 @@ function P({ children }: { children: React.ReactNode }) {
 }
 
 function H({ children }: { children: React.ReactNode }) {
+  // h3 — follows the dialog's h2 title without skipping a level (axe
+  // heading-order); styled as a small field label regardless of level.
   return (
-    <h4 className="field-label text-[11px] font-semibold mt-5 mb-2">
+    <h3 className="field-label text-[11px] font-semibold mt-5 mb-2">
       {children}
-    </h4>
+    </h3>
   );
 }
 
@@ -698,7 +700,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'shadows',
       category: t('Styling'),
       title: t('Drop shadows'),
-      keywords: t('shadow elevation depth'),
+      keywords: t('shadow-sm elevation depth'),
       body: () => (
         <>
           <P>
@@ -2655,7 +2657,7 @@ function buildTopics(t: (k: string) => string): Topic[] {
       id: 'auto-bleed',
       category: t('Stickers & cutting'),
       title: t('Auto bleed'),
-      keywords: t('bleed smear ring nearest colour edge pixels print then cut cricut'),
+      keywords: t('bleed smear ring-3 nearest colour edge pixels print then cut cricut'),
       body: () => (
         <>
           <P>
@@ -3161,7 +3163,7 @@ export function HelpCenter() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs"
       onClick={close}
       role="dialog"
       aria-modal="true"
@@ -3216,7 +3218,7 @@ export function HelpCenter() {
                   placeholder={t('Search topics…')}
                   aria-label={t('Search topics…')}
                   title={`${t('Press Enter to open first search result')} · ${t('Press Arrow Down to focus first topic')}`}
-                  className="min-w-0 flex-1 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70"
+                  className="min-w-0 flex-1 bg-transparent outline-hidden text-xs text-ink placeholder:text-muted/70"
                 />
               </div>
               <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-muted tabular-nums" aria-live="polite">
@@ -3288,11 +3290,11 @@ export function HelpCenter() {
                 <div className="flex flex-col items-center text-center px-3 py-6">
                   {/* Open-book + question-mark — matches the other empty-state
                       illustrations (Layers / Assets / Symbols / Artboards). */}
-                  <svg width="48" height="40" viewBox="0 0 48 40" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'rgb(var(--color-muted))' }}>
+                  <svg width="48" height="40" viewBox="0 0 48 40" fill="none" className="mb-2 opacity-70" aria-hidden="true" style={{ color: 'var(--muted)' }}>
                     <path d="M6 8 L 23 8 L 24 32 L 6 32 Z" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1" strokeLinejoin="round" />
                     <path d="M42 8 L 25 8 L 24 32 L 42 32 Z" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1" strokeLinejoin="round" />
-                    <path d="M30 16 a 3 3 0 1 1 4 2.5 L 33 22" stroke="rgb(var(--color-accent2))" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-                    <circle cx="33" cy="26" r="0.9" fill="rgb(var(--color-accent))" />
+                    <path d="M30 16 a 3 3 0 1 1 4 2.5 L 33 22" stroke="var(--accent2)" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+                    <circle cx="33" cy="26" r="0.9" fill="var(--accent)" />
                   </svg>
                   <div className="text-xs text-ink/90 mb-1">{t('No topics match')}</div>
                   <div className="type-caption leading-relaxed max-w-[180px]">
@@ -3301,7 +3303,7 @@ export function HelpCenter() {
                   {query && (
                     <button
                       type="button"
-                      className="btn !py-1 !px-2 text-[10px] mt-2"
+                      className="btn py-1! px-2! text-[10px] mt-2"
                       onClick={() => setQuery('')}
                     >
                       {t('Clear search')}

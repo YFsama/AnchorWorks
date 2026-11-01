@@ -48,7 +48,7 @@ export function Logo({ size = 24, variant = 'mark', className = '' }: LogoProps)
           handles. Reads as the "live path" the user is shaping. */}
       <path
         d="M5 23 C 11 23, 11 9, 16 9 C 21 9, 21 23, 27 23"
-        stroke="rgb(var(--color-accent2))"
+        stroke="var(--accent2)"
         strokeWidth={stroke}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -60,14 +60,14 @@ export function Logo({ size = 24, variant = 'mark', className = '' }: LogoProps)
           recognises immediately. */}
       <line
         x1="5" y1="23" x2="16" y2="16"
-        stroke="rgb(var(--color-accent2))"
+        stroke="var(--accent2)"
         strokeOpacity={0.35}
         strokeWidth={stroke * 0.5}
         strokeLinecap="round"
       />
       <line
         x1="27" y1="23" x2="16" y2="16"
-        stroke="rgb(var(--color-accent2))"
+        stroke="var(--accent2)"
         strokeOpacity={0.35}
         strokeWidth={stroke * 0.5}
         strokeLinecap="round"
@@ -81,7 +81,7 @@ export function Logo({ size = 24, variant = 'mark', className = '' }: LogoProps)
         height={diamond}
         transform={`rotate(45 5 23)`}
         fill="rgb(var(--color-app-bg))"
-        stroke="rgb(var(--color-accent2))"
+        stroke="var(--accent2)"
         strokeWidth={Math.max(1, stroke * 0.7)}
       />
       {/* Right diamond — filled tangent handle (selected). The asymmetry
@@ -92,7 +92,7 @@ export function Logo({ size = 24, variant = 'mark', className = '' }: LogoProps)
         width={diamond}
         height={diamond}
         transform={`rotate(45 27 23)`}
-        fill="rgb(var(--color-accent2))"
+        fill="var(--accent2)"
       />
       {/* Central anchor — filled square in brand orange. The smallest
           rotation (5°) breaks the rigid grid and gives the mark a
@@ -104,7 +104,7 @@ export function Logo({ size = 24, variant = 'mark', className = '' }: LogoProps)
         height={anchorSq}
         rx="0.8"
         transform="rotate(5 16 16)"
-        fill="rgb(var(--color-accent))"
+        fill="var(--accent)"
       />
     </svg>
   );
@@ -128,11 +128,11 @@ export function Logo({ size = 24, variant = 'mark', className = '' }: LogoProps)
           fontSize: wordSize,
           fontWeight: 600,
           letterSpacing: '-0.01em',
-          color: 'rgb(var(--color-ink))',
+          color: 'var(--ink)',
           lineHeight: 1,
         }}
       >
-        Anchor<span style={{ color: 'rgb(var(--color-muted))', fontWeight: 500 }}>works</span>
+        Anchor<span style={{ color: 'var(--muted)', fontWeight: 500 }}>works</span>
       </span>
     </span>
   );

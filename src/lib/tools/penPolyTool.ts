@@ -263,7 +263,7 @@ function updateAuthoringPreview(sp: Pt, tool: ToolId = 'pen'): void {
   }
   if (anchors.length === 0) return;
   const last = anchors[anchors.length - 1];
-  const stroke = readToken('--color-accent2', '#5ac8d8');
+  const stroke = readToken('--accent2', '#5ac8d8');
 
   // When the last anchor is smooth, preview the bezier curve from the
   // last anchor to the cursor using the anchor's outgoing tangent for cp1
@@ -325,7 +325,7 @@ function legacyPolygonPreview(sp: Pt): void {
   const canvas = getCanvas();
   if (!canvas || polyPoints.length === 0) return;
   const last = polyPoints[polyPoints.length - 1];
-  const stroke = readToken('--color-accent2', '#5ac8d8');
+  const stroke = readToken('--accent2', '#5ac8d8');
   if (!previewLine) {
     previewLine = new fabric.Line([last.x, last.y, sp.x, sp.y], {
       stroke, strokeWidth: 1, selectable: false, evented: false, strokeDashArray: [4, 4],

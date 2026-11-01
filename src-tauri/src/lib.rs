@@ -15,8 +15,11 @@ use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
+#[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuBuilder, MenuItem, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+#[cfg(target_os = "macos")]
+use tauri::AppHandle;
+use tauri::{Emitter, Manager, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
 mod serial;
@@ -365,6 +368,9 @@ async fn print_native<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String
 /// corresponding handler table. The two have to be kept in lock-step;
 /// renaming an id here without updating the TS side silently breaks the
 /// menu item (the action will fire but no handler will recognise it).
+// Only attached from the macOS block in setup(); cfg-gated so the Windows
+// build doesn't warn dead_code.
+#[cfg(target_os = "macos")]
 fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     // File menu — actions mirror the File dropdown in MenuBar.tsx.
     let file = SubmenuBuilder::new(app, "File")

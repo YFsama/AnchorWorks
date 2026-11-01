@@ -129,7 +129,9 @@ export function applyEyedropperAppearance(objs: fabric.FabricObject[], look: Eye
  */
 export function eyedropperPick(ctx: ToolMouseCtx): void {
   const { canvas } = ctx;
-  const source = canvas.findTarget(ctx.raw.e) as fabric.FabricObject | undefined;
+  // fabric v7: findTarget returns full target info; `.target` is the
+  // decided hit object (what v6 returned directly).
+  const source = canvas.findTarget(ctx.raw.e).target;
   if (!source) return;
   const alt = (ctx.raw.e as MouseEvent).altKey;
 

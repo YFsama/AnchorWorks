@@ -86,7 +86,7 @@ export function ContrastChecker() {
       {/* Row 3: status pill */}
       <div className="mb-2">
         <span
-          className={`inline-block px-2 py-0.5 rounded-sm field-label !mb-0 border ${pillClass}`}
+          className={`inline-block px-2 py-0.5 rounded-sm field-label mb-0! border ${pillClass}`}
         >
           {t(grade.label)}
         </span>

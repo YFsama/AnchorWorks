@@ -97,12 +97,12 @@ export function EraserHUD({ host }: { host: HTMLElement | null }) {
           // Inverted overlay-on-canvas pill (same pattern as TooltipHost):
           // `ink` surface at 0.85 alpha keeps the canvas dimly visible through
           // the badge; `panel` text always reads correctly in either theme.
-          background: 'rgb(var(--color-ink) / 0.85)',
-          color: 'rgb(var(--color-panel))',
+          background: 'color-mix(in srgb, var(--ink) 85%, transparent)',
+          color: 'var(--panel)',
           fontSize: 11,
           padding: '4px 8px',
           borderRadius: 4,
-          border: '1px solid rgb(var(--color-ink))',
+          border: '1px solid var(--ink)',
           pointerEvents: 'none',
           zIndex: 31,
           fontFamily: 'Inter, sans-serif',

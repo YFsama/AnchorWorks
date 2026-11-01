@@ -12,7 +12,7 @@ describe('expand appearance helpers', () => {
     });
   });
 
-  it('clamps invalid shadow numbers to safe defaults', () => {
+  it('clamps invalid shadow-sm numbers to safe defaults', () => {
     expect(extractExpandedShadowSpec({ color: '#000000', blur: Number.NaN, offsetX: Number.POSITIVE_INFINITY, offsetY: Number.NaN })).toEqual({
       color: '#000000',
       blur: 0,

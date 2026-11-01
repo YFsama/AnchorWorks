@@ -9,7 +9,7 @@ import { ringToBezierPathD } from '../pathOps';
 // always starts with M and ends with Z.
 
 describe('ringToBezierPathD', () => {
-  it('returns empty string for an empty ring', () => {
+  it('returns empty string for an empty ring-3', () => {
     expect(ringToBezierPathD([])).toBe('');
   });
 

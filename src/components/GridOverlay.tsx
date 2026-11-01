@@ -7,10 +7,10 @@ import { readToken, readTokenAlpha } from '../lib/tokens';
 // Resolve the live theme tokens at draw time so the overlay re-colors itself
 // when the user flips dark/light. `accent2` is the cyan-ish "secondary brand"
 // token which inverts to a dark teal in light theme for WCAG-AA contrast.
-const guideColor = () => readToken('--color-accent2', '#5ac8d8');
-const anchorPointColor = () => readToken('--color-accent2', '#5ac8d8');
-const gridColorMinor = () => readTokenAlpha('--color-muted', 0.08, 'rgba(120, 160, 220, 0.06)');
-const gridColorMajor = () => readTokenAlpha('--color-muted', 0.2, 'rgba(120, 160, 220, 0.15)');
+const guideColor = () => readToken('--accent2', '#5ac8d8');
+const anchorPointColor = () => readToken('--accent2', '#5ac8d8');
+const gridColorMinor = () => readTokenAlpha('--muted', 0.08, 'rgba(120, 160, 220, 0.06)');
+const gridColorMajor = () => readTokenAlpha('--muted', 0.2, 'rgba(120, 160, 220, 0.15)');
 
 export function GridOverlay() {
   const ref = useRef<HTMLCanvasElement>(null);

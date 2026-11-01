@@ -44,7 +44,7 @@ function ErrorLogRow({ entry, t }: { entry: ErrorLogEntry; t: (k: string) => str
         <span className="text-[11px] leading-4 break-all">{entry.message}</span>
       </div>
       {entry.source && (
-        <div className="mt-1 ml-[calc(1.5rem+1.5rem)] text-muted text-[10px] font-mono break-all">
+        <div className="mt-1 ml-12 text-muted text-[10px] font-mono break-all">
           {entry.source}{entry.lineno ? `:${entry.lineno}` : ''}{entry.colno ? `:${entry.colno}` : ''}
         </div>
       )}
@@ -109,10 +109,10 @@ export function ErrorLogDialog() {
   };
 
   return (
-    // z-[120]: above ToastHost (z-110) so the Copy-all confirmation toast
+    // z-120: above ToastHost (z-110) so the Copy-all confirmation toast
     // can't cover the dialog's own action row.
     <div
-      className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center"
+      className="fixed inset-0 z-120 bg-black/60 backdrop-blur-xs flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="error-log-title"

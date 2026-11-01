@@ -76,7 +76,7 @@ export function getStrokeAlign(obj: FabricObject | null | undefined): StrokeAlig
 
 /**
  * Strip any alignment-related auxiliary state from `obj` (clipPath added
- * by us, "stroke shadow" sibling, doubled width). After this call, the
+ * by us, "stroke shadow-sm" sibling, doubled width). After this call, the
  * object's stroke width is exactly `__originalStrokeWidth` (or the current
  * strokeWidth if no original was stashed yet).
  */
@@ -95,7 +95,7 @@ function resetAlignment(obj: AlignedObject): void {
     obj.set({ clipPath: undefined } as Partial<FabricObject>);
   }
 
-  // Remove our sibling "shadow" stroke object, if any.
+  // Remove our sibling "shadow-sm" stroke object, if any.
   if (canvas) {
     const shadows = canvas.getObjects().filter((o) => {
       const ao = o as AlignedObject & { __alignShadowFor?: FabricObject };

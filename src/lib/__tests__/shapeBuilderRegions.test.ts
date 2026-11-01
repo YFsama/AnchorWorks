@@ -115,7 +115,7 @@ describe('mergeFaces (Keep mode)', () => {
   const faces = buildRegions([A, B]);
   const overlap = faces.find(f => f.sources.length === 2)!;
 
-  it('sweeping only the overlap unites BOTH sources — area = A∪B, one ring', () => {
+  it('sweeping only the overlap unites BOTH sources — area = A∪B, one ring-3', () => {
     const { geom, sources } = mergeFaces([overlap], [A, B]);
     expect(sources).toEqual([0, 1]);
     // Single polygon, no holes — one ring covering the peanut [0,15]×[0,10].

@@ -226,7 +226,7 @@ export function ShortcutsDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs"
       onClick={close}
       role="dialog"
       aria-modal="true"
@@ -244,7 +244,7 @@ export function ShortcutsDialog() {
         </div>
         <div className="px-4 py-2 border-b border-border bg-panel2/40">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="field-label !mb-0">{t('Shortcut search recipes')}</span>
+            <span className="field-label mb-0!">{t('Shortcut search recipes')}</span>
             <PresetRow
               statusId="shortcut-recipe-action-review-status"
               className="flex flex-wrap items-center gap-1"
@@ -261,7 +261,7 @@ export function ShortcutsDialog() {
                 const active = query === recipe.query;
                 return {
                   key: recipe.label,
-                  className: `btn !py-1 !px-2 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                  className: `btn py-1! px-2! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                   pressed: active,
                   onClick: () => { setReviewIndex(0); setQuery(recipe.query); searchRef.current?.focus(); },
                   title: t(recipe.title),
@@ -279,7 +279,7 @@ export function ShortcutsDialog() {
             <input
               ref={searchRef}
               type="search"
-              className="flex-1 min-w-0 bg-transparent outline-none text-xs text-ink placeholder:text-muted/70"
+              className="flex-1 min-w-0 bg-transparent outline-hidden text-xs text-ink placeholder:text-muted/70"
               placeholder={t('Search shortcuts…')}
               value={query}
               onChange={(event) => { setReviewIndex(0); setQuery(event.target.value); }}
@@ -368,7 +368,7 @@ export function ShortcutsDialog() {
               {query && (
                 <button
                   type="button"
-                  className="btn !py-1 !px-2 text-[10px] mt-2"
+                  className="btn py-1! px-2! text-[10px] mt-2"
                   onClick={() => { setReviewIndex(0); setQuery(''); searchRef.current?.focus(); }}
                 >
                   {t('Clear search')}
@@ -392,8 +392,8 @@ export function ShortcutsDialog() {
             actionAttr="data-shortcut-footer-action"
             setReviewed={setReviewedFooterAction}
             actions={[
-              { children: t('Close'), review: t('Close'), className: 'btn !py-1 !px-2 !text-[10px]', onClick: close },
-              { children: t('Customize Shortcuts…'), review: t('Customize Shortcuts…'), className: 'btn !py-1 !px-2 !text-[10px]', onClick: openKeymapEditor },
+              { children: t('Close'), review: t('Close'), className: 'btn py-1! px-2! text-[10px]!', onClick: close },
+              { children: t('Customize Shortcuts…'), review: t('Customize Shortcuts…'), className: 'btn py-1! px-2! text-[10px]!', onClick: openKeymapEditor },
             ]}
           />
         </div>
@@ -434,7 +434,7 @@ function Column({
               aria-selected={selected}
               data-shortcut-index={absoluteIndex}
               onFocus={() => onReview(absoluteIndex)}
-              className={`flex items-center justify-between gap-3 text-sm py-1 px-2 rounded hover:bg-panel3/50 focus-visible:bg-panel3/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent2/70 transition-colors ${selected ? 'bg-accent2/10 ring-1 ring-accent2/40' : ''}`}
+              className={`flex items-center justify-between gap-3 text-sm py-1 px-2 rounded hover:bg-panel3/50 focus-visible:bg-panel3/70 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent2/70 transition-colors ${selected ? 'bg-accent2/10 ring-1 ring-accent2/40' : ''}`}
             >
               <span className="text-ink/90 min-w-0 truncate">{t(it.labelKey)}</span>
               <kbd className="shrink-0 px-2 py-0.5 rounded bg-panel3 border border-border text-[11px] font-mono text-ink">{shortcutKeys(it)}</kbd>

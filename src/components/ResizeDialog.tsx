@@ -115,7 +115,7 @@ export function ResizeDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -140,7 +140,7 @@ export function ResizeDialog() {
           </label>
         </div>
         <div className="mt-3">
-          <div className="field-label !mb-1">{t('Size recipes')}</div>
+          <div className="field-label mb-1!">{t('Size recipes')}</div>
           <PresetRow
             statusId="resize-size-recipe-review-status"
             className="grid grid-cols-2 gap-1"
@@ -158,7 +158,7 @@ export function ResizeDialog() {
               const active = w === targetW && h === targetH;
               return {
                 key: recipe.label,
-                className: `btn !py-1 !px-1.5 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`,
+                className: `btn py-1! px-1.5! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`,
                 pressed: active,
                 onClick: () => applySizeRecipe(recipe),
                 title: `${t(recipe.title)} · ${targetW} × ${targetH} mm`,
@@ -170,7 +170,7 @@ export function ResizeDialog() {
         </div>
 
         <div className="mt-3">
-          <div className="field-label !mb-1">{t('Scale presets')}</div>
+          <div className="field-label mb-1!">{t('Scale presets')}</div>
           <div
             className="grid grid-cols-3 gap-1"
             role="toolbar"
@@ -196,7 +196,7 @@ export function ResizeDialog() {
                   data-resize-scale-preset-action
                   data-factor={preset.factor}
                   data-review={review}
-                  className={`btn !py-1 !px-1.5 !text-[10px] ${active ? 'ring-1 ring-accent' : ''}`}
+                  className={`btn py-1! px-1.5! text-[10px]! ${active ? 'ring-1 ring-accent' : ''}`}
                   onClick={() => applyScalePreset(preset.factor)}
                   onFocus={(event) => setReviewedScalePreset(event.currentTarget.dataset.review ?? '')}
                   disabled={!initialSize}

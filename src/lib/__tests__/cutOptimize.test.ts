@@ -41,7 +41,7 @@ describe('cutOptimize', () => {
     expect(out.points[0]).toEqual([5, 0]); // nearer end first
   });
 
-  it('rotates a closed ring to begin near the head', () => {
+  it('rotates a closed ring-3 to begin near the head', () => {
     const ring: PolyLite = { points: [[10, 10], [20, 10], [20, 20], [10, 20], [10, 10]], closed: true };
     const [out] = optimizeOrder([ring], [10, 20]);
     // Nearest vertex to (10,20) is index 3; ring should now start there.

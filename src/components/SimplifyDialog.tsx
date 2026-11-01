@@ -55,7 +55,7 @@ export function SimplifyDialog() {
 
   return (
     <div
-      className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50"
       onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       role="dialog"
       aria-modal="true"
@@ -83,7 +83,7 @@ export function SimplifyDialog() {
           />
         </label>
         <div className="mb-2">
-          <div className="field-label !mb-1">{t('Tolerance presets')}</div>
+          <div className="field-label mb-1!">{t('Tolerance presets')}</div>
           <PresetRow
             statusId="simplify-preset-review-status"
             className="grid grid-cols-6 gap-1"
@@ -97,7 +97,7 @@ export function SimplifyDialog() {
             setReviewed={setReviewedPreset}
             items={SIMPLIFY_PRESETS_PX.map((value) => ({
               key: value,
-              className: `btn !py-1 !px-1 !text-[10px] ${tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+              className: `btn py-1! px-1! text-[10px]! ${tolerance === value ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
               pressed: tolerance === value,
               onClick: () => setTolerance(value),
               data: { tolerance: value, review: `${t('Tolerance (px)')} ${value}` },

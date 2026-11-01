@@ -75,7 +75,7 @@ export function RecoveryDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-xs"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="recovery-title"

@@ -33,7 +33,7 @@ describe('weedCheck', () => {
     expect(report.checkedPaths).toBe(2);
   });
 
-  it('flags a 20×1 mm closed ring as thin-feature (width < 1.5)', () => {
+  it('flags a 20×1 mm closed ring-3 as thin-feature (width < 1.5)', () => {
     const report = weedCheck([rect('t', 0, 0, 20, 1)]);
     expect(report.issues).toHaveLength(1);
     const issue = report.issues[0];
@@ -43,7 +43,7 @@ describe('weedCheck', () => {
     expect(issue.pathIds).toEqual(['t']);
   });
 
-  it('passes a 20×5 mm closed ring', () => {
+  it('passes a 20×5 mm closed ring-3', () => {
     expect(weedCheck([rect('t', 0, 0, 20, 5)]).issues).toEqual([]);
   });
 

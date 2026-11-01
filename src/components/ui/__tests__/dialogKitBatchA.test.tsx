@@ -113,7 +113,7 @@ function LegacyShearAnglePreset(props: { angle: number; reviewed: string }) {
             data-shear-angle-preset-action
             data-angle={preset}
             data-review={review}
-            className={`btn !py-1 !px-1 !text-[10px] ${props.angle === preset ? 'ring-1 ring-accent' : ''}`}
+            className={`btn py-1! px-1! text-[10px]! ${props.angle === preset ? 'ring-1 ring-accent' : ''}`}
             onClick={() => undefined}
             onFocus={(event) => setReviewed(event.currentTarget.dataset.review ?? '')}
             aria-pressed={props.angle === preset}
@@ -142,7 +142,7 @@ function KitShearAnglePreset(props: { angle: number; reviewed: string }) {
       setReviewed={setReviewed}
       items={SHEAR_ANGLE_PRESETS.map((preset) => ({
         key: preset,
-        className: `btn !py-1 !px-1 !text-[10px] ${props.angle === preset ? 'ring-1 ring-accent' : ''}`,
+        className: `btn py-1! px-1! text-[10px]! ${props.angle === preset ? 'ring-1 ring-accent' : ''}`,
         pressed: props.angle === preset,
         onClick: () => undefined,
         title: `${t('Set shear angle to')} ${preset > 0 ? '+' : ''}${preset}°`,
@@ -173,8 +173,8 @@ function LegacySingleLineFieldActions(props: { reviewed: string; hasText: boolea
       <span id="single-line-field-action-review-status" className="sr-only" aria-live="polite">
         {`${t('Reviewing')} ${props.reviewed || t('Single-line Text field actions')}`}
       </span>
-      <button type="button" data-single-line-action data-single-line-action-review={t('Reset fields')} onFocus={() => setReviewed(t('Reset fields'))} className="btn !py-1 !text-[10px]" onClick={() => undefined}>{t('Reset fields')}</button>
-      <button type="button" data-single-line-action data-single-line-action-review={t('Clear text')} onFocus={() => setReviewed(t('Clear text'))} className="btn !py-1 !text-[10px]" onClick={() => undefined} disabled={!props.hasText}>{t('Clear text')}</button>
+      <button type="button" data-single-line-action data-single-line-action-review={t('Reset fields')} onFocus={() => setReviewed(t('Reset fields'))} className="btn py-1! text-[10px]!" onClick={() => undefined}>{t('Reset fields')}</button>
+      <button type="button" data-single-line-action data-single-line-action-review={t('Clear text')} onFocus={() => setReviewed(t('Clear text'))} className="btn py-1! text-[10px]!" onClick={() => undefined} disabled={!props.hasText}>{t('Clear text')}</button>
     </div>
   );
 }
@@ -192,8 +192,8 @@ function KitSingleLineFieldActions(props: { reviewed: string; hasText: boolean }
       fallback={t('Single-line Text field actions')}
       statusAs="span"
     >
-      <button type="button" data-single-line-action data-single-line-action-review={t('Reset fields')} onFocus={() => setReviewed(t('Reset fields'))} className="btn !py-1 !text-[10px]" onClick={() => undefined}>{t('Reset fields')}</button>
-      <button type="button" data-single-line-action data-single-line-action-review={t('Clear text')} onFocus={() => setReviewed(t('Clear text'))} className="btn !py-1 !text-[10px]" onClick={() => undefined} disabled={!props.hasText}>{t('Clear text')}</button>
+      <button type="button" data-single-line-action data-single-line-action-review={t('Reset fields')} onFocus={() => setReviewed(t('Reset fields'))} className="btn py-1! text-[10px]!" onClick={() => undefined}>{t('Reset fields')}</button>
+      <button type="button" data-single-line-action data-single-line-action-review={t('Clear text')} onFocus={() => setReviewed(t('Clear text'))} className="btn py-1! text-[10px]!" onClick={() => undefined} disabled={!props.hasText}>{t('Clear text')}</button>
     </ActionToolbar>
   );
 }
@@ -236,7 +236,7 @@ function LegacySplitGridRecipe(props: { rows: number; cols: number; gutter: numb
             data-cols={preset.cols}
             data-gutter={preset.gutter}
             data-review={review}
-            className={`btn !py-1 !px-1 !text-[10px] ${props.rows === preset.rows && props.cols === preset.cols ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+            className={`btn py-1! px-1! text-[10px]! ${props.rows === preset.rows && props.cols === preset.cols ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
             onFocus={(event) => setReviewed(event.currentTarget.dataset.review ?? '')}
             onClick={() => undefined}
             aria-pressed={props.rows === preset.rows && props.cols === preset.cols}
@@ -265,7 +265,7 @@ function KitSplitGridRecipe(props: { rows: number; cols: number; gutter: number;
       setReviewed={setReviewed}
       items={GRID_RECIPE_PRESETS.map((preset) => ({
         key: preset.label,
-        className: `btn !py-1 !px-1 !text-[10px] ${props.rows === preset.rows && props.cols === preset.cols ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+        className: `btn py-1! px-1! text-[10px]! ${props.rows === preset.rows && props.cols === preset.cols ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
         pressed: props.rows === preset.rows && props.cols === preset.cols,
         onClick: () => undefined,
         title: `${t(preset.title)} ${preset.rows} ${t('Rows')} × ${preset.cols} ${t('Columns')}, ${preset.gutter.toFixed(1)} ${t('Gutter (mm)')}`,
@@ -310,7 +310,7 @@ function LegacyRepeatGridPreset(props: { cols: number; rows: number; reviewed: s
               data-repeat-grid-preset-action
               data-value={preset.id}
               data-review={review}
-              className={`btn !py-1 !px-1 !text-[10px] ${props.cols === preset.cols && props.rows === preset.rows ? 'ring-1 ring-accent' : ''}`}
+              className={`btn py-1! px-1! text-[10px]! ${props.cols === preset.cols && props.rows === preset.rows ? 'ring-1 ring-accent' : ''}`}
               onClick={() => undefined}
               onFocus={(event) => setReviewed(event.currentTarget.dataset.review ?? '')}
               aria-pressed={props.cols === preset.cols && props.rows === preset.rows}
@@ -341,7 +341,7 @@ function KitRepeatGridPreset(props: { cols: number; rows: number; reviewed: stri
         setReviewed={setReviewed}
         items={GRID_REPEAT_PRESETS.map((preset) => ({
           key: preset.id,
-          className: `btn !py-1 !px-1 !text-[10px] ${props.cols === preset.cols && props.rows === preset.rows ? 'ring-1 ring-accent' : ''}`,
+          className: `btn py-1! px-1! text-[10px]! ${props.cols === preset.cols && props.rows === preset.rows ? 'ring-1 ring-accent' : ''}`,
           pressed: props.cols === preset.cols && props.rows === preset.rows,
           onClick: () => undefined,
           title: `${t(preset.label)} · ${preset.cols}×${preset.rows}`,

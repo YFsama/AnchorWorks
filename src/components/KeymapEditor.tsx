@@ -187,7 +187,7 @@ export function KeymapEditor() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs"
       onClick={close}
       role="dialog"
       aria-modal="true"
@@ -253,7 +253,7 @@ export function KeymapEditor() {
                 </span>
                 <button
                   type="button"
-                  className="btn !py-1.5 !px-2 text-xs shrink-0"
+                  className="btn py-1.5! px-2! text-xs shrink-0"
                   data-keymap-search-action
                   data-keymap-search-action-review={t('Edit first search result')}
                   onFocus={() => setReviewedSearchAction(t('Edit first search result'))}
@@ -269,7 +269,7 @@ export function KeymapEditor() {
                 </button>
                 <button
                   type="button"
-                  className="btn !py-1.5 !px-2 text-xs shrink-0"
+                  className="btn py-1.5! px-2! text-xs shrink-0"
                   data-keymap-search-action
                   data-keymap-search-action-review={t('Clear search')}
                   onFocus={() => setReviewedSearchAction(t('Clear search'))}
@@ -289,7 +289,7 @@ export function KeymapEditor() {
         </div>
         <div className="overflow-y-auto flex-1">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-panel2/95 backdrop-blur z-10">
+            <thead className="sticky top-0 bg-panel2/95 backdrop-blur-sm z-10">
               <tr className="field-label">
                 <th className="text-left font-semibold py-2 px-4">{t('Action')}</th>
                 <th className="text-left font-semibold py-2 px-2">{t('Shortcut')}</th>
@@ -368,7 +368,7 @@ export function KeymapEditor() {
                       {query && (
                         <button
                           type="button"
-                          className="btn !py-1 !px-2 text-[10px]"
+                          className="btn py-1! px-2! text-[10px]"
                           onClick={() => { setReviewIndex(0); setQuery(''); searchRef.current?.focus(); }}
                         >
                           {t('Clear search')}

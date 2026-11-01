@@ -570,7 +570,7 @@ function renderStationOverlays(canvas: fabric.Canvas): void {
   for (const o of hover.overlays) canvas.remove(o);
   hover.overlays = [];
   const s = 1 / (canvas.getZoom() || 1);
-  const accent = readToken('--color-accent2', '#5ac8d8');
+  const accent = readToken('--accent2', '#5ac8d8');
   for (let i = 0; i < hover.stations.length; i++) {
     const g = stationGeometry(hover, i);
     const diamond = new fabric.Rect({

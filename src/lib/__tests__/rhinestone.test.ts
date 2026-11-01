@@ -83,7 +83,7 @@ describe('rhinestoneFromSelection — open outline', () => {
 });
 
 describe('rhinestoneFromSelection — closed outline', () => {
-  it('walks the full ring perimeter (square ≈ 105.83mm → 11 stones at 10mm)', () => {
+  it('walks the full ring-3 perimeter (square ≈ 105.83mm → 11 stones at 10mm)', () => {
     const square = () => [new fabric.Path('M 0 0 L 100 0 L 100 100 L 0 100 Z', OPTS)];
     const stones = rhinestoneFromSelection(square(), 10, 4);
     expect(stones).toHaveLength(11);
@@ -100,7 +100,7 @@ describe('rhinestoneFromSelection — closed outline', () => {
     }
   });
 
-  it('consecutive stones along the ring are one spacing apart', () => {
+  it('consecutive stones along the ring-3 are one spacing apart', () => {
     const square = () => [new fabric.Path('M 0 0 L 100 0 L 100 100 L 0 100 Z', OPTS)];
     const cs = centres(rhinestoneFromSelection(square(), 10, 4));
     // Consecutive stones are ~10mm apart in emission order (stone k sits at

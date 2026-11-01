@@ -114,7 +114,7 @@ export function FreeformGradientDialog() {
   };
 
   return (
-    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) close(); }} role="dialog" aria-modal="true" aria-labelledby="freeform-gradient-title">
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) close(); }} role="dialog" aria-modal="true" aria-labelledby="freeform-gradient-title">
       <div className="bg-panel border border-border rounded-lg w-[460px] p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3"><h2 id="freeform-gradient-title" className="dialog-title flex items-center gap-2"><Sparkles size={14} aria-hidden="true" /> {t('Freeform Gradient')}</h2><button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button></div>
         <p className="text-xs text-muted leading-relaxed mb-3">{t('Creates rasterized freeform and mesh-style gradients from color stops; they export reliably where SVG mesh gradients are unsupported.')}</p>
@@ -135,7 +135,7 @@ export function FreeformGradientDialog() {
           <label><div className="field-label">{t('Height')}</div><input type="number" className="input-num" min={16} value={height} onChange={(e) => setHeight(Math.max(16, parseInt(e.target.value, 10) || 320))} /></label>
         </div>
         <div className="mb-3">
-          <div className="field-label !mb-1">{t('Freeform gradient presets')}</div>
+          <div className="field-label mb-1!">{t('Freeform gradient presets')}</div>
           <PresetRow
             statusId="freeform-gradient-preset-review-status"
             className="grid grid-cols-4 gap-1"
@@ -152,7 +152,7 @@ export function FreeformGradientDialog() {
               const review = `${t(preset.label)}: ${t(preset.title)} ${preset.width}×${preset.height}, ${preset.stops.length} ${t('stops')}`;
               return {
                 key: preset.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => applyPreset(preset),
                 title: review,

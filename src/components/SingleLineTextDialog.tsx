@@ -67,7 +67,7 @@ export function SingleLineTextDialog() {
   const clearText = () => setText('');
 
   return (
-    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) close(); }} role="dialog" aria-modal="true" aria-labelledby="single-line-title">
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) close(); }} role="dialog" aria-modal="true" aria-labelledby="single-line-title">
       <div className="bg-panel border border-border rounded-lg w-[360px] p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h2 id="single-line-title" className="dialog-title flex items-center gap-2"><Type size={14} aria-hidden="true" /> {t('Single-line Text')}</h2>
@@ -82,7 +82,7 @@ export function SingleLineTextDialog() {
           <label className="block"><div className="field-label">{t('Tracking')}</div><input type="number" className="input-num" min={0} max={80} value={tracking} onChange={(e) => setTracking(Math.max(0, parseFloat(e.target.value) || 0))} /></label>
         </div>
         <div className="mt-3">
-          <div className="field-label !mb-1">{t('Single-line presets')}</div>
+          <div className="field-label mb-1!">{t('Single-line presets')}</div>
           <PresetRow
             statusId="single-line-preset-review-status"
             className="grid grid-cols-2 gap-1"
@@ -99,7 +99,7 @@ export function SingleLineTextDialog() {
               const review = `${t(preset.label)}: ${t(preset.title)} ${preset.text}, ${preset.size}px, ${preset.tracking} ${t('Tracking')}`;
               return {
                 key: preset.label,
-                className: `btn !py-1 !px-1 !text-[10px] ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
+                className: `btn py-1! px-1! text-[10px]! ${active ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`,
                 pressed: active,
                 onClick: () => applyPreset(preset),
                 title: review,
@@ -120,8 +120,8 @@ export function SingleLineTextDialog() {
           fallback={t('Single-line Text field actions')}
           statusAs="span"
         >
-          <button type="button" data-single-line-action data-single-line-action-review={t('Reset fields')} onFocus={() => setReviewedFooterAction(t('Reset fields'))} className="btn !py-1 !text-[10px]" onClick={resetFields}>{t('Reset fields')}</button>
-          <button type="button" data-single-line-action data-single-line-action-review={t('Clear text')} onFocus={() => setReviewedFooterAction(t('Clear text'))} className="btn !py-1 !text-[10px]" onClick={clearText} disabled={!text}>{t('Clear text')}</button>
+          <button type="button" data-single-line-action data-single-line-action-review={t('Reset fields')} onFocus={() => setReviewedFooterAction(t('Reset fields'))} className="btn py-1! text-[10px]!" onClick={resetFields}>{t('Reset fields')}</button>
+          <button type="button" data-single-line-action data-single-line-action-review={t('Clear text')} onFocus={() => setReviewedFooterAction(t('Clear text'))} className="btn py-1! text-[10px]!" onClick={clearText} disabled={!text}>{t('Clear text')}</button>
         </ActionToolbar>
         <p className="text-[10px] text-muted leading-relaxed mt-3">{t('Creates open stroke paths for engraving, pen plotters, and V-carve workflows.')}</p>
         <ReviewedFooter
