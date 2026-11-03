@@ -112,5 +112,43 @@ Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js`
 - `useT` i18n selector (`i18n.ts:151-155`): template-string selector returns a primitive — zustand v5 `Object.is` equality means NO re-render fan-out on unrelated store writes; per-write cost is one string concat. Fine as-is.
 - `History` cutPaths guard + immutable-array sharing: correct as landed.
 
+## 2026-11 improvement-wave candidates (from docs/research-competitive-2026-11.md)
+
+### W1. Prune the imageHandoff variant family (~10k lines) — effort M, risk M
+Confirmed self-generated make-work residue (same class as the pruned
+certificate chain, commits 33ee5f9 / 9d34fa5): `src/lib/imageHandoff.ts`
+(4,121 lines) carries 36 report families × 3 formats × 2 scopes + 9 CI
+workflow generators (a vector editor generating Jenkinsfiles). Its only
+consumers are the 212 menu items and 212 palette commands generated alongside
+it, plus 214 i18n keys and ~305 `selectionOps.test.ts` assertions. Runtime
+cost is zero (isolated lazy chunk); the cost is pure cognitive load. Prune
+keeping the ~20 core exports (Report/Tsv/Json/SourceManifest/collect+verify
+scripts/checklists); precedents show it can be done safely but watch the
+byte-exact DOM snapshot tests that reference those menu rows.
+
+### W2. Image Trace → editable vector art — effort M, highest-value entry-side gap
+Every competitor ships it (Kittl Vectorizer, Linearity Auto Trace, SignLab
+Vectorization Previewer, Illustrator Image Trace, even LightBurn Center Line).
+We already have the k-means colour clustering in trace.worker; missing is
+per-cluster → filled Path groups (layer-editable art) + live param preview.
+### W3. Segmented linear drift compensation — effort S-M, industry vacuum
+Top-of-page true / bottom drifts is the #1 print&cut complaint thread; no
+consumer tool ships per-region y-interpolated cut correction. Enter measured
+top/bottom offsets, compensate cut coordinates.
+### W4. AI generate-then-cut — effort M
+Free/self-hostable OpenAI-compatible endpoints → generated bitmap → auto
+trace → auto Make Sticker. The prompt→cuttable-sticker one-click chain Kittl
+hasn't closed and Cricut charges credits for.
+### W5. Small follow-ups from the 2026-11 independent review
+- `importUserMaterialsJson`: duplicate-detection by label+params on re-import
+  of the same file; `version > 1` envelope warning.
+- User material cards could capture `accelMmS2`/`headUpS` so the physics
+  cut-time estimate doesn't silently fall back (bladeAngleDeg/passes
+  confirmed display-only).
+- `masks.test.ts` still has 4 `it.todo` (clip mask / compound path round-trips);
+  `strokeAlign.test.ts` 2.
+- `CommandPalette` embed entry was migrated to the Detailed API in f8d5ca9's
+  follow-up — no action, listed for traceability.
+
 ## Verdict
 The three highest-leverage moves: (1) **P0-1 viewport gate** — a ~10-line change that eliminates 4 full-canvas overlay repaints on every non-viewport render; it is the single biggest runtime win per line of code. (2) **P0-3 MenuBar action registry** — MenuBar's static imports are the root cause keeping measureTool + ~200 kB of click-only libraries in the entry chunk AND defeating four existing dynamic imports; fixing it (with P0-2/P1-1 riding along) should cut the eager entry by roughly a quarter. (3) **P0-4 dialog primitives** — 1,308 duplicated roving-handler lines plus ~3,000 lines of wiring across 51 dialogs is the codebase's dominant maintenance tax; a byte-compatible shared kit pays back on every future dialog. Everything else is opportunistic.
