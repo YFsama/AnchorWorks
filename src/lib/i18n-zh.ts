@@ -4121,4 +4121,34 @@ export const zhDict: Record<string, string> = {
   "Printing is unavailable in this environment.": "当前环境无法打印。",
   "Sheet sent to the printer — print at 100% / Actual size.": "整版已发送到打印机——请按 100% / 实际大小打印。",
 
+  // Data-safety feedback (2026-11 wave): autosave / artboard persistence
+  // failures must be visible instead of silently disabling protection.
+  "Autosave failed: storage quota exceeded. Recent changes are not being saved.": "自动保存失败：存储空间已满，最近的更改未被保存。",
+  "Artboard changes could not be saved and will be lost after refresh.": "画板更改保存失败，刷新后将会丢失。",
+  "linked images failed to embed (cross-origin or serialization failure)": "张链接图像嵌入失败（跨域或序列化失败）",
+
+  // User materials library (2026-11 wave) — LightBurn-style saved material
+  // cards with JSON import/export for community sharing.
+  "User": "用户",
+  "User material": "用户材料",
+  "User material actions": "用户材料操作",
+  "Use arrow keys to review material actions": "使用方向键浏览材料操作",
+  "Material name": "材料名称",
+  "Name for the saved material card.": "保存材料卡的名称。",
+  "Save as material": "保存为材料",
+  "Save the current machine settings as a reusable material card.": "将当前机器设置保存为可复用的材料卡。",
+  "Enter a material name first.": "请先输入材料名称。",
+  "Material saved": "材料已保存",
+  "Material deleted": "材料已删除",
+  "Delete material": "删除材料",
+  "Delete the user material": "删除用户材料",
+  "Import materials": "导入材料",
+  "Import material cards from a JSON file (shared library).": "从 JSON 文件导入材料卡（共享库）。",
+  "Export materials": "导出材料",
+  "Export your material cards as a JSON file to share or back up.": "将材料卡导出为 JSON 文件以分享或备份。",
+  "No user materials to export yet.": "还没有可导出的用户材料。",
+  "No valid materials found in the file.": "文件中未找到有效材料。",
+  "Imported": "已导入",
+  "skipped": "跳过",
+
 };

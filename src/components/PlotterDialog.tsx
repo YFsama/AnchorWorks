@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network } from 'lucide-react';
+import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network, Save, Trash2, Upload } from 'lucide-react';
 import { useEditor, type CutPath } from '../store/editor';
-import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, MATERIAL_PRESETS, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
+import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
+import { addUserMaterial, allMaterials, deleteUserMaterial, exportUserMaterialsJson, importUserMaterialsJson, loadUserMaterials, saveUserMaterials, type UserMaterial } from '../lib/userMaterials';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
 import { connectDataLink, dataLinkHandshake, validateJobName, type DataLinkHandle } from '../lib/dataLink';
 import { buildAbortSnippet, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
@@ -147,6 +148,12 @@ export function PlotterDialog() {
   const [armsEnabled, setArmsEnabled] = useState(() => !!savedPrefs.opts?.arms);
   const [materialId, setMaterialId] = useState(savedPrefs.materialId ?? '');
   const [materialQuery, setMaterialQuery] = useState('');
+  // User material library (userMaterials.ts) — saved cards loaded once per
+  // mount and mirrored in state; every mutation round-trips through the lib's
+  // own persistence so localStorage stays the source of truth.
+  const [userMaterials, setUserMaterials] = useState<UserMaterial[]>(() => loadUserMaterials());
+  // Name input for the "Save as material" action (PlotterConsole machine-name pattern).
+  const [newMaterialName, setNewMaterialName] = useState('');
   // Cut-by-colour: which source swatches are muted (excluded from this job).
   const [mutedColors, setMutedColors] = useState<Set<string>>(() => new Set());
   // Per-layer mirror overrides (keyed by layer colour). Seeded empty — an
@@ -281,9 +288,13 @@ export function PlotterDialog() {
   }, [cutPaths]);
 
   const normalizedMaterialQuery = materialQuery.trim().toLowerCase();
+  // Merged library: the read-only built-ins first, the user's saved cards
+  // after (userMaterials.ts — LightBurn-style material library). User cards
+  // carry userMaterial=true so the list can badge them and offer delete.
+  const materialLibrary = useMemo(() => allMaterials(userMaterials), [userMaterials]);
   const filteredMaterials = useMemo(() => {
-    if (!normalizedMaterialQuery) return MATERIAL_PRESETS;
-    return MATERIAL_PRESETS.filter((material) => [
+    if (!normalizedMaterialQuery) return materialLibrary;
+    return materialLibrary.filter((material) => [
       material.label,
       t(material.label),
       material.id,
@@ -292,9 +303,10 @@ export function PlotterDialog() {
       `${material.speed}`,
       `${material.overcut}`,
       material.mirror ? 'htv mirror heat transfer' : '',
+      material.note ?? '',
     ].some((value) => value.toLowerCase().includes(normalizedMaterialQuery)));
-  }, [normalizedMaterialQuery, t]);
-  const currentMaterial = materialId ? MATERIAL_PRESETS.find((material) => material.id === materialId) : null;
+  }, [normalizedMaterialQuery, t, materialLibrary]);
+  const currentMaterial = materialId ? materialLibrary.find((material) => material.id === materialId) ?? null : null;
   const selectedMaterialHidden = materialId && !filteredMaterials.some((material) => material.id === materialId);
   const selectedMaterial = selectedMaterialHidden ? currentMaterial : null;
   const reviewedMaterial = materialId && filteredMaterials.some((material) => material.id === materialId)
@@ -598,6 +610,25 @@ export function PlotterDialog() {
   const handleMaterialSearchActionKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-material-search-action]'))
+      .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
+    if (actions.length === 0) return;
+    const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? actions.length - 1
+        : event.key === 'ArrowRight'
+          ? (activeIndex + 1) % actions.length
+          : (activeIndex - 1 + actions.length) % actions.length;
+    event.preventDefault();
+    actions[nextIndex]?.focus();
+  };
+
+  /** Roving arrows over the user-material actions (Save as / Import / Export)
+   *  — same convention as the material search actions toolbar. */
+  const handleMaterialManageKeys = (event: React.KeyboardEvent<HTMLSpanElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const actions = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-material-manage-action]'))
       .filter((button) => !button.disabled && button.getAttribute('aria-disabled') !== 'true');
     if (actions.length === 0) return;
     const activeIndex = Math.max(0, actions.findIndex((button) => button === document.activeElement));
@@ -1050,13 +1081,14 @@ export function PlotterDialog() {
     soloColor(colors[(currentIndex + 1) % colors.length]);
   };
 
-  // Apply a material preset to the machine fields. HTV is cut face-down, so
-  // selecting it auto-enables the mirror toggle — one less footgun.
-  // Overcut prefers the explicit defaultOvercutMm twin when research gave
-  // one, else the legacy overcut field.
+  // Apply a material preset (built-in or user-saved) to the machine fields.
+  // HTV is cut face-down, so selecting it auto-enables the mirror toggle —
+  // one less footgun. Overcut prefers the explicit defaultOvercutMm twin when
+  // research gave one, else the legacy overcut field (user cards always have
+  // the twin set from their overcut).
   const applyMaterial = (id: string) => {
     setMaterialId(id);
-    const m = MATERIAL_PRESETS.find(p => p.id === id);
+    const m = materialLibrary.find(p => p.id === id);
     if (!m) return;
     setOpts(o => ({
       ...o,
@@ -1066,6 +1098,86 @@ export function PlotterDialog() {
       overcutMm: m.defaultOvercutMm ?? m.overcut,
       mirror: m.mirror ? true : o.mirror,
     }));
+  };
+
+  /* ---- User material library (userMaterials.ts) ----
+   * Save-the-current-setup / delete / JSON import+export — the LightBurn
+   * materials-library workflow. State stays a mirror of what the lib
+   * persisted (loadUserMaterials after every mutation) so localStorage
+   * remains the single source of truth. */
+
+  /** Capture the dialog's current machine fields as a named user card. */
+  const saveCurrentUserMaterial = () => {
+    const name = newMaterialName.trim();
+    if (!name) {
+      toast.warn(t('Enter a material name first.'), { title: t('Save as material') });
+      return;
+    }
+    const record = addUserMaterial({
+      label: name,
+      feedRate: opts.feedRate,
+      force: opts.graphtecForce,
+      speed: opts.graphtecSpeed,
+      overcut: opts.overcutMm,
+      mirror: opts.mirror,
+    });
+    setUserMaterials(loadUserMaterials());
+    setNewMaterialName('');
+    setMaterialId(record.id);
+    toast.success(`${t('Material saved')}: ${record.label}`, { title: t('Save as material') });
+  };
+
+  /** Delete a user card behind a ConfirmHost confirmation (danger action). */
+  const removeUserMaterial = async (id: string, label: string) => {
+    const ok = await showConfirm({
+      title: t('Delete material'),
+      message: `${t('Delete the user material')} “${label}”?`,
+      confirmLabel: t('Delete'),
+      danger: true,
+    });
+    if (!ok) return;
+    deleteUserMaterial(id);
+    setUserMaterials(loadUserMaterials());
+    if (materialId === id) setMaterialId('');
+    toast.success(t('Material deleted'), { title: t('Delete material') });
+  };
+
+  /** Export the user cards as the versioned JSON envelope (io.download). */
+  const exportMaterials = () => {
+    if (userMaterials.length === 0) {
+      toast.warn(t('No user materials to export yet.'), { title: t('Export materials') });
+      return;
+    }
+    download('anchorworks-materials.json', exportUserMaterialsJson(userMaterials), 'application/json');
+  };
+
+  /** Import cards from a JSON file (envelope or bare array — lenient parse
+   *  in userMaterials.ts); the toast reports N imported / M skipped. */
+  const importMaterials = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const { materials, skipped } = importUserMaterialsJson(await file.text());
+        if (materials.length === 0) {
+          toast.warn(t('No valid materials found in the file.'), { title: t('Import materials') });
+          return;
+        }
+        const next = [...userMaterials, ...materials];
+        saveUserMaterials(next);
+        setUserMaterials(next);
+        toast.success(
+          `${t('Imported')} ${materials.length} ${t('materials')}${skipped > 0 ? ` · ${t('skipped')} ${skipped}` : ''}`,
+          { title: t('Import materials') },
+        );
+      } catch (e) {
+        toast.error((e as Error).message);
+      }
+    };
+    input.click();
   };
 
   /** Auto-fill the ARMS expected-mark rectangle from the job's own tight
@@ -1180,7 +1292,7 @@ export function PlotterDialog() {
                     title={`${t('Press Enter to use first search result')} · ${t('Press Arrow Down to focus material list')}`}
                   />
                   <span className="text-[10px] text-muted tabular-nums shrink-0" aria-live="polite">
-                    {normalizedMaterialQuery ? `${filteredMaterials.length} / ${MATERIAL_PRESETS.length} ${t('matches')}` : `${MATERIAL_PRESETS.length} ${t('materials')}`}
+                    {normalizedMaterialQuery ? `${filteredMaterials.length} / ${materialLibrary.length} ${t('matches')}` : `${materialLibrary.length} ${t('materials')}`}
                   </span>
                   {materialQuery && (
                     <div
@@ -1241,23 +1353,100 @@ export function PlotterDialog() {
                   {filteredMaterials.map((material) => {
                     const active = materialId === material.id;
                     return (
-                      <button
-                        key={material.id}
-                        id={`plotter-material-${material.id}`}
-                        type="button"
-                        data-material-option
-                        role="option"
-                        aria-selected={active}
-                        className={`rounded-md border px-2 py-1 text-left transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel hover:text-ink hover:border-accent2/60 text-muted'}`}
-                        onClick={() => applyMaterial(material.id)}
-                      >
-                        <span className="block text-xs font-medium">{t(material.label)}</span>
-                        <span className="mt-0.5 block text-[10px] leading-tight opacity-80">
-                          {material.feedRate} {t('Feed rate')} · {material.force} {t('Force')} · {material.speed} {t('Speed')} · {material.overcut} mm {t('Overcut')}{material.mirror ? ` · ${t('Mirror')}` : ''}{material.bladeAngleDeg ? ` · ${material.bladeAngleDeg}° ${t('blade')}` : ''}{(material.passes ?? 1) > 1 ? ` · ${material.passes} ${t('passes')}` : ''}
-                        </span>
-                      </button>
+                      <div key={material.id} className="relative" role="presentation">
+                        <button
+                          id={`plotter-material-${material.id}`}
+                          type="button"
+                          data-material-option
+                          role="option"
+                          aria-selected={active}
+                          className={`w-full rounded-md border px-2 py-1 text-left transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel hover:text-ink hover:border-accent2/60 text-muted'} ${material.userMaterial ? 'pr-6' : ''}`}
+                          onClick={() => applyMaterial(material.id)}
+                          title={material.note}
+                        >
+                          <span className="block text-xs font-medium">
+                            {material.userMaterial && (
+                              <span
+                                className="mr-1 inline-block rounded-sm border border-accent2/50 bg-accent2/10 px-1 text-[9px] font-normal leading-4 text-accent2 align-middle"
+                                title={t('User material')}
+                              >
+                                {t('User')}
+                              </span>
+                            )}
+                            {t(material.label)}
+                          </span>
+                          <span className="mt-0.5 block text-[10px] leading-tight opacity-80">
+                            {material.feedRate} {t('Feed rate')} · {material.force} {t('Force')} · {material.speed} {t('Speed')} · {material.overcut} mm {t('Overcut')}{material.mirror ? ` · ${t('Mirror')}` : ''}{material.bladeAngleDeg ? ` · ${material.bladeAngleDeg}° ${t('blade')}` : ''}{(material.passes ?? 1) > 1 ? ` · ${material.passes} ${t('passes')}` : ''}
+                          </span>
+                        </button>
+                        {material.userMaterial && (
+                          <button
+                            type="button"
+                            className="absolute top-1 right-1 rounded-sm p-0.5 text-muted/70 hover:text-danger transition-colors"
+                            aria-label={`${t('Delete material')}: ${material.label}`}
+                            title={`${t('Delete material')}: ${material.label}`}
+                            onClick={() => { void removeUserMaterial(material.id, material.label); }}
+                          >
+                            <Trash2 size={10} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
+                </div>
+                {/* User material library actions — save the current setup as
+                    a named card, import/export the library as JSON. */}
+                <div className="mt-1 flex items-center gap-1">
+                  <input
+                    type="text"
+                    className="input-num min-w-0 flex-1 py-1! px-2! text-[11px]!"
+                    placeholder={t('Material name')}
+                    value={newMaterialName}
+                    onChange={(e) => setNewMaterialName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        saveCurrentUserMaterial();
+                      }
+                    }}
+                    aria-label={t('Material name')}
+                    title={t('Name for the saved material card.')}
+                  />
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1"
+                    role="toolbar"
+                    aria-label={t('User material actions')}
+                    title={t('Use arrow keys to review material actions')}
+                    onKeyDown={handleMaterialManageKeys}
+                  >
+                    <button
+                      type="button"
+                      data-material-manage-action
+                      className="btn flex items-center gap-1 py-1! px-1.5! text-[10px]!"
+                      onClick={saveCurrentUserMaterial}
+                      title={t('Save the current machine settings as a reusable material card.')}
+                    >
+                      <Save size={11} aria-hidden="true" />{t('Save as material')}
+                    </button>
+                    <button
+                      type="button"
+                      data-material-manage-action
+                      className="btn flex items-center gap-1 py-1! px-1.5! text-[10px]!"
+                      onClick={importMaterials}
+                      title={t('Import material cards from a JSON file (shared library).')}
+                    >
+                      <Upload size={11} aria-hidden="true" />{t('Import')}
+                    </button>
+                    <button
+                      type="button"
+                      data-material-manage-action
+                      className="btn flex items-center gap-1 py-1! px-1.5! text-[10px]!"
+                      onClick={exportMaterials}
+                      title={t('Export your material cards as a JSON file to share or back up.')}
+                    >
+                      <Download size={11} aria-hidden="true" />{t('Export')}
+                    </button>
+                  </span>
                 </div>
                 {normalizedMaterialQuery && filteredMaterials.length === 0 && (
                   <div className="type-caption mt-1 flex flex-col items-start gap-2">
