@@ -15,9 +15,16 @@ import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './canvasEngine';
 import { useEditor } from '../store/editor';
 import { download, downloadDataURL } from './io';
+import { recordLibError } from './errorLog';
+import { toast } from './toast';
+import { t } from './i18n';
 import type { Artboard } from '../types';
 
 const STORAGE_KEY = 'vector.artboards';
+
+// Once-per-session latch — see autosave.ts. Repeated persistence failures
+// (e.g. quota exceeded) toast once and then only go to the error log.
+let persistFailureToastShown = false;
 
 function notify() {
   try { window.dispatchEvent(new CustomEvent('vector:artboards-changed')); } catch { /* ignore */ }
@@ -27,8 +34,15 @@ function persist() {
   try {
     const list = useEditor.getState().artboards;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    /* quota or unavailable — silently skip */
+  } catch (e) {
+    // Quota or unavailable — keep the in-memory artboards working (never
+    // throw out of a commit), but make the failure visible: artboard edits
+    // made after this point are lost on refresh.
+    recordLibError('artboards.persist', e);
+    if (!persistFailureToastShown) {
+      persistFailureToastShown = true;
+      toast.warn(t('Artboard changes could not be saved and will be lost after refresh.'));
+    }
   }
 }
 

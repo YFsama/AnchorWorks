@@ -22,6 +22,7 @@
 
 import polygonClipping from 'polygon-clipping';
 import type { CutPath } from '../store/editor';
+import { recordLibError } from './errorLog';
 
 /* ============================================================ */
 /* offsetPolyline                                                */
@@ -318,9 +319,13 @@ export function offsetPolyline(
         polys.push(outer.map(([x, y]) => [x, y] as [number, number]));
       }
       if (polys.length > 0) return polys;
-    } catch {
-      // Degenerate input — fall through to raw output rather than
-      // crashing the whole cut operation.
+    } catch (e) {
+      // Degenerate input — fall through to raw output rather than crashing
+      // the whole cut operation, but leave a trace: the raw ring may still
+      // contain bowtie/pinch artefacts and this geometry goes to a physical
+      // cutter, so silent degradation is not acceptable.
+      console.warn('offsetPolyline: polygon-clipping union failed; falling back to raw offset ring', e);
+      recordLibError('cutContour.offsetPolyline', e);
     }
   }
 

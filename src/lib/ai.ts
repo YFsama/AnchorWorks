@@ -21,6 +21,7 @@ import { getCanvas } from './canvasEngine';
 import { useEditor } from '../store/editor';
 import { listSkills, callSkill, listMCPTools, callMCPTool, isMCPToolName } from './mcp';
 import { t } from './i18n';
+import { recordLibError } from './errorLog';
 
 export interface AIMessage { role: 'user' | 'assistant'; content: string; image?: string; error?: boolean; }
 
@@ -118,18 +119,28 @@ function buildToolList() {
 
 function buildContent(userMessage: string, opts: { includeImage: boolean; includeSVG: boolean }, cfg: AIConfig): Array<Record<string, unknown>> {
   const content: Array<Record<string, unknown>> = [];
+  // Dropped contexts are recorded to the error log AND annotated inside the
+  // request — otherwise the model has no way to know it is answering blind.
+  // The notes stay English like the system prompt: the model is the reader.
   if (opts.includeImage && cfg.enableVision) {
     try {
       const dataUrl = exportPNG(1);
       const base64 = dataUrl.split(',')[1];
+      if (!base64) throw new Error('exportPNG returned a malformed data URL');
       content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64 } });
-    } catch { /* ignore */ }
+    } catch (e) {
+      recordLibError('ai.vision', e);
+      content.push({ type: 'text', text: '[Context note: canvas snapshot unavailable — the image attachment was dropped after a capture error. You cannot see the current drawing.]' });
+    }
   }
   if (opts.includeSVG) {
     try {
       const svg = exportSVG();
       content.push({ type: 'text', text: `Current SVG markup:\n\`\`\`xml\n${svg.slice(0, 12000)}\n\`\`\`` });
-    } catch { /* ignore */ }
+    } catch (e) {
+      recordLibError('ai.svg', e);
+      content.push({ type: 'text', text: '[Context note: SVG markup unavailable — the document markup attachment was dropped after a capture error.]' });
+    }
   }
   content.push({ type: 'text', text: userMessage });
   return content;

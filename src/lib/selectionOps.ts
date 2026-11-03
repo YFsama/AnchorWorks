@@ -938,8 +938,16 @@ function imageElementDataUrl(image: fabric.FabricImage): string | null {
   return null;
 }
 
-function embedLinkedImageObject(object: fabric.FabricObject): boolean {
-  if (!isLinkedImageObject(object) || isMissingLinkedImageObject(object)) return false;
+/**
+ * Embed outcome for a single object: 'embedded' (converted to a data URL),
+ * 'failed' (a loaded linked image whose bitmap could not be re-serialized —
+ * CORS-tainted canvas or Fabric serialization error), or 'skipped' (not a
+ * candidate: not linked, missing, or already embedded).
+ */
+type EmbedLinkedImageStatus = 'embedded' | 'failed' | 'skipped';
+
+function embedLinkedImageObject(object: fabric.FabricObject): EmbedLinkedImageStatus {
+  if (!isLinkedImageObject(object) || isMissingLinkedImageObject(object)) return 'skipped';
   const image = object as fabric.FabricImage & {
     _src?: unknown;
     src?: unknown;
@@ -952,7 +960,9 @@ function embedLinkedImageObject(object: fabric.FabricObject): boolean {
   };
   const source = imageSource(image).trim();
   const dataUrl = imageElementDataUrl(image);
-  if (!dataUrl) return false;
+  // A live linked image that cannot produce a data URL is a real failure —
+  // distinct from "nothing to embed" — so callers can warn about it.
+  if (!dataUrl) return 'failed';
   const currentName = typeof image.name === 'string' ? image.name : '';
   const nextName = currentName.includes('[Embedded Image]') ? currentName : `${currentName ? `${currentName} ` : ''}[Embedded Image]`;
   const updates = {
@@ -966,10 +976,10 @@ function embedLinkedImageObject(object: fabric.FabricObject): boolean {
   };
   const current = image as unknown as Record<string, unknown>;
   const changed = Object.entries(updates).some(([key, value]) => current[key] !== value);
-  if (!changed) return false;
+  if (!changed) return 'skipped';
   if (typeof image.set === 'function') image.set(updates);
   else Object.assign(image, updates);
-  return true;
+  return 'embedded';
 }
 
 function restoreEmbeddedImageLinkObject(object: fabric.FabricObject): boolean {
@@ -1054,37 +1064,65 @@ export function selectImageHandoffRiskActiveArtboardObjects(): number {
   return selectObjectsByActiveArtboard((box, bounds) => !isOutsideBounds(box, bounds), (o) => isImageHandoffRiskObject(o));
 }
 
+/** Result of a bulk embed pass — lets callers tell "nothing to embed"
+ *  (both 0) apart from "tried but some images could not be embedded"
+ *  (failed > 0), e.g. CORS-tainted or unserializable bitmaps. */
+export interface EmbedLinkedImagesResult {
+  /** Linked images successfully converted to embedded data URLs. */
+  embedded: number;
+  /** Loaded linked images that failed to embed (cross-origin or serialization failure). */
+  failed: number;
+}
+
 /** Embed loaded linked images as data URLs while preserving their original link source. */
-export function embedLinkedImageObjects(): number {
+export function embedLinkedImageObjectsDetailed(): EmbedLinkedImagesResult {
   const canvas = getCanvas();
-  if (!canvas) return 0;
-  let changed = 0;
+  if (!canvas) return { embedded: 0, failed: 0 };
+  let embedded = 0;
+  let failed = 0;
   for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && embedLinkedImageObject(object)) changed += 1;
+    if (!isSelectableArtwork(object)) continue;
+    const status = embedLinkedImageObject(object);
+    if (status === 'embedded') embedded += 1;
+    else if (status === 'failed') failed += 1;
   }
-  if (changed > 0) {
+  if (embedded > 0) {
     canvas.requestRenderAll();
     pushHistory();
     updateSelection();
   }
-  return changed;
+  return { embedded, failed };
+}
+
+/** Embed loaded linked images as data URLs while preserving their original link source. */
+export function embedLinkedImageObjects(): number {
+  return embedLinkedImageObjectsDetailed().embedded;
+}
+
+/** Embed loaded linked images only on the active object's artboard, separating successes from failures. */
+export function embedLinkedImageActiveArtboardObjectsDetailed(): EmbedLinkedImagesResult {
+  const canvas = getCanvas();
+  const inActiveArtboard = activeArtboardObjectPredicate();
+  if (!canvas || !inActiveArtboard) return { embedded: 0, failed: 0 };
+  let embedded = 0;
+  let failed = 0;
+  for (const object of canvas.getObjects()) {
+    if (!isSelectableArtwork(object) || !inActiveArtboard(object)) continue;
+    const status = embedLinkedImageObject(object);
+    if (status === 'embedded') embedded += 1;
+    else if (status === 'failed') failed += 1;
+  }
+  if (embedded > 0) {
+    canvas.requestRenderAll();
+    pushHistory();
+    updateSelection();
+  }
+  return { embedded, failed };
 }
 
 /** Embed loaded linked images only on the active object's artboard. */
 export function embedLinkedImageActiveArtboardObjects(): number {
-  const canvas = getCanvas();
-  const inActiveArtboard = activeArtboardObjectPredicate();
-  if (!canvas || !inActiveArtboard) return 0;
-  let changed = 0;
-  for (const object of canvas.getObjects()) {
-    if (isSelectableArtwork(object) && inActiveArtboard(object) && embedLinkedImageObject(object)) changed += 1;
-  }
-  if (changed > 0) {
-    canvas.requestRenderAll();
-    pushHistory();
-    updateSelection();
-  }
-  return changed;
+  return embedLinkedImageActiveArtboardObjectsDetailed().embedded;
 }
 
 /** Restore embedded images back to their preserved original linked sources. */

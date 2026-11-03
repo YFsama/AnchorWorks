@@ -11,6 +11,9 @@
 import { getCanvas } from './canvasEngine';
 import { getAutoSaveInterval } from './preferences';
 import { useEditor, type CutPath } from '../store/editor';
+import { recordLibError } from './errorLog';
+import { toast } from './toast';
+import { t } from './i18n';
 
 // Re-exported so callers (e.g. PreferencesDialog) can read the effective
 // interval without pulling in `./preferences` separately.
@@ -52,6 +55,12 @@ function setStatus(patch: Partial<AutoSaveStatus>) {
   for (const fn of statusListeners) fn(snapshot);
 }
 
+// Failure latch: once localStorage starts rejecting writes (quota exceeded)
+// every autosave tick fails identically. Toast once per session so the user
+// learns their work is no longer being snapshotted; later failures only go
+// to the error log.
+let failureToastShown = false;
+
 function persistOnce() {
   const canvas = getCanvas();
   if (!canvas) return;
@@ -70,8 +79,15 @@ function persistOnce() {
     };
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(entry));
     setStatus({ lastSavedAt: ts, dirty: false });
-  } catch {
-    /* quota exceeded or canvas not ready — silently skip */
+  } catch (e) {
+    // Quota exceeded or canvas not ready — keep autosaving (never throw out
+    // of the interval callback), but make the failure visible: a full
+    // localStorage means every snapshot from here on is silently lost.
+    recordLibError('autosave', e);
+    if (!failureToastShown) {
+      failureToastShown = true;
+      toast.warn(t('Autosave failed: storage quota exceeded. Recent changes are not being saved.'));
+    }
   }
 }
 

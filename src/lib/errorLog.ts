@@ -110,6 +110,23 @@ export function recordReactError(error: unknown, componentStack?: string): void 
   });
 }
 
+/**
+ * Record a caught library-level failure — the escape hatch for code paths
+ * that used to swallow errors in empty catch blocks (autosave quota misses,
+ * artboard persistence, cut-contour geometry degradation, AI context
+ * capture). `source` prefixes the message (e.g. 'autosave') so the report
+ * shows where the failure came from; kind stays 'toast' because a new
+ * ErrorKind member would ripple into the dialog's exhaustive badge map.
+ */
+export function recordLibError(source: string, error: unknown): void {
+  const { message, stack } = describeReason(error);
+  record({
+    kind: 'toast',
+    message: `${source}: ${message}`,
+    stack,
+  });
+}
+
 function describeReason(reason: unknown): { message: string; stack?: string } {
   if (reason instanceof Error) return { message: reason.message || String(reason), stack: reason.stack };
   if (typeof reason === 'string') return { message: reason };
