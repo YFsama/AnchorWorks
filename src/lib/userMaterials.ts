@@ -20,6 +20,11 @@ const STORAGE_KEY = 'vector.userMaterials';
 export const USER_MATERIALS_SCHEMA = 'anchorworks-materials';
 export const USER_MATERIALS_VERSION = 1;
 
+/** Built-in preset ids are reserved: a user card with one of these ids would
+ *  shadow the preset in allMaterials (built-ins are found first), applying
+ *  the wrong physical parameters when clicked. */
+const BUILT_IN_MATERIAL_IDS = new Set(MATERIAL_PRESETS.map(p => p.id));
+
 /**
  * A user-saved material card. Field names mirror MaterialPreset (label /
  * feedRate / force / speed / overcut / mirror / bladeAngleDeg / passes) so a
@@ -117,7 +122,11 @@ function sanitizeUserMaterial(raw: unknown): Omit<UserMaterial, 'id'> | null {
   };
 }
 
-/** Load + sanitise. Corrupt JSON or bad rows → dropped, never throws. */
+/** Load + sanitise. Corrupt JSON or bad rows → dropped, never throws.
+ *  Ids colliding with a built-in preset id are regenerated — a user card
+ *  that shadowed 'htv' / 'sticker' would apply the BUILT-IN force/speed when
+ *  clicked (allMaterials finds the built-in first), a physical-output
+ *  parameter mismatch on a cutter. */
 export function loadUserMaterials(): UserMaterial[] {
   if (typeof window === 'undefined') return [];
   let arr: unknown;
@@ -133,40 +142,53 @@ export function loadUserMaterials(): UserMaterial[] {
   for (const raw of arr) {
     const m = sanitizeUserMaterial(raw);
     if (!m) continue;
-    const id = typeof (raw as Record<string, unknown>).id === 'string' && (raw as Record<string, unknown>).id
-      ? (raw as Record<string, unknown>).id as string
+    const rawId = typeof (raw as Record<string, unknown>).id === 'string' ? (raw as Record<string, unknown>).id as string : '';
+    const id = rawId && !out.some(x => x.id === rawId) && !BUILT_IN_MATERIAL_IDS.has(rawId)
+      ? rawId
       : newId();
-    if (out.some(x => x.id === id)) continue; // duplicate id — first one wins
     out.push({ ...m, id });
   }
   return out;
 }
 
-/** Persist the whole list. Quota / private-mode failures are swallowed. */
-export function saveUserMaterials(list: UserMaterial[]): void {
-  if (typeof window === 'undefined') return;
+/** Persist the whole list. Returns false when the write failed (quota /
+ *  private mode) so callers can warn instead of toasting a false success —
+ *  never throws: the in-memory library keeps working regardless. */
+export function saveUserMaterials(list: UserMaterial[]): boolean {
+  if (typeof window === 'undefined') return false;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch { /* quota / private mode — library just won't persist */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface AddUserMaterialResult {
+  record: UserMaterial;
+  /** false → the card was NOT persisted (quota / private mode); the caller
+   *  must not report success or select the phantom card. */
+  persisted: boolean;
 }
 
 /** Append a card (id/createdAt filled in; a conflicting id is regenerated). */
-export function addUserMaterial(draft: UserMaterialDraft): UserMaterial {
+export function addUserMaterial(draft: UserMaterialDraft): AddUserMaterialResult {
   const sanitized = sanitizeUserMaterial(draft) ?? {
     label: String((draft as { label?: unknown }).label ?? '').trim().slice(0, 80) || 'Material',
     feedRate: 1, force: 0, speed: 0, overcut: 0, createdAt: Date.now(),
   };
   const existing = loadUserMaterials();
-  const wantsId = typeof draft.id === 'string' && draft.id ? draft.id : null;
+  const wantsId = typeof draft.id === 'string' && draft.id && !BUILT_IN_MATERIAL_IDS.has(draft.id) ? draft.id : null;
   const id = wantsId && !existing.some(m => m.id === wantsId) ? wantsId : newId();
   const record: UserMaterial = { ...sanitized, id };
-  saveUserMaterials([...existing, record]);
-  return record;
+  const persisted = saveUserMaterials([...existing, record]);
+  return { record, persisted };
 }
 
-/** Remove one card by id. Idempotent. */
-export function deleteUserMaterial(id: string): void {
-  saveUserMaterials(loadUserMaterials().filter(m => m.id !== id));
+/** Remove one card by id. Idempotent; returns whether the (possibly empty)
+ *  result was actually persisted. */
+export function deleteUserMaterial(id: string): boolean {
+  return saveUserMaterials(loadUserMaterials().filter(m => m.id !== id));
 }
 
 /* ------------------------------------------------------------------ *
@@ -217,7 +239,8 @@ export function importUserMaterialsJson(text: string): ImportResult {
     : parsed && typeof parsed === 'object' && Array.isArray((parsed as { materials?: unknown }).materials)
       ? (parsed as { materials: unknown[] }).materials
       : [];
-  const takenIds = new Set(loadUserMaterials().map(m => m.id));
+  const stored = loadUserMaterials();
+  const takenIds = new Set<string>([...BUILT_IN_MATERIAL_IDS, ...stored.map(m => m.id)]);
   const materials: UserMaterial[] = [];
   let skipped = 0;
   for (const raw of entries) {

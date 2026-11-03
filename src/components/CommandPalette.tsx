@@ -501,6 +501,7 @@ export function CommandPalette({
     } },
     { id: 'file.nestCutVinyl', label: t('Nest cut paths (vinyl)'), category: t('File'), keywords: 'nest nesting pack hull convex polygon cut paths vinyl roll sheet material waste layout cutter plotter decal true shape', icon: Grid3X3, run: () => nestCutPathsVinyl(t) },
     { id: 'file.nestCutRaster', label: t('Nest cut paths (raster true-shape)'), category: t('File'), keywords: 'nest raster occupancy grid true shape concave nesting vinyl cutter plotter material', icon: Grid3X3, run: () => nestCutPathsRaster(t) },
+    { id: 'file.gangSheetBuilder', label: t('Gang Sheet Builder…'), category: t('File'), keywords: 'gang sheet dtf uv dtf roll imposition batch images nesting sticker transfer production png 拼版', icon: Grid3X3, run: () => setModal('showGangSheet', true) },
     { id: 'file.plotterRegMarks', label: t('Add positioning marks'), category: t('File'), keywords: 'registration marks reg marks print cut contour plotter cutter align', icon: Send, run: () => addPlotterRegistrationMarks(t) },
     { id: 'file.plotterWeedBorder', label: t('Weed border'), category: t('File'), keywords: 'weed border weeding vinyl cutter plotter peel waste cut prep', icon: Send, run: () => addPlotterWeedBorder(t) },
     { id: 'file.plotterWeedRows', label: `${t('Weed border')} — ${t('Weed rows')}`, category: t('File'), keywords: 'weed grid rows horizontal divider weeding vinyl cutter plotter peel waste cut prep', icon: Grid3X3, run: () => addPlotterWeedBorder(t, 2, 0) },

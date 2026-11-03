@@ -3,6 +3,7 @@ import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIc
 import { useEditor, type CutPath } from '../store/editor';
 import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { addUserMaterial, allMaterials, deleteUserMaterial, exportUserMaterialsJson, importUserMaterialsJson, loadUserMaterials, saveUserMaterials, type UserMaterial } from '../lib/userMaterials';
+import { recordLibError } from '../lib/errorLog';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
 import { connectDataLink, dataLinkHandshake, validateJobName, type DataLinkHandle } from '../lib/dataLink';
 import { buildAbortSnippet, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
@@ -1113,7 +1114,7 @@ export function PlotterDialog() {
       toast.warn(t('Enter a material name first.'), { title: t('Save as material') });
       return;
     }
-    const record = addUserMaterial({
+    const { record, persisted } = addUserMaterial({
       label: name,
       feedRate: opts.feedRate,
       force: opts.graphtecForce,
@@ -1122,6 +1123,14 @@ export function PlotterDialog() {
       mirror: opts.mirror,
     });
     setUserMaterials(loadUserMaterials());
+    if (!persisted) {
+      // The write failed (quota / private mode) — the card did NOT land in
+      // storage and loadUserMaterials() above already reflects that. Keep
+      // the typed name so the user can retry after freeing space.
+      recordLibError('userMaterials.save', new Error('localStorage write failed'));
+      toast.warn(t('Material was not saved — storage is full or unavailable.'), { title: t('Save as material') });
+      return;
+    }
     setNewMaterialName('');
     setMaterialId(record.id);
     toast.success(`${t('Material saved')}: ${record.label}`, { title: t('Save as material') });
@@ -1136,8 +1145,13 @@ export function PlotterDialog() {
       danger: true,
     });
     if (!ok) return;
-    deleteUserMaterial(id);
+    const persisted = deleteUserMaterial(id);
     setUserMaterials(loadUserMaterials());
+    if (!persisted) {
+      recordLibError('userMaterials.delete', new Error('localStorage write failed'));
+      toast.warn(t('Material was not deleted — storage is full or unavailable.'), { title: t('Delete material') });
+      return;
+    }
     if (materialId === id) setMaterialId('');
     toast.success(t('Material deleted'), { title: t('Delete material') });
   };
@@ -1167,12 +1181,16 @@ export function PlotterDialog() {
           return;
         }
         const next = [...userMaterials, ...materials];
-        saveUserMaterials(next);
+        if (!saveUserMaterials(next)) {
+          recordLibError('userMaterials.import', new Error('localStorage write failed'));
+          toast.warn(t('Materials were imported for this session but could not be persisted — storage is full.'), { title: t('Import materials') });
+        } else {
+          toast.success(
+            `${t('Imported')} ${materials.length} ${t('materials')}${skipped > 0 ? ` · ${t('skipped')} ${skipped}` : ''}`,
+            { title: t('Import materials') },
+          );
+        }
         setUserMaterials(next);
-        toast.success(
-          `${t('Imported')} ${materials.length} ${t('materials')}${skipped > 0 ? ` · ${t('skipped')} ${skipped}` : ''}`,
-          { title: t('Import materials') },
-        );
       } catch (e) {
         toast.error((e as Error).message);
       }

@@ -4,6 +4,84 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added — Gang Sheet Builder (2026-11 wave)
+- **File → Gang Sheet Builder…**: batch-drop PNG/JPEG/WebP files, nest them
+  onto a fixed-width DTF/UV-DTF roll, export one production PNG — the
+  workflow free tools (DTFBuild) and $1000-class sign suites (Flexi) sell as
+  their whole product, on top of the engines this app already ships. Engine
+  routing per job: all-rect jobs → `nestRects` (no part cap), masked jobs →
+  `nestPolygonsRaster` true-shape nesting (60-part cap surfaced in-UI),
+  masked + rotation-off → `nestPolygons`. Per-file quantity steppers,
+  alpha≥128 downsampled hull for true-shape nesting, roll-width presets
+  (13/22/24 in, A4/A3, custom), gap/DPI/90°-rotation controls, live preview
+  with utilization %, unfit reasons (`too-wide` / `too-tall` / `engine-cap`),
+  64-megapixel composition budget with proportional downscale, and an exact-mm
+  PNG export honoring the packer's rotation mapping. Lazy-loaded as its own
+  chunk; File-menu + command-palette entries; 22 unit tests.
+- Research digest: `docs/research-competitive-2026-11.md` — 11-competitor gap
+  analysis with evidence, seller pain points, and the shipped-vs-backlog
+  decision record (image trace, segmented drift compensation,
+  AI-generate-then-cut on the backlog).
+
+### Added — user materials library (2026-11 wave)
+- **Save / apply / delete material cards + JSON share** (LightBurn-parity):
+  the Plotter dialog's material section now captures the live feed rate / force
+  / speed / overcut / mirror into a named user card (`Save as material`), lists
+  user cards alongside the 9 read-only built-ins with a badge, deletes them
+  behind a confirmation, and exports/imports the library as a versioned JSON
+  envelope (`{schema:'anchorworks-materials', version:1}`) for community
+  sharing — LightBurn's `.lbvendor` distribution model on a free tool. Import
+  is lenient (envelope or bare array, per-row validation, bad rows skipped and
+  counted, conflicting ids regenerated, never throws). 23 unit tests.
+
+### Fixed — data-safety feedback (2026-11 wave)
+Five read-audit findings where protective features failed invisibly:
+- **Autosave quota failures now speak**: `localStorage` full used to silently
+  disable every snapshot from then on. Failures record to the error log every
+  time and toast once per session (latch) that recent changes are not being
+  saved (quota called out when detectable, neutral wording otherwise). 10
+  red→green tests.
+- Artboard persistence failures (refresh would lose artboards) get the same
+  treatment — in-memory artboards keep working.
+- Cut-contour geometry degradation (polygon-clipping union failure falling
+  back to the raw ring) warns and records — this geometry feeds a physical
+  cutter.
+- AI context capture failures (vision snapshot / SVG markup) record to the
+  error log AND annotate the request so the model knows it is answering blind;
+  a malformed data-URL path that sent `data: undefined` is folded into the
+  same failure handling.
+- Embed Linked Images now distinguishes failure from "nothing to embed":
+  new `embedLinkedImageObjectsDetailed()` / `...ActiveArtboard...Detailed()`
+  return `{embedded, failed}` (three-state per-object outcome; legacy number
+  API stays as a thin wrapper); MenuBar + Command Palette warn
+  "N failed (cross-origin or serialization failure)" instead of misleading
+  "no embeddable objects".
+- New public `recordLibError(source, error)` in the error log (reuses the
+  200-entry ring buffer + 60s dedup).
+
+### Fixed — independent-review follow-ups (same wave)
+- **User-materials storage failures no longer fake success**: save / delete /
+  import all surface `localStorage` write failures (`toast.warn` + error log)
+  instead of toasting success over a card that never persisted — the exact
+  silent-failure class this wave set out to kill, caught by independent
+  review on the feature that introduced it.
+- User cards can no longer shadow built-in preset ids: ids colliding with
+  `MATERIAL_PRESETS` are regenerated at load, import, and add time (a shadowed
+  id applied the BUILT-IN force/speed when clicked — a physical-output
+  mismatch); duplicate stored ids are re-ided instead of silently dropped
+  (import parity).
+
+### Security
+- **Tauri shell CSP** (was `null`): `script-src 'self'` (Tauri appends its
+  injection nonces), `object-src 'none'`, `base-uri`/`form-action 'self'`;
+  fonts.googleapis.com / rsms.me style+font allowlist. `img-src` keeps `https:`
+  (linked https images are a supported feature) and `connect-src` keeps plain
+  `http:` — LAN MCP servers (`http://192.168.x.x`) are a considered use case,
+  and `https:` was already open so blocking plain-http added no meaningful
+  exfil protection beyond `script-src 'self'` itself. `cargo check` clean.
+
 ## [0.18.0] — 2026-11-01
 
 ### Changed — dependency refresh (2026-10-30)

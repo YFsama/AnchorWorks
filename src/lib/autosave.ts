@@ -80,13 +80,18 @@ function persistOnce() {
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(entry));
     setStatus({ lastSavedAt: ts, dirty: false });
   } catch (e) {
-    // Quota exceeded or canvas not ready — keep autosaving (never throw out
-    // of the interval callback), but make the failure visible: a full
-    // localStorage means every snapshot from here on is silently lost.
+    // Quota exceeded, private mode, or a canvas serialisation error — keep
+    // autosaving (never throw out of the interval callback), but make the
+    // failure visible: from here on every snapshot is silently lost. The
+    // message stays accurate for non-quota causes too (the same catch covers
+    // canvas.toJSON() throws), with quota called out when detectable.
     recordLibError('autosave', e);
     if (!failureToastShown) {
       failureToastShown = true;
-      toast.warn(t('Autosave failed: storage quota exceeded. Recent changes are not being saved.'));
+      const quota = e instanceof DOMException && e.name === 'QuotaExceededError';
+      toast.warn(quota
+        ? t('Autosave failed: storage quota exceeded. Recent changes are not being saved.')
+        : t('Autosave failed — recent changes are not being saved.'));
     }
   }
 }
