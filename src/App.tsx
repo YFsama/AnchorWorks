@@ -90,6 +90,7 @@ const GrommetsDialog = lazy(() => import('./components/GrommetsDialog').then(m =
 const MakeStickerDialog = lazy(() => import('./components/MakeStickerDialog').then(m => ({ default: m.MakeStickerDialog })));
 const ProductionPreviewDialog = lazy(() => import('./components/ProductionPreviewDialog').then(m => ({ default: m.ProductionPreviewDialog })));
 const GangSheetDialog = lazy(() => import('./components/GangSheetDialog').then(m => ({ default: m.GangSheetDialog })));
+const TraceArtDialog = lazy(() => import('./components/TraceArtDialog').then(m => ({ default: m.TraceArtDialog })));
 const WrapDialog = lazy(() => import('./components/WrapDialog').then(m => ({ default: m.WrapDialog })));
 const MarginGuidesDialog = lazy(() => import('./components/MarginGuidesDialog').then(m => ({ default: m.MarginGuidesDialog })));
 const HelpCenter = lazy(() => import('./components/HelpCenter').then(m => ({ default: m.HelpCenter })));
@@ -910,6 +911,7 @@ export default function App() {
   const showMakeSticker = useEditor(s => s.showMakeSticker);
   const showProductionPreview = useEditor(s => s.showProductionPreview);
   const showGangSheet = useEditor(s => s.showGangSheet);
+  const showTraceArt = useEditor(s => s.showTraceArt);
   const showSurfaceWrap = useEditor(s => s.showSurfaceWrap);
   const showMarginGuides = useEditor(s => s.showMarginGuides);
   const showSeparations = useEditor(s => s.showSeparations);
@@ -1811,6 +1813,11 @@ export default function App() {
       {showGangSheet && (
         <Suspense fallback={null}>
           <GangSheetDialog />
+        </Suspense>
+      )}
+      {showTraceArt && (
+        <Suspense fallback={null}>
+          <TraceArtDialog />
         </Suspense>
       )}
       {showSurfaceWrap && (

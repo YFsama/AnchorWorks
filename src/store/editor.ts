@@ -216,7 +216,8 @@ interface EditorState {
   showSeparations: boolean;
   showProductionPreview: boolean;
   showGangSheet: boolean;
-  setModal: (k: 'openPrintPrep' | 'showPlotter' | 'showEpsonMaint' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showStar' | 'showFindReplace' | 'showSingleLineText' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMakeSticker' | 'showSurfaceWrap' | 'showMarginGuides' | 'showSeparations' | 'showProductionPreview' | 'showGangSheet', v: boolean) => void;
+  showTraceArt: boolean;
+  setModal: (k: 'openPrintPrep' | 'showPlotter' | 'showEpsonMaint' | 'showPrint' | 'showDocSettings' | 'showTemplates' | 'showShortcuts' | 'showCommandPalette' | 'showHelpCenter' | 'showRepeat' | 'showPreferences' | 'showKeymapEditor' | 'showCutContour' | 'showTilePrint' | 'showOutline' | 'showRecolor' | 'showVariableData' | 'showRhinestone' | 'showSimplify' | 'showTransform' | 'showRoundCorners' | 'showOffsetPath' | 'showBlend' | 'showRoughen' | 'showZigzag' | 'showPucker' | 'showTwist' | 'showFreeDistort' | 'showStar' | 'showFindReplace' | 'showSingleLineText' | 'showFreeformGradient' | 'showSaturate' | 'showHue' | 'showSplitGrid' | 'showResize' | 'showBrightness' | 'showShear' | 'showWarp' | 'showGrommets' | 'showMakeSticker' | 'showSurfaceWrap' | 'showMarginGuides' | 'showSeparations' | 'showProductionPreview' | 'showGangSheet' | 'showTraceArt', v: boolean) => void;
 
   // Cut paths — vinyl-cutter geometry that lives ALONGSIDE the canvas
   // content. Contour offsets, bitmap traces, and registration marks all
@@ -394,6 +395,7 @@ export const useEditor = create<EditorState>((set) => ({
   showSeparations: false,
   showProductionPreview: false,
   showGangSheet: false,
+  showTraceArt: false,
   setModal: (k, v) => set({ [k]: v } as Partial<EditorState>),
 
   cutPaths: [],

@@ -4,6 +4,7 @@ import {
   Redo2, Copy, Trash2, Group, Ungroup, MousePointerClick, ChevronsUp, ChevronUp, ChevronDown,
   ChevronsDown, Plus, Minus, Maximize2, Bug, Settings2, Keyboard, HelpCircle, Sparkles, BookOpen,
   Wand2, Palette, AlignCenter, Grid3X3, Ruler, SunMoon, Type, RotateCw, RotateCcw, Star, Download,
+  ImageDown,
   type LucideIcon,
   } from 'lucide-react';
 import { useEditor } from '../store/editor';
@@ -514,6 +515,7 @@ export function CommandPalette({
     { id: 'file.bannerGrommets', label: t('Banner Grommets…'), category: t('File'), keywords: 'grommet eyelet banner finishing hole vinyl cutter plotter output signmaster', icon: Send, run: () => runWithSelection(() => setModal('showGrommets', true)) },
     { id: 'document.makeSticker', label: t('Make Sticker…'), category: t('File'), shortcut: getBinding('document.makeSticker'), keywords: 'sticker decal contour kiss perf border underlay die-cut sticker mule white border vinyl', icon: Send, run: () => runWithSelection(() => setModal('showMakeSticker', true)) },
     { id: 'document.productionPreview', label: t('Production Preview…'), category: t('File'), keywords: 'production preview imposition sheet layout bleed nest copies print cut 生产', icon: Printer, run: () => runWithSelection(() => setModal('showProductionPreview', true)) },
+    { id: 'document.traceToArt', label: t('Trace to Vector Art…'), category: t('File'), keywords: 'trace vectorize vector art bitmap raster image colour color layers kittl linearity illustrator auto trace 转矢量', icon: ImageDown, run: () => setModal('showTraceArt', true) },
     { id: 'document.surfaceWrap', label: t('Surface Wrap…'), category: t('File'), keywords: 'wrap cone cylinder tumbler sphere gore decal unwrap curved surface label bottle cup ornament', icon: Send, run: () => setModal('showSurfaceWrap', true) },
     { id: 'file.bannerGrommetsSmall', label: `${t('Banner Grommets')} — ${t('Small banner')}`, category: t('File'), keywords: 'grommet eyelet small banner finishing hole preset vinyl cutter plotter output signmaster', icon: Send, run: () => addPlotterGrommets(t, 15, 300, 8) },
     { id: 'file.bannerGrommetsStandard', label: `${t('Banner Grommets')} — ${t('Standard banner')}`, category: t('File'), keywords: 'grommet eyelet standard banner finishing hole preset vinyl cutter plotter output signmaster', icon: Send, run: () => addPlotterGrommets(t, 20, 500, 10) },

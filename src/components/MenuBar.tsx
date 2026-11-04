@@ -992,6 +992,10 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Make Sticker…'), onClick: () => openWithSelection('showMakeSticker'), kbd: getBinding('document.makeSticker') },
         // Production Preview — imposed sheet composition (nest + bleed + cut overlay + regmarks).
         { label: t('Production Preview…'), onClick: () => openWithSelection('showProductionPreview') },
+        // Trace to Vector Art — bitmap → editable filled vector paths (the
+        // Kittl Vectorizer / Illustrator Image Trace entry-side flow). Open
+        // without a selection too: the dialog also accepts an uploaded file.
+        { label: t('Trace to Vector Art…'), onClick: () => setModal('showTraceArt', true) },
         // Surface Wrap — flat developments for cylinder/cone/sphere decals.
         { label: t('Surface Wrap…'), onClick: () => setModal('showSurfaceWrap', true) },
         { label: t('Clear positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterRegistrationMarks(t) },

@@ -1106,6 +1106,38 @@ function buildTopics(t: (k: string) => string): Topic[] {
       ),
     },
     {
+      id: 'trace-to-art',
+      category: t('Assets'),
+      title: t('Trace to Vector Art'),
+      keywords: t('vectorize raster trace bitmap artwork colour layers'),
+      body: () => (
+        <>
+          <P>
+            <strong>Trace to Vector Art…</strong> (Document menu) converts a bitmap into
+            editable vector art: the image is quantized into 2–8 colour clusters, every
+            cluster becomes one filled path (holes knocked out automatically via the
+            even-odd fill rule), and the whole set lands on the canvas as a single
+            group named <em>Traced Art</em> — one undo step, members named by their hex
+            colour in the Layers panel.
+          </P>
+          <H>Sources &amp; parameters</H>
+          <P>
+            The source is either the selected canvas image (the artwork is inserted
+            exactly over it, original untouched) or an uploaded PNG / JPEG / WebP.
+            Set the colour count, a detail preset (coarse / medium / fine), the
+            smallest region to keep (1–10 mm), and optionally a final output width —
+            empty keeps the source size.
+          </P>
+          <Note>
+            <strong>Trace</strong> previews the colour layers before anything touches
+            the document; <strong>Insert as artwork</strong> places them. The bitmap
+            cut-line tracer in <em>Cut Contour</em> remains the tool for blade paths —
+            this one is for art.
+          </Note>
+        </>
+      ),
+    },
+    {
       id: 'assets-library',
       category: t('Assets'),
       title: t('Asset library'),
