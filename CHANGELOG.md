@@ -6,6 +6,55 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Image Trace to editable vector art (2026-11 wave 2, W2)
+- **Document → Trace to Vector Art…**: bitmaps (selected canvas image or
+  uploaded PNG/JPEG/WebP) become filled, layer-editable vector art — the
+  entry-side capability every competitor ships (Kittl Vectorizer, Linearity
+  Auto Trace, SignLab Vectorization Previewer, Illustrator Image Trace) that
+  was our highest-value gap. Each k-means colour cluster becomes one fabric
+  Path whose subpaths carry all of that cluster's rings under
+  `fillRule: evenodd` — holes render as holes with zero ring classification.
+  Colour count 2-8, three detail steps, min-size filter, output width,
+  per-colour worker progress + live Path2D preview, insert as a named Group
+  (members named by hex, layer-panel readable) in one undo step. Known
+  limitation documented in tests: the k-means luminance-percentile seeding
+  merges small colour clusters at extreme area ratios (k-means++ seeding is
+  a backlog item affecting the existing multi-colour trace too).
+
+### Added — segmented drift compensation (2026-11 wave 2, W3)
+- **Drift compensation** in the Plotter dialog (machine settings, next to
+  overcut/blade-offset): enter the measured offsets of a test cut at the top
+  and bottom of the page; every cut point shifts by the y-interpolated
+  opposite (per-point, which also cancels the shear distortion drift
+  introduces). Registration marks stay fixed (the sensor's reference frame)
+  and don't widen the interpolation domain. Applied at the single
+  cut-paths→polylines seam so send / save / layered per-colour jobs / code
+  view all compensate identically while test cuts (the measurement tool)
+  route around it. Live top/middle/bottom correction preview, ±20 mm band,
+  persisted with plotter prefs, "active" chip in the Ready-to-output summary.
+  Sign convention pinned by 19 lib tests + 4 output-seam tests on
+  hand-computable geometry. No consumer cutting tool ships per-region drift
+  correction — top-true/bottom-drifted is the #1 print&cut complaint class.
+
+### Changed — imageHandoff variant family pruned (2026-11 wave 2, W1)
+- **−5,576 lines** of confirmed self-generated make-work: 212 exports → 9
+  (all 106 ActiveArtboard twins, ~36 report families × 3 formats, 9 CI
+  workflow generators deleted; the real core kept — Report / Tsv / Json /
+  SourceManifest / Collect script + PowerShell / Verify script / Package
+  Checklist + Blockers). Menu 212 → 9 items, palette 212 → 9 commands,
+  203 orphaned zh keys dropped. Precedent: the certificate-chain prune
+  (33ee5f9 / 9d34fa5).
+
+### Added — materials import hardening (2026-11 wave 2, W5)
+- Importing the same shared file twice now counts content-duplicate cards
+  (label + feed/force/speed/overcut/mirror fingerprint) instead of stacking
+  duplicates; version > 1 envelopes flag a newer-version warning; user cards
+  carry optional `accelMmS2` / `headUpS` (banded, clamped, inherited from
+  the active material on save) so the physics cut-time estimate no longer
+  silently degrades. The 6 long-standing `it.todo` tests (clip masks,
+  compound paths, inside stroke alignment) landed against the real
+  contracts — zero source changes needed.
+
 ### Added — Gang Sheet Builder (2026-11 wave)
 - **File → Gang Sheet Builder…**: batch-drop PNG/JPEG/WebP files, nest them
   onto a fixed-width DTF/UV-DTF roll, export one production PNG — the
