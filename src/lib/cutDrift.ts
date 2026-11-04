@@ -65,11 +65,16 @@
  * rather than a store import, keeping lib → store a one-way street.)
  */
 export interface CutPath {
-  id: string;
+  /** Unused by the math — carried for identity. Optional so plotter-side
+   *  CutPathLike arrays (no id) can pass through without adapter types. */
+  id?: string;
   /** Polyline vertices, document mm, y down — same space as DriftSample. */
   points: Array<[number, number]>;
   closed: boolean;
-  kind: 'outline' | 'trace' | 'regmark' | 'manual' | 'kiss' | 'perf';
+  /** Plotter-side kinds arrive as free strings (sometimes absent — the
+   *  plotter layer defaults missing kinds to 'manual'); only 'regmark' is
+   *  special to the math. */
+  kind?: string;
 }
 
 /** One measured calibration error (mm, document space): where the blade
@@ -92,7 +97,9 @@ export interface DriftCalibration {
 export interface DriftCalibrationResult {
   /** Compensated paths: a NEW array (the input is never mutated). Non-
    *  regmark entries are shallow copies with new points arrays; regmark
-   *  entries keep their original object references. */
+   *  entries keep their original object references. Generic in the input
+   *  element type so caller-specific CutPath shapes (store CutPath,
+   *  plotter CutPathLike) pass through without adapter casts. */
   paths: CutPath[];
   /** Growth of the (un-negated) drift offset per mm of y travel,
    *  (bottom − top) / y-range, for UI diagnostics. Zero when the extent is

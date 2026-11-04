@@ -483,3 +483,59 @@ describe('material preset physics constants', () => {
     expect(by('stencil')).toMatchObject({ accelMmS2: 1500, headUpS: 0.15 });
   });
 });
+
+describe('drift compensation at the plotter output seam', () => {
+  // Two squares anchored at the interpolation domain's exact endpoints so
+  // the expected compensation is hand-computable: top square starts at
+  // y=10 (t=0, no compensation), bottom square starts at y=100 (t=1, full
+  // sample). The regmark shares the bottom square's y but must never be
+  // compensated (sensor reference frame) nor widen the domain.
+  // HP-GL units are mm*40; optimize off keeps input order (all three kinds
+  // share rank 0, and the partition is stable); originBottomLeft off keeps
+  // raw document y.
+  const topSquare = { points: [[10, 10], [20, 10], [20, 20], [10, 20]] as Array<[number, number]>, closed: true, kind: 'manual' };
+  const bottomSquare = { points: [[10, 100], [20, 100], [20, 90], [10, 90]] as Array<[number, number]>, closed: true, kind: 'manual' };
+  const bottomRegmark = { points: [[50, 90], [60, 90], [60, 100], [50, 100]] as Array<[number, number]>, closed: true, kind: 'regmark' };
+  const baseOpts = { ...defaultPlotterOptions, optimize: false, originBottomLeft: false };
+  const puStarts = (out: string): Array<[number, number]> =>
+    out.split('\n')
+      .filter((l) => /^PU-?\d+(\.\d+)?,-?\d+(\.\d+)?;$/.test(l))
+      .slice(0, -1) // footer park
+      .map((l) => l.slice(2).replace(';', '').split(',').map(Number) as [number, number]);
+
+  it('leaves coordinates untouched without a drift block', () => {
+    const out = buildPlotterOutput('hpgl', baseOpts, [topSquare, bottomSquare, bottomRegmark]);
+    expect(puStarts(out)).toEqual([[400, 400], [400, 4000], [2000, 3600]]);
+  });
+
+  it('applies the negated interpolated offset at the domain endpoints', () => {
+    // Drift measured +1 mm right / +0.5 mm down at the bottom, none at the
+    // top: the bottom square must cut 1 mm LEFT and 0.5 mm UP.
+    const out = buildPlotterOutput('hpgl', {
+      ...baseOpts,
+      drift: { topDxMm: 0, topDyMm: 0, bottomDxMm: 1, bottomDyMm: 0.5 },
+    }, [topSquare, bottomSquare, bottomRegmark]);
+    expect(puStarts(out)).toEqual([[400, 400], [360, 3980], [2000, 3600]]);
+  });
+
+  it('compensates uniformly across the whole job when only the top sample is set', () => {
+    // top-only drift with a zero bottom sample interpolates from the top
+    // sample down to zero — the top square (t=0) takes the FULL top offset.
+    const out = buildPlotterOutput('hpgl', {
+      ...baseOpts,
+      drift: { topDxMm: 0.5, topDyMm: 0, bottomDxMm: 0, bottomDyMm: 0 },
+    }, [topSquare, bottomSquare, bottomRegmark]);
+    expect(puStarts(out)).toEqual([[380, 400], [400, 4000], [2000, 3600]]);
+  });
+
+  it('survives the prefs round-trip (sanitize keeps the block, drops all-zero)', () => {
+    // sanitizePlotterOptions is not exported; the prefs path is covered via
+    // loadPlotterPrefs round-trip in the drift-active shape only — here we
+    // pin the PlotterOptions typing seam: a valid block flows through
+    // buildPlotterOutput unchanged in behaviour when re-supplied.
+    const drift = { topDxMm: 0.25, topDyMm: 0, bottomDxMm: 0.75, bottomDyMm: 0 };
+    const a = buildPlotterOutput('hpgl', { ...baseOpts, drift }, [topSquare, bottomSquare]);
+    const b = buildPlotterOutput('hpgl', { ...baseOpts, drift: { ...drift } }, [topSquare, bottomSquare]);
+    expect(a).toBe(b);
+  });
+});

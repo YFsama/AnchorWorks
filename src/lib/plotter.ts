@@ -6,6 +6,7 @@
 import { exportSVG } from './io';
 import { useEditor } from '../store/editor';
 import { optimizeOrder, mirrorPolys, applyOvercut, applyBladeOffset, reversePolys, sortInsideFirst } from './cutOptimize';
+import { applyDriftCompensation } from './cutDrift';
 import { isTauri, callNative } from './runtime';
 
 /**
@@ -69,6 +70,14 @@ export interface PlotterOptions {
    *  mark rectangle; all lengths in mm, sent as 0.1 mm steps, every command
    *  ETX-terminated. Source: open-graphtec-server marks.py, FC9000-validated. */
   arms?: { armMm: number; type: 1 | 2; rectW: number; rectH: number };
+  /** Segmented linear drift compensation (mm) — the #1 print&cut failure
+   *  where cuts run true at the top of the page and drift toward the bottom.
+   *  `top`/`bottom` are MEASURED offsets of test cuts relative to their
+   *  targets (right/down positive); `applyDriftCompensation` shifts every
+   *  cut point by the y-interpolated OPPOSITE before machine output.
+   *  Registration marks are excluded (the sensor's reference frame).
+   *  Undefined / all-zero = off. Band ±20 mm per axis. */
+  drift?: { topDxMm: number; topDyMm: number; bottomDxMm: number; bottomDyMm: number };
   /** Reverse the cut direction of every path. */
   reverse: boolean;
   /** Cut contours contained inside others first (print-and-cut weeding order). */
@@ -221,6 +230,7 @@ function sanitizePlotterOptions(o: Partial<PlotterOptions>): PlotterOptions {
     overcutMm: num(o.overcutMm, d.overcutMm, 0, 10),
     bladeOffsetMm: num(o.bladeOffsetMm, 0, 0, 5),
     arms: sanitizeArms(o.arms),
+    drift: sanitizeDrift(o.drift),
     reverse: Boolean(o.reverse),
     insideFirst: Boolean(o.insideFirst),
     ejectAfter: typeof o.ejectAfter === 'boolean' ? o.ejectAfter : d.ejectAfter,
@@ -240,6 +250,19 @@ function sanitizeArms(a: unknown): PlotterOptions['arms'] {
   const rectH = num(r.rectH, 1, 10000);
   if (armMm === null || rectW === null || rectH === null || (r.type !== 1 && r.type !== 2)) return undefined;
   return { armMm, type: r.type, rectW, rectH };
+}
+
+/** Drift block survives the round-trip only when all four axes are finite
+ *  and within ±20 mm; an all-zero block is dropped (compensation off). */
+function sanitizeDrift(a: unknown): PlotterOptions['drift'] {
+  if (!a || typeof a !== 'object') return undefined;
+  const r = a as Record<string, unknown>;
+  const num = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(20, Math.max(-20, v)) : null;
+  const topDxMm = num(r.topDxMm), topDyMm = num(r.topDyMm), bottomDxMm = num(r.bottomDxMm), bottomDyMm = num(r.bottomDyMm);
+  if (topDxMm === null || topDyMm === null || bottomDxMm === null || bottomDyMm === null) return undefined;
+  if (topDxMm === 0 && topDyMm === 0 && bottomDxMm === 0 && bottomDyMm === 0) return undefined;
+  return { topDxMm, topDyMm, bottomDxMm, bottomDyMm };
 }
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
@@ -750,7 +773,17 @@ function cutPathsToPlotterPolylines(
   const scale = opts.unit === 'mm' ? 1 : 1 / 25.4;
   const out: Array<{ points: Array<[number, number]>; closed: boolean }> = [];
   const kinds: string[] = [];
-  for (const c of cuts) {
+  // Segmented drift compensation (mm space, BEFORE the unit scale) — one
+  // seam covers every consumer of this function: send, save, layered
+  // per-colour jobs, and the code view. Test cuts don't route through here.
+  // Regmarks are excluded inside the math (sensor reference frame).
+  const drifted: CutPathLike[] = opts.drift
+    ? applyDriftCompensation(cuts, {
+        top: { dxMm: opts.drift.topDxMm, dyMm: opts.drift.topDyMm },
+        bottom: { dxMm: opts.drift.bottomDxMm, dyMm: opts.drift.bottomDyMm },
+      }).paths
+    : cuts;
+  for (const c of drifted) {
     if (c.points.length === 0) continue;
     const kind = c.kind ?? 'manual';
     const passes = Math.max(1, c.passes ?? 1);

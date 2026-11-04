@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network, Save, Trash2, Upload } from 'lucide-react';
 import { useEditor, type CutPath } from '../store/editor';
 import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
+import { driftPreviewAt } from '../lib/cutDrift';
 import { addUserMaterial, allMaterials, deleteUserMaterial, exportUserMaterialsJson, importUserMaterialsJson, loadUserMaterials, saveUserMaterials, type UserMaterial } from '../lib/userMaterials';
 import { recordLibError } from '../lib/errorLog';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
@@ -1052,12 +1053,46 @@ export function PlotterDialog() {
   ].join(' · ');
   const materialSummaryLabel = currentMaterial ? t(currentMaterial.label) : t('Custom material');
   const bladeOffsetMm = opts.bladeOffsetMm ?? 0;
+  const driftActive = !!opts.drift;
   const speedSummaryLabel = `${t('Feed')} ${opts.feedRate} · ${t('Travel')} ${opts.travelRate} · ${t('Overcut')} ${opts.overcutMm}mm`
     + (bladeOffsetMm > 0 ? ` · ${t('blade offset')} ${bladeOffsetMm} mm` : '')
+    + (driftActive ? ` · ${t('Drift compensation active')}` : '')
     + (armsActive ? ` · ${t('ARMS 4-mark')}` : '');
   const cutterPressureSummaryLabel = format === 'hpgl' && opts.dialect === 'graphtec-fc'
     ? ` · ${t('Force')} ${opts.graphtecForce} · ${t('Speed')} ${opts.graphtecSpeed}`
     : '';
+
+  /* ---- Segmented drift compensation (cutDrift.ts) ----
+   * Four measured offsets (top/bottom test cuts, mm). All-zero drops the
+   * block entirely (sanitizeDrift round-trip parity); output-time
+   * application lives in plotter.ts cutPathsToPlotterPolylines — one seam
+   * for send/save/layered/code-view; test cuts route around it. */
+  const drift = opts.drift ?? { topDxMm: 0, topDyMm: 0, bottomDxMm: 0, bottomDyMm: 0 };
+  const setDriftField = (key: 'topDxMm' | 'topDyMm' | 'bottomDxMm' | 'bottomDyMm', raw: string) => {
+    const v = Math.min(20, Math.max(-20, parseFloat(raw) || 0));
+    const next = { ...drift, [key]: v };
+    const allZero = next.topDxMm === 0 && next.topDyMm === 0 && next.bottomDxMm === 0 && next.bottomDyMm === 0;
+    setOpts({ ...opts, drift: allZero ? undefined : next });
+  };
+  // Cheap O(total points) walk, recomputed per render like the neighbouring
+  // summary labels (a useMemo here would sit after the early returns above).
+  const computeDriftPreview = () => {
+    if (!opts.drift) return null;
+    let minY = Infinity, maxY = -Infinity;
+    for (const p of previewPaths) {
+      if (p.kind === 'regmark') continue;
+      for (const [, y] of p.points) {
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    if (!Number.isFinite(minY) || maxY <= minY) return null;
+    return driftPreviewAt(
+      { top: { dxMm: opts.drift.topDxMm, dyMm: opts.drift.topDyMm }, bottom: { dxMm: opts.drift.bottomDxMm, dyMm: opts.drift.bottomDyMm } },
+      { minY, maxY },
+    );
+  };
+  const driftPreview = computeDriftPreview();
   // Physics-estimate suffix: shown next to the classic `~` only when the
   // trapezoidal model produced a number AND it disagrees with the classic
   // estimate by more than a second — `≈` distinguishes it from `~`.
@@ -1924,6 +1959,67 @@ export function PlotterDialog() {
                 {t('Drag-knife swivel compensation — 0.25 mm typical for a 45° blade')}
               </div>
             </Field>
+            <div className="col-span-2">
+              <div className="field-label mb-1!">{t('Drift compensation')}</div>
+              <div
+                className="grid grid-cols-2 gap-2"
+                role="group"
+                aria-label={t('Drift compensation')}
+                title={t('Corrects progressive print-and-cut drift (cuts true at the top, drifting toward the bottom): measure a test cut at the top and bottom of the page and enter the offsets. Cut coordinates shift by the interpolated opposite; registration marks stay fixed.')}
+              >
+                <label className="block">
+                  <span className="sr-only">{t('Top drift X (mm)')}</span>
+                  <input
+                    type="number" step={0.1} min={-20} max={20} className="input-num"
+                    aria-label={t('Top drift X (mm)')}
+                    title={t('How far the TOP test cut landed right/down of its target.')}
+                    value={drift.topDxMm}
+                    onChange={(e) => setDriftField('topDxMm', e.target.value)}
+                  />
+                  <div className="mt-0.5 text-[10px] text-muted">{t('Top drift X (mm)')}</div>
+                </label>
+                <label className="block">
+                  <span className="sr-only">{t('Top drift Y (mm)')}</span>
+                  <input
+                    type="number" step={0.1} min={-20} max={20} className="input-num"
+                    aria-label={t('Top drift Y (mm)')}
+                    title={t('How far the TOP test cut landed right/down of its target.')}
+                    value={drift.topDyMm}
+                    onChange={(e) => setDriftField('topDyMm', e.target.value)}
+                  />
+                  <div className="mt-0.5 text-[10px] text-muted">{t('Top drift Y (mm)')}</div>
+                </label>
+                <label className="block">
+                  <span className="sr-only">{t('Bottom drift X (mm)')}</span>
+                  <input
+                    type="number" step={0.1} min={-20} max={20} className="input-num"
+                    aria-label={t('Bottom drift X (mm)')}
+                    title={t('How far the BOTTOM test cut landed right/down of its target.')}
+                    value={drift.bottomDxMm}
+                    onChange={(e) => setDriftField('bottomDxMm', e.target.value)}
+                  />
+                  <div className="mt-0.5 text-[10px] text-muted">{t('Bottom drift X (mm)')}</div>
+                </label>
+                <label className="block">
+                  <span className="sr-only">{t('Bottom drift Y (mm)')}</span>
+                  <input
+                    type="number" step={0.1} min={-20} max={20} className="input-num"
+                    aria-label={t('Bottom drift Y (mm)')}
+                    title={t('How far the BOTTOM test cut landed right/down of its target.')}
+                    value={drift.bottomDyMm}
+                    onChange={(e) => setDriftField('bottomDyMm', e.target.value)}
+                  />
+                  <div className="mt-0.5 text-[10px] text-muted">{t('Bottom drift Y (mm)')}</div>
+                </label>
+              </div>
+              {driftPreview && (
+                <div className="mt-1 text-[10px] text-muted leading-tight" aria-live="polite">
+                  {t('Correction preview (mm) — top / middle / bottom')}:{' '}
+                  {driftPreview.top.dxMm.toFixed(2)} / {driftPreview.middle.dxMm.toFixed(2)} / {driftPreview.bottom.dxMm.toFixed(2)} X · {' '}
+                  {driftPreview.top.dyMm.toFixed(2)} / {driftPreview.middle.dyMm.toFixed(2)} / {driftPreview.bottom.dyMm.toFixed(2)} Y
+                </div>
+              )}
+            </div>
             <div className="col-span-2">
               <div className="field-label mb-1!">{t('Overcut presets')}</div>
               <div
