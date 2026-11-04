@@ -1123,7 +1123,8 @@ function buildTopics(t: (k: string) => string): Topic[] {
           <H>Sources &amp; parameters</H>
           <P>
             The source is either the selected canvas image (the artwork is inserted
-            exactly over it, original untouched) or an uploaded PNG / JPEG / WebP.
+            at the same place and size, original untouched — a rotated source
+            needs manual alignment afterwards) or an uploaded PNG / JPEG / WebP.
             Set the colour count, a detail preset (coarse / medium / fine), the
             smallest region to keep (1–10 mm), and optionally a final output width —
             empty keeps the source size.

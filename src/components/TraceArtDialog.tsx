@@ -137,7 +137,11 @@ export function TraceArtDialog() {
       const prepared = prepareSelection();
       if (prepared) {
         setSource(prepared);
-        setOutWidthMm(prepared.naturalWidthMm.toFixed(1));
+        // Output width stays EMPTY for the natural default: identity scale
+        // lands the content exactly on its source. Prefilling the natural
+        // (full-bitmap) width would scale the CONTENT bbox up by the
+        // transparent-margin ratio and shift it off the source.
+        setOutWidthMm('');
       }
     }, 0);
     return () => window.clearTimeout(id);
@@ -146,7 +150,7 @@ export function TraceArtDialog() {
   /** Reset everything a new source invalidates. */
   const adoptSource = useCallback((next: PreparedSource) => {
     setSource(next);
-    setOutWidthMm(next.naturalWidthMm.toFixed(1));
+    setOutWidthMm(''); // identity default — see the open-scan note above
     setResult(null);
   }, []);
 
@@ -233,6 +237,10 @@ export function TraceArtDialog() {
           minSizeMm,
           targetWidthMm: Number.isFinite(widthMm) && widthMm > 0 ? widthMm : undefined,
         },
+        undefined,
+        // The preview's trace IS the insert's geometry (deterministic
+        // pipeline, same params) — reuse it instead of a second worker pass.
+        result ?? undefined,
       );
       // One undo entry for the whole artwork insert (the multi-trace
       // suspend/resume + pushHistory idiom).
@@ -255,7 +263,7 @@ export function TraceArtDialog() {
     } finally {
       setBusy(false);
     }
-  }, [source, busy, t, colorCount, detail, minSizeMm, outWidthMm, close, uploadOrigin]);
+  }, [source, busy, t, colorCount, detail, minSizeMm, outWidthMm, close, uploadOrigin, result]);
 
   // Preview: paint every piece's path data with evenodd onto a white canvas,
   // scaled to fit. Pure canvas side effect — no state writes.

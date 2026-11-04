@@ -8,6 +8,9 @@ import {
   postProcess,
   defaultPlotterOptions,
   MATERIAL_PRESETS,
+  savePlotterPrefs,
+  loadPlotterPrefs,
+  applyDriftToPolylines,
 } from '../plotter';
 
 /**
@@ -537,5 +540,84 @@ describe('drift compensation at the plotter output seam', () => {
     const a = buildPlotterOutput('hpgl', { ...baseOpts, drift }, [topSquare, bottomSquare]);
     const b = buildPlotterOutput('hpgl', { ...baseOpts, drift: { ...drift } }, [topSquare, bottomSquare]);
     expect(a).toBe(b);
+  });
+});
+
+describe('drift compensation — default origin flip + prefs round-trip + canvas fallback', () => {
+  const topSquare = { points: [[10, 10], [20, 10], [20, 20], [10, 20]] as Array<[number, number]>, closed: true, kind: 'manual' };
+  const bottomSquare = { points: [[10, 100], [20, 100], [20, 90], [10, 90]] as Array<[number, number]>, closed: true, kind: 'manual' };
+  const puStarts = (out: string): Array<[number, number]> =>
+    out.split('\n')
+      .filter((l) => /^PU-?\d+(\.\d+)?,-?\d+(\.\d+)?;$/.test(l))
+      .slice(0, -1)
+      .map((l) => l.slice(2).replace(';', '').split(',').map(Number) as [number, number]);
+  const drift = { topDxMm: 0, topDyMm: 0, bottomDxMm: 1, bottomDyMm: 0.5 };
+
+  it('keeps the physical compensation direction under the default originBottomLeft flip', () => {
+    // Bottom-left origin: machine Y = paperHeightUnits − document y. With
+    // paperHeightUnits = 200 the bottom sample sits at machine Y = 100. The
+    // +0.5 mm down-cut sample must move the cut UP: machine Y +0.5 → 100.5
+    // → 4020 plotter units; dx is unaffected by the y flip (−1 mm → 360).
+    const flipped = { ...defaultPlotterOptions, optimize: false, originBottomLeft: true, paperHeightUnits: 200, drift };
+    const out = buildPlotterOutput('hpgl', flipped, [topSquare, bottomSquare]);
+    expect(puStarts(out)).toEqual([
+      [400, (200 - 10) * 40],        // top: no compensation
+      [360, (200 - 99.5) * 40],      // bottom: x −1 mm, machine Y +0.5 mm
+    ]);
+  });
+
+  it('sanitizeDrift survives a real prefs round-trip and drops all-zero blocks', () => {
+    // The prefs blob is written by savePlotterPrefs; a drifted opts object
+    // must come back with the block intact (±20 band), and an all-zero one
+    // must come back without a block at all.
+    const prefs = { format: 'hpgl' as const, materialId: '', baud: 9600, flowControl: 'none' as const, lastPort: '', profileId: '' };
+    savePlotterPrefs({ ...prefs, opts: { ...defaultPlotterOptions, drift } });
+    const kept = loadPlotterPrefs().opts?.drift;
+    expect(kept).toEqual(drift);
+    savePlotterPrefs({ ...prefs, opts: { ...defaultPlotterOptions, drift: { topDxMm: 0, topDyMm: 0, bottomDxMm: 0, bottomDyMm: 0 } } });
+    expect(loadPlotterPrefs().opts?.drift).toBeUndefined();
+    savePlotterPrefs({ ...prefs, opts: { ...defaultPlotterOptions, drift: { topDxMm: 99, topDyMm: -99, bottomDxMm: 5, bottomDyMm: 0 } } });
+    expect(loadPlotterPrefs().opts?.drift).toEqual({ topDxMm: 20, topDyMm: -20, bottomDxMm: 5, bottomDyMm: 0 });
+    window.localStorage.removeItem('vector.plotter.prefs');
+  });
+
+  it('applyDriftToPolylines compensates the canvas fallback in user-unit space', () => {
+    // Two polylines already in mm (unit 'mm', no flip): top at y=10, bottom
+    // at y=100 — same geometry as the seam tests, expressed as raw polylines.
+    const polys = [
+      { points: [[10, 10], [20, 10]] as Array<[number, number]>, closed: false },
+      { points: [[10, 100], [20, 100]] as Array<[number, number]>, closed: false },
+    ];
+    const out = applyDriftToPolylines(polys, drift, { ...defaultPlotterOptions, unit: 'mm', originBottomLeft: false });
+    expect(out[0].points).toEqual([[10, 10], [20, 10]]);            // t=0: untouched
+    expect(out[1].points).toEqual([[9, 99.5], [19, 99.5]]);         // t=1: −1/−0.5
+    expect(polys[1].points[0]).toEqual([10, 100]);                  // input immutable
+  });
+
+  it('applyDriftToPolylines anchors the top sample at maxY under the y flip', () => {
+    const polys = [
+      { points: [[0, 90], [1, 90]] as Array<[number, number]>, closed: false },
+      { points: [[0, 10], [1, 10]] as Array<[number, number]>, closed: false },
+    ];
+    // Flipped machine space: the physical page TOP is the polyline with the
+    // LARGEST machine y (y=90 here) — it anchors the top sample (−2); the
+    // y=10 polyline is the physical bottom (bottom sample = 0 shift).
+    const out = applyDriftToPolylines(polys, { topDxMm: 2, topDyMm: 0, bottomDxMm: 0, bottomDyMm: 0 },
+      { ...defaultPlotterOptions, unit: 'mm', originBottomLeft: true });
+    expect(out[0].points).toEqual([[-2, 90], [-1, 90]]);            // machine y=90: physical top, full −2
+    expect(out[1].points).toEqual([[0, 10], [1, 10]]);              // machine y=10: physical bottom, 0
+  });
+
+  it('applyDriftToPolylines converts mm samples into inch user units', () => {
+    const polys = [{ points: [[0, 0], [0, 25.4]] as Array<[number, number]>, closed: false }];
+    const out = applyDriftToPolylines(polys, { topDxMm: 0, topDyMm: 0, bottomDxMm: 25.4, bottomDyMm: 0 },
+      { ...defaultPlotterOptions, unit: 'in', originBottomLeft: false });
+    expect(out[0].points[1][0]).toBeCloseTo(-1, 10); // 25.4 mm sample = 1 in of shift
+  });
+
+  it('applyDriftToPolylines passes single-row jobs through unchanged', () => {
+    const polys = [{ points: [[5, 5], [6, 5]] as Array<[number, number]>, closed: false }];
+    const out = applyDriftToPolylines(polys, drift, { ...defaultPlotterOptions, unit: 'mm', originBottomLeft: false });
+    expect(out).toBe(polys); // degenerate extent — no interpolation possible
   });
 });

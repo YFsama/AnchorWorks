@@ -267,6 +267,45 @@ function sanitizeDrift(a: unknown): PlotterOptions['drift'] {
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
 
+/**
+ * Drift compensation for the canvas-SVG fallback path (no cut paths).
+ * `applyDriftCompensation` (cutDrift.ts) works in document mm y-down space
+ * on CutPath objects; these polylines are already in USER UNITS and may be
+ * y-flipped (`originBottomLeft`). Samples convert mm→units here, and the
+ * flip maps the physical page TOP (small document y) to the LARGEST machine
+ * y, so the top sample anchors maxY when flipped. Mirroring happens later
+ * in postProcess and carries the correction with the geometry.
+ */
+export function applyDriftToPolylines(
+  polys: Polyline[],
+  drift: NonNullable<PlotterOptions['drift']>,
+  opts: PlotterOptions,
+): Polyline[] {
+  const k = opts.unit === 'in' ? 1 / 25.4 : 1; // mm → user units
+  const topX = drift.topDxMm * k, topY = drift.topDyMm * k;
+  const botX = drift.bottomDxMm * k, botY = drift.bottomDyMm * k;
+  let minY = Infinity, maxY = -Infinity;
+  for (const p of polys) for (const [, y] of p.points) {
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const range = maxY - minY;
+  if (!Number.isFinite(minY) || range <= 0) return polys; // single row — nothing to interpolate
+  return polys.map((p) => ({
+    ...p,
+    points: p.points.map(([x, y]) => {
+      // Physical-top fraction of this point's y.
+      const t = opts.originBottomLeft ? (maxY - y) / range : (y - minY) / range;
+      const dxAt = topX + (botX - topX) * t;
+      const dyAt = topY + (botY - topY) * t; // document-space (y-down) offset
+      return [
+        x - dxAt,
+        opts.originBottomLeft ? y + dyAt : y - dyAt,
+      ] as [number, number];
+    }),
+  }));
+}
+
 /** Flatten current canvas SVG into polylines (units), ready for G-code/HPGL. */
 export function svgToPolylines(svg: string, opts: PlotterOptions): Polyline[] {
   const parser = new DOMParser();
@@ -615,6 +654,11 @@ export function buildPlotterOutput(
       ({ polylines, kinds } = cutPathsToPlotterPolylines(cuts, opts));
     } else {
       polylines = svgToPolylines(exportSVG(), opts);
+      // The canvas fallback carries no regmarks — compensate every polyline.
+      // Without this the dialog's "drift compensation active" chip would lie
+      // for the no-cut-paths workflow (caught by independent review: output
+      // uncompensated while the UI claimed it was on).
+      if (opts.drift) polylines = applyDriftToPolylines(polylines, opts.drift, opts);
     }
   }
   // Post-process in user-unit space: travel optimisation and HTV mirroring

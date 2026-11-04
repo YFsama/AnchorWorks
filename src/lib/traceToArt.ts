@@ -57,6 +57,12 @@ export interface TracedArtPiece {
   pathData: string;
   /** Rings in pathData (outer boundaries + holes, unclassified). */
   ringCount: number;
+  /** Raw ring point arrays (source mm) — lets buildTracedArtGroup remap a
+   *  PRECOMPUTED result (dialog preview state) into canvas space without
+   *  re-running the trace. Not rendered; geometry only. */
+  rings: Array<Array<[number, number]>>;
+  /** Cluster RGB — the ring map's colour source (kept beside the hex). */
+  rgb: [number, number, number];
 }
 
 export interface TraceToArtResult {
@@ -134,13 +140,15 @@ function clustersToResult(clusters: TraceClusterResult[]): TraceToArtResult {
         color: rgbToHex(cluster.color),
         pathData: ringsToPathData(cluster.contours),
         ringCount: cluster.contours.length,
+        rings: cluster.contours,
+        rgb: cluster.color,
         area,
       };
     })
     // Largest area first → fabric draws children in order, so the dominant
     // colour lands at the BOTTOM of the stack (layered-vinyl build order).
     .sort((a, b) => b.area - a.area)
-    .map(({ color, pathData, ringCount }) => ({ color, pathData, ringCount }));
+    .map(({ color, pathData, ringCount, rings, rgb }) => ({ color, pathData, ringCount, rings, rgb }));
 
   return { pieces, boundsMm: { minX, minY, maxX, maxY } };
 }
@@ -213,44 +221,50 @@ export async function buildTracedArtGroup(
   originMm: { x: number; y: number },
   opts: TraceToArtOptions,
   onProgress?: (done: number, total: number) => void,
+  /** Precomputed trace result (e.g. the dialog's preview state) — skips the
+   *  re-trace so Insert doesn't pay the worker pass a second time. */
+  precomputed?: TraceToArtResult,
 ): Promise<{ group: fabric.Group; result: TraceToArtResult }> {
-  const clusters = await traceMultiColorAsync(
-    img,
-    {
-      colorCount: opts.colorCount,
-      simplifyTolerance: opts.simplifyTolerance,
-      pixelSizeMm,
-      minSizeMm: opts.minSizeMm,
-    },
-    onProgress,
-  );
-  const result = clustersToResult(clusters);
+  const clusters = precomputed
+    ? null
+    : await traceMultiColorAsync(
+        img,
+        {
+          colorCount: opts.colorCount,
+          simplifyTolerance: opts.simplifyTolerance,
+          pixelSizeMm,
+          minSizeMm: opts.minSizeMm,
+        },
+        onProgress,
+      );
+  const result = precomputed ?? clustersToResult(clusters!);
   if (result.pieces.length === 0) {
     throw new Error('nothing to trace');
   }
 
   // Source-mm → doc-mm scale (1 unless the caller resizes via targetWidthMm),
-  // then doc-mm → canvas-px, all folded into the ring→px mapping.
+  // then doc-mm → canvas-px, all folded into the ring→px mapping. Ring
+  // coords are relative to the FULL source bitmap, so the content bbox's
+  // (minX, minY) is subtracted first: at scale 1 the content lands exactly
+  // on its source position (identity insert), and a targetWidthMm resize
+  // scales the CONTENT, not the transparent margin around it.
   const wMm = result.boundsMm.maxX - result.boundsMm.minX;
   const scaleMm = opts.targetWidthMm && wMm > 0 ? opts.targetWidthMm / wMm : 1;
+  const { minX, minY } = result.boundsMm;
   const toPx = (rings: Array<Array<[number, number]>>): string =>
     ringsToPathData(
       rings.map((ring) =>
         ring.map(([x, y]) =>
-          [(originMm.x + x * scaleMm) * MM_TO_PX, (originMm.y + y * scaleMm) * MM_TO_PX] as [number, number],
+          [(originMm.x + (x - minX) * scaleMm) * MM_TO_PX, (originMm.y + (y - minY) * scaleMm) * MM_TO_PX] as [number, number],
         ),
       ),
     );
 
-  const paths: fabric.Path[] = clusters
-    .map((cluster) => ({
-      cluster,
-      area: cluster.contours.reduce((s, r) => s + ringArea(r), 0),
-    }))
-    .sort((a, b) => b.area - a.area) // largest colour at the bottom of the stack
-    .map(({ cluster }) => {
-      const color = rgbToHex(cluster.color);
-      const path = new fabric.Path(toPx(cluster.contours), {
+  // Piece order (area desc) is baked into `result`; build paths from its
+  // rings so the precomputed path and the fresh-trace path are identical.
+  const paths: fabric.Path[] = result.pieces
+    .map(({ color, rings }) => {
+      const path = new fabric.Path(toPx(rings), {
         fill: color,
         stroke: '',
         strokeWidth: 0,

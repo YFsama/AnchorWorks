@@ -221,3 +221,63 @@ describe('buildTracedArtGroup', () => {
     await expect(buildTracedArtGroup(img, 1, { x: 0, y: 0 }, OPTS)).rejects.toThrow(/nothing to trace/i);
   });
 });
+
+describe('trace-to-art review follow-ups', () => {
+  const opts: TraceToArtOptions = { colorCount: 2, simplifyTolerance: 1, minSizeMm: 1 };
+
+  it('identity insert lands content on its source despite transparent margins', async () => {
+    // 12x8 bitmap whose red content sits at x 2..9 (2 px transparent margin
+    // on each side). 1 px = 1 mm. The content bbox therefore starts at
+    // (2, 2) — at scale 1 the traced group must land at the ORIGIN (the
+    // bbox's top-left), not shifted right by the margin.
+    const img = paintImage(12, 8, (x, y) => (x >= 2 && x <= 9 && y >= 2 && y <= 5 ? [255, 0, 0, 255] : [0, 0, 0, 0]));
+    const MM_TO_PX = 96 / 25.4;
+    const { group } = await buildTracedArtGroup(img, 1, { x: 30, y: 40 }, opts);
+    expect(group.left).toBeCloseTo(30 * MM_TO_PX, 2);   // anchored at the ORIGIN
+    // Pixel-CENTRE tracing semantics: 8 columns of ink span 7 mm (same
+    // convention the two-colour fixture pins). The 2 mm margins on each
+    // side are gone — the bbox is the CONTENT, not the 12 mm bitmap.
+    expect(group.width).toBeCloseTo(7 * MM_TO_PX, 2);
+  });
+
+  it('targetWidthMm scales the CONTENT bbox, not the full bitmap width', async () => {
+    const img = paintImage(12, 8, (x, y) => (x >= 2 && x <= 9 && y >= 2 && y <= 5 ? [255, 0, 0, 255] : [0, 0, 0, 0]));
+    // Content bbox is 7 mm wide in traced coords (8 columns, centre
+    // semantics). Requesting 16 mm produces exactly 16 mm of content.
+    const { group } = await buildTracedArtGroup(img, 1, { x: 0, y: 0 }, { ...opts, targetWidthMm: 16 });
+    expect(group.width).toBeCloseTo(16 * MM_TO_PX, 2);
+  });
+
+  it('reuses a precomputed result instead of re-tracing', async () => {
+    const img = twoColourImage();
+    const first = await buildTracedArtGroup(img, 1, { x: 0, y: 0 }, opts);
+    const second = await buildTracedArtGroup(img, 1, { x: 0, y: 0 }, opts, undefined, first.result);
+    // Identical geometry (deterministic pipeline) — and no worker pass, so
+    // the second call resolves with the same pieces and positions.
+    expect(second.group.getObjects()).toHaveLength(first.group.getObjects().length);
+    expect(second.group.left).toBeCloseTo(first.group.left, 6);
+    expect(second.group.width).toBeCloseTo(first.group.width, 6);
+  });
+
+  it('evenodd handles a hole-in-hole (3-level nesting) fixture', () => {
+    // 16x16: red ring (outer 12x12 at 2..13), blue ring inside it (8x8 at
+    // 4..11), red island inside THAT (4x4 at 6..9). The RED cluster gets
+    // outer + island (2 rings) and blue gets its own ring — evenodd fills
+    // red, holes blue, island red again, exactly the hand-drawn picture.
+    const img = paintImage(16, 16, (x, y) => {
+      const inOuter = x >= 2 && x <= 13 && y >= 2 && y <= 13;
+      const inBlue = x >= 4 && x <= 11 && y >= 4 && y <= 11;
+      const inIsland = x >= 6 && x <= 9 && y >= 6 && y <= 9;
+      if (inIsland) return [255, 0, 0, 255];
+      if (inBlue) return [0, 0, 255, 255];
+      if (inOuter) return [255, 0, 0, 255];
+      return [0, 0, 0, 0];
+    });
+    const res = traceToArtPieces(img, 1, opts);
+    const red = res.pieces.find(p => p.color === '#ff0000');
+    const blue = res.pieces.find(p => p.color === '#0000ff');
+    expect(red).toBeDefined();
+    expect(blue).toBeDefined();
+    expect(red!.ringCount).toBeGreaterThanOrEqual(2); // outer ring + island
+  });
+});

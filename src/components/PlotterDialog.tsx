@@ -1069,7 +1069,12 @@ export function PlotterDialog() {
    * for send/save/layered/code-view; test cuts route around it. */
   const drift = opts.drift ?? { topDxMm: 0, topDyMm: 0, bottomDxMm: 0, bottomDyMm: 0 };
   const setDriftField = (key: 'topDxMm' | 'topDyMm' | 'bottomDxMm' | 'bottomDyMm', raw: string) => {
-    const v = Math.min(20, Math.max(-20, parseFloat(raw) || 0));
+    // Intermediate typing states ('', '-', '.', '-.') keep the current value —
+    // collapsing them to 0 mid-keystroke would drop the whole drift block
+    // (all-zero ⇒ undefined) and make typing negatives jarring.
+    const parsed = parseFloat(raw);
+    if (!Number.isFinite(parsed)) return;
+    const v = Math.min(20, Math.max(-20, parsed));
     const next = { ...drift, [key]: v };
     const allZero = next.topDxMm === 0 && next.topDyMm === 0 && next.bottomDxMm === 0 && next.bottomDyMm === 0;
     setOpts({ ...opts, drift: allZero ? undefined : next });
