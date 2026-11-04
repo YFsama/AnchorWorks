@@ -1114,6 +1114,10 @@ export function PlotterDialog() {
       toast.warn(t('Enter a material name first.'), { title: t('Save as material') });
       return;
     }
+    // Physics-estimate inheritance: a user card is usually dialled in from a
+    // built-in preset, so capture the current material's accel / head-lift
+    // constants too — otherwise selecting the saved card later silently
+    // downgrades the job-time estimate to the simple model.
     const { record, persisted } = addUserMaterial({
       label: name,
       feedRate: opts.feedRate,
@@ -1121,6 +1125,8 @@ export function PlotterDialog() {
       speed: opts.graphtecSpeed,
       overcut: opts.overcutMm,
       mirror: opts.mirror,
+      ...(currentMaterial?.accelMmS2 !== undefined ? { accelMmS2: currentMaterial.accelMmS2 } : {}),
+      ...(currentMaterial?.headUpS !== undefined ? { headUpS: currentMaterial.headUpS } : {}),
     });
     setUserMaterials(loadUserMaterials());
     if (!persisted) {
@@ -1166,7 +1172,8 @@ export function PlotterDialog() {
   };
 
   /** Import cards from a JSON file (envelope or bare array — lenient parse
-   *  in userMaterials.ts); the toast reports N imported / M skipped. */
+   *  in userMaterials.ts); the toast reports N imported / M skipped /
+   *  K duplicates, and warns when the file came from a newer schema. */
   const importMaterials = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -1175,20 +1182,25 @@ export function PlotterDialog() {
       const file = input.files?.[0];
       if (!file) return;
       try {
-        const { materials, skipped } = importUserMaterialsJson(await file.text());
-        if (materials.length === 0) {
+        const { materials, skipped, duplicates, newerVersion } = importUserMaterialsJson(await file.text());
+        if (materials.length === 0 && !duplicates) {
           toast.warn(t('No valid materials found in the file.'), { title: t('Import materials') });
           return;
         }
         const next = [...userMaterials, ...materials];
+        // Toast suffix parts: invalid skips, content duplicates (already in
+        // the library), and the future-schema warning each ride along.
+        const parts = [
+          `${t('Imported')} ${materials.length} ${t('materials')}`,
+          ...(skipped > 0 ? [`${t('skipped')} ${skipped}`] : []),
+          ...(duplicates ? [`${duplicates} ${t('duplicates skipped')}`] : []),
+          ...(newerVersion ? [t('File is from a newer version — some fields may not be kept.')] : []),
+        ];
         if (!saveUserMaterials(next)) {
           recordLibError('userMaterials.import', new Error('localStorage write failed'));
           toast.warn(t('Materials were imported for this session but could not be persisted — storage is full.'), { title: t('Import materials') });
         } else {
-          toast.success(
-            `${t('Imported')} ${materials.length} ${t('materials')}${skipped > 0 ? ` · ${t('skipped')} ${skipped}` : ''}`,
-            { title: t('Import materials') },
-          );
+          toast.success(parts.join(' · '), { title: t('Import materials') });
         }
         setUserMaterials(next);
       } catch (e) {

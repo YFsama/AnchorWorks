@@ -42,6 +42,12 @@ export interface UserMaterial {
   mirror?: boolean;
   bladeAngleDeg?: number;
   passes?: number;
+  /** Acceleration (mm/s²) the material cuts cleanly at — feeds the
+   *  trapezoidal job-time estimate (PlotterDialog stats). Band 100–10000;
+   *  absent on legacy cards → the estimate falls back to the simple model. */
+  accelMmS2?: number;
+  /** Per-path head-lift settle delay (s). Band 0.05–1.0. */
+  headUpS?: number;
   note?: string;
   createdAt: number;
 }
@@ -72,6 +78,8 @@ const BANDS = {
   speed: [0, 200],
   overcut: [0, 10],
   bladeAngleDeg: [0, 90],
+  accelMmS2: [100, 10_000],
+  headUpS: [0.05, 1],
 } as const;
 
 /** Required numeric field: present, finite, non-negative → clamped into band. */
@@ -103,6 +111,8 @@ function sanitizeUserMaterial(raw: unknown): Omit<UserMaterial, 'id'> | null {
   const overcut = requiredNum(r.overcut, BANDS.overcut[0], BANDS.overcut[1]);
   if (feedRate === null || force === null || speed === null || overcut === null) return null;
   const bladeAngleDeg = optionalNum(r.bladeAngleDeg, BANDS.bladeAngleDeg[0], BANDS.bladeAngleDeg[1]);
+  const accelMmS2 = optionalNum(r.accelMmS2, BANDS.accelMmS2[0], BANDS.accelMmS2[1]);
+  const headUpS = optionalNum(r.headUpS, BANDS.headUpS[0], BANDS.headUpS[1]);
   // Pass count is integral by meaning: <1 / fractional / non-finite drops
   // the field (clamping 0 up to 1 would silently change the user's card).
   const passes = typeof r.passes === 'number' && Number.isFinite(r.passes) && r.passes >= 1
@@ -117,6 +127,8 @@ function sanitizeUserMaterial(raw: unknown): Omit<UserMaterial, 'id'> | null {
     mirror: r.mirror === true,
     ...(bladeAngleDeg !== undefined ? { bladeAngleDeg } : {}),
     ...(passes !== undefined ? { passes } : {}),
+    ...(accelMmS2 !== undefined ? { accelMmS2 } : {}),
+    ...(headUpS !== undefined ? { headUpS } : {}),
     ...(typeof r.note === 'string' && r.note.trim() ? { note: r.note.trim().slice(0, 300) } : {}),
     createdAt: typeof r.createdAt === 'number' && Number.isFinite(r.createdAt) && r.createdAt >= 0 ? r.createdAt : Date.now(),
   };
@@ -219,6 +231,23 @@ export interface ImportResult {
   materials: UserMaterial[];
   /** Entries that failed validation (bad label / negative / non-finite). */
   skipped: number;
+  /** Valid entries dropped because an identical card (label + feedRate +
+   *  force + speed + overcut + mirror) already exists in the stored library
+   *  or earlier in the same file. Optional so pre-existing callers that
+   *  only read materials/skipped keep working. */
+  duplicates?: number;
+  /** The envelope's version is NEWER than USER_MATERIALS_VERSION — the file
+   *  was exported by a future build and some fields may be dropped on
+   *  import; the UI should warn. */
+  newerVersion?: true;
+}
+
+/** Content fingerprint for import de-duplication: label + the five machine
+ *  fields. id / createdAt / note / optionals are deliberately excluded —
+ *  re-importing the same shared file must be recognised as "already here",
+ *  while numbers are compared post-sanitise so clamping can't split keys. */
+function cardKey(m: Pick<UserMaterial, 'label' | 'feedRate' | 'force' | 'speed' | 'overcut' | 'mirror'>): string {
+  return [m.label, m.feedRate, m.force, m.speed, m.overcut, m.mirror === true].join('\u0000');
 }
 
 /**
@@ -226,6 +255,9 @@ export interface ImportResult {
  * `{ materials: [], skipped: 0 }` (the UI treats that as "nothing usable").
  * Ids that are missing, duplicated within the file, or already in the
  * stored library are regenerated so the result can be appended as-is.
+ * Entries whose content duplicates a stored card (or an earlier entry in
+ * the same file) are counted in `duplicates` and NOT returned — importing
+ * the same shared file twice must not create parallel identical cards.
  */
 export function importUserMaterialsJson(text: string): ImportResult {
   let parsed: unknown;
@@ -234,24 +266,41 @@ export function importUserMaterialsJson(text: string): ImportResult {
   } catch {
     return { materials: [], skipped: 0 };
   }
+  // Future-schema detection: only the envelope (not a bare array) carries a
+  // version. Anything above this build's version flags newerVersion so the
+  // UI can warn; import still proceeds leniently field-by-field.
+  const rawVersion = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as { version?: unknown }).version
+    : undefined;
+  const newerVersion = typeof rawVersion === 'number' && Number.isFinite(rawVersion) && rawVersion > USER_MATERIALS_VERSION;
   const entries: unknown[] = Array.isArray(parsed)
     ? parsed
     : parsed && typeof parsed === 'object' && Array.isArray((parsed as { materials?: unknown }).materials)
       ? (parsed as { materials: unknown[] }).materials
       : [];
   const stored = loadUserMaterials();
+  const seen = new Set<string>(stored.map(cardKey));
   const takenIds = new Set<string>([...BUILT_IN_MATERIAL_IDS, ...stored.map(m => m.id)]);
   const materials: UserMaterial[] = [];
   let skipped = 0;
+  let duplicates = 0;
   for (const raw of entries) {
     const m = sanitizeUserMaterial(raw);
     if (!m) { skipped++; continue; }
+    const key = cardKey(m);
+    if (seen.has(key)) { duplicates++; continue; }
+    seen.add(key);
     const rawId = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).id : undefined;
     const id = typeof rawId === 'string' && rawId && !takenIds.has(rawId) ? rawId : newId();
     takenIds.add(id);
     materials.push({ ...m, id });
   }
-  return { materials, skipped };
+  return {
+    materials,
+    skipped,
+    ...(duplicates > 0 ? { duplicates } : {}),
+    ...(newerVersion ? { newerVersion: true as const } : {}),
+  };
 }
 
 /**
@@ -271,6 +320,8 @@ export function allMaterials(userMaterials?: UserMaterial[]): LibraryMaterial[] 
     ...(m.mirror ? { mirror: true } : {}),
     ...(m.bladeAngleDeg !== undefined ? { bladeAngleDeg: m.bladeAngleDeg } : {}),
     ...(m.passes !== undefined ? { passes: m.passes } : {}),
+    ...(m.accelMmS2 !== undefined ? { accelMmS2: m.accelMmS2 } : {}),
+    ...(m.headUpS !== undefined ? { headUpS: m.headUpS } : {}),
     ...(m.note !== undefined ? { note: m.note } : {}),
     userMaterial: true,
   }));

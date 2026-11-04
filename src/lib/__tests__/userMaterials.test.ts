@@ -213,11 +213,94 @@ describe('user materials import', () => {
     expect(materials[1].note).toBeUndefined();
   });
 
+  it('keeps accelMmS2 / headUpS when valid, clamps out-of-band, drops invalid', () => {
+    const text = JSON.stringify([
+      card('Physics', { accelMmS2: 1500, headUpS: 0.15 }),
+      card('Clamped low', { accelMmS2: 1, headUpS: 0.001 }),
+      card('Clamped high', { accelMmS2: 1e9, headUpS: 99 }),
+      card('Bad accel', { accelMmS2: -500 }),
+      card('Bad head', { headUpS: 'slow' as unknown as number }),
+    ]);
+    const { materials, skipped } = importUserMaterialsJson(text);
+    expect(skipped).toBe(0); // invalid optionals drop the field, not the card
+    expect(materials[0]).toMatchObject({ accelMmS2: 1500, headUpS: 0.15 });
+    expect(materials[1]).toMatchObject({ accelMmS2: 100, headUpS: 0.05 });
+    expect(materials[2]).toMatchObject({ accelMmS2: 10_000, headUpS: 1 });
+    expect(materials[3].accelMmS2).toBeUndefined();
+    expect(materials[4].headUpS).toBeUndefined();
+  });
+
+  it('round-trips accelMmS2 / headUpS through export → import', () => {
+    const exported = exportUserMaterialsJson([
+      card('Accel card', { id: 'user-a', accelMmS2: 800, headUpS: 0.35 }),
+    ]);
+    const { materials } = importUserMaterialsJson(exported);
+    expect(materials[0]).toMatchObject({ label: 'Accel card', accelMmS2: 800, headUpS: 0.35 });
+    // And the persistence round-trip keeps them too.
+    saveUserMaterials(materials);
+    const loaded = loadUserMaterials();
+    expect(loaded[0]).toMatchObject({ accelMmS2: 800, headUpS: 0.35 });
+  });
+
   it('clamps out-of-band values into the plotter bands instead of rejecting', () => {
     const text = JSON.stringify([card('Hot', { feedRate: 1e9, speed: 5e3 })]);
     const { materials } = importUserMaterialsJson(text);
     expect(materials[0].feedRate).toBe(100_000);
     expect(materials[0].speed).toBe(200);
+  });
+
+  it('re-importing the same file counts every entry as a duplicate and returns none', () => {
+    const text = exportUserMaterialsJson([card('Shared A', { id: 'user-a' }), card('Shared B', { id: 'user-b' })]);
+    const first = importUserMaterialsJson(text);
+    expect(first.materials).toHaveLength(2);
+    expect(first.duplicates).toBeUndefined();
+    // What the dialog does between the two imports: persist the result.
+    saveUserMaterials(first.materials);
+    const second = importUserMaterialsJson(text);
+    expect(second.materials).toHaveLength(0);
+    expect(second.skipped).toBe(0);
+    expect(second.duplicates).toBe(2);
+  });
+
+  it('counts entries duplicated WITHIN a file as duplicates (first one kept)', () => {
+    const text = JSON.stringify([
+      card('Twin'),                       // kept
+      card('Twin'),                       // same content → duplicate
+      { ...card('Twin'), id: 'user-x' },  // different id, same content → duplicate
+      card('Twin', { force: 200 }),       // different force → NOT a duplicate
+    ]);
+    const { materials, skipped, duplicates } = importUserMaterialsJson(text);
+    expect(skipped).toBe(0);
+    expect(duplicates).toBe(2);
+    expect(materials.map(m => m.label)).toEqual(['Twin', 'Twin']);
+    expect(materials[0].force).toBe(90);
+    expect(materials[1].force).toBe(200);
+  });
+
+  it('treats mirror as part of the content fingerprint', () => {
+    saveUserMaterials([card('HTV mine', { mirror: true })]);
+    const { materials, duplicates } = importUserMaterialsJson(JSON.stringify([
+      card('HTV mine', { mirror: true }),   // identical → duplicate
+      card('HTV mine', { mirror: false }),  // mirror differs → new card
+    ]));
+    expect(duplicates).toBe(1);
+    expect(materials).toHaveLength(1);
+    expect(materials[0].mirror).toBe(false);
+  });
+
+  it('flags newerVersion when the envelope version is above USER_MATERIALS_VERSION', () => {
+    const v2 = JSON.stringify({
+      schema: USER_MATERIALS_SCHEMA, version: 2, exportedAt: '2030-01-01T00:00:00Z',
+      materials: [card('From the future')],
+    });
+    const { materials, newerVersion } = importUserMaterialsJson(v2);
+    expect(newerVersion).toBe(true);
+    expect(materials).toHaveLength(1); // still imported leniently
+
+    const v1 = exportUserMaterialsJson([card('Present day')]);
+    expect(importUserMaterialsJson(v1).newerVersion).toBeUndefined();
+    // Bare arrays carry no version — no flag either.
+    expect(importUserMaterialsJson(JSON.stringify([card('Bare')])).newerVersion).toBeUndefined();
   });
 });
 
@@ -232,6 +315,20 @@ describe('allMaterials merged view', () => {
       id: 'user-1', label: 'My HTV', userMaterial: true, mirror: true, note: 'notes here',
       feedRate: 350, force: 90, speed: 25, overcut: 0.3, defaultOvercutMm: 0.3,
     });
+  });
+
+  it('passes accelMmS2 / headUpS through to the merged view (legacy cards stay without)', () => {
+    const merged = allMaterials([
+      card('Physics card', { id: 'user-p', accelMmS2: 1200, headUpS: 0.2 }),
+      card('Legacy card', { id: 'user-l' }),
+    ]);
+    const physics = merged[merged.length - 2];
+    const legacy = merged[merged.length - 1];
+    expect(physics).toMatchObject({ id: 'user-p', accelMmS2: 1200, headUpS: 0.2, userMaterial: true });
+    expect(legacy.accelMmS2).toBeUndefined();
+    expect(legacy.headUpS).toBeUndefined();
+    // Built-ins carry their own accel/headUp values untouched by the merge.
+    expect(merged[0].accelMmS2).toBe(MATERIAL_PRESETS[0].accelMmS2);
   });
 
   it('reads from storage when no list is passed', () => {
