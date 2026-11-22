@@ -97,10 +97,13 @@ export function Toolbar() {
                   className={clsx(
                     // `transition-colors` (was `transition-opacity`) — the
                     // active/inactive diff is a colour switch (white/70 ↔
-                    // muted/60), not an alpha change, so opacity transitions
+                    // muted), not an alpha change, so opacity transitions
                     // were a no-op and the badge colour flipped instantly.
+                    // Inactive uses the full muted token (no /60 dimming):
+                    // muted@0.6 fails AA at 8px in the light theme (2.6:1),
+                    // same reasoning as badge-inactive in index.css.
                     'absolute bottom-0.5 right-1 text-[8px] font-medium font-mono leading-none tabular-nums select-none transition-colors',
-                    active ? 'text-white/70' : 'text-muted/60',
+                    active ? 'text-white/70' : 'text-muted',
                   )}
                 >
                   {shortcut}

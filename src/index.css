@@ -936,6 +936,31 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
   background: color-mix(in oklab, var(--accent) 40%, transparent);
 }
 
+/* Viewport-aware ceiling for the right panel. useResizableWidth clamps its
+ * pixel width against the viewport in JS; this is the CSS backstop for
+ * widths that reach the DOM without passing through that clamp (first paint
+ * of a persisted value, future callers). 720px ≈ toolbar (56) + resize
+ * handle (4) + the smallest workable canvas (660), so the panel can never
+ * squeeze the canvas below that. max-width needs no !important here: as a
+ * different property it constrains the inline `width` regardless of origin. */
+.aside-right {
+  max-width: calc(100vw - 720px);
+}
+
+/* Medium windows (≤ 1200px): cap the panel harder so it doesn't dominate a
+ * narrower canvas — 32vw ≈ 328px at 1024, ≈ 307px at 960. The calc() term
+ * re-asserts the 720px canvas reserve wherever 32vw would exceed it (at
+ * 960px only 240px is spareable). useResizableWidth applies the identical
+ * min(320px, 32vw) terms in JS (MID_BAND_* constants) so the drag handle
+ * never dead-zones against a tighter CSS cap — change both together.
+ * Unlayered, so it wins over the Tailwind utility layer but sits below the
+ * mobile slide-over block that follows. */
+@media (max-width: 1200px) {
+  .aside-right {
+    max-width: min(320px, 32vw, calc(100vw - 720px));
+  }
+}
+
 @media (max-width: 900px) {
   .aside-mobile-toggle { display: inline-flex; align-items: center; }
   /* Mobile slide-over takes over — hide the inline handle too. */
@@ -948,8 +973,12 @@ div[class*="inset-0"][class*="bg-black/"] > div[class~="bg-panel"] {
     position: fixed;
     right: 0;
     top: 44px; /* below MenuBar */
-    bottom: 24px; /* above StatusBar */
-    width: 280px;
+    bottom: 28px; /* above StatusBar (h-7 = 28px) */
+    /* !important: beats the inline `style={{width}}` the hook paints on the
+     * aside in desktop mode. min() keeps the slide-over on screen when the
+     * viewport itself is narrower than the panel (mobile web / split view). */
+    width: min(280px, 86vw) !important;
+    max-width: min(280px, 86vw) !important;
     z-index: 60;
     box-shadow: -8px 0 24px rgba(0, 0, 0, 0.55);
   }

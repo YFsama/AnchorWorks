@@ -16,7 +16,10 @@ const devURL = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
 // the 1440×900 defaults below only seed the very first run.
 // ---------------------------------------------------------------------------
 const DEFAULT_BOUNDS = { width: 1440, height: 900 };
-const MIN_WIDTH = 900;
+// 960 keeps the window clear of the ≤ 900px mobile media query in
+// index.css — at the old 900 minimum, dragging to the smallest legal size
+// flipped the layout into slide-over mode mid-drag.
+const MIN_WIDTH = 960;
 const MIN_HEIGHT = 600;
 const STATE_FILE = 'window-state.json';
 

@@ -1553,7 +1553,14 @@ export default function App() {
         <section aria-label={t('Tools')} className="contents">
           <Toolbar />
         </section>
-        <main className="flex-1 flex flex-col relative" aria-label={t('Canvas workspace')}>
+        {/* min-w keeps the canvas alive in the flex row: the toolbar, drag
+            handle and side panels are all shrink-0, so without a floor the
+            canvas is the only flexible item and collapses to 0px once the
+            fixed siblings add up to the window width. 320 is the smallest
+            width at which the canvas + rulers stay usable. The row itself
+            is overflow-hidden, so an impossible combination (e.g. AI panel
+            open on a tiny window) clips the panels, not the canvas. */}
+        <main className="flex-1 flex flex-col relative min-w-[320px]" aria-label={t('Canvas workspace')}>
           <CanvasView />
           <QuickHelp />
           <StatusBar />
