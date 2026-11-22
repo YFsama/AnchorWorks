@@ -2,6 +2,46 @@
 
 Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js` 1,143 kB raw / 217 kB gzip; 141 eager sources totaling 2,112 kB of source text. A parallel session is mid-edit on `epson*/plotter*/src-tauri` — those files are measured but excluded from recommendations.
 
+**Status update (2026-11-21, wave-5 topbar declutter + Plotter tabs):**
+- **Topbar right 24→7 DONE** — view toggles delegated to StatusBar/View menu; 16-button output strip → Plotter + Print + grouped More… dropdown (trigger = button + aria-haspopup; menuitem-in-toolbar fails aria-required-parent). print.spec entry path updated to the dropdown (same handshake, one extra hover).
+- **Plotter dialog 3-tab reorg DONE** — Machine / Cut settings / Output, ≤8 numeric inputs per tab (was 17 flat), pinned action footer on every tab, smart default tab by connection state, preflight rejection jumps to Output. Unit suites (450) + card-behavior/dialog-fit green with assertion strength preserved.
+- **Residuals:**
+  - Cut-tab preset chips have slight style variance (Travel-rate active outline vs Feed-rate style) — visual polish pass candidate.
+  - `window.confirm` double-track now also covers the two send() preflight rejections (PlotterDialog:874/958) beyond the previously logged Epson/plotter spots — unify on ConfirmHost in one sweep.
+  - Material preset cards truncate their description lines by design (ellipsis); fine at current sizes.
+
+**Status update (2026-11-21, wave-4 plotter auto-detect + card deep-tests):**
+- **Plotter/engraver auto-detect DONE** — `runAutoSetup` orchestration (chip fingerprint → baud ladder → OI;/$I/$$ identification → light self-test → profile suggestion), Plotter-dialog top-level Auto-detect button with step panel, grbl-generic/grbl-laser profiles, optional spindle in the G-code generator (byte-identical when unset, M5 before homing), `$$`/`$#` console commands, laser/corner test patterns, diagnostics report now embeds identify + selfTest + grbl settings. 36 new unit tests. Remaining notes:
+  - `buildCornerTour` hardcodes Z −1/+5 taps (not the user's pen Z) — small-Z-travel lasers may alarm on soft limits (test-button use, accepted).
+  - `parseGrblSettings` doesn't tolerate grblHAL inline comments (`$32=1 (…)`) → such lasers suggest grbl-generic; official grbl 1.1 is fine.
+  - `$$` full-table snapshots truncate to the first line on real links (query() returns at the first CR/LF); single-key fallbacks ($32/$130/$131) carry the decisions.
+  - gcode jog re-queries travel limits per jog when the controller doesn't answer (fire-and-forget 2×900 ms).
+  - Plotter/Epson still use native `window.confirm` in 3 spots alongside ConfirmHost (double-track confirm UX).
+- **Card deep-tests DONE** — card-behavior.spec (44 dialogs × focus/footer/preset/reset/cancel/focus-return/objects-unchanged contracts, 3 batches ~90 s), confirm-behavior.spec (4 tests incl. the menu path), dialog-fit +Zig Zag/Multi-outline. Harness surfaced and wave fixed three src defects: DocSettings render-time setState freeze (→ open-edge effect), ErrorLog empty-log focus no-op (→ Close fallback), and the menu-row focus-restore :hover race (→ shared `restoreDialogFocus`, menu rows resolve to their `aria-haspopup` trigger). Known residual:
+  - **Reset semantics are three-headed** (Twist/Shear reset to 0 rather than the open value; SplitGrid/MarginGuides/TilePrint load a canonical preset rather than the open state) — a product decision to unify, not touched.
+  - RecoveryDialog still has no UI-path test (mounts only from crash-recovery state; needs injection).
+  - AIPanel with no API key auto-opens its Configuration modal on "Open AI Panel" — by design, pinned as-is.
+
+**Status update (2026-11-21, wave-3b dialog viewport-fit):**
+- **Dialog height caps DONE** — every modal now fits the window: 16 big dialogs restructured (pinned header/footer + scroll body, `max-h-[calc(100vh-4rem)]`), ~31 small cards mechanical `max-h + overflow-y-auto`, menubar dropdown panels `max-h-[calc(100vh-6rem)]`, whole-card-scroll trio (Epson/GangSheet/TraceArt) upgraded so footers no longer scroll out of reach. Wave-3 follow-up #5 (dropdown max-height) closed by this. Guarded by `tests/e2e/dialog-fit.spec.ts` (47 dialogs × 2 viewports + 9 menu panels × 2): card four-side fit, pinned footer clickable on first paint, close control reachable.
+- **Notes for future waves:**
+  - **Tailwind class-order reliance** — the common `overflow-hidden overflow-y-auto` combo only yields x-hidden/y-auto because Tailwind v4 emits `.overflow-hidden` before `.overflow-y-auto` in the generated CSS (verified in dist 4.3.3 via compile API + computed styles). Undocumented ordering; re-verify on Tailwind major bumps.
+  - **EpsonMaintDialog is footer-less by design** (header + monolithic body); its actions scroll with content and only the header × is pinned. A pinned action row is a product decision away.
+  - **PrintDialog right preview column `min-h-[280px]`** clips below ~470px viewport height — below the promised 600px floor.
+  - **dialog-fit spec runtime** — the two 47-dialog cases are the heaviest e2e block (~2-3 min); iterate with `--grep dialog-fit`. `'Open AI Panel'` actually measures AIPanel's auto-opened Configuration Modal (the sidebar has no role=dialog) — if that default changes the spec fails loudly, which is the desired tripwire.
+
+**Status update (2026-11-21, wave-3 UI-deep-dive: responsive layout + IA reorg):**
+- **Responsive layout DONE** — desktop shells' minWidth 900→960 (decoupled from the 900px mobile breakpoint), viewport-aware panel clamp with `min(320px, 32vw)` mid-band terms synced between `useResizableWidth.ts` (MID_BAND_* constants) and the `.aside-right` CSS backstop, shrink-only resize fallback that preserves the persisted preference (new regression suite `src/lib/hooks/__tests__/useResizableWidth.test.tsx`), slide-over `min(280px,86vw) !important`, canvas 320px floor, 36 dialogs `max-w-[92vw]`, scrollable menubar strip with fixed-position dropdowns that re-measure on resize/scroll. Layout probe: 18/18 across 901–1440px (1024px → panel 288-304 / canvas ≥660).
+- **IA reorg DONE** — MenuBar 6→9 top menus (File/Edit/Object/Type/Effects/Production/View/Insert/Help), 807→490 entries; CanvasContextMenu 629→147 (object-context core only). Zero commands lost: 300 removed entries verified byte-exact against CommandPalette (`C:\tmp\audit_aw\cp_coverage_removed.json`), 34 merges logged, Darken/Lighten blend kept as the only context-only pair. Tauri native shell menu synced (File/Edit/Object/View/Help). zh dict: +4 keys (Effects/Production/Stylize/Proof), 9 dead keys removed.
+- **OPEN follow-ups from this wave:**
+  1. **Unified command registry (P1)** — MenuBar, CanvasContextMenu, and CommandPalette still hand-write their own onClick wiring for shared commands (Send-to-Plotter had 6 entry points pre-reorg). One id→label/shortcut/run table consumed by all three surfaces is the structural fix; the wave-3 reorg moved blocks but did not introduce it.
+  2. **"Simplified mode" progressive disclosure (P2)** — one toggle hiding the Production/Effects/Insert top menus and low-frequency submenus (~400 entries) behind CP-only; cheap now that menus are grouped, deferred to avoid scope-creep in wave 3.
+  3. **`aria-valuemax` on the panel drag handle is static 560** while the effective ceiling is viewport-aware (`App.tsx` handle; SR users get a stale capability range on narrow windows).
+  4. **Electron `loadWindowState` clamps a sub-960 restored width but not `x`** — a right-edge window restores 60px off-screen right (work-area intersection only rescues fully-offscreen).
+  5. ~~**Dropdown panels lack max-height**~~ — **DONE in wave 3b** (`max-h-[calc(100vh-6rem)] overflow-y-auto`, guarded by dialog-fit.spec).
+  6. **First-open dropdown plays a ~150ms slide-in** from the off-screen parking spot (`transition-all` + JS-set left/top; `transition-[opacity,visibility]` would silence it).
+  7. **AIPanel ≤900px** still renders inline-capped (`max-w-[32vw]`) rather than joining the mobile slide-over mechanism.
+
 **Status update (2026-10-31, dependency-refresh + tailwind v4 session):**
 - **Eager-set health re-verified on the tailwind v4 build**: 13 chunks / 988 kB raw / **300 kB gzip** for the full first-paint chain (entry 293, fabric 285, react 208, canvasEngine 99, lucide 51 kB raw). All heavyweights (pdf.worker 420, jspdf 390, CommandPalette 366, fontkit 348, MenuBar 246, i18n-zh 228 kB; html2canvas was dropped from the dependency tree entirely in the 2026-10-31 refresh) stay lazy. The 2026-09-22→10-04 slim-down work survived the fabric 7 / lucide 1.64 / tailwind 4 upgrades — no action needed.
 - **`pool: 'vmThreads'` REJECTED for vitest**: tried 2026-10-31 — 15 tests fail (shared-jsdom module-state leaks across files in the same VM) and env time only drops 73%→58% with no wall-clock gain (12.1s vs 11.6s). One-jsdom-per-file (default `threads` pool) is load-bearing isolation here.

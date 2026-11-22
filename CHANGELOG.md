@@ -6,8 +6,166 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — topbar declutter + Plotter dialog tabs (2026-11 wave 5)
+- **Topbar right side: 24 controls → 7.** The Grid/Snap/Guides/Anchor
+  segmented toggle moved out (the StatusBar pips and View menu remain the
+  two always-available entry points), and the 16-button horizontally
+  scrolling output strip collapsed to three: **Plotter** and **Print**
+  stay one-click, everything else (Cut Contour, Reg marks, Weed/Bridges/
+  Grommets, Test cut, Nest, Rhinestone, Variable Data, Print Prep, Tile
+  Print, Export SVG, Document Settings) folds into a grouped **More…**
+  dropdown — grouped by cut-prep / layout / print / doc with separators,
+  keyboard-reachable, shortcuts preserved. The dropdown trigger renders as
+  a plain button + `aria-haspopup` (menuitem-in-toolbar fails axe's
+  aria-required-parent; LanguageSwitcher was the working precedent).
+- **Plotter dialog: flat 17-input form → three tabs.** Machine
+  (profiles/auto-detect/connection/serial console/Data-Link), Cut settings
+  (material presets, feed/travel with chips, strategy toggles, ARMS,
+  blade overcut/offset with chips, drift compensation), and Output
+  (preview, estimates, cut-by-colour, job prep, weed grid). Any single tab
+  exposes ≤8 numeric inputs (was 17 in one scroll); the action footer
+  (Cancel / Test cut / Force test / Laser test / Corner tour / Save File /
+  Send via USB) is pinned and visible on every tab; opening defaults to
+  Machine when disconnected and Output when connected; a rejected preflight
+  now jumps to the Output tab so the code pane with the rejection is
+  actually visible. Zero callback/state changes — JSX reorganization only,
+  both PlotterDialog behaviour suites kept their assertion strength.
+- Wave-5 residuals recorded in OPTIMIZATION_BACKLOG (preset-chip style
+  variance in Cut tab, window.confirm double-track in send paths).
+
+### Added — plotter/engraver auto-detect + grbl laser tooling (2026-11 wave 4)
+- **Auto-detect machine** (Plotter dialog, machine settings): one button now
+  runs the whole identification pipeline that previously took 6-7 manual
+  steps through the collapsed debug console — rank candidate ports by USB
+  bridge chip (CH340/CH9102 → clone cutters, FTDI/Prolific → brand machines,
+  CP2102/STM32 CDC → grbl), probe baud rates (chip-suggested first, then the
+  full ladder), query the machine (HP-GL `OI;`/`OE;`/`OH;`, grbl `$I` and a
+  `$$` snapshot with a single-line `$32` fallback for truncating links),
+  run a light self-test, and suggest a machine profile — auto-filling
+  port/baud/profile/format and pre-filling the saved-machine name. A CH340
+  port that stays silent is suggested as the china-clone profile (they
+  mostly ignore status queries); detection never auto-connects (that stays
+  a user action) and releases the port when it started disconnected. Web
+  Serial builds degrade to guidance (the browser requires a gesture per
+  port and cannot enumerate).
+- **grbl/engraver support**: two new machine profiles (grbl-generic pen/
+  spindle, grbl-laser with $32=1 / $30 notes and goggle warnings); the
+  profile picker now renders for every output format; the G-code generator
+  gained an optional spindle/laser power field (M3 S… header, **M5 before
+  the G0 return home** so a laser never fires on the way back — output is
+  byte-identical when unset); `$$`/`$#` console commands with decoded
+  replies; jog travel-limits awareness via `$130/$131` instead of HP-GL
+  page queries; new **Laser test** gradient strip (10-50%, M3/M5-paired)
+  and **Corner tour** four-corner probe pattern, both streamed through the
+  existing test-cut channel.
+- **Diagnostics report** now embeds the machine identification, grbl `$$`
+  snapshot, and self-test steps alongside the existing connection knobs and
+  job history.
+- 36 new unit tests (auto-setup orchestration across clone/grbl/brand/
+  silent branches, identify format fields, spindle snapshots, corner-tour/
+  laser-test structure and lint, profile compatibility).
+
+### Added — card deep-test harness: 44 dialogs × behavior contracts (2026-11 wave 4)
+- `tests/e2e/card-behavior.spec.ts` (three batches, ~90s): every dialog that
+  previously only had open/close coverage now asserts a behavioral contract
+  — initial focus (where the card defines one), footer inventory (incl.
+  negative disabled pins like Recolor's Reset/Apply before a mapping, Trace
+  Art's Trace/Insert without a bitmap, Plotter's Send before a connection),
+  safe preset-chip interaction (aria-pressed flip + linked field value),
+  Reset regression where present, Cancel/Escape closes, focus returns to the
+  menu trigger, and the canvas object count is unchanged — plus zero new
+  console errors. `tests/e2e/confirm-behavior.spec.ts` pins the ConfirmHost
+  contract (alertdialog role, Escape answers false without reload, danger
+  defaults focus to Cancel, focus returns on both binding and menu paths).
+  dialog-fit gained Zig Zag and Multi-outline entries.
+- Harness-driven src fixes: **DocSettings orientation seeding moved from a
+  render-time setState reconciliation to an open-edge effect** (the old
+  pattern froze the page intermittently under react-compiler and left
+  orientation inconsistent with Reset); **Error Log focuses the enabled
+  Close when the log is empty** (disabled Copy-all silently refused focus);
+  **useFocusRestore now routes menu-row restores to the menu's trigger
+  button** — the row is hidden the moment a dialog steals focus-within, and
+  focusing it raced :hover recomputation into focus-drops-to-body in both
+  orderings; the shared `restoreDialogFocus` resolves role=menu targets to
+  their `aria-haspopup` trigger (tight match, verified against all six
+  role=menu sites) and hidden non-menu targets to the nearest visible
+  focusable ancestor.
+
+### Fixed — every dialog now fits the window (2026-11 wave 3b, dialog viewport-fit)
+- The width caps from wave 3 hid the other axis: modal cards had **no height
+  constraint at all**, so tall dialogs overflowed the window on both sides
+  and their footer actions were unreachable — measured at 960×600, the
+  Plotter dialog (1472px of content) overflowed 436px top and bottom with
+  "Send via USB" off-screen, Print Prep overflowed 192px, Tile Print 99px,
+  and the seven long menubar dropdown panels overflowed ~100px. Fixed with a
+  measured hybrid: the 16 big dialogs got the structural treatment
+  (`max-h-[calc(100vh-4rem)]` card, pinned header/footer, scrollable body —
+  Plotter/Print/TilePrint/CutContour/Repeat/VariableData/MakeSticker/
+  Transform/FreeDistort/ProductionPreview/FreeformGradient/EpsonMaint/
+  GangSheet/TraceArt/Shortcuts plus Print's left-column scroll), the ~31
+  small cards got a mechanical `max-h + overflow-y-auto` backstop, and the
+  menubar panels got `max-h-[calc(100vh-6rem)]`. The three whole-card-scroll
+  dialogs (Epson/GangSheet/TraceArt) were upgraded — their footers used to
+  scroll out of reach with the content. Guarded by a new data-driven e2e
+  (`tests/e2e/dialog-fit.spec.ts`): 47 dialogs × 2 viewports (960×600,
+  1366×768) assert the card fits on all four sides, the pinned footer is
+  clickable on first paint, and the close control is reachable, plus 9 menu
+  panels × 2 viewports assert no bottom overflow. All measured green at
+  960×600, 1366×768, and spot-checked 1440×900 / 1920×1080 (no large-window
+  regressions from the flex-column restructure).
+
+### Changed — responsive layout: the window can finally be resized sanely (2026-11 wave 3, UI-deep-dive)
+- Root causes fixed at the layout-container tier (the canvas itself always
+  handled resize — ResizeObserver + zoom-preserving reflow): the desktop
+  shells' `minWidth` (Tauri + Electron) moved 900→960 so dragging to the
+  minimum no longer collides with the single `max-width: 900px` mobile
+  breakpoint (which made the UI flip into mobile mode and jitter at the
+  minimum size); the right panel's drag-resize clamp became viewport-aware
+  (`min(max, 100vw − 720px canvas reserve)`, plus the same `min(320px, 32vw)`
+  mid-band terms as the CSS backstop — a JS/CSS disagreement was a drag dead
+  zone) with shrink-only fallback on window resize that leaves the persisted
+  preference untouched; `≤1200px` windows cap the panel harder so it never
+  dominates a narrow canvas (1024px window → panel 288-304px, canvas ≥660px,
+  measured); the `≤900px` slide-over ignores stale inline widths
+  (`min(280px, 86vw) !important` — previously a panel dragged to 560px on a
+  big screen reopened as a 560px drawer); the canvas `main` keeps a 320px
+  floor; the AI panel shrinks (`max-w-[32vw]`); and the 36 fixed-px dialogs
+  that lacked a viewport cap got `max-w-[92vw]` so their close buttons stay
+  reachable. The menubar strip scrolls horizontally instead of pushing the
+  right-hand controls off-screen, dropdown panels re-measure on resize/scroll
+  while open (they're `position: fixed` against the scrollable strip), and
+  the Save chip no longer wraps to three lines at narrow widths. Verified:
+  Playwright layout probe 18/18 across 901-1440px, plus 160 vitest files
+  (new `useResizableWidth` regression suite incl. mid-band/dead-zone cases).
+
+### Changed — information architecture: 807 menu entries → 490, context menu 629 → 147, zero commands lost (2026-11 wave 3, UI-deep-dive)
+- The menubar grew 6 top menus with 807 discoverable entries (View alone had
+  103 — 73% of them measure/proof commands; Edit buried Select Object [217]
+  + Select Same [86]; Document had 30 submenus, 4 levels deep). Reorganized
+  into the 9-menu layout pro apps converge on — File / Edit / Object / Type
+  / Effects / Production / View / Insert / Help: Document's five jobs split
+  into Object (arrange/align/appearance/path), Effects (stylize/distort/
+  colour dialogs), and Production (plotter/cut prep/nesting/proof — the 82
+  measure/proof commands live under Production ▸ Proof); the Select
+  monoliths keep only the 10 high-frequency entries in-menus; the 16 export
+  formats collapsed into one Export submenu. Context menu reduced to the
+  object-context core (clipboard, z-order, group/mask/compound + Pathfinder/
+  Align/Transform/Type/stroke/appearance submenus), dropping the submenus
+  that duplicated the menubar wholesale (File/Export/Cut prep/Print/Help/
+  Select ×2 — including three preset submenus that appeared twice). Zero
+  commands lost: every one of the 300 entries removed from menus matches a
+  command-palette entry byte-for-byte (audited, `Ctrl+K` reaches them), the
+  34 merges are accounted, and the only two context-only commands
+  (Darken/Lighten blend modes) were kept. The Tauri native shell menu
+  mirrors the new shape (File/Edit/Object/View/Help). New zh entries for
+  the new menus (效果/生产/风格化/打样校验); 9 dead zh keys retired.
+  Follow-ups recorded in OPTIMIZATION_BACKLOG: unified command registry
+  (three entry surfaces still hand-sync their onClicks), a lightweight
+  "simplified mode" progressive-disclosure switch, dynamic
+  `aria-valuemax` on the panel drag handle.
+
 ### Added — Image Trace to editable vector art (2026-11 wave 2, W2)
-- **Document → Trace to Vector Art…**: bitmaps (selected canvas image or
+- **Production → Trace to Vector Art… (moved from Document in the wave-3 IA reorg)**: bitmaps (selected canvas image or
   uploaded PNG/JPEG/WebP) become filled, layer-editable vector art — the
   entry-side capability every competitor ships (Kittl Vectorizer, Linearity
   Auto Trace, SignLab Vectorization Previewer, Illustrator Image Trace) that
