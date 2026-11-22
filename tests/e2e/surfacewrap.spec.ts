@@ -39,12 +39,13 @@ function cutPathsChip(page: Page) {
   return page.getByRole('button', { name: /^\d+ cut paths/ });
 }
 
-/** Open via Document → Surface Wrap… — the menu walk mirrors envelope.spec.ts
- *  (CSS-hover dropdowns; getByRole only sees the visible items). 10s
- *  first-visibility wait: the dialog chunk is lazy (templates.spec
- *  precedent). */
+/** Open via Effects → Distort & Transform → Surface Wrap… — the menu walk
+ *  mirrors envelope.spec.ts (CSS-hover dropdowns; getByRole only sees the
+ *  visible items). 10s first-visibility wait: the dialog chunk is lazy
+ *  (templates.spec precedent). */
 async function openSurfaceWrap(page: Page): Promise<Locator> {
-  await page.getByRole('menuitem', { name: 'Document' }).hover();
+  await page.getByRole('menuitem', { name: 'Effects' }).hover();
+  await page.getByRole('menuitem', { name: 'Distort & Transform' }).hover();
   await page.getByRole('menuitem', { name: 'Surface Wrap…' }).click();
   const dialog = page.getByRole('dialog', { name: 'Surface Wrap' });
   await expect(dialog).toBeVisible({ timeout: 10_000 });

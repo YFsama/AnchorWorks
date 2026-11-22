@@ -16,10 +16,10 @@ test('envelope distort entry exists and warns on an invalid selection', async ({
   await expect(page.locator('[role="menubar"]')).toBeVisible();
 
   // MenuBar dropdowns are CSS-hover surfaces (group-hover reveals the
-  // panel), so hover Document open, then the Distort & Transform row to fly
+  // panel), so hover Effects open, then the Distort & Transform row to fly
   // out its submenu. getByRole only matches the now-visible items, which
   // keeps each lookup unique without attachment gymnastics.
-  await page.getByRole('menuitem', { name: 'Document' }).hover();
+  await page.getByRole('menuitem', { name: 'Effects' }).hover();
   await page.getByRole('menuitem', { name: 'Distort & Transform' }).hover();
 
   const envelopeItem = page.getByRole('menuitem', { name: 'Envelope Distort — Make with Top Object' });

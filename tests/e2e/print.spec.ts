@@ -193,7 +193,13 @@ test('Ctrl+P opens the dialog; Print Prep… opens it with the prep section expa
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 
-  await outputToolbar(page).getByRole('button', { name: 'Print Prep…', exact: true }).click();
+  // Wave-5 topbar declutter: Print Prep… moved from the always-visible strip
+  // into the grouped "More…" dropdown (hover opens it, same openPrintPrep
+  // handshake). Same entry semantics, one extra hover.
+  const more = outputToolbar(page).getByRole('button', { name: 'More…', exact: true });
+  await more.hover();
+  await page.getByRole('menu', { name: 'More…' })
+    .getByRole('menuitem', { name: 'Print Prep…', exact: true }).click();
   await expect(dialog).toBeVisible();
 
   // The prep disclosure starts expanded via this entry point.

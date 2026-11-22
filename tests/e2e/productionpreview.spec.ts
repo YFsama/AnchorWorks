@@ -56,12 +56,12 @@ function selectedCount(page: Page) {
   return page.locator('[role="group"][aria-label="Editor status"] [aria-label^="Selected "]').first();
 }
 
-/** Open via Document → Production Preview… (the selection-satisfying entry —
+/** Open via Production → Production Preview… (the selection-satisfying entry —
  *  openWithSelection lets it through once a shape is active). 10s
  *  first-visibility wait: the dialog chunk is lazy (templates.spec
  *  precedent). */
 async function openProductionPreview(page: Page): Promise<Locator> {
-  await page.getByRole('menuitem', { name: 'Document' }).hover();
+  await page.getByRole('menuitem', { name: 'Production' }).hover();
   await page.getByRole('menuitem', { name: 'Production Preview…' }).click();
   const dialog = page.getByRole('dialog', { name: 'Production Preview' });
   await expect(dialog).toBeVisible({ timeout: 10_000 });
@@ -76,7 +76,7 @@ test('Production Preview… with nothing selected warns off and the dialog never
   await page.goto('/');
   await expect(page.locator('[role="menubar"]')).toBeVisible();
 
-  await page.getByRole('menuitem', { name: 'Document' }).hover();
+  await page.getByRole('menuitem', { name: 'Production' }).hover();
   await page.getByRole('menuitem', { name: 'Production Preview…' }).click();
 
   // openWithSelection (MenuBar) answers with the bare warn toast — no title

@@ -168,9 +168,9 @@ test('Escape closes the sticker dialog and focus returns to the invoking element
   await drawOneRect(page);
   await expect(selectedCount(page)).toHaveAttribute('aria-label', /Selected 1$/);
 
-  // Focus the menubar's Document trigger (its dropdown opening is harmless).
-  const documentTrigger = page.getByRole('menuitem', { name: 'Document', exact: true });
-  await documentTrigger.click();
+  // Focus the menubar's Production trigger (its dropdown opening is harmless).
+  const productionTrigger = page.getByRole('menuitem', { name: 'Production', exact: true });
+  await productionTrigger.click();
 
   const dialog = await openMakeSticker(page);
 
@@ -182,5 +182,5 @@ test('Escape closes the sticker dialog and focus returns to the invoking element
   await expect(dialog).toBeHidden();
 
   // Focus restored to the element that invoked the dialog.
-  await expect(documentTrigger).toBeFocused();
+  await expect(productionTrigger).toBeFocused();
 });

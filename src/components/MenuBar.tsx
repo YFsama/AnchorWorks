@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Settings2, Layers, Hash, Magnet, Crosshair, Target, X, Globe, Check, ChevronRight, Sheet, Grid3X3 } from 'lucide-react';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent } from 'react';
+import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Layers, X, Globe, Check, ChevronRight } from 'lucide-react';
 import { useEditor } from '../store/editor';
-import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, zoomToAllArtboards, zoomToActiveArtboard, zoomToAdjacentArtboard, zoomToSelection, getCanvas, duplicateSelection, deleteSelection, autoArrangeSelection, flipSelection, lockSelection, lockOthers, lockActiveArtboard, lockOtherArtboards, unlockSelection, unlockActiveArtboard, unlockOtherArtboards, unlockAll, hideSelection, hideOthers, hideActiveArtboard, hideOtherArtboards, showSelection, showActiveArtboard, showOtherArtboards, showAll, makeGuidesFromSelection, releaseGuides, selectAllObjects, selectVisibleObjects, selectVisibleActiveArtboardObjects, selectUnlockedObjects, selectUnlockedActiveArtboardObjects, selectLockedObjects, selectLockedActiveArtboardObjects, selectHiddenObjects, selectHiddenActiveArtboardObjects, fixHiddenObjects, fixHiddenActiveArtboardObjects, selectNamedObjects, selectNamedActiveArtboardObjects, selectUnnamedObjects, selectUnnamedActiveArtboardObjects, selectClippingMaskedObjects, selectClippingMaskedActiveArtboardObjects, selectOpenPathObjects, selectOpenPathActiveArtboardObjects, selectCompoundPathObjects, selectCompoundPathActiveArtboardObjects, selectStrayPointObjects, selectStrayPointActiveArtboardObjects, fixAllCleanupObjects, fixAllCleanupActiveArtboardObjects, fixStrayPointObjects, fixStrayPointActiveArtboardObjects, selectZeroLengthPathObjects, selectZeroLengthPathActiveArtboardObjects, fixZeroLengthPathObjects, fixZeroLengthPathActiveArtboardObjects, selectZeroSizeObjects, selectZeroSizeActiveArtboardObjects, fixZeroSizeObjects, fixZeroSizeActiveArtboardObjects, selectEmptyGroupObjects, selectEmptyGroupActiveArtboardObjects, fixEmptyGroupObjects, fixEmptyGroupActiveArtboardObjects, selectUnpaintedObjects, selectUnpaintedActiveArtboardObjects, fixUnpaintedObjects, fixUnpaintedActiveArtboardObjects, selectDropShadowObjects, selectDropShadowActiveArtboardObjects, selectTransparencyObjects, selectTransparencyActiveArtboardObjects, fixTransparencyObjects, fixTransparencyActiveArtboardObjects, selectFullyTransparentObjects, selectFullyTransparentActiveArtboardObjects, fixFullyTransparentObjects, fixFullyTransparentActiveArtboardObjects, selectDashedStrokeObjects, selectDashedStrokeActiveArtboardObjects, fixDashedStrokeObjects, fixDashedStrokeActiveArtboardObjects, selectThinStrokeObjects, selectThinStrokeActiveArtboardObjects, fixThinStrokeObjects, fixThinStrokeActiveArtboardObjects, selectOverprintObjects, selectOverprintActiveArtboardObjects, fixOverprintObjects, fixOverprintActiveArtboardObjects, selectWhiteOverprintObjects, selectWhiteOverprintActiveArtboardObjects, fixWhiteOverprintObjects, fixWhiteOverprintActiveArtboardObjects, fixAllPrepressRisks, fixAllPrepressRisksActiveArtboard, selectSpotColorObjects, selectSpotColorActiveArtboardObjects, fixSpotColorObjects, fixSpotColorActiveArtboardObjects, selectRgbColorObjects, selectRgbColorActiveArtboardObjects, fixRgbColorObjects, fixRgbColorActiveArtboardObjects, selectGrayscaleColorObjects, selectGrayscaleColorActiveArtboardObjects, fixGrayscaleColorObjects, fixGrayscaleColorActiveArtboardObjects, selectLabColorObjects, selectLabColorActiveArtboardObjects, fixLabColorObjects, fixLabColorActiveArtboardObjects, selectNonCmykColorObjects, selectNonCmykColorActiveArtboardObjects, fixNonCmykColorObjects, fixNonCmykColorActiveArtboardObjects, selectPrintMarkObjects, selectPrintMarkActiveArtboardObjects, selectRichBlackObjects, selectRichBlackActiveArtboardObjects, fixRichBlackObjects, fixRichBlackActiveArtboardObjects, selectOverInkLimitObjects, selectOverInkLimitActiveArtboardObjects, fixOverInkLimitObjects, fixOverInkLimitActiveArtboardObjects, selectRegistrationColorObjects, selectRegistrationColorActiveArtboardObjects, fixRegistrationColorObjects, fixRegistrationColorActiveArtboardObjects, selectActiveArtboardObjects, selectSameArtboardObjects, selectInsideActiveArtboardObjects, selectOverflowingActiveArtboardObjects, selectOtherArtboardsObjects, selectOutsideArtboardObjects, selectOutsideAnyArtboardObjects, fixOutsideArtboardObjects, fixOutsideAnyArtboardObjects, selectInsideArtboardObjects, selectInsideAnyArtboardObjects, selectOverflowingArtboardObjects, selectOverflowingAnyArtboardObjects, selectCustomStrokeObjects, selectCustomStrokeActiveArtboardObjects, selectNonScalingStrokeObjects, selectNonScalingStrokeActiveArtboardObjects, selectPatternFillObjects, selectPatternFillActiveArtboardObjects, selectGradientFillObjects, selectGradientFillActiveArtboardObjects, deselectAll, promptRenameSelection, selectSame, selectSameActiveArtboard, selectSameType, selectSameTypeActiveArtboardObjects, selectInverse, selectObjectInStack, selectAllText, selectAllTextActiveArtboardObjects, selectPointTextObjects, selectPointTextActiveArtboardObjects, selectAreaTextObjects, selectAreaTextActiveArtboardObjects, selectOverflowingTextObjects, selectOverflowingTextActiveArtboardObjects, selectEmptyTextObjects, selectEmptyTextActiveArtboardObjects, fixEmptyTextObjects, fixEmptyTextActiveArtboardObjects, selectTextOnPathObjects, selectTextOnPathActiveArtboardObjects, selectMissingFontTextObjects, selectMissingFontTextActiveArtboardObjects, selectCustomTextSpacingObjects, selectCustomTextSpacingActiveArtboardObjects, selectDecoratedTextObjects, selectDecoratedTextActiveArtboardObjects, selectStyledTextObjects, selectStyledTextActiveArtboardObjects, selectTransformedTextObjects, selectTransformedTextActiveArtboardObjects, selectMixedStyleTextObjects, selectMixedStyleTextActiveArtboardObjects, selectNonLeftAlignedTextObjects, selectNonLeftAlignedTextActiveArtboardObjects, selectAllImages, selectAllImagesActiveArtboardObjects, selectFilteredImageObjects, selectFilteredImageActiveArtboardObjects, fixFilteredImageObjects, fixFilteredImageActiveArtboardObjects, selectCroppedImageObjects, selectCroppedImageActiveArtboardObjects, fixCroppedImageObjects, fixCroppedImageActiveArtboardObjects, selectEmbeddedImageObjects, selectEmbeddedImageActiveArtboardObjects, selectLinkedImageObjects, selectLinkedImageActiveArtboardObjects, selectUnknownSourceImageObjects, selectUnknownSourceImageActiveArtboardObjects, selectEmbeddableLinkedImageObjects, selectEmbeddableLinkedImageActiveArtboardObjects, selectNotEmbeddableLinkedImageObjects, selectNotEmbeddableLinkedImageActiveArtboardObjects, selectImageHandoffRiskObjects, selectImageHandoffRiskActiveArtboardObjects, restoreEmbeddedImageLinkObjects, restoreEmbeddedImageLinkActiveArtboardObjects, selectRestorableEmbeddedImageLinkObjects, selectRestorableEmbeddedImageLinkActiveArtboardObjects, selectMissingLinkedImageObjects, selectMissingLinkedImageActiveArtboardObjects, fixMissingLinkedImageObjects, fixMissingLinkedImageActiveArtboardObjects, selectTransformedImageObjects, selectTransformedImageActiveArtboardObjects, fixTransformedImageObjects, fixTransformedImageActiveArtboardObjects, selectLowResolutionImageObjects, selectLowResolutionImageActiveArtboardObjects, fixLowResolutionImageObjects, fixLowResolutionImageActiveArtboardObjects, selectHighResolutionImageObjects, selectHighResolutionImageActiveArtboardObjects, fixHighResolutionImageObjects, fixHighResolutionImageActiveArtboardObjects, imageLinksSummary, imageLinksActiveArtboardSummary, imagePreflightSummary, imagePreflightActiveArtboardSummary, selectAllImagePreflightObjects, selectAllImagePreflightActiveArtboardObjects, fixAllImagePreflightObjects, fixAllImagePreflightActiveArtboardObjects, selectImagePreflightReviewObjects, selectImagePreflightReviewActiveArtboardObjects, clearImagePreflightReviewObjects, clearImagePreflightReviewActiveArtboardObjects, selectTransformedObjects, selectTransformedActiveArtboardObjects, selectAllPaths, selectAllPathsActiveArtboardObjects, selectAllShapes, selectAllShapesActiveArtboardObjects, selectAllGroups, selectAllGroupsActiveArtboardObjects, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, sendToBack, bringToFront, applyStyleToSelection, swapFillStroke, defaultColors, alignSelection, distributeSelection, distributeInArtboard, centerOnArtboard, setKeyObject } from '../lib/canvasEngine';
+import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, zoomToAllArtboards, zoomToActiveArtboard, zoomToAdjacentArtboard, zoomToSelection, getCanvas, duplicateSelection, deleteSelection, autoArrangeSelection, flipSelection, lockSelection, lockOthers, lockActiveArtboard, lockOtherArtboards, unlockSelection, unlockActiveArtboard, unlockOtherArtboards, unlockAll, hideSelection, hideOthers, hideActiveArtboard, hideOtherArtboards, showSelection, showActiveArtboard, showOtherArtboards, showAll, makeGuidesFromSelection, releaseGuides, selectAllObjects, fixAllCleanupObjects, fixStrayPointObjects, fixAllPrepressRisks, deselectAll, promptRenameSelection, selectSame, selectSameType, selectInverse, selectObjectInStack, fixEmptyTextObjects, fixMissingLinkedImageObjects, fixAllImagePreflightObjects, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, sendToBack, bringToFront, applyStyleToSelection, swapFillStroke, defaultColors, alignSelection, distributeSelection, distributeInArtboard, centerOnArtboard, setKeyObject } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
-import { embedLinkedImageObjectsDetailed, embedLinkedImageActiveArtboardObjectsDetailed } from '../lib/selectionOps';
 import { nestSelection } from '../lib/alignDistribute';
 import { scissorsSplitSelectionAtMidpoint } from '../lib/scissors';
 import { knifeSplitSelectionAtCenter } from '../lib/knife';
@@ -88,24 +87,8 @@ function formatNativeOS(os: string): string {
   }
 }
 
-const imagePreflightSummaryText = (summary: ReturnType<typeof imagePreflightSummary>) => `Image preflight: ${summary.total} total · ${summary.filtered} filters · ${summary.cropped} crops · ${summary.transformed} transforms · ${summary.lowResolution} low PPI · ${summary.highResolution} high PPI · ${summary.missingLinked} missing links · ${summary.reviewMarked} marked`;
-const imageLinksSummaryText = (summary: ReturnType<typeof imageLinksSummary>) => `Image links: ${summary.total} total · ${summary.linked} linked · ${summary.embedded} embedded · ${summary.missingLinked} missing · ${summary.embeddable} embeddable · ${summary.notEmbeddableLinked} not embeddable · ${summary.restorable} restorable · ${summary.unknownSource} unknown`;
-
 export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) {
   const t = useT();
-  // Safe clipboard copy — `navigator.clipboard` is undefined on insecure
-  // origins (e.g. http://LAN-IP served to a plotter PC), and touching the
-  // property throws synchronously, which the old trailing .catch could not
-  // rescue. try/await keeps both the success and fallback toasts honest
-  // (same pattern as DebugPanel's copyDiagnostics).
-  const copyImageHandoffReport = async (report: string) => {
-    try {
-      await navigator.clipboard.writeText(report);
-      toast.success(t('Image handoff report copied'));
-    } catch {
-      toast.info(report);
-    }
-  };
   const fileRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
@@ -227,14 +210,6 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
     else toast.warn(t('Select 2 or more objects first.'), { title: t('Nest (rotation-aware)') });
   };
 
-  const requireTextSelection = (action: () => void, message = t('Select a text object first.')) => {
-    const hasText = (getCanvas()?.getActiveObjects().some(o => o.type === 'i-text' || o.type === 'text' || o.type === 'textbox')) ?? false;
-    if (!hasText) {
-      toast.warn(message);
-      return;
-    }
-    action();
-  };
   const adjustTextMetric = (fn: (delta: number) => number, delta: number) => {
     if (!fn(delta)) toast.warn(t('Select a text object first.'));
   };
@@ -326,7 +301,16 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       </button>
       <span className="topbar-sep" aria-hidden="true" />
 
-      <div role="menubar" aria-label={t('Application menu')} className="flex items-center gap-2">
+      {/* Menu strip — `min-w-[340px] overflow-x-auto` lets the 9 top-level
+          menus keep a workable width and scroll horizontally when the
+          window is narrow instead of pushing the right-hand toolbars
+          off-screen (same paradigm as .output-actions-toolbar; the explicit
+          floor stops the flex shrink from crushing the strip to 0px).
+          Because an overflow container clips absolutely-positioned
+          descendants, the Dropdown panels below pin themselves with
+          `position: fixed` at the trigger's viewport rect once open — see
+          the Dropdown component. */}
+      <div role="menubar" aria-label={t('Application menu')} className="flex items-center gap-2 min-w-[340px] overflow-x-auto">
       <Dropdown label={t('File')} width="w-64" items={[
         { label: t('Save Project'), onClick: async () => { void (await import('../lib/projectFile')).saveProjectQuick(); }, kbd: getBinding('file.saveProject') },
         { label: t('Save Project As…'), onClick: async () => { void (await import('../lib/projectFile')).saveProjectToFile(); }, kbd: getBinding('file.saveProjectAs') },
@@ -335,88 +319,45 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('New'), onClick: async () => { if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) location.reload(); }, kbd: getBinding('file.new') },
         { label: t('New from Template…'), onClick: () => setModal('showTemplates', true), kbd: getBinding('file.newFromTemplate') },
         { label: t('Open SVG / JSON…'), onClick: () => fileRef.current?.click(), kbd: getBinding('file.open') },
-        { label: t('Import Image…'), onClick: () => imageRef.current?.click(), kbd: getBinding('file.importImage') },
-        { label: t('Import PDF…'), onClick: () => pdfRef.current?.click() },
-        { label: t('Paste from Clipboard'), onClick: () => { void withIO3((m) => m.pasteFromSystemClipboard()).then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }).catch((e) => console.warn('io3 chunk failed to load — paste disabled', e)); } },
-        { sep: true },
-        // File-menu exports route through the format registry — same files,
-        // filenames, and options as before, but every consumer (CommandPalette,
-        // drag-drop, AI skills, future Tauri "Save as…" dialog) reads the
-        // single source of truth. `exportPDFReal` (vector PDF) doesn't have a
-        // registry entry yet; its options story is heavier and migrates in a
-        // later cycle.
-        { label: t('Export SVG'), onClick: async () => { void getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
-        { label: t('Export PNG (2×)'), onClick: async () => { void getFormat('png')?.export?.(); } },
-        { label: t('Export JPG (2×)'), onClick: async () => { void getFormat('jpg')?.export?.(); } },
-        { label: t('Export PDF'), onClick: async () => { void getFormat('pdf')?.export?.(); } },
-        { label: t('Export PDF (Vector)'), onClick: async () => { void getFormat('pdf-vector')?.export?.(); } },
-        { label: t('Export DXF (paths)'), onClick: async () => { void getFormat('dxf')?.export?.(); } },
-        { label: t('Export JSON'), onClick: async () => { void getFormat('json')?.export?.(); } },
-        // Print-then-cut RIP handoff: same files as the plain exports, with
-        // the store's cut paths appended (CutContour spot layer in the SVG,
-        // magenta hairlines in the PDF). Shared with the command palette via
-        // the cutPrepActions helpers.
-        { label: t('Export SVG (with cut layer)'), onClick: async () => (await import('../lib/cutPrepActions')).exportSvgWithCutLayer(t) },
-        { label: t('Export PDF (with cut layer)'), onClick: async () => (await import('../lib/cutPrepActions')).exportPdfWithCutLayer(t) },
-        { sep: true },
-        { label: t('Export Active Artboard (SVG)'), onClick: () => { void exportActiveArtboardAsSVG().then(ok => { if (ok) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); }); } },
-        { label: t('Export Active Artboard (PNG)'), onClick: () => { if (exportActiveArtboardAsPNG()) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Export All Artboards (SVG)'), onClick: () => { void exportAllArtboardsAsFiles().then(n => { if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }); } },
-        { label: t('Export All Artboards (PNG)'), onClick: () => { const n = exportAllArtboardsAsPNG(); if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
-        { label: t('Export Artboard Range (SVG)…'), onClick: () => { void promptExportArtboardRangeAsSVG(t('Artboard range'), '1').then(n => { if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }); } },
-        { label: t('Export Artboard Range (PNG)…'), onClick: () => { const n = promptExportArtboardRangeAsPNG(t('Artboard range'), '1'); if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
-        { label: t('Export Selection as SVG'), onClick: async () => { void (await import('../lib/exportSelection')).exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
-        { label: t('Export Selection as PNG'), onClick: async () => { void (await import('../lib/exportSelection')).exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
-        { label: t('Copy as SVG'), onClick: async () => { void (await import('../lib/exportSelection')).copySelectionSVG().then(r => { if (r === 'ok') toast.success(t('SVG copied to clipboard')); else if (r === 'empty') toast.warn(t('Select something first.')); else toast.warn(t('Clipboard unavailable.')); }); } },
+        { label: t('Import'), sub: [
+          { label: t('Import Image…'), onClick: () => imageRef.current?.click(), kbd: getBinding('file.importImage') },
+          { label: t('Import PDF…'), onClick: () => pdfRef.current?.click() },
+          { label: t('Paste from Clipboard'), onClick: () => { void withIO3((m) => m.pasteFromSystemClipboard()).then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }).catch((e) => console.warn('io3 chunk failed to load — paste disabled', e)); } },
+        ] },
+        { label: t('Export'), sub: [
+          // File-menu exports route through the format registry — same files,
+          // filenames, and options as before, but every consumer (CommandPalette,
+          // drag-drop, AI skills, future Tauri "Save as…" dialog) reads the
+          // single source of truth. `exportPDFReal` (vector PDF) doesn't have a
+          // registry entry yet; its options story is heavier and migrates in a
+          // later cycle.
+          { label: t('Export SVG'), onClick: async () => { void getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
+          { label: t('Export PNG (2×)'), onClick: async () => { void getFormat('png')?.export?.(); } },
+          { label: t('Export JPG (2×)'), onClick: async () => { void getFormat('jpg')?.export?.(); } },
+          { label: t('Export PDF'), onClick: async () => { void getFormat('pdf')?.export?.(); } },
+          { label: t('Export PDF (Vector)'), onClick: async () => { void getFormat('pdf-vector')?.export?.(); } },
+          { label: t('Export DXF (paths)'), onClick: async () => { void getFormat('dxf')?.export?.(); } },
+          { label: t('Export JSON'), onClick: async () => { void getFormat('json')?.export?.(); } },
+          // Print-then-cut RIP handoff: same files as the plain exports, with
+          // the store's cut paths appended (CutContour spot layer in the SVG,
+          // magenta hairlines in the PDF). Shared with the command palette via
+          // the cutPrepActions helpers.
+          { label: t('Export SVG (with cut layer)'), onClick: async () => (await import('../lib/cutPrepActions')).exportSvgWithCutLayer(t) },
+          { label: t('Export PDF (with cut layer)'), onClick: async () => (await import('../lib/cutPrepActions')).exportPdfWithCutLayer(t) },
+          { sep: true },
+          { label: t('Export Active Artboard (SVG)'), onClick: () => { void exportActiveArtboardAsSVG().then(ok => { if (ok) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); }); } },
+          { label: t('Export Active Artboard (PNG)'), onClick: () => { if (exportActiveArtboardAsPNG()) toast.success(t('Artboard exported')); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Export All Artboards (SVG)'), onClick: () => { void exportAllArtboardsAsFiles().then(n => { if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }); } },
+          { label: t('Export All Artboards (PNG)'), onClick: () => { const n = exportAllArtboardsAsPNG(); if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
+          { label: t('Export Artboard Range (SVG)…'), onClick: () => { void promptExportArtboardRangeAsSVG(t('Artboard range'), '1').then(n => { if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); }); } },
+          { label: t('Export Artboard Range (PNG)…'), onClick: () => { const n = promptExportArtboardRangeAsPNG(t('Artboard range'), '1'); if (n == null) toast.warn(t('Invalid artboard range.')); else if (n) toast.success(`${n} ${t('artboards exported')}`); else toast.warn(t('No artboards to export.')); } },
+          { label: t('Export Selection as SVG'), onClick: async () => { void (await import('../lib/exportSelection')).exportSelectionSVG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+          { label: t('Export Selection as PNG'), onClick: async () => { void (await import('../lib/exportSelection')).exportSelectionPNG().then(ok => { if (!ok) toast.warn(t('Select something first.')); }); } },
+          { label: t('Copy as SVG'), onClick: async () => { void (await import('../lib/exportSelection')).copySelectionSVG().then(r => { if (r === 'ok') toast.success(t('SVG copied to clipboard')); else if (r === 'empty') toast.warn(t('Select something first.')); else toast.warn(t('Clipboard unavailable.')); }); } },
+        ] },
         { sep: true },
         { label: t('Print…'), onClick: () => setModal('showPrint', true), kbd: getBinding('file.print') },
-        { label: t('Print Prep…'), onClick: openPrintPrep },
-        { label: t('Add Print Marks'), onClick: () => { const n = addPrintMarksToArtboard(); if (n) toast.success(`${n} ${t('print marks added')}`); else toast.warn(t('No artboard for print marks.')); } },
-        { label: t('Clear Print Marks'), onClick: () => { const n = clearPrintMarks(); if (n) toast.success(`${n} ${t('print marks cleared')}`); else toast.warn(t('No print marks.')); } },
-        { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true), kbd: getBinding('file.tilePrint') },
-        { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
-        { label: t('Nest (rotation-aware)'), onClick: runRotationNest },
-        { label: t('Nest cut paths (vinyl)'), onClick: async () => (await import('../lib/cutPrepActions')).nestCutPathsVinyl(t) },
-        { label: t('Nest cut paths (raster true-shape)'), onClick: async () => (await import('../lib/cutPrepActions')).nestCutPathsRaster(t) },
-        // Gang Sheet Builder — batch image files imposed onto a fixed-width
-        // DTF roll (nest + one production PNG out). File-menu neighbour of
-        // the nest actions because it is file-intake driven, not selection-driven.
-        { label: t('Gang Sheet Builder…'), onClick: () => setModal('showGangSheet', true) },
-        { label: t('Add positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
-        {
-          label: t('Weed border'),
-          sub: [
-            { label: t('Border only'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t) },
-            { label: t('Weed rows'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 2, 0) },
-            { label: t('Weed columns'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 0, 2) },
-            { label: t('2×2'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 2, 2) },
-            { label: t('3×2'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 3, 2) },
-          ],
-        },
-        {
-          label: t('Bridges'),
-          sub: [
-            { label: t('Light'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 2, 0.6) },
-            { label: t('Standard'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1) },
-            { label: t('Heavy'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 6, 1.5) },
-          ],
-        },
-        {
-          label: t('Banner Grommet presets'),
-          sub: [
-            { label: t('Small banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 15, 300, 8) },
-            { label: t('Standard banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 20, 500, 10) },
-            { label: t('Large banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 25, 750, 12) },
-            { label: t('Custom…'), onClick: () => openWithSelection('showGrommets') },
-          ],
-        },
-        { label: t('Save Test Cut File'), onClick: async () => (await import('../lib/cutPrepActions')).savePlotterTestCut(t) },
-        { label: t('Clear positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterRegistrationMarks(t) },
-        { label: t('Clear weed borders'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterWeedBorders(t) },
-        { label: t('Clear bridges'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterBridges(t) },
-        { label: t('Clear cut paths'), onClick: () => clearCutJob(), disabled: cutPathCount === 0 },
-        { label: t('Send to Plotter…'), onClick: () => setModal('showPlotter', true), kbd: getBinding('window.plotter') },
-        { label: t('Epson maintenance…'), onClick: () => setModal('showEpsonMaint', true) },
+        { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
         ...buildRecentFilesItems(recent),
       ]} />
 
@@ -438,348 +379,89 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true), kbd: getBinding('text.findReplace') },
         { label: t('Select All'), onClick: () => { const n = selectAllObjects(); if (!n) toast.warn(t('Nothing to select.')); }, kbd: getBinding('edit.selectAll') },
         { label: t('Deselect All'), onClick: () => { deselectAll(); }, kbd: getBinding('edit.deselectAll') },
-        { label: t('Select Visible Objects'), onClick: () => { const n = selectVisibleObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No visible unlocked objects.')); } },
-        { label: t('Select Visible Active Artboard Objects'), onClick: () => { const n = selectVisibleActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Select Unlocked Objects'), onClick: () => { const n = selectUnlockedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unlocked objects.')); } },
-        { label: t('Select Unlocked Active Artboard Objects'), onClick: () => { const n = selectUnlockedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Select Locked Objects'), onClick: () => { const n = selectLockedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No locked objects.')); } },
-        { label: t('Select Locked Active Artboard Objects'), onClick: () => { const n = selectLockedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Select Hidden Objects'), onClick: () => { const n = selectHiddenObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No hidden objects.')); } },
-        { label: t('Select Hidden Active Artboard Objects'), onClick: () => { const n = selectHiddenActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Fix Hidden Objects'), onClick: () => { const n = fixHiddenObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No hidden objects.')); } },
-        { label: t('Fix Hidden Active Artboard Objects'), onClick: () => { const n = fixHiddenActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+        // The long tail of Select Visible / Unlocked / Locked / Hidden ×
+        // (document | active artboard) helpers moved out of the menu —
+        // every one remains reachable from the command palette (verified
+        // 1:1 label match in CommandPalette.tsx; see the reorg report).
         { label: t('Select Same'), sub: [
+          // High-frequency subset kept in the menu; the remaining 79
+          // "Select Same …" variants (appearance / geometry / artboard
+          // scoping pairs) are command-palette only — every removed label
+          // was verified 1:1 against CommandPalette.tsx first.
           { label: t('Select Same Fill'), onClick: () => { const n = selectSame('fill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-          { label: t('Select Same Fill Appearance'), onClick: () => { const n = selectSame('fillAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a fill first.')); } },
-          { label: t('Select Same Fill Appearance Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('fillAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
           { label: t('Select Same Stroke'), onClick: () => { const n = selectSame('stroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
           { label: t('Select Same Fill & Stroke'), onClick: () => { const n = selectSame('fillStroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-          { label: t('Select Same Fill & Stroke Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('fillStroke'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Stroke Appearance'), onClick: () => { const n = selectSame('strokeAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a stroke first.')); } },
-          { label: t('Select Same Stroke Appearance Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('strokeAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Stroke Weight'), onClick: () => { const n = selectSame('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Stroke Weight Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('strokeWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
           { label: t('Select Same Opacity'), onClick: () => { const n = selectSame('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Opacity Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('opacity'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
           { label: t('Select Same Font Family'), onClick: () => { const n = selectSame('fontFamily'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); } },
-          { label: t('Select Same Font Family Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('fontFamily'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
           { label: t('Select Same Font Size'), onClick: () => { const n = selectSame('fontSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); } },
-          { label: t('Select Same Font Size Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('fontSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Text Appearance'), onClick: () => { const n = selectSame('textAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a text object first.')); } },
-          { label: t('Select Same Text Appearance Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('textAppearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Blend Mode'), onClick: () => { const n = selectSame('globalCompositeOperation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Blend Mode Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('globalCompositeOperation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Dash'), onClick: () => { const n = selectSame('strokeDashArray'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Dash Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('strokeDashArray'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Line Cap'), onClick: () => { const n = selectSame('strokeLineCap'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Line Cap Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('strokeLineCap'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Line Join'), onClick: () => { const n = selectSame('strokeLineJoin'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Line Join Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('strokeLineJoin'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
           { label: t('Select Same Type'), onClick: () => { const n = selectSameType(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Type Active Artboard Objects'), onClick: () => { const n = selectSameTypeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same X Position'), onClick: () => { const n = selectSame('objectX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same X Position Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Y Position'), onClick: () => { const n = selectSame('objectY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Y Position Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Position'), onClick: () => { const n = selectSame('objectPosition'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Position Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectPosition'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Right Edge'), onClick: () => { const n = selectSame('objectRight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Right Edge Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectRight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Bottom Edge'), onClick: () => { const n = selectSame('objectBottom'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Bottom Edge Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectBottom'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Bounds'), onClick: () => { const n = selectSame('objectBounds'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Bounds Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectBounds'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Center X'), onClick: () => { const n = selectSame('objectCenterX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Center X Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectCenterX'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Center Y'), onClick: () => { const n = selectSame('objectCenterY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Center Y Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectCenterY'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Center'), onClick: () => { const n = selectSame('objectCenter'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Center Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectCenter'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Width'), onClick: () => { const n = selectSame('objectWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Width Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectWidth'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Height'), onClick: () => { const n = selectSame('objectHeight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Height Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectHeight'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Object Size'), onClick: () => { const n = selectSame('objectSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Object Size Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectSize'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Area'), onClick: () => { const n = selectSame('objectArea'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Area Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectArea'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Aspect Ratio'), onClick: () => { const n = selectSame('objectAspectRatio'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Aspect Ratio Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectAspectRatio'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Scale'), onClick: () => { const n = selectSame('objectScale'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Scale Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectScale'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Skew'), onClick: () => { const n = selectSame('objectSkew'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Skew Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectSkew'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Rotation'), onClick: () => { const n = selectSame('objectRotation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Rotation Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectRotation'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Transform'), onClick: () => { const n = selectSame('objectTransform'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Transform Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('objectTransform'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Artboard Placement'), onClick: () => { const n = selectSame('artboardPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Artboard Placement Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('artboardPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Any-Artboard Placement'), onClick: () => { const n = selectSame('artboardAnyPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Any-Artboard Placement Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('artboardAnyPlacement'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Name'), onClick: () => { const n = selectSame('name'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a named object first.')); } },
-          { label: t('Select Same Name Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('name'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Appearance'), onClick: () => { const n = selectSame('appearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object first.')); } },
-          { label: t('Select Same Appearance Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('appearance'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Shadow'), onClick: () => { const n = selectSame('shadow'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a drop shadow first.')); } },
-          { label: t('Select Same Shadow Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('shadow'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Pattern Fill'), onClick: () => { const n = selectSame('patternSpec'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a pattern fill first.')); } },
-          { label: t('Select Same Pattern Fill Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('patternSpec'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Gradient Fill'), onClick: () => { const n = selectSame('gradientFill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object with a gradient fill first.')); } },
-          { label: t('Select Same Gradient Fill Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('gradientFill'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Overprint'), onClick: () => { const n = selectSame('overprint'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an overprint object first.')); } },
-          { label: t('Select Same Overprint Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('overprint'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Print Mark Type'), onClick: () => { const n = selectSame('printMarkKind'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a print mark first.')); } },
-          { label: t('Select Same Print Mark Type Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('printMarkKind'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Symbol'), onClick: () => { const n = selectSame('symbolId'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a symbol instance first.')); } },
-          { label: t('Select Same Symbol Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('symbolId'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Clipping Mask'), onClick: () => { const n = selectSame('clipPath'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select a clipping group first.')); } },
-          { label: t('Select Same Clipping Mask Active Artboard Objects'), onClick: () => { const n = selectSameActiveArtboard('clipPath'); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
         ] },
-        { label: t('Select Object'), sub: [
-          { label: t('Select All Text Objects'), onClick: () => { const n = selectAllText(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text objects.')); } },
-          { label: t('Select All Text Active Artboard Objects'), onClick: () => { const n = selectAllTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Point Text Objects'), onClick: () => { const n = selectPointTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No point text objects.')); } },
-          { label: t('Select Point Text Active Artboard Objects'), onClick: () => { const n = selectPointTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Area Text Objects'), onClick: () => { const n = selectAreaTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No area text objects.')); } },
-          { label: t('Select Area Text Active Artboard Objects'), onClick: () => { const n = selectAreaTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Overflowing Text Objects'), onClick: () => { const n = selectOverflowingTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overflowing text objects.')); } },
-          { label: t('Select Overflowing Text Active Artboard Objects'), onClick: () => { const n = selectOverflowingTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Empty Text Objects'), onClick: () => { const n = selectEmptyTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No empty text objects.')); } },
-          { label: t('Select Empty Text Active Artboard Objects'), onClick: () => { const n = selectEmptyTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Empty Text Objects'), onClick: () => { const n = fixEmptyTextObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No empty text objects.')); } },
-          { label: t('Fix Empty Text Active Artboard Objects'), onClick: () => { const n = fixEmptyTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Text on Path Objects'), onClick: () => { const n = selectTextOnPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No text on path objects.')); } },
-          { label: t('Select Text on Path Active Artboard Objects'), onClick: () => { const n = selectTextOnPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Missing Font Text Objects'), onClick: () => { const n = selectMissingFontTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No missing font text objects.')); } },
-          { label: t('Select Missing Font Text Active Artboard Objects'), onClick: () => { const n = selectMissingFontTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Custom Text Spacing Objects'), onClick: () => { const n = selectCustomTextSpacingObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No custom text spacing objects.')); } },
-          { label: t('Select Custom Text Spacing Active Artboard Objects'), onClick: () => { const n = selectCustomTextSpacingActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Decorated Text Objects'), onClick: () => { const n = selectDecoratedTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No decorated text objects.')); } },
-          { label: t('Select Decorated Text Active Artboard Objects'), onClick: () => { const n = selectDecoratedTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Non-Left Aligned Text Objects'), onClick: () => { const n = selectNonLeftAlignedTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No non-left aligned text objects.')); } },
-          { label: t('Select Non-Left Aligned Text Active Artboard Objects'), onClick: () => { const n = selectNonLeftAlignedTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Styled Text Objects'), onClick: () => { const n = selectStyledTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No styled text objects.')); } },
-          { label: t('Select Styled Text Active Artboard Objects'), onClick: () => { const n = selectStyledTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Transformed Text Objects'), onClick: () => { const n = selectTransformedTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transformed text objects.')); } },
-          { label: t('Select Transformed Text Active Artboard Objects'), onClick: () => { const n = selectTransformedTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Mixed Style Text Objects'), onClick: () => { const n = selectMixedStyleTextObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No mixed style text objects.')); } },
-          { label: t('Select Mixed Style Text Active Artboard Objects'), onClick: () => { const n = selectMixedStyleTextActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select All Image Objects'), onClick: () => { const n = selectAllImages(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No image objects.')); } },
-          { label: t('Select All Image Active Artboard Objects'), onClick: () => { const n = selectAllImagesActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Filtered Image Objects'), onClick: () => { const n = selectFilteredImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No filtered image objects.')); } },
-          { label: t('Select Filtered Image Active Artboard Objects'), onClick: () => { const n = selectFilteredImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Filtered Image Objects'), onClick: () => { const n = fixFilteredImageObjects(); if (n) toast.success(`${n} ${t('image filters cleared')}`); else toast.warn(t('No filtered image objects.')); } },
-          { label: t('Fix Filtered Image Active Artboard Objects'), onClick: () => { const n = fixFilteredImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('image filters cleared')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Cropped Image Objects'), onClick: () => { const n = selectCroppedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No cropped image objects.')); } },
-          { label: t('Select Cropped Image Active Artboard Objects'), onClick: () => { const n = selectCroppedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Cropped Image Objects'), onClick: () => { const n = fixCroppedImageObjects(); if (n) toast.success(`${n} ${t('image crops cleared')}`); else toast.warn(t('No cropped image objects.')); } },
-          { label: t('Fix Cropped Image Active Artboard Objects'), onClick: () => { const n = fixCroppedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('image crops cleared')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Embedded Image Objects'), onClick: () => { const n = selectEmbeddedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No embedded image objects.')); } },
-          { label: t('Select Embedded Image Active Artboard Objects'), onClick: () => { const n = selectEmbeddedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Linked Image Objects'), onClick: () => { const n = selectLinkedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No linked image objects.')); } },
-          { label: t('Select Linked Image Active Artboard Objects'), onClick: () => { const n = selectLinkedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Image Links Summary'), onClick: () => toast.info(imageLinksSummaryText(imageLinksSummary())) },
-          { label: t('Image Links Active Artboard Summary'), onClick: () => toast.info(imageLinksSummaryText(imageLinksActiveArtboardSummary())) },
-          { label: t('Copy Image Handoff Report'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffReport()) },
-          { label: t('Copy Image Handoff TSV Report'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffTsvReport()) },
-          { label: t('Copy Image Handoff JSON Report'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffJsonReport()) },
-          { label: t('Copy Image Handoff Source Manifest'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffSourceManifest()) },
-          { label: t('Copy Image Handoff Package Checklist'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffPackageChecklist()) },
-          { label: t('Copy Image Handoff Collect Script'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffCollectScript()) },
-          { label: t('Copy Image Handoff Collect PowerShell'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffCollectPowerShell()) },
-          { label: t('Copy Image Handoff Verify Script'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffVerifyScript()) },
-          { label: t('Copy Image Handoff Package Blockers'), onClick: async () => copyImageHandoffReport((await import('../lib/imageHandoff')).imageHandoffPackageBlockers()) },
-          { label: t('Select Unknown Source Image Objects'), onClick: () => { const n = selectUnknownSourceImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unknown source image objects.')); } },
-          { label: t('Select Unknown Source Image Active Artboard Objects'), onClick: () => { const n = selectUnknownSourceImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Embeddable Linked Image Objects'), onClick: () => { const n = selectEmbeddableLinkedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No embeddable linked image objects.')); } },
-          { label: t('Select Embeddable Linked Image Active Artboard Objects'), onClick: () => { const n = selectEmbeddableLinkedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Not Embeddable Linked Image Objects'), onClick: () => { const n = selectNotEmbeddableLinkedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No not embeddable linked image objects.')); } },
-          { label: t('Select Not Embeddable Linked Image Active Artboard Objects'), onClick: () => { const n = selectNotEmbeddableLinkedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Image Handoff Risk Objects'), onClick: () => { const n = selectImageHandoffRiskObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No image handoff risk objects.')); } },
-          { label: t('Select Image Handoff Risk Active Artboard Objects'), onClick: () => { const n = selectImageHandoffRiskActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Embed Linked Image Objects'), onClick: () => { const r = embedLinkedImageObjectsDetailed(); if (r.failed > 0) toast.warn(`${r.failed} ${t('linked images failed to embed (cross-origin or serialization failure)')}`); else if (r.embedded > 0) toast.success(`${r.embedded} ${t('linked images embedded')}`); else toast.warn(t('No embeddable linked image objects.')); } },
-          { label: t('Embed Linked Image Active Artboard Objects'), onClick: () => { const r = embedLinkedImageActiveArtboardObjectsDetailed(); if (r.failed > 0) toast.warn(`${r.failed} ${t('linked images failed to embed (cross-origin or serialization failure)')}`); else if (r.embedded > 0) toast.success(`${r.embedded} ${t('linked images embedded')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Restore Embedded Image Link Objects'), onClick: () => { const n = restoreEmbeddedImageLinkObjects(); if (n) toast.success(`${n} ${t('embedded image links restored')}`); else toast.warn(t('No restorable embedded image links.')); } },
-          { label: t('Restore Embedded Image Link Active Artboard Objects'), onClick: () => { const n = restoreEmbeddedImageLinkActiveArtboardObjects(); if (n) toast.success(`${n} ${t('embedded image links restored')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Restorable Embedded Image Link Objects'), onClick: () => { const n = selectRestorableEmbeddedImageLinkObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No restorable embedded image links.')); } },
-          { label: t('Select Restorable Embedded Image Link Active Artboard Objects'), onClick: () => { const n = selectRestorableEmbeddedImageLinkActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Missing Linked Image Objects'), onClick: () => { const n = selectMissingLinkedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No missing linked image objects.')); } },
-          { label: t('Select Missing Linked Image Active Artboard Objects'), onClick: () => { const n = selectMissingLinkedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Missing Linked Image Objects'), onClick: () => { const n = fixMissingLinkedImageObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No missing linked image objects.')); } },
-          { label: t('Fix Missing Linked Image Active Artboard Objects'), onClick: () => { const n = fixMissingLinkedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Transformed Image Objects'), onClick: () => { const n = selectTransformedImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transformed image objects.')); } },
-          { label: t('Select Transformed Image Active Artboard Objects'), onClick: () => { const n = selectTransformedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Transformed Image Objects'), onClick: () => { const n = fixTransformedImageObjects(); if (n) toast.success(`${n} ${t('transformed images marked')}`); else toast.warn(t('No transformed image objects.')); } },
-          { label: t('Fix Transformed Image Active Artboard Objects'), onClick: () => { const n = fixTransformedImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('transformed images marked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Low Resolution Image Objects'), onClick: () => { const n = selectLowResolutionImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No low resolution image objects.')); } },
-          { label: t('Select Low Resolution Image Active Artboard Objects'), onClick: () => { const n = selectLowResolutionImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Low Resolution Image Objects'), onClick: () => { const n = fixLowResolutionImageObjects(); if (n) toast.success(`${n} ${t('low resolution images marked')}`); else toast.warn(t('No low resolution image objects.')); } },
-          { label: t('Fix Low Resolution Image Active Artboard Objects'), onClick: () => { const n = fixLowResolutionImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('low resolution images marked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select High Resolution Image Objects'), onClick: () => { const n = selectHighResolutionImageObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No high resolution image objects.')); } },
-          { label: t('Select High Resolution Image Active Artboard Objects'), onClick: () => { const n = selectHighResolutionImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix High Resolution Image Objects'), onClick: () => { const n = fixHighResolutionImageObjects(); if (n) toast.success(`${n} ${t('high resolution images marked')}`); else toast.warn(t('No high resolution image objects.')); } },
-          { label: t('Fix High Resolution Image Active Artboard Objects'), onClick: () => { const n = fixHighResolutionImageActiveArtboardObjects(); if (n) toast.success(`${n} ${t('high resolution images marked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Image Preflight Summary'), onClick: () => toast.info(imagePreflightSummaryText(imagePreflightSummary())) },
-          { label: t('Image Preflight Active Artboard Summary'), onClick: () => toast.info(imagePreflightSummaryText(imagePreflightActiveArtboardSummary())) },
-          { label: t('Select All Image Preflight Objects'), onClick: () => { const n = selectAllImagePreflightObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No image preflight issues.')); } },
-          { label: t('Select All Image Preflight Active Artboard Objects'), onClick: () => { const n = selectAllImagePreflightActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix All Image Preflight Objects'), onClick: () => { const n = fixAllImagePreflightObjects(); if (n) toast.success(`${n} ${t('image preflight issues fixed')}`); else toast.warn(t('No image preflight issues.')); } },
-          { label: t('Fix All Image Preflight Active Artboard Objects'), onClick: () => { const n = fixAllImagePreflightActiveArtboardObjects(); if (n) toast.success(`${n} ${t('image preflight issues fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Image Preflight Review Objects'), onClick: () => { const n = selectImagePreflightReviewObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No image preflight review markers.')); } },
-          { label: t('Select Image Preflight Review Active Artboard Objects'), onClick: () => { const n = selectImagePreflightReviewActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Clear Image Preflight Review Objects'), onClick: () => { const n = clearImagePreflightReviewObjects(); if (n) toast.success(`${n} ${t('image preflight reviews cleared')}`); else toast.warn(t('No image preflight review markers.')); } },
-          { label: t('Clear Image Preflight Review Active Artboard Objects'), onClick: () => { const n = clearImagePreflightReviewActiveArtboardObjects(); if (n) toast.success(`${n} ${t('image preflight reviews cleared')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Transformed Objects'), onClick: () => { const n = selectTransformedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transformed objects.')); } },
-          { label: t('Select Transformed Active Artboard Objects'), onClick: () => { const n = selectTransformedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select All Path Objects'), onClick: () => { const n = selectAllPaths(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No path objects.')); } },
-          { label: t('Select All Path Active Artboard Objects'), onClick: () => { const n = selectAllPathsActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select All Shape Objects'), onClick: () => { const n = selectAllShapes(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No shape objects.')); } },
-          { label: t('Select All Shape Active Artboard Objects'), onClick: () => { const n = selectAllShapesActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select All Group Objects'), onClick: () => { const n = selectAllGroups(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No group objects.')); } },
-          { label: t('Select All Group Active Artboard Objects'), onClick: () => { const n = selectAllGroupsActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Named Objects'), onClick: () => { const n = selectNamedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No named objects.')); } },
-          { label: t('Select Named Active Artboard Objects'), onClick: () => { const n = selectNamedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Unnamed Objects'), onClick: () => { const n = selectUnnamedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unnamed objects.')); } },
-          { label: t('Select Unnamed Active Artboard Objects'), onClick: () => { const n = selectUnnamedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Clipping Masked Objects'), onClick: () => { const n = selectClippingMaskedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No clipping masked objects.')); } },
-          { label: t('Select Clipping Masked Active Artboard Objects'), onClick: () => { const n = selectClippingMaskedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Open Path Objects'), onClick: () => { const n = selectOpenPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No open path objects.')); } },
-          { label: t('Select Open Path Active Artboard Objects'), onClick: () => { const n = selectOpenPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Compound Path Objects'), onClick: () => { const n = selectCompoundPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No compound path objects.')); } },
-          { label: t('Select Compound Path Active Artboard Objects'), onClick: () => { const n = selectCompoundPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Stray Point Objects'), onClick: () => { const n = selectStrayPointObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No stray point objects.')); } },
-          { label: t('Select Stray Point Active Artboard Objects'), onClick: () => { const n = selectStrayPointActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix All Cleanup Objects'), onClick: () => { const n = fixAllCleanupObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No cleanup objects found.')); } },
-          { label: t('Fix All Cleanup Active Artboard Objects'), onClick: () => { const n = fixAllCleanupActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Stray Point Objects'), onClick: () => { const n = fixStrayPointObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No stray point objects.')); } },
-          { label: t('Fix Stray Point Active Artboard Objects'), onClick: () => { const n = fixStrayPointActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Zero-Length Path Objects'), onClick: () => { const n = selectZeroLengthPathObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No zero-length path objects.')); } },
-          { label: t('Select Zero-Length Path Active Artboard Objects'), onClick: () => { const n = selectZeroLengthPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Zero-Length Path Objects'), onClick: () => { const n = fixZeroLengthPathObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No zero-length path objects.')); } },
-          { label: t('Fix Zero-Length Path Active Artboard Objects'), onClick: () => { const n = fixZeroLengthPathActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Zero-Size Objects'), onClick: () => { const n = selectZeroSizeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No zero-size objects.')); } },
-          { label: t('Select Zero-Size Active Artboard Objects'), onClick: () => { const n = selectZeroSizeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Zero-Size Objects'), onClick: () => { const n = fixZeroSizeObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No zero-size objects.')); } },
-          { label: t('Fix Zero-Size Active Artboard Objects'), onClick: () => { const n = fixZeroSizeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Empty Group Objects'), onClick: () => { const n = selectEmptyGroupObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No empty group objects.')); } },
-          { label: t('Select Empty Group Active Artboard Objects'), onClick: () => { const n = selectEmptyGroupActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Empty Group Objects'), onClick: () => { const n = fixEmptyGroupObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No empty group objects.')); } },
-          { label: t('Fix Empty Group Active Artboard Objects'), onClick: () => { const n = fixEmptyGroupActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Unpainted Objects'), onClick: () => { const n = selectUnpaintedObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No unpainted objects.')); } },
-          { label: t('Select Unpainted Active Artboard Objects'), onClick: () => { const n = selectUnpaintedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Unpainted Objects'), onClick: () => { const n = fixUnpaintedObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No unpainted objects.')); } },
-          { label: t('Fix Unpainted Active Artboard Objects'), onClick: () => { const n = fixUnpaintedActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Drop Shadow Objects'), onClick: () => { const n = selectDropShadowObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No drop shadow objects.')); } },
-          { label: t('Select Drop Shadow Active Artboard Objects'), onClick: () => { const n = selectDropShadowActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Transparency Objects'), onClick: () => { const n = selectTransparencyObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No transparency objects.')); } },
-          { label: t('Select Transparency Active Artboard Objects'), onClick: () => { const n = selectTransparencyActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Transparency Objects'), onClick: () => { const n = fixTransparencyObjects(); if (n) toast.success(`${n} ${t('transparency flattened')}`); else toast.warn(t('No transparency objects.')); } },
-          { label: t('Fix Transparency Active Artboard Objects'), onClick: () => { const n = fixTransparencyActiveArtboardObjects(); if (n) toast.success(`${n} ${t('transparency flattened')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Fully Transparent Objects'), onClick: () => { const n = selectFullyTransparentObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No fully transparent objects.')); } },
-          { label: t('Select Fully Transparent Active Artboard Objects'), onClick: () => { const n = selectFullyTransparentActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Fully Transparent Objects'), onClick: () => { const n = fixFullyTransparentObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No fully transparent objects.')); } },
-          { label: t('Fix Fully Transparent Active Artboard Objects'), onClick: () => { const n = fixFullyTransparentActiveArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Dashed Stroke Objects'), onClick: () => { const n = selectDashedStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No dashed stroke objects.')); } },
-          { label: t('Select Dashed Stroke Active Artboard Objects'), onClick: () => { const n = selectDashedStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Dashed Stroke Objects'), onClick: () => { const n = fixDashedStrokeObjects(); if (n) toast.success(`${n} ${t('dash patterns cleared')}`); else toast.warn(t('No dashed stroke objects.')); } },
-          { label: t('Fix Dashed Stroke Active Artboard Objects'), onClick: () => { const n = fixDashedStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('dash patterns cleared')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Thin Stroke Objects'), onClick: () => { const n = selectThinStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No thin stroke objects.')); } },
-          { label: t('Select Thin Stroke Active Artboard Objects'), onClick: () => { const n = selectThinStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Thin Stroke Objects'), onClick: () => { const n = fixThinStrokeObjects(); if (n) toast.success(`${n} ${t('thin strokes fixed')}`); else toast.warn(t('No thin stroke objects.')); } },
-          { label: t('Fix Thin Stroke Active Artboard Objects'), onClick: () => { const n = fixThinStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('thin strokes fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Overprint Objects'), onClick: () => { const n = selectOverprintObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overprint objects.')); } },
-          { label: t('Select Overprint Active Artboard Objects'), onClick: () => { const n = selectOverprintActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Overprint Objects'), onClick: () => { const n = fixOverprintObjects(); if (n) toast.success(`${n} ${t('overprint flags cleared')}`); else toast.warn(t('No overprint objects.')); } },
-          { label: t('Fix Overprint Active Artboard Objects'), onClick: () => { const n = fixOverprintActiveArtboardObjects(); if (n) toast.success(`${n} ${t('overprint flags cleared')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select White Overprint Objects'), onClick: () => { const n = selectWhiteOverprintObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No white overprint objects.')); } },
-          { label: t('Select White Overprint Active Artboard Objects'), onClick: () => { const n = selectWhiteOverprintActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix White Overprint Objects'), onClick: () => { const n = fixWhiteOverprintObjects(); if (n) toast.success(`${n} ${t('overprint flags cleared')}`); else toast.warn(t('No white overprint objects.')); } },
-          { label: t('Fix White Overprint Active Artboard Objects'), onClick: () => { const n = fixWhiteOverprintActiveArtboardObjects(); if (n) toast.success(`${n} ${t('overprint flags cleared')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix All Prepress Risks'), onClick: () => { const n = fixAllPrepressRisks(); if (n) toast.success(`${n} ${t('prepress risks fixed')}`); else toast.warn(t('No prepress risks found.')); } },
-          { label: t('Fix All Prepress Risks Active Artboard'), onClick: () => { const n = fixAllPrepressRisksActiveArtboard(); if (n) toast.success(`${n} ${t('prepress risks fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Spot Color Objects'), onClick: () => { const n = selectSpotColorObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No spot color objects.')); } },
-          { label: t('Select Spot Color Active Artboard Objects'), onClick: () => { const n = selectSpotColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Spot Color Objects'), onClick: () => { const n = fixSpotColorObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No spot color objects.')); } },
-          { label: t('Fix Spot Color Active Artboard Objects'), onClick: () => { const n = fixSpotColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select RGB Color Objects'), onClick: () => { const n = selectRgbColorObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No RGB color objects.')); } },
-          { label: t('Select RGB Color Active Artboard Objects'), onClick: () => { const n = selectRgbColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix RGB Color Objects'), onClick: () => { const n = fixRgbColorObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No RGB color objects.')); } },
-          { label: t('Fix RGB Color Active Artboard Objects'), onClick: () => { const n = fixRgbColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Grayscale Color Objects'), onClick: () => { const n = selectGrayscaleColorObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No grayscale color objects.')); } },
-          { label: t('Select Grayscale Color Active Artboard Objects'), onClick: () => { const n = selectGrayscaleColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Grayscale Color Objects'), onClick: () => { const n = fixGrayscaleColorObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No grayscale color objects.')); } },
-          { label: t('Fix Grayscale Color Active Artboard Objects'), onClick: () => { const n = fixGrayscaleColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Lab Color Objects'), onClick: () => { const n = selectLabColorObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No Lab color objects.')); } },
-          { label: t('Select Lab Color Active Artboard Objects'), onClick: () => { const n = selectLabColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Lab Color Objects'), onClick: () => { const n = fixLabColorObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No Lab color objects.')); } },
-          { label: t('Fix Lab Color Active Artboard Objects'), onClick: () => { const n = fixLabColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Non-CMYK Color Objects'), onClick: () => { const n = selectNonCmykColorObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No non-CMYK color objects.')); } },
-          { label: t('Select Non-CMYK Color Active Artboard Objects'), onClick: () => { const n = selectNonCmykColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Non-CMYK Color Objects'), onClick: () => { const n = fixNonCmykColorObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No non-CMYK color objects.')); } },
-          { label: t('Fix Non-CMYK Color Active Artboard Objects'), onClick: () => { const n = fixNonCmykColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Print Mark Objects'), onClick: () => { const n = selectPrintMarkObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No print mark objects.')); } },
-          { label: t('Select Print Mark Active Artboard Objects'), onClick: () => { const n = selectPrintMarkActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Rich Black Objects'), onClick: () => { const n = selectRichBlackObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No rich black objects.')); } },
-          { label: t('Select Rich Black Active Artboard Objects'), onClick: () => { const n = selectRichBlackActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Rich Black Objects'), onClick: () => { const n = fixRichBlackObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No rich black objects.')); } },
-          { label: t('Fix Rich Black Active Artboard Objects'), onClick: () => { const n = fixRichBlackActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Over Ink Limit Objects'), onClick: () => { const n = selectOverInkLimitObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No over ink limit objects.')); } },
-          { label: t('Select Over Ink Limit Active Artboard Objects'), onClick: () => { const n = selectOverInkLimitActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Over Ink Limit Objects'), onClick: () => { const n = fixOverInkLimitObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No over ink limit objects.')); } },
-          { label: t('Fix Over Ink Limit Active Artboard Objects'), onClick: () => { const n = fixOverInkLimitActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Registration Color Objects'), onClick: () => { const n = selectRegistrationColorObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No registration color objects.')); } },
-          { label: t('Select Registration Color Active Artboard Objects'), onClick: () => { const n = selectRegistrationColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Fix Registration Color Objects'), onClick: () => { const n = fixRegistrationColorObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('No registration color objects.')); } },
-          { label: t('Fix Registration Color Active Artboard Objects'), onClick: () => { const n = fixRegistrationColorActiveArtboardObjects(); if (n) toast.success(`${n} ${t('prepress paints fixed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Active Artboard Objects'), onClick: () => { const n = selectActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Same Artboard Objects'), onClick: () => { const n = selectSameArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Inside Active Artboard Objects'), onClick: () => { const n = selectInsideActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Overflowing Active Artboard Objects'), onClick: () => { const n = selectOverflowingActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Other Artboards Objects'), onClick: () => { const n = selectOtherArtboardsObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Outside Artboard Objects'), onClick: () => { const n = selectOutsideArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No outside artboard objects.')); } },
-          { label: t('Select Outside Any Artboard Objects'), onClick: () => { const n = selectOutsideAnyArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No outside any artboard objects.')); } },
-          { label: t('Fix Outside Artboard Objects'), onClick: () => { const n = fixOutsideArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No outside artboard objects.')); } },
-          { label: t('Fix Outside Any Artboard Objects'), onClick: () => { const n = fixOutsideAnyArtboardObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No outside any artboard objects.')); } },
-          { label: t('Select Inside Artboard Objects'), onClick: () => { const n = selectInsideArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No inside artboard objects.')); } },
-          { label: t('Select Inside Any Artboard Objects'), onClick: () => { const n = selectInsideAnyArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No inside any artboard objects.')); } },
-          { label: t('Select Overflowing Artboard Objects'), onClick: () => { const n = selectOverflowingArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overflowing artboard objects.')); } },
-          { label: t('Select Overflowing Any Artboard Objects'), onClick: () => { const n = selectOverflowingAnyArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No overflowing any artboard objects.')); } },
-          { label: t('Select Custom Stroke Objects'), onClick: () => { const n = selectCustomStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No custom stroke objects.')); } },
-          { label: t('Select Custom Stroke Active Artboard Objects'), onClick: () => { const n = selectCustomStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Non-Scaling Stroke Objects'), onClick: () => { const n = selectNonScalingStrokeObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No non-scaling stroke objects.')); } },
-          { label: t('Select Non-Scaling Stroke Active Artboard Objects'), onClick: () => { const n = selectNonScalingStrokeActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Pattern Fill Objects'), onClick: () => { const n = selectPatternFillObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No pattern fill objects.')); } },
-          { label: t('Select Pattern Fill Active Artboard Objects'), onClick: () => { const n = selectPatternFillActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select Gradient Fill Objects'), onClick: () => { const n = selectGradientFillObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No gradient fill objects.')); } },
-          { label: t('Select Gradient Fill Active Artboard Objects'), onClick: () => { const n = selectGradientFillActiveArtboardObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-          { label: t('Select All Symbol Instances'), onClick: () => { const n = selectAllSymbolInstances(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); } },
-        ] },
+        // "Select Object …" family (217 entries) moved out of the menu —
+        // every removed label was verified 1:1 against CommandPalette.tsx
+        // first, so the long tail stays reachable from the palette. The
+        // six high-frequency fix actions stay one click away, plus the
+        // cleanup pair (formerly Document > Path).
+        { label: t('Fix All Cleanup Objects'), onClick: () => { const n = fixAllCleanupObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No cleanup objects found.')); } },
+        { label: t('Fix Stray Point Objects'), onClick: () => { const n = fixStrayPointObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No stray point objects.')); } },
+        { label: t('Fix Empty Text Objects'), onClick: () => { const n = fixEmptyTextObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No empty text objects.')); } },
+        { label: t('Fix Missing Linked Image Objects'), onClick: () => { const n = fixMissingLinkedImageObjects(); if (n) toast.success(`${n} ${t('cleanup objects removed')}`); else toast.warn(t('No missing linked image objects.')); } },
+        { label: t('Fix All Prepress Risks'), onClick: () => { const n = fixAllPrepressRisks(); if (n) toast.success(`${n} ${t('prepress risks fixed')}`); else toast.warn(t('No prepress risks found.')); } },
+        { label: t('Fix All Image Preflight Objects'), onClick: () => { const n = fixAllImagePreflightObjects(); if (n) toast.success(`${n} ${t('image preflight issues fixed')}`); else toast.warn(t('No image preflight issues.')); } },
+        { label: t('Select Cleanup Objects'), onClick: () => { const n = selectCleanupObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.success(t('Nothing to clean up.')); } },
+        { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
         { label: t('Select Inverse'), onClick: () => { selectInverse(); }, kbd: getBinding('edit.selectInverse') },
         { label: t('Select Next Object Above'), onClick: () => { if (!selectObjectInStack('up')) toast.warn(t('Nothing above.')); }, kbd: getBinding('edit.selectNextAbove') },
         { label: t('Select Next Object Below'), onClick: () => { if (!selectObjectInStack('down')) toast.warn(t('Nothing below.')); }, kbd: getBinding('edit.selectNextBelow') },
         { sep: true },
-        { label: t('Transform…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showTransform', true); } },
-        { label: t('Resize…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showResize', true); } },
-        { label: t('Shear…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showShear', true); } },
-        { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: getBinding('edit.transformAgain') },
-        { label: t('Rotate 90° CW'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(90); } },
-        { label: t('Rotate 90° CCW'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(-90); } },
-        { label: t('Rotate 180°'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(180); } },
-        { label: t('Flip Horizontal'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else flipSelection('x'); }, kbd: getBinding('edit.flipH') },
-        { label: t('Flip Vertical'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else flipSelection('y'); }, kbd: getBinding('edit.flipV') },
-        { label: t('Reflect 45°'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else reflectSelection(45); } },
-        { label: t('Reflect 135°'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else reflectSelection(135); } },
-        { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: getBinding('edit.join') },
-        { sep: true },
+      ]} />
+
+      <Dropdown label={t('Object')} items={[
         { label: t('Group'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 2) toast.warn(t('Select 2 or more objects first.')); else groupSelection(); }, kbd: getBinding('edit.group') },
         { label: t('Isolation Mode'), onClick: () => { if (!toggleIsolationMode()) toast.warn(t('Select a group first.')); }, kbd: getBinding('object.isolation') },
         { label: t('Ungroup'), onClick: () => { if (getCanvas()?.getActiveObject()?.type !== 'group') toast.warn(t('Select a group first.')); else ungroupSelection(); }, kbd: getBinding('edit.ungroup') },
         { label: t('Ungroup All'), onClick: () => { const n = ungroupAll(); if (n) toast.success(`${n} ${t('groups ungrouped')}`); else toast.warn(t('Select a group first.')); } },
-        { label: t('Bring to Front'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else bringToFront(); }, kbd: `${getBinding('arrange.forwardFront').replace(/]$/, 'Shift+]')}` },
-        { label: t('Bring Forward'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else bringForward(); }, kbd: getBinding('arrange.forwardFront') },
-        { label: t('Send Backward'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else sendBackward(); }, kbd: getBinding('arrange.backwardBack') },
-        { label: t('Send to Back'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else sendToBack(); }, kbd: `${getBinding('arrange.backwardBack').replace(/[[]$/, 'Shift+[')}` },
+        { sep: true },
+        { label: t('Transform'), sub: [
+          { label: t('Transform…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showTransform', true); } },
+          { label: t('Resize…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showResize', true); } },
+          { label: t('Shear…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showShear', true); } },
+          { label: t('Free Distort…'), onClick: () => openWithSelection('showFreeDistort') },
+          { label: t('Transform Again'), onClick: () => { repeatTransform().then((ok) => { if (!ok) toast.warn(t('Apply a Transform first.')); }); }, kbd: getBinding('edit.transformAgain') },
+          { label: t('Rotate 90° CW'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(90); } },
+          { label: t('Rotate 90° CCW'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(-90); } },
+          { label: t('Rotate 180°'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else void rotateSelection(180); } },
+          { label: t('Flip Horizontal'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else flipSelection('x'); }, kbd: getBinding('edit.flipH') },
+          { label: t('Flip Vertical'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else flipSelection('y'); }, kbd: getBinding('edit.flipV') },
+          { label: t('Reflect 45°'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else reflectSelection(45); } },
+          { label: t('Reflect 135°'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else reflectSelection(135); } },
+        ] },
+        { label: t('Arrange'), sub: [
+          { label: t('Bring to Front'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else bringToFront(); }, kbd: `${getBinding('arrange.forwardFront').replace(/]$/, 'Shift+]')}` },
+          { label: t('Bring Forward'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else bringForward(); }, kbd: getBinding('arrange.forwardFront') },
+          { label: t('Send Backward'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else sendBackward(); }, kbd: getBinding('arrange.backwardBack') },
+          { label: t('Send to Back'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else sendToBack(); }, kbd: `${getBinding('arrange.backwardBack').replace(/[[]$/, 'Shift+[')}` },
+        ] },
+        { sep: true },
+        { label: t('Lock'), sub: [
+          { label: t('Lock Selection'), onClick: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select something first.')); }, kbd: getBinding('edit.lockSelection') },
+          { label: t('Lock Others'), onClick: () => { const n = lockOthers(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('No other unlocked objects.')); } },
+          { label: t('Lock Active Artboard'), onClick: () => { const n = lockActiveArtboard(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Lock Other Artboards'), onClick: () => { const n = lockOtherArtboards(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Unlock Selection'), onClick: () => { const n = unlockSelection(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked selection.')); } },
+          { label: t('Unlock Active Artboard'), onClick: () => { const n = unlockActiveArtboard(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Unlock Other Artboards'), onClick: () => { const n = unlockOtherArtboards(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Unlock All'), onClick: () => { const n = unlockAll(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked objects.')); }, kbd: getBinding('edit.unlockAll') },
+        ] },
+        { label: t('Hide'), sub: [
+          { label: t('Hide Selection'), onClick: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); }, kbd: getBinding('edit.hideSelection') },
+          { label: t('Hide Others'), onClick: () => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); } },
+          { label: t('Hide Active Artboard'), onClick: () => { const n = hideActiveArtboard(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Hide Other Artboards'), onClick: () => { const n = hideOtherArtboards(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Show Selection'), onClick: () => { const n = showSelection(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden selection.')); } },
+          { label: t('Show Active Artboard'), onClick: () => { const n = showActiveArtboard(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Show Other Artboards'), onClick: () => { const n = showOtherArtboards(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Show All'), onClick: () => { const n = showAll(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden objects.')); }, kbd: getBinding('edit.showAll') },
+        ] },
         { sep: true },
         { label: t('Pathfinder'), sub: [
           { label: t('Union'), onClick: () => { void booleanOp('union').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); } },
@@ -794,297 +476,16 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Merge Same Fill'), onClick: () => { const n = mergeSameFillSelection(); if (n) toast.success(`${n} ${t('same-fill groups merged')}`); else toast.warn(t('Select 2 or more same-fill shapes first.')); } },
           { label: t('Crop'), onClick: () => { const n = cropSelection(); if (!n) toast.warn(t('Select 2 or more objects first.')); } },
         ] },
+        { label: t('Join Paths'), onClick: () => { if (!joinSelection()) toast.warn(t('Select 1 open path to close, or 2 to join.')); }, kbd: getBinding('edit.join') },
         { label: t('Make Clipping Mask'), onClick: () => { if (!applyClipMask()) toast.warn(t('Select 2 or more objects first.')); }, kbd: getBinding('edit.clipMask') },
         { label: t('Release Clipping Mask'), onClick: () => { if (!releaseClipMask()) toast.warn(t('Select a clipping group first.')); }, kbd: getBinding('edit.releaseClip') },
         { label: t('Expand Clipping Mask'), onClick: () => { const n = expandClippingMask(); if (n) toast.success(`${n} ${t('clip masks expanded')}`); else toast.warn(t('Select a clipping group first.')); } },
         { label: t('Make Compound Path'), onClick: () => { if (!makeCompoundPath()) toast.warn(t('Select 2 or more objects first.')); }, kbd: getBinding('edit.compoundPath') },
         { label: t('Release Compound Path'), onClick: () => { if (!releaseCompoundPath()) toast.warn(t('Select a compound path first.')); }, kbd: getBinding('edit.releaseCompound') },
         { sep: true },
-        { label: t('Lock Selection'), onClick: () => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select something first.')); }, kbd: getBinding('edit.lockSelection') },
-        { label: t('Lock Others'), onClick: () => { const n = lockOthers(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('No other unlocked objects.')); } },
-        { label: t('Lock Active Artboard'), onClick: () => { const n = lockActiveArtboard(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Lock Other Artboards'), onClick: () => { const n = lockOtherArtboards(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Unlock Selection'), onClick: () => { const n = unlockSelection(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked selection.')); } },
-        { label: t('Unlock Active Artboard'), onClick: () => { const n = unlockActiveArtboard(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Unlock Other Artboards'), onClick: () => { const n = unlockOtherArtboards(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Unlock All'), onClick: () => { const n = unlockAll(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked objects.')); }, kbd: getBinding('edit.unlockAll') },
-        { label: t('Hide Selection'), onClick: () => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); }, kbd: getBinding('edit.hideSelection') },
-        { label: t('Hide Others'), onClick: () => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); } },
-        { label: t('Hide Active Artboard'), onClick: () => { const n = hideActiveArtboard(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Hide Other Artboards'), onClick: () => { const n = hideOtherArtboards(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Show Selection'), onClick: () => { const n = showSelection(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden selection.')); } },
-        { label: t('Show Active Artboard'), onClick: () => { const n = showActiveArtboard(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Show Other Artboards'), onClick: () => { const n = showOtherArtboards(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Show All'), onClick: () => { const n = showAll(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden objects.')); }, kbd: getBinding('edit.showAll') },
-      ]} />
-
-      <Dropdown label={t('Type')} items={[
-        { label: t('Create Outlines'), onClick: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); }, kbd: getBinding('text.createOutlines') },
-        { label: t('Break Text into Letters'), onClick: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.splitLetters') },
-        { label: t('Break Text into Lines'), onClick: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); }, kbd: getBinding('text.splitLines') },
+        { label: t('Expand Appearance'), onClick: () => { void expandAppearanceSelection().then((n) => { if (n) toast.success(`${n} ${t('appearances expanded')}`); else toast.warn(t('Select objects with expandable appearance first.')); }); } },
+        { label: t('Flatten Transparency'), onClick: () => { const n = flattenTransparencySelection(); if (n) toast.success(`${n} ${t('objects flattened')}`); else toast.warn(t('Select transparent or blended objects first.')); } },
         { sep: true },
-        { label: t('Text on Arc (Up)'), onClick: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.arcUp') },
-        { label: t('Text on Arc (Down)'), onClick: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.arcDown') },
-        { sep: true },
-        { label: t('Change Case'), sub: [
-          { label: t('UPPERCASE'), onClick: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseUpper') },
-          { label: t('lowercase'), onClick: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseLower') },
-          { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseTitle') },
-          { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseSentence') },
-        ] },
-        { label: t('Smart Punctuation'), onClick: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.smartPunctuation') },
-        { sep: true },
-        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true), kbd: getBinding('text.findReplace') },
-      ]} />
-
-      <Dropdown label={t('View')} items={[
-        { label: t('Zoom In'), onClick: () => zoomBy(1.25), kbd: getBinding('view.zoomIn') },
-        { label: t('Zoom Out'), onClick: () => zoomBy(1 / 1.25), kbd: getBinding('view.zoomOut') },
-        { label: t('Actual Size'), onClick: () => zoomToPercent(100), kbd: getBinding('view.actualSize') },
-        { label: t('Fit to Page'), onClick: () => zoomFit(), kbd: getBinding('view.zoomFit') },
-        { label: t('Fit All Artboards in Window'), onClick: () => { if (!zoomToAllArtboards()) toast.warn(t('No artboards to navigate.')); } },
-        { label: t('Zoom to Active Artboard'), onClick: () => { if (!zoomToActiveArtboard()) toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Previous Artboard'), onClick: () => { if (!zoomToAdjacentArtboard(-1)) toast.warn(t('No artboards to navigate.')); } },
-        { label: t('Next Artboard'), onClick: () => { if (!zoomToAdjacentArtboard(1)) toast.warn(t('No artboards to navigate.')); } },
-        { label: t('Zoom to Selection'), onClick: () => { if (!zoomToSelection()) toast.warn(t('Select something first.')); }, kbd: getBinding('view.zoomSelection') },
-        { sep: true },
-        { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: getBinding('view.outline'), checked: outlineMode },
-        { sep: true },
-        { label: t('Pin measurement as dimension'), onClick: async () => { if ((await import('../lib/tools/measureTool')).commitDimension()) toast.success(t('Dimension added')); else toast.warn(t('No measurement to pin.')); }, kbd: 'Enter' },
-        { label: t('Add selection dimensions'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).addSelectionDimensions(); if (n) toast.success(`${n} ${t('dimensions added')}`); else toast.warn(t('Select something first.')); } },
-        { label: t('Add selection area label'), onClick: async () => { if ((await import('../lib/tools/measureTool')).addSelectionAreaLabel()) toast.success(t('Area label added')); else toast.warn(t('Select something first.')); } },
-        { label: t('Add selection center mark'), onClick: async () => { if ((await import('../lib/tools/measureTool')).addSelectionCenterMark()) toast.success(t('Center mark added')); else toast.warn(t('Select something first.')); } },
-        { label: t('Add selection corner marks'), onClick: async () => { if ((await import('../lib/tools/measureTool')).addSelectionCornerMarks()) toast.success(t('Corner marks added')); else toast.warn(t('Select something first.')); } },
-        { label: t('Add production mark set'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).addSelectionProductionMarks(); if (n) toast.success(`${n} ${t('production mark sets added')}`); else toast.warn(t('Select something first.')); } },
-        { label: t('Add selection margin frame'), onClick: async () => { const raw = window.prompt(t('Set selection margin frame in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); if ((await import('../lib/tools/measureTool')).addSelectionMarginFrame(marginMm)) toast.success(t('Margin frame added')); else toast.warn(Number.isFinite(marginMm) ? t('Select something first.') : t('Invalid margin value.')); } },
-        { label: t('Add selection inset frame'), onClick: async () => { const raw = window.prompt(t('Set selection inset frame in mm'), '5'); if (raw == null) return; const insetMm = Number(raw); if ((await import('../lib/tools/measureTool')).addSelectionInsetFrame(insetMm)) toast.success(t('Inset frame added')); else toast.warn(Number.isFinite(insetMm) ? t('Select something first.') : t('Invalid inset value.')); } },
-        { label: t('Select measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).selectMeasureAnnotations(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Lock measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).lockMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations locked')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Unlock measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).unlockMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations unlocked')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Hide measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).hideMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations hidden')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Show measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).showMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations shown')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Bring measure annotations to front'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).bringMeasureAnnotationsToFront(); if (n) toast.success(`${n} ${t('measure annotations brought to front')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Prepare measure annotations for proof'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).proofMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations proof-ready')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Edit measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).editMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations editable')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Duplicate measure annotations to selection'), onClick: async () => { const n = await (await import('../lib/tools/measureTool')).duplicateMeasureAnnotationsToSelection(); if (n) toast.success(`${n} ${t('measure annotations duplicated')}`); else toast.warn(t('Select artwork and keep measure annotations.')); } },
-        { label: t('Make guides from measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).makeGuidesFromMeasureAnnotations(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Make margin guides from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure guide margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); const n = (await import('../lib/tools/measureTool')).makeMarginGuidesFromMeasureAnnotations(marginMm); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
-        { label: t('Make center guides from measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).makeCenterGuidesFromMeasureAnnotations(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Make full guide set from measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).makeFullGuidesFromMeasureAnnotations(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Make margin full guide set from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure guide margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); const n = (await import('../lib/tools/measureTool')).makeMarginFullGuidesFromMeasureAnnotations(marginMm); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
-        { label: t('Add print marks from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure print bleed in mm'), '3'); if (raw == null) return; const bleedMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addPrintMarksFromMeasureAnnotations(bleedMm); if (n) toast.success(`${n} ${t('print marks added')}`); else toast.warn(Number.isFinite(bleedMm) ? t('No measure annotations.') : t('Invalid bleed value.')); } },
-        { label: t('Add cut contour from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (raw == null) return; const offsetMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addCutContourFromMeasureAnnotations(offsetMm); if (n) toast.success(`${n} ${t('contour(s) added')}`); else toast.warn(Number.isFinite(offsetMm) ? t('No measure annotations.') : t('Invalid offset value.')); } },
-        { label: t('Add bridged cut contour from measure annotations'), onClick: async () => { const offsetRaw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (offsetRaw == null) return; const countRaw = window.prompt(t('Set measure bridge count'), '4'); if (countRaw == null) return; const gapRaw = window.prompt(t('Set measure bridge gap in mm'), '1'); if (gapRaw == null) return; const offsetMm = Number(offsetRaw); const count = Number(countRaw); const gapMm = Number(gapRaw); const n = (await import('../lib/tools/measureTool')).addBridgedCutContourFromMeasureAnnotations(offsetMm, count, gapMm); if (n) toast.success(`${n} ${t('bridged contours added')}`); else toast.warn(Number.isFinite(offsetMm) && Number.isFinite(count) && Number.isFinite(gapMm) ? t('No measure annotations.') : t('Invalid bridge value.')); } },
-        { label: t('Add positioning marks from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure positioning mark offset in mm'), '5'); if (raw == null) return; const offsetMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addRegistrationMarksFromMeasureAnnotations(offsetMm); if (n) toast.success(t('4-corner registration marks added.')); else toast.warn(Number.isFinite(offsetMm) ? t('No measure annotations.') : t('Invalid offset value.')); } },
-        { label: t('Add weed border from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure weed margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addWeedBorderFromMeasureAnnotations(marginMm); if (n) toast.success(t('Weed border added.')); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
-        { label: t('Add weed grid from measure annotations'), onClick: async () => { const marginRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (marginRaw == null) return; const rowsRaw = window.prompt(t('Set measure weed rows'), '1'); if (rowsRaw == null) return; const colsRaw = window.prompt(t('Set measure weed columns'), '1'); if (colsRaw == null) return; const marginMm = Number(marginRaw); const rows = Number(rowsRaw); const cols = Number(colsRaw); const n = (await import('../lib/tools/measureTool')).addWeedBorderFromMeasureAnnotations(marginMm, rows, cols); if (n) toast.success(t('Weed grid added.')); else toast.warn(Number.isFinite(marginMm) && Number.isFinite(rows) && Number.isFinite(cols) ? t('No measure annotations.') : t('Invalid weed grid value.')); } },
-        { label: t('Add grommets from measure annotations'), onClick: async () => { const insetRaw = window.prompt(t('Set measure grommet inset in mm'), '20'); if (insetRaw == null) return; const spacingRaw = window.prompt(t('Set measure grommet max spacing in mm'), '500'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure grommet diameter in mm'), '10'); if (diameterRaw == null) return; const insetMm = Number(insetRaw); const spacingMm = Number(spacingRaw); const diameterMm = Number(diameterRaw); const n = (await import('../lib/tools/measureTool')).addGrommetsFromMeasureAnnotations(insetMm, spacingMm, diameterMm); if (n) toast.success(`${n} ${t('grommets added')}`); else toast.warn(Number.isFinite(insetMm) && Number.isFinite(spacingMm) && Number.isFinite(diameterMm) ? t('No measure annotations.') : t('Invalid grommet value.')); } },
-        { label: t('Add rhinestones from measure annotations'), onClick: async () => { const spacingRaw = window.prompt(t('Set measure rhinestone spacing in mm'), '4'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure rhinestone diameter in mm'), '2.8'); if (diameterRaw == null) return; const spacingMm = Number(spacingRaw); const diameterMm = Number(diameterRaw); const n = (await import('../lib/tools/measureTool')).addRhinestonesFromMeasureAnnotations(spacingMm, diameterMm); if (n) toast.success(`${n} ${t('stones placed')}`); else toast.warn(Number.isFinite(spacingMm) && Number.isFinite(diameterMm) ? t('No measure annotations.') : t('Invalid rhinestone value.')); } },
-        { label: t('Prepare print and cut from measure annotations'), onClick: async () => { const bleedRaw = window.prompt(t('Set measure print bleed in mm'), '3'); if (bleedRaw == null) return; const contourRaw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (contourRaw == null) return; const regRaw = window.prompt(t('Set measure positioning mark offset in mm'), '5'); if (regRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const result = (await import('../lib/tools/measureTool')).preparePrintAndCutFromMeasureAnnotations(Number(bleedRaw), Number(contourRaw), Number(regRaw), Number(weedRaw)); if (result) toast.success(`${result.printMarks} ${t('print marks added')} · ${result.cutPaths} ${t('cut paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid print and cut prep value.')); } },
-        { label: t('Prepare banner finishing from measure annotations'), onClick: async () => { const insetRaw = window.prompt(t('Set measure grommet inset in mm'), '20'); if (insetRaw == null) return; const spacingRaw = window.prompt(t('Set measure grommet max spacing in mm'), '500'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure grommet diameter in mm'), '10'); if (diameterRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const rowsRaw = window.prompt(t('Set measure weed rows'), '0'); if (rowsRaw == null) return; const colsRaw = window.prompt(t('Set measure weed columns'), '0'); if (colsRaw == null) return; const result = (await import('../lib/tools/measureTool')).prepareBannerFinishingFromMeasureAnnotations(Number(insetRaw), Number(spacingRaw), Number(diameterRaw), Number(weedRaw), Number(rowsRaw), Number(colsRaw)); if (result) toast.success(`${result.grommets} ${t('grommets added')} · ${result.weedPaths} ${t('weed paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid banner finishing value.')); } },
-        { label: t('Prepare stencil cut from measure annotations'), onClick: async () => { const offsetRaw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (offsetRaw == null) return; const countRaw = window.prompt(t('Set measure bridge count'), '4'); if (countRaw == null) return; const gapRaw = window.prompt(t('Set measure bridge gap in mm'), '1'); if (gapRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const rowsRaw = window.prompt(t('Set measure weed rows'), '1'); if (rowsRaw == null) return; const colsRaw = window.prompt(t('Set measure weed columns'), '1'); if (colsRaw == null) return; const result = (await import('../lib/tools/measureTool')).prepareStencilCutFromMeasureAnnotations(Number(offsetRaw), Number(countRaw), Number(gapRaw), Number(weedRaw), Number(rowsRaw), Number(colsRaw)); if (result) toast.success(`${result.bridgedContours} ${t('bridged contours added')} · ${result.weedPaths} ${t('weed paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid stencil cut value.')); } },
-        { label: t('Prepare rhinestone template from measure annotations'), onClick: async () => { const spacingRaw = window.prompt(t('Set measure rhinestone spacing in mm'), '4'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure rhinestone diameter in mm'), '2.8'); if (diameterRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const result = (await import('../lib/tools/measureTool')).prepareRhinestoneTemplateFromMeasureAnnotations(Number(spacingRaw), Number(diameterRaw), Number(weedRaw)); if (result) toast.success(`${result.stones} ${t('stones placed')} · ${result.weedPaths} ${t('weed paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid rhinestone template value.')); } },
-        { label: t('Prepare proof page from measure annotations'), onClick: async () => { const marginRaw = window.prompt(t('Set measure proof page margin in mm'), '5'); if (marginRaw == null) return; const bleedRaw = window.prompt(t('Set measure print bleed in mm'), '3'); if (bleedRaw == null) return; const result = (await import('../lib/tools/measureProof')).prepareProofPageFromMeasureAnnotations(Number(marginRaw), Number(bleedRaw)); if (result) toast.success(`${t('Artboard added')} · ${result.printMarks} ${t('print marks added')} · ${result.proofFrames} ${t('proof frames added')} · ${result.proofLabels} ${t('proof labels added')} · ${result.proofLegends} ${t('proof legends added')} · ${result.proofChecklists} ${t('proof checklists added')} · ${result.proofApprovalStamps} ${t('proof approval stamps added')} · ${result.proofColorBars} ${t('proof color bars added')} · ${result.proofScales} ${t('proof scales added')} · ${result.proofJobInfos} ${t('proof job info panels added')} · ${result.proofFilenames} ${t('proof filename labels added')} · ${result.proofPreflights} ${t('proof preflight summaries added')} · ${result.proofSpecs} ${t('proof specs panels added')} · ${result.proofSafetyNotes} ${t('proof safety notes added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid proof page value.')); } },
-        { label: t('Prepare proof pages from measure annotations'), onClick: async () => { const marginRaw = window.prompt(t('Set measure proof page margin in mm'), '5'); if (marginRaw == null) return; const bleedRaw = window.prompt(t('Set measure print bleed in mm'), '3'); if (bleedRaw == null) return; const result = (await import('../lib/tools/measureProof')).prepareProofPagesFromMeasureAnnotations(Number(marginRaw), Number(bleedRaw)); if (result) toast.success(`${result.artboards} ${t('artboards added')} · ${result.printMarks} ${t('print marks added')} · ${result.proofFrames} ${t('proof frames added')} · ${result.proofLabels} ${t('proof labels added')} · ${result.proofLegends} ${t('proof legends added')} · ${result.proofChecklists} ${t('proof checklists added')} · ${result.proofApprovalStamps} ${t('proof approval stamps added')} · ${result.proofColorBars} ${t('proof color bars added')} · ${result.proofScales} ${t('proof scales added')} · ${result.proofJobInfos} ${t('proof job info panels added')} · ${result.proofFilenames} ${t('proof filename labels added')} · ${result.proofPreflights} ${t('proof preflight summaries added')} · ${result.proofSpecs} ${t('proof specs panels added')} · ${result.proofSafetyNotes} ${t('proof safety notes added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid proof pages value.')); } },
-        { label: t('Make artboard from measure annotations'), onClick: async () => { if ((await import('../lib/tools/measureTool')).makeArtboardFromMeasureAnnotations()) toast.success(t('Artboard added')); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Make margin artboard from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure artboard margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); if ((await import('../lib/tools/measureTool')).makeMarginArtboardFromMeasureAnnotations(marginMm)) toast.success(t('Artboard added')); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
-        { label: t('Resize artboard to measure annotations'), onClick: async () => { if ((await import('../lib/tools/measureTool')).resizeArtboardToMeasureAnnotations()) toast.success(t('Artboard resized')); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Resize artboard to measure annotations with margin'), onClick: async () => { const raw = window.prompt(t('Set measure artboard margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); if ((await import('../lib/tools/measureTool')).resizeArtboardToMeasureAnnotations(marginMm)) toast.success(t('Artboard resized')); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
-        { label: t('Clear measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).clearMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations cleared')}`); else toast.warn(t('No measure annotations.')); } },
-        { label: t('Add measure proof manifest'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofManifest(); if (n) toast.success(`${n} ${t('proof manifests updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Add measure proof revision history'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofRevisionHistory(); if (n) toast.success(`${n} ${t('proof revision histories updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Add measure proof approval audit'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofApprovalAudit(); if (n) toast.success(`${n} ${t('proof approval audits updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Add measure proof package cover'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofPackageCover(); if (n) toast.success(`${n} ${t('proof package covers updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Add measure proof delivery checklist'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliveryChecklist(); if (n) toast.success(`${n} ${t('proof delivery checklists updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Add measure proof release stamp'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofReleaseStamp(); if (n) toast.success(`${n} ${t('proof release stamps updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Add measure proof package index'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofPackageIndex(); if (n) toast.success(`${n} ${t('proof package indexes updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Add measure proof delivery contact'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliveryContact(); if (n) toast.success(`${n} ${t('proof delivery contacts updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof delivery contact'), onClick: async () => { const client = window.prompt(t('Set measure proof client'), ''); if (client == null) return; const contact = window.prompt(t('Set measure proof contact name'), ''); if (contact == null) return; const email = window.prompt(t('Set measure proof contact email'), ''); if (email == null) return; const phone = window.prompt(t('Set measure proof contact phone'), ''); if (phone == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofDeliveryContact({ client, contact, email, phone }); if (n) toast.success(`${n} ${t('proof delivery contacts updated')}`); else toast.warn(t('No measure proof delivery contact panels.')); } },
-        { label: t('Add measure proof delivery schedule'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliverySchedule(); if (n) toast.success(`${n} ${t('proof delivery schedules updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof delivery schedule'), onClick: async () => { const due = window.prompt(t('Set measure proof due date'), ''); if (due == null) return; const ship = window.prompt(t('Set measure proof ship date'), ''); if (ship == null) return; const method = window.prompt(t('Set measure proof delivery method'), ''); if (method == null) return; const notes = window.prompt(t('Set measure proof delivery notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofDeliverySchedule({ due, ship, method, notes }); if (n) toast.success(`${n} ${t('proof delivery schedules updated')}`); else toast.warn(t('No measure proof delivery schedule panels.')); } },
-        { label: t('Add measure proof delivery route'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliveryRoute(); if (n) toast.success(`${n} ${t('proof delivery routes updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof delivery route'), onClick: async () => { const carrier = window.prompt(t('Set measure proof route carrier'), ''); if (carrier == null) return; const service = window.prompt(t('Set measure proof route service'), ''); if (service == null) return; const account = window.prompt(t('Set measure proof route account'), ''); if (account == null) return; const address = window.prompt(t('Set measure proof route address'), ''); if (address == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofDeliveryRoute({ carrier, service, account, address }); if (n) toast.success(`${n} ${t('proof delivery routes updated')}`); else toast.warn(t('No measure proof delivery route panels.')); } },
-        { label: t('Add measure proof fulfillment handoff'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofFulfillmentHandoff(); if (n) toast.success(`${n} ${t('proof fulfillment handoffs updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof fulfillment handoff'), onClick: async () => { const quantity = window.prompt(t('Set measure proof fulfillment quantity'), ''); if (quantity == null) return; const packaging = window.prompt(t('Set measure proof fulfillment packaging'), ''); if (packaging == null) return; const owner = window.prompt(t('Set measure proof fulfillment owner'), ''); if (owner == null) return; const tracking = window.prompt(t('Set measure proof fulfillment tracking'), ''); if (tracking == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofFulfillmentHandoff({ quantity, packaging, owner, tracking }); if (n) toast.success(`${n} ${t('proof fulfillment handoffs updated')}`); else toast.warn(t('No measure proof fulfillment handoff panels.')); } },
-        { label: t('Add measure proof install handoff'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofInstallHandoff(); if (n) toast.success(`${n} ${t('proof install handoffs updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof install handoff'), onClick: async () => { const installer = window.prompt(t('Set measure proof install installer'), ''); if (installer == null) return; const date = window.prompt(t('Set measure proof install date'), ''); if (date == null) return; const site = window.prompt(t('Set measure proof install site'), ''); if (site == null) return; const notes = window.prompt(t('Set measure proof install notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofInstallHandoff({ installer, date, site, notes }); if (n) toast.success(`${n} ${t('proof install handoffs updated')}`); else toast.warn(t('No measure proof install handoff panels.')); } },
-        { label: t('Add measure proof site readiness'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofSiteReadiness(); if (n) toast.success(`${n} ${t('proof site readiness panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof site readiness'), onClick: async () => { const permit = window.prompt(t('Set measure proof site permit'), ''); if (permit == null) return; const access = window.prompt(t('Set measure proof site access'), ''); if (access == null) return; const power = window.prompt(t('Set measure proof site power'), ''); if (power == null) return; const risks = window.prompt(t('Set measure proof site risks'), ''); if (risks == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofSiteReadiness({ permit, access, power, risks }); if (n) toast.success(`${n} ${t('proof site readiness panels updated')}`); else toast.warn(t('No measure proof site readiness panels.')); } },
-        { label: t('Add measure proof install punch list'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofInstallPunchList(); if (n) toast.success(`${n} ${t('proof install punch lists updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof install punch list'), onClick: async () => { const open = window.prompt(t('Set measure proof punch list open items'), ''); if (open == null) return; const owner = window.prompt(t('Set measure proof punch list owner'), ''); if (owner == null) return; const due = window.prompt(t('Set measure proof punch list due date'), ''); if (due == null) return; const resolution = window.prompt(t('Set measure proof punch list resolution'), ''); if (resolution == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofInstallPunchList({ open, owner, due, resolution }); if (n) toast.success(`${n} ${t('proof install punch lists updated')}`); else toast.warn(t('No measure proof install punch list panels.')); } },
-        { label: t('Add measure proof client acceptance'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofClientAcceptance(); if (n) toast.success(`${n} ${t('proof client acceptances updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof client acceptance'), onClick: async () => { const acceptedBy = window.prompt(t('Set measure proof accepted by'), ''); if (acceptedBy == null) return; const date = window.prompt(t('Set measure proof acceptance date'), ''); if (date == null) return; const status = window.prompt(t('Set measure proof acceptance status'), ''); if (status == null) return; const notes = window.prompt(t('Set measure proof acceptance notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofClientAcceptance({ acceptedBy, date, status, notes }); if (n) toast.success(`${n} ${t('proof client acceptances updated')}`); else toast.warn(t('No measure proof client acceptance panels.')); } },
-        { label: t('Add measure proof warranty info'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofWarrantyInfo(); if (n) toast.success(`${n} ${t('proof warranty info panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof warranty info'), onClick: async () => { const term = window.prompt(t('Set measure proof warranty term'), ''); if (term == null) return; const coverage = window.prompt(t('Set measure proof warranty coverage'), ''); if (coverage == null) return; const contact = window.prompt(t('Set measure proof warranty contact'), ''); if (contact == null) return; const notes = window.prompt(t('Set measure proof warranty notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofWarrantyInfo({ term, coverage, contact, notes }); if (n) toast.success(`${n} ${t('proof warranty info panels updated')}`); else toast.warn(t('No measure proof warranty info panels.')); } },
-        { label: t('Add measure proof care instructions'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofCareInstructions(); if (n) toast.success(`${n} ${t('proof care instruction panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof care instructions'), onClick: async () => { const cleaning = window.prompt(t('Set measure proof care cleaning'), ''); if (cleaning == null) return; const chemicals = window.prompt(t('Set measure proof care chemicals'), ''); if (chemicals == null) return; const inspection = window.prompt(t('Set measure proof care inspection'), ''); if (inspection == null) return; const notes = window.prompt(t('Set measure proof care notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofCareInstructions({ cleaning, chemicals, inspection, notes }); if (n) toast.success(`${n} ${t('proof care instruction panels updated')}`); else toast.warn(t('No measure proof care instruction panels.')); } },
-        { label: t('Add measure proof asset archive'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofAssetArchive(); if (n) toast.success(`${n} ${t('proof asset archive panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof asset archive'), onClick: async () => { const source = window.prompt(t('Set measure proof archive source'), ''); if (source == null) return; const exports = window.prompt(t('Set measure proof archive exports'), ''); if (exports == null) return; const photos = window.prompt(t('Set measure proof archive photos'), ''); if (photos == null) return; const notes = window.prompt(t('Set measure proof archive notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofAssetArchive({ source, exports, photos, notes }); if (n) toast.success(`${n} ${t('proof asset archive panels updated')}`); else toast.warn(t('No measure proof asset archive panels.')); } },
-        { label: t('Add measure proof file verification'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofFileVerification(); if (n) toast.success(`${n} ${t('proof file verification panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Set measure proof file verification'), onClick: async () => { const version = window.prompt(t('Set measure proof verification version'), ''); if (version == null) return; const checksum = window.prompt(t('Set measure proof verification checksum'), ''); if (checksum == null) return; const reviewed = window.prompt(t('Set measure proof verification reviewed'), ''); if (reviewed == null) return; const notes = window.prompt(t('Set measure proof verification notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofFileVerification({ version, checksum, reviewed, notes }); if (n) toast.success(`${n} ${t('proof file verification panels updated')}`); else toast.warn(t('No measure proof file verification panels.')); } },
-        { label: t('Set measure proof job information'), onClick: async () => { const job = window.prompt(t('Set measure proof job name'), ''); if (job == null) return; const revision = window.prompt(t('Set measure proof revision'), ''); if (revision == null) return; const prepared = window.prompt(t('Set measure proof prepared by'), ''); if (prepared == null) return; const notes = window.prompt(t('Set measure proof notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofJobInfo({ job, revision, prepared, notes }); if (n) toast.success(`${n} ${t('proof job info panels updated')}`); else toast.warn(t('No measure proof job info panels.')); } },
-        { label: t('Set measure proof signoff'), onClick: async () => { const signer = window.prompt(t('Set measure proof signer'), ''); if (signer == null) return; const date = window.prompt(t('Set measure proof signoff date'), ''); if (date == null) return; const note = window.prompt(t('Set measure proof signoff note'), ''); if (note == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofSignoff({ signer, date, note }); if (n) toast.success(`${n} ${t('proof signoffs updated')}`); else toast.warn(t('No measure proof checklists.')); } },
-        { label: t('Select draft measure proof objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofObjectsByStatus('draft'); if (n) toast.success(`${n} ${t('proof objects selected')}`); else toast.warn(t('No matching measure proof objects.')); } },
-        { label: t('Select approved measure proof objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofObjectsByStatus('approved'); if (n) toast.success(`${n} ${t('proof objects selected')}`); else toast.warn(t('No matching measure proof objects.')); } },
-        { label: t('Select changes-required measure proof objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofObjectsByStatus('changes'); if (n) toast.success(`${n} ${t('proof objects selected')}`); else toast.warn(t('No matching measure proof objects.')); } },
-        { label: t('Select measure proof delivery blockers'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofDeliveryBlockers(); if (n) toast.success(`${n} ${t('proof blockers selected')}`); else toast.warn(t('No measure proof blockers.')); } },
-        { label: t('Mark proof sheet as draft'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).setMeasureProofApprovalStatus('draft'); if (n) toast.success(`${n} ${t('proof approval stamps updated')}`); else toast.warn(t('No measure proof approval stamps.')); } },
-        { label: t('Mark proof sheet as approved'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).setMeasureProofApprovalStatus('approved'); if (n) toast.success(`${n} ${t('proof approval stamps updated')}`); else toast.warn(t('No measure proof approval stamps.')); } },
-        { label: t('Mark proof sheet as changes required'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).setMeasureProofApprovalStatus('changes'); if (n) toast.success(`${n} ${t('proof approval stamps updated')}`); else toast.warn(t('No measure proof approval stamps.')); } },
-        { label: t('Clear measure proof sheet objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).clearMeasureProofSheetObjects(); if (n) toast.success(`${n} ${t('proof sheet objects cleared')}`); else toast.warn(t('No measure proof sheet objects.')); } },
-        { label: t('Show Rulers'), onClick: () => setRulersVisible(!rulersVisible), checked: rulersVisible },
-        { label: t('Show Grid'), onClick: () => setGridVisible(!gridVisible), checked: gridVisible },
-        { label: t('Snap to Grid'), onClick: () => setSnapEnabled(!snapEnabled), checked: snapEnabled },
-        { label: t('Smart Guides'), onClick: () => setSmartGuidesEnabled(!smartGuidesEnabled), checked: smartGuidesEnabled },
-        { label: t('Anchor Snap'), onClick: () => setAnchorSnapEnabled(!anchorSnapEnabled), checked: anchorSnapEnabled },
-        { sep: true },
-        { label: t('Make Guides from Selection'), onClick: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
-        { label: t('Margin Guides…'), onClick: () => setModal('showMarginGuides', true) },
-        { label: t('Release Guides'), onClick: () => { const n = releaseGuides(); if (n) toast.success(`${n} ${t('guides released')}`); else toast.warn(t('No guides to release.')); } },
-        { label: t('Show Guides'), onClick: () => { const s = useEditor.getState(); s.setGuidesVisible(!s.guidesVisible); }, checked: guidesVisible, kbd: getBinding('view.toggleGuides') },
-        { label: t('Lock Guides'), onClick: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked), checked: guidesLocked },
-        { label: t('Clear Guides'), onClick: () => useEditor.getState().clearUserGuides() },
-      ]} />
-
-      <Dropdown label={t('Document')} items={[
-        { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
-        { label: t('Create Artboard from Selection'), onClick: () => { const ab = createArtboardFromSelection(); if (ab) toast.success(t('Artboard created')); else toast.warn(t('Select something first.')); } },
-        { label: t('Duplicate Active Artboard'), onClick: () => { void duplicateActiveArtboard().then((ab) => { if (ab) toast.success(t('Artboard duplicated')); else toast.warn(t('Select an object on or near an artboard first.')); }); } },
-        { label: t('Duplicate Active Artboard Frame'), onClick: () => { if (duplicateActiveArtboardFrame()) toast.success(t('Artboard duplicated')); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Rename Active Artboard…'), onClick: () => { if (promptRenameActiveArtboard(t('Artboard name'))) toast.success(t('Artboard renamed')); else toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Move Active Artboard Earlier'), onClick: () => { if (reorderActiveArtboard('previous')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
-        { label: t('Move Active Artboard Later'), onClick: () => { if (reorderActiveArtboard('next')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
-        { label: t('Move Active Artboard to First'), onClick: () => { if (reorderActiveArtboard('first')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
-        { label: t('Move Active Artboard to Last'), onClick: () => { if (reorderActiveArtboard('last')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
-        { label: t('Sort Artboards by Position'), onClick: () => { if (sortArtboardsByPosition()) toast.success(t('Artboard order updated')); else toast.warn(t('Artboard order already matches position.')); } },
-        { label: t('Renumber Artboards by Position'), onClick: () => { if (renumberArtboardsByPosition(t('Artboard'))) toast.success(t('Artboards renumbered')); else toast.warn(t('Artboards already numbered by position.')); } },
-        { label: t('Delete Active Artboard'), onClick: async () => { if (await showConfirm({ message: t('Delete active artboard?'), confirmLabel: t('Delete'), danger: true })) { if (deleteActiveArtboard()) toast.success(t('Artboard deleted')); else toast.warn(t('Select an object on or near an artboard first.')); } } },
-        { label: t('Rearrange Artboards'), onClick: () => { const n = promptRearrangeArtboards({ columns: t('Columns'), spacing: t('Spacing'), moveArtwork: t('Move artwork? yes/no') }); if (n == null) return; if (n === -1) toast.warn(t('Invalid artboard rearrange options.')); else if (n) toast.success(t('Artboards rearranged')); else toast.warn(t('Need at least two artboards.')); } },
-        { label: t('Fit Artboard to Artwork'), onClick: () => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); } },
-        { label: t('Fit Artboard to Selection'), onClick: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
-        { label: t('Fit Active Artboard to Artwork'), onClick: () => { if (!fitActiveArtboardToContent('all')) toast.warn(t('Select an object on or near an artboard first.')); } },
-        { label: t('Fit Active Artboard to Selection'), onClick: () => { if (!fitActiveArtboardToContent('selection')) toast.warn(t('Select an object on or near an artboard first.')); } },
-        { sep: true },
-        { label: t('Insert'), sub: [
-          { label: t('Star / Polygon…'), onClick: () => setModal('showStar', true) },
-          { label: t('Split Into Grid…'), onClick: () => setModal('showSplitGrid', true) },
-          { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showRepeat', true); } },
-        ] },
-        // Cut Contour suite — opens the multi-tab dialog covering vector
-        // offset, bitmap trace, and registration marks. Lives under
-        // Document because cut paths are document-level metadata.
-        { label: t('Cut Contour…'), onClick: () => openWithSelection('showCutContour'), kbd: getBinding('window.cutContour') },
-        // Separations — per-plate spot/process colour inventory, isolation
-        // preview, and per-plate export. Print-production colour workflow.
-        { label: t('Separations…'), onClick: () => setModal('showSeparations', true) },
-        { label: t('Add positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
-        { label: t('Weed border'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t) },
-        { label: t('Bridge presets'), sub: [
-          { label: t('Light'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 2, 0.6) },
-          { label: t('Standard'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1) },
-          { label: t('Heavy'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 6, 1.5) },
-        ] },
-        { label: t('Banner Grommets…'), onClick: () => openWithSelection('showGrommets') },
-        { label: `${t('Banner Grommets')} — ${t('Small banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 15, 300, 8) },
-        { label: `${t('Banner Grommets')} — ${t('Standard banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 20, 500, 10) },
-        { label: `${t('Banner Grommets')} — ${t('Large banner')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 25, 750, 12) },
-        // Make Sticker — welded art + offset white border + die/kiss/perf cut.
-        { label: t('Make Sticker…'), onClick: () => openWithSelection('showMakeSticker'), kbd: getBinding('document.makeSticker') },
-        // Production Preview — imposed sheet composition (nest + bleed + cut overlay + regmarks).
-        { label: t('Production Preview…'), onClick: () => openWithSelection('showProductionPreview') },
-        // Trace to Vector Art — bitmap → editable filled vector paths (the
-        // Kittl Vectorizer / Illustrator Image Trace entry-side flow). Open
-        // without a selection too: the dialog also accepts an uploaded file.
-        { label: t('Trace to Vector Art…'), onClick: () => setModal('showTraceArt', true) },
-        // Surface Wrap — flat developments for cylinder/cone/sphere decals.
-        { label: t('Surface Wrap…'), onClick: () => setModal('showSurfaceWrap', true) },
-        { label: t('Clear positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterRegistrationMarks(t) },
-        { label: t('Clear weed borders'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterWeedBorders(t) },
-        { label: t('Clear bridges'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterBridges(t) },
-        { label: t('Clear contour'), onClick: () => clearCutKind('outline'), disabled: contourCutCount === 0 },
-        { label: t('Clear trace'), onClick: () => clearCutKind('trace'), disabled: traceCutCount === 0 },
-        { label: t('Clear regmarks'), onClick: () => clearCutKind('regmark'), disabled: regmarkCutCount === 0 },
-        { label: t('Clear cut paths'), onClick: () => clearCutJob(), disabled: cutPathCount === 0 },
-        { sep: true },
-        { label: t('Type'), sub: [
-          { label: t('Create Outlines'), onClick: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); }, kbd: getBinding('text.createOutlines') },
-          { label: t('Break Text into Letters'), onClick: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.splitLetters') },
-          { label: t('Break Text into Lines'), onClick: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); }, kbd: getBinding('text.splitLines') },
-          { sep: true },
-          { label: t('Text on Arc (Up)'), onClick: () => requireTextSelection(() => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); }), kbd: getBinding('text.arcUp') },
-          { label: t('Text on Arc (Down)'), onClick: () => requireTextSelection(() => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); }), kbd: getBinding('text.arcDown') },
-          { sep: true },
-          { label: t('Increase Font Size'), onClick: () => adjustTextMetric(adjustFontSize, 2), kbd: getBinding('text.fontSizeUp') },
-          { label: t('Decrease Font Size'), onClick: () => adjustTextMetric(adjustFontSize, -2), kbd: getBinding('text.fontSizeDown') },
-          { label: t('Increase Tracking'), onClick: () => adjustTextMetric(adjustTracking, 25), kbd: getBinding('text.trackingUp') },
-          { label: t('Decrease Tracking'), onClick: () => adjustTextMetric(adjustTracking, -25), kbd: getBinding('text.trackingDown') },
-          { label: t('Increase Leading'), onClick: () => adjustTextMetric(adjustLeading, 0.05), kbd: getBinding('text.leadingUp') },
-          { label: t('Decrease Leading'), onClick: () => adjustTextMetric(adjustLeading, -0.05), kbd: getBinding('text.leadingDown') },
-          { sep: true },
-          { label: t('Single-line Text…'), onClick: () => setModal('showSingleLineText', true), kbd: getBinding('text.singleLine') },
-          { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true), kbd: getBinding('text.findReplace') },
-          { label: t('Change Case'), sub: [
-            { label: t('UPPERCASE'), onClick: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseUpper') },
-            { label: t('lowercase'), onClick: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseLower') },
-            { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseTitle') },
-            { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseSentence') },
-          ] },
-          { label: t('Smart Punctuation'), onClick: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.smartPunctuation') },
-        ] },
-        { sep: true },
-        // Path / effect operations grouped into flyouts — all also reachable via
-        // the command palette + right-click; submenus keep this menu navigable.
-        { label: t('Path'), sub: [
-          { label: t('Add Anchor Points'), onClick: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
-          { label: t('Scissors at Midpoint'), onClick: () => { const n = scissorsSplitSelectionAtMidpoint(); if (n) toast.success(`${n} ${t('paths split')}`); else toast.warn(t('Select open stroked paths first.')); } },
-          { label: t('Knife Split Horizontal'), onClick: () => { const n = knifeSplitSelectionAtCenter('horizontal'); if (n) toast.success(`${n} ${t('objects knife-split')}`); else toast.warn(t('Select closed shapes first.')); } },
-          { label: t('Knife Split Vertical'), onClick: () => { const n = knifeSplitSelectionAtCenter('vertical'); if (n) toast.success(`${n} ${t('objects knife-split')}`); else toast.warn(t('Select closed shapes first.')); } },
-          { label: t('Average Anchor Points'), onClick: () => { const n = averageSelectedAnchors('both'); if (n) toast.success(`${n} ${t('anchors averaged')}`); else toast.warn(t('Shift-click two or more path anchors first.')); }, kbd: getBinding('path.averageAnchors') },
-          { label: t('Outline Stroke to Fill'), onClick: () => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); } },
-          { label: t('Simplify Path…'), onClick: () => openWithSelection('showSimplify') },
-          { label: t('Smooth Path'), onClick: () => { const n = smoothPathSelection(); if (n) toast.success(`${n} ${t('paths smoothed')}`); else toast.warn(t('Select one or more paths first.')); } },
-          { label: t('Round Corners…'), onClick: () => openWithSelection('showRoundCorners') },
-          { label: t('Offset Path…'), onClick: () => openWithSelection('showOffsetPath') },
-          { label: t('Reverse Path Direction'), onClick: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
-          { label: t('Add Arrowhead (Start)'), onClick: () => { const n = addArrowheads('start'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
-          { label: t('Add Arrowhead (End)'), onClick: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
-          { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
-          { label: t('Select Cleanup Objects'), onClick: () => { const n = selectCleanupObjects(); if (n) toast.success(`${n} ${t('selected')}`); else toast.success(t('Nothing to clean up.')); } },
-          { label: t('Clean Up'), onClick: () => { const n = cleanUpDocument(); if (n) toast.success(`${n} ${t('stray objects removed')}`); else toast.success(t('Nothing to clean up.')); } },
-          { label: t('Rasterize'), onClick: async () => { void (await import('../lib/rasterize')).rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); } },
-        ] },
-        { label: t('Distort & Transform'), sub: [
-          { label: t('Roughen…'), onClick: () => openWithSelection('showRoughen') },
-          { label: t('Zig Zag…'), onClick: () => openWithSelection('showZigzag') },
-          { label: t('Pucker & Bloat…'), onClick: () => openWithSelection('showPucker') },
-          { label: t('Twist…'), onClick: () => openWithSelection('showTwist') },
-          { label: t('Free Distort…'), onClick: () => openWithSelection('showFreeDistort') },
-          { label: t('Arc Warp…'), onClick: () => openWithSelection('showWarp') },
-          { label: t('Envelope Distort — Make with Top Object'), onClick: () => {
-            void envelopeSelection().then((r) => {
-              if (r && r.reshaped > 0) toast.success(`${r.reshaped} ${t('objects reshaped into the envelope')}${r.skipped > 0 ? ` · ${r.skipped} ${t('raster images skipped')}` : ''}`, { title: t('Envelope Distort') });
-              else toast.warn(t('Select the artwork plus one vector shape on top (2+ objects) — the top-most object becomes the envelope.'), { title: t('Envelope Distort') });
-            });
-          } },
-          { label: t('Blend…'), onClick: () => openWithSelection('showBlend', t('Select 2 or more objects first.'), 2) },
-          { label: t('Select Blend Steps'), onClick: () => { const n = selectBlendSteps(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('No generated blend steps found.')); } },
-          { label: t('Select Related Blend Steps'), onClick: () => { const n = selectBlendStepsFromSelection(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); } },
-          { label: t('Select Blend Endpoints'), onClick: () => { const n = selectBlendEndpointsFromSelection(); if (n) toast.success(`${n} ${t('blend endpoints selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); } },
-          { label: t('Select All Blend Endpoints'), onClick: () => { const n = selectAllBlendEndpoints(); if (n) toast.success(`${n} ${t('blend endpoints selected')}`); else toast.warn(t('No generated blend steps found.')); } },
-          { label: t('Select Blend Group'), onClick: () => { const n = selectBlendGroupFromSelection(); if (n) toast.success(`${n} ${t('blend objects selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); } },
-          { label: t('Select All Blend Groups'), onClick: () => { const n = selectAllBlendGroups(); if (n) toast.success(`${n} ${t('blend objects selected')}`); else toast.warn(t('No generated blend steps found.')); } },
-          { label: t('Select Orphan Blend Steps'), onClick: () => { const n = selectOrphanBlendSteps('document'); if (n) toast.success(`${n} ${t('orphan blend steps selected')}`); else toast.success(t('No orphan blend steps found.')); } },
-          { label: t('Update Blend Steps'), onClick: () => { const n = updateBlendSteps(); if (n) toast.success(`${n} ${t('blend steps updated')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
-          { label: t('Relink Blend Endpoint'), onClick: () => { const n = relinkBlendEndpointFromSelection(); if (n) toast.success(`${n} ${t('blend steps relinked')}`); else toast.warn(t('Select one blend endpoint and one replacement object.')); } },
-          { label: t('Update All Blend Steps'), onClick: () => { const n = updateBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps updated')}`); else toast.warn(t('No generated blend steps found.')); } },
-          { label: t('Reverse Blend Steps'), onClick: () => { const n = reverseBlendSteps(); if (n) toast.success(`${n} ${t('blend steps reversed')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
-          { label: t('Reverse All Blend Steps'), onClick: () => { const n = reverseBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps reversed')}`); else toast.warn(t('No generated blend steps found.')); } },
-          { label: t('Expand Blend Steps'), onClick: () => { const n = expandBlendSteps(); if (n) toast.success(`${n} ${t('blend steps expanded')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
-          { label: t('Expand All Blend Steps'), onClick: () => { const n = expandBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps expanded')}`); else toast.warn(t('No generated blend steps found.')); } },
-          { label: t('Release Blend Steps'), onClick: () => { const n = releaseBlendSteps(); if (n) toast.success(`${n} ${t('blend steps released')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
-          { label: t('Release All Blend Steps'), onClick: () => { const n = releaseBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps released')}`); else toast.warn(t('No generated blend steps found.')); } },
-          { label: t('Remove Orphan Blend Steps'), onClick: () => { const n = removeOrphanBlendSteps('document'); if (n) toast.success(`${n} ${t('orphan blend steps removed')}`); else toast.success(t('No orphan blend steps found.')); } },
-        ] },
         { label: t('Align & Distribute'), sub: [
           { label: t('Align left'), onClick: () => runAlign(() => alignSelection('left'), 2), kbd: getBinding('align.left') },
           { label: t('Align center horizontally'), onClick: () => runAlign(() => alignSelection('centerH'), 2), kbd: getBinding('align.centerH') },
@@ -1140,22 +541,8 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           { label: t('Distribute vertically in Artboard'), onClick: () => runArtboardAlign(() => distributeInArtboard('vertical')) },
           { label: t('Center on Artboard'), onClick: () => runArtboardAlign(() => centerOnArtboard()) },
         ] },
-        { sep: true },
-        { label: t('Symbols'), sub: [
-          { label: t('Redefine Symbol'), onClick: () => { void redefineSymbolFromSelection().then((entry) => { if (entry) toast.success(t('Symbol redefined')); else toast.warn(t('Select a symbol instance first.')); }); } },
-          { label: t('Break Symbol Link'), onClick: () => { const count = detachSymbolInstancesFromSelection(); if (count) toast.success(`${count} ${t('symbol instances detached')}`); else toast.warn(t('Select a symbol instance first.')); } },
-          { sep: true },
-          { label: t('Select All Symbol Instances'), onClick: () => { const count = selectAllSymbolInstances(); if (count) toast.success(`${count} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); } },
-          { label: t('Select symbol instances'), sub: getSymbols().map((symbol) => ({
-            label: symbol.name,
-            onClick: () => { const count = selectSymbolInstances(symbol.id); if (count) toast.success(`${count} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); },
-          })) },
-        ] },
-        { sep: true },
         { label: t('Appearance'), sub: [
           { label: t('Clear Appearance'), onClick: () => { const n = clearAppearanceFromSelection(); if (n) toast.success(`${n} ${t('appearances cleared')}`); else toast.warn(t('Select something first.')); } },
-          { label: t('Flatten Transparency'), onClick: () => { const n = flattenTransparencySelection(); if (n) toast.success(`${n} ${t('objects flattened')}`); else toast.warn(t('Select transparent or blended objects first.')); } },
-          { label: t('Expand Appearance'), onClick: () => { void expandAppearanceSelection().then((n) => { if (n) toast.success(`${n} ${t('appearances expanded')}`); else toast.warn(t('Select objects with expandable appearance first.')); }); } },
           { label: t('Clear Gradient Fill'), onClick: () => { const n = clearGradientFillSelection(); if (n) toast.success(`${n} ${t('gradient fills cleared')}`); else toast.warn(t('Select objects with gradient fills first.')); } },
           { label: t('Overprint'), sub: [
             { label: t('Overprint Fill'), onClick: () => { const n = applyOverprintToSelection('fill', true); if (n) toast.success(`${n} ${t('overprint updated')}`); else toast.warn(t('Select objects to update overprint.')); } },
@@ -1227,33 +614,18 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
             { label: '50%', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ opacity: 0.5 })) },
             { label: '25%', onClick: () => openWithSelectionAction(() => applyStyleToSelection({ opacity: 0.25 })) },
           ] },
-          { label: t('Pattern Fill'), sub: [
-            { label: t('Checker'), onClick: () => openWithSelectionAction(() => applyPatternFill('checker', 16, '#ffffff', '#111827')) },
-            { label: t('Stripes'), onClick: () => openWithSelectionAction(() => applyPatternFill('stripes', 16, '#ffffff', '#111827')) },
-            { label: t('Dots'), onClick: () => openWithSelectionAction(() => applyPatternFill('dots', 16, '#ffffff', '#111827')) },
-            { label: t('Crosshatch'), onClick: () => openWithSelectionAction(() => applyPatternFill('crosshatch', 16, '#ffffff', '#111827')) },
-            { sep: true },
-            { label: t('Clear Pattern Fill'), onClick: () => { const n = clearPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills cleared')}`); else toast.warn(t('Select objects with pattern fills first.')); } },
-            { label: t('Expand Pattern Fill'), onClick: () => { const n = expandPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills expanded')}`); else toast.warn(t('Select objects with pattern fills first.')); } },
-          ] },
-          { label: t('Drop shadow'), sub: [
-            { label: t('Soft Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.35)', blur: 12, offsetX: 4, offsetY: 6 })) },
-            { label: t('Hard Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.45)', blur: 0, offsetX: 5, offsetY: 5 })) },
-            { label: t('Glow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 })) },
-            { sep: true },
-            { label: t('Clear Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection(null)) },
-            { label: t('Expand Drop Shadow'), onClick: () => { void expandDropShadowSelection().then((n) => { if (n) toast.success(`${n} ${t('drop shadows expanded')}`); else toast.warn(t('Select objects with drop shadows first.')); }); } },
-          ] },
+
+
         ] },
-        { sep: true },
-        { label: t('Edit Colors'), sub: [
-          { label: t('Recolor Artwork…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showRecolor', true); } },
-          { label: t('Freeform Gradient…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showFreeformGradient', true); } },
-          { label: t('Invert Colors'), onClick: async () => { const n = (await import('../lib/colorAdjust')).invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-          { label: t('Convert to Grayscale'), onClick: async () => { const n = (await import('../lib/colorAdjust')).grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
-          { label: t('Saturate…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showSaturate', true); } },
-          { label: t('Adjust Hue…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showHue', true); } },
-          { label: t('Adjust Brightness…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showBrightness', true); } },
+        { label: t('Symbols'), sub: [
+          { label: t('Redefine Symbol'), onClick: () => { void redefineSymbolFromSelection().then((entry) => { if (entry) toast.success(t('Symbol redefined')); else toast.warn(t('Select a symbol instance first.')); }); } },
+          { label: t('Break Symbol Link'), onClick: () => { const count = detachSymbolInstancesFromSelection(); if (count) toast.success(`${count} ${t('symbol instances detached')}`); else toast.warn(t('Select a symbol instance first.')); } },
+          { sep: true },
+          { label: t('Select All Symbol Instances'), onClick: () => { const count = selectAllSymbolInstances(); if (count) toast.success(`${count} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); } },
+          { label: t('Select symbol instances'), sub: getSymbols().map((symbol) => ({
+            label: symbol.name,
+            onClick: () => { const count = selectSymbolInstances(symbol.id); if (count) toast.success(`${count} ${t('selected')}`); else toast.warn(t('No symbol instances found.')); },
+          })) },
         ] },
         { label: t('Image'), sub: [
           { label: t('Trace Image'), onClick: () => { void withIO3((m) => m.traceSelectedImage()).then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }).catch((e) => console.warn('io3 chunk failed to load — trace disabled', e)); } },
@@ -1270,21 +642,338 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
             { label: t('Clear Image Filters'), onClick: () => clearFilters() },
           ] },
         ] },
-        { sep: true },
-        { label: t('Sign Effects'), sub: [
-          { label: t('Multi-outline…'), onClick: () => openWithSelection('showOutline') },
-          { label: t('Rhinestone Template…'), onClick: () => openWithSelection('showRhinestone') },
-          { label: t('Rhinestone presets'), sub: [
-            { label: t('Fine stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 2, 3) },
-            { label: t('Standard stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 2.8, 4) },
-            { label: t('Bold stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 4.7, 6) },
-            { label: t('Custom…'), onClick: () => openWithSelection('showRhinestone') },
-          ] },
-          { label: t('Banner Grommets…'), onClick: () => openWithSelection('showGrommets') },
-          { label: t('Variable Data…'), onClick: () => openWithSelection('showVariableData'), kbd: getBinding('text.variableData') },
-          { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
-          { label: t('Nest (rotation-aware)'), onClick: runRotationNest },
+        { label: t('Path'), sub: [
+          { label: t('Add Anchor Points'), onClick: () => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); } },
+          { label: t('Scissors at Midpoint'), onClick: () => { const n = scissorsSplitSelectionAtMidpoint(); if (n) toast.success(`${n} ${t('paths split')}`); else toast.warn(t('Select open stroked paths first.')); } },
+          { label: t('Knife Split Horizontal'), onClick: () => { const n = knifeSplitSelectionAtCenter('horizontal'); if (n) toast.success(`${n} ${t('objects knife-split')}`); else toast.warn(t('Select closed shapes first.')); } },
+          { label: t('Knife Split Vertical'), onClick: () => { const n = knifeSplitSelectionAtCenter('vertical'); if (n) toast.success(`${n} ${t('objects knife-split')}`); else toast.warn(t('Select closed shapes first.')); } },
+          { label: t('Average Anchor Points'), onClick: () => { const n = averageSelectedAnchors('both'); if (n) toast.success(`${n} ${t('anchors averaged')}`); else toast.warn(t('Shift-click two or more path anchors first.')); }, kbd: getBinding('path.averageAnchors') },
+          { label: t('Smooth Path'), onClick: () => { const n = smoothPathSelection(); if (n) toast.success(`${n} ${t('paths smoothed')}`); else toast.warn(t('Select one or more paths first.')); } },
+          { label: t('Reverse Path Direction'), onClick: () => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); } },
+          { label: t('Add Arrowhead (Start)'), onClick: () => { const n = addArrowheads('start'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
+          { label: t('Add Arrowhead (End)'), onClick: () => { const n = addArrowheads('end'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
+          { label: t('Add Arrowheads (Both)'), onClick: () => { const n = addArrowheads('both'); if (n) toast.success(`${n} ${t('arrowheads added')}`); else toast.warn(t('Select an open path or line first.')); } },
         ] },
+        { label: t('Artboards'), sub: [
+          { label: t('Create Artboard from Selection'), onClick: () => { const ab = createArtboardFromSelection(); if (ab) toast.success(t('Artboard created')); else toast.warn(t('Select something first.')); } },
+          { label: t('Duplicate Active Artboard'), onClick: () => { void duplicateActiveArtboard().then((ab) => { if (ab) toast.success(t('Artboard duplicated')); else toast.warn(t('Select an object on or near an artboard first.')); }); } },
+          { label: t('Duplicate Active Artboard Frame'), onClick: () => { if (duplicateActiveArtboardFrame()) toast.success(t('Artboard duplicated')); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Rename Active Artboard…'), onClick: () => { if (promptRenameActiveArtboard(t('Artboard name'))) toast.success(t('Artboard renamed')); else toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Move Active Artboard Earlier'), onClick: () => { if (reorderActiveArtboard('previous')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
+          { label: t('Move Active Artboard Later'), onClick: () => { if (reorderActiveArtboard('next')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
+          { label: t('Move Active Artboard to First'), onClick: () => { if (reorderActiveArtboard('first')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
+          { label: t('Move Active Artboard to Last'), onClick: () => { if (reorderActiveArtboard('last')) toast.success(t('Artboard order updated')); else toast.warn(t('Active artboard cannot move further.')); } },
+          { label: t('Sort Artboards by Position'), onClick: () => { if (sortArtboardsByPosition()) toast.success(t('Artboard order updated')); else toast.warn(t('Artboard order already matches position.')); } },
+          { label: t('Renumber Artboards by Position'), onClick: () => { if (renumberArtboardsByPosition(t('Artboard'))) toast.success(t('Artboards renumbered')); else toast.warn(t('Artboards already numbered by position.')); } },
+          { label: t('Delete Active Artboard'), onClick: async () => { if (await showConfirm({ message: t('Delete active artboard?'), confirmLabel: t('Delete'), danger: true })) { if (deleteActiveArtboard()) toast.success(t('Artboard deleted')); else toast.warn(t('Select an object on or near an artboard first.')); } } },
+          { label: t('Rearrange Artboards'), onClick: () => { const n = promptRearrangeArtboards({ columns: t('Columns'), spacing: t('Spacing'), moveArtwork: t('Move artwork? yes/no') }); if (n == null) return; if (n === -1) toast.warn(t('Invalid artboard rearrange options.')); else if (n) toast.success(t('Artboards rearranged')); else toast.warn(t('Need at least two artboards.')); } },
+          { label: t('Fit Artboard to Artwork'), onClick: () => { if (!fitArtboardToContent('all')) toast.warn(t('Nothing to fit.')); } },
+          { label: t('Fit Artboard to Selection'), onClick: () => { if (!fitArtboardToContent('selection')) toast.warn(t('Select something first.')); } },
+          { label: t('Fit Active Artboard to Artwork'), onClick: () => { if (!fitActiveArtboardToContent('all')) toast.warn(t('Select an object on or near an artboard first.')); } },
+          { label: t('Fit Active Artboard to Selection'), onClick: () => { if (!fitActiveArtboardToContent('selection')) toast.warn(t('Select an object on or near an artboard first.')); } },
+        ] },
+      ]} />
+
+      <Dropdown label={t('Type')} items={[
+        { label: t('Create Outlines'), onClick: () => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); }, kbd: getBinding('text.createOutlines') },
+        { label: t('Break Text into Letters'), onClick: () => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.splitLetters') },
+        { label: t('Break Text into Lines'), onClick: () => { const n = splitTextToLines(); if (n) toast.success(`${n} ${t('lines created')}`); else toast.warn(t('Select multi-line text first.')); }, kbd: getBinding('text.splitLines') },
+        { sep: true },
+        { label: t('Text on Arc (Up)'), onClick: () => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.arcUp') },
+        { label: t('Text on Arc (Down)'), onClick: () => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.arcDown') },
+        { sep: true },
+        { label: t('Change Case'), sub: [
+          { label: t('UPPERCASE'), onClick: () => { if (!changeCaseSelection('upper')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseUpper') },
+          { label: t('lowercase'), onClick: () => { if (!changeCaseSelection('lower')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseLower') },
+          { label: t('Title Case'), onClick: () => { if (!changeCaseSelection('title')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseTitle') },
+          { label: t('Sentence case'), onClick: () => { if (!changeCaseSelection('sentence')) toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.caseSentence') },
+        ] },
+        { label: t('Smart Punctuation'), onClick: () => { const n = smartPunctuationSelection(); if (n) toast.success(`${n} ${t('text objects updated')}`); else toast.warn(t('Select a text object first.')); }, kbd: getBinding('text.smartPunctuation') },
+        { sep: true },
+        { label: t('Increase Font Size'), onClick: () => adjustTextMetric(adjustFontSize, 2), kbd: getBinding('text.fontSizeUp') },
+        { label: t('Decrease Font Size'), onClick: () => adjustTextMetric(adjustFontSize, -2), kbd: getBinding('text.fontSizeDown') },
+        { label: t('Increase Tracking'), onClick: () => adjustTextMetric(adjustTracking, 25), kbd: getBinding('text.trackingUp') },
+        { label: t('Decrease Tracking'), onClick: () => adjustTextMetric(adjustTracking, -25), kbd: getBinding('text.trackingDown') },
+        { label: t('Increase Leading'), onClick: () => adjustTextMetric(adjustLeading, 0.05), kbd: getBinding('text.leadingUp') },
+        { label: t('Decrease Leading'), onClick: () => adjustTextMetric(adjustLeading, -0.05), kbd: getBinding('text.leadingDown') },
+        { sep: true },
+        { label: t('Single-line Text…'), onClick: () => setModal('showSingleLineText', true), kbd: getBinding('text.singleLine') },
+        { label: t('Find & Replace…'), onClick: () => setModal('showFindReplace', true), kbd: getBinding('text.findReplace') },
+      ]} />
+
+      <Dropdown label={t('Effects')} items={[
+        { label: t('Stylize'), sub: [
+          { label: t('Outline Stroke to Fill'), onClick: () => { const n = outlineStrokeToFillSelection(); if (n) toast.success(`${n} ${t('strokes outlined')}`); else toast.warn(t('Select shapes that have a stroke first.')); } },
+          { label: t('Simplify Path…'), onClick: () => openWithSelection('showSimplify') },
+          { label: t('Round Corners…'), onClick: () => openWithSelection('showRoundCorners') },
+          { label: t('Offset Path…'), onClick: () => openWithSelection('showOffsetPath') },
+          { label: t('Roughen…'), onClick: () => openWithSelection('showRoughen') },
+          { label: t('Zig Zag…'), onClick: () => openWithSelection('showZigzag') },
+          { label: t('Pucker & Bloat…'), onClick: () => openWithSelection('showPucker') },
+          { label: t('Twist…'), onClick: () => openWithSelection('showTwist') },
+        ] },
+        { label: t('Distort & Transform'), sub: [
+          { label: t('Arc Warp…'), onClick: () => openWithSelection('showWarp') },
+          { label: t('Surface Wrap…'), onClick: () => setModal('showSurfaceWrap', true) },
+          { label: t('Envelope Distort — Make with Top Object'), onClick: () => {
+            void envelopeSelection().then((r) => {
+              if (r && r.reshaped > 0) toast.success(`${r.reshaped} ${t('objects reshaped into the envelope')}${r.skipped > 0 ? ` · ${r.skipped} ${t('raster images skipped')}` : ''}`, { title: t('Envelope Distort') });
+              else toast.warn(t('Select the artwork plus one vector shape on top (2+ objects) — the top-most object becomes the envelope.'), { title: t('Envelope Distort') });
+            });
+          } },
+        ] },
+        { label: t('Edit Colors'), sub: [
+          { label: t('Recolor Artwork…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showRecolor', true); } },
+          { label: t('Invert Colors'), onClick: async () => { const n = (await import('../lib/colorAdjust')).invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Convert to Grayscale'), onClick: async () => { const n = (await import('../lib/colorAdjust')).grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); } },
+          { label: t('Saturate…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showSaturate', true); } },
+          { label: t('Adjust Hue…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showHue', true); } },
+          { label: t('Adjust Brightness…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showBrightness', true); } },
+          { sep: true },
+          { label: t('Blur'), onClick: () => applyBlur(0.08) },
+          { label: t('Contrast +'), onClick: () => applyContrast(0.18) },
+        ] },
+        { sep: true },
+        { label: t('Blend'), sub: [
+          { label: t('Blend…'), onClick: () => openWithSelection('showBlend', t('Select 2 or more objects first.'), 2) },
+          { label: t('Select Blend Steps'), onClick: () => { const n = selectBlendSteps(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('No generated blend steps found.')); } },
+          { label: t('Select Related Blend Steps'), onClick: () => { const n = selectBlendStepsFromSelection(); if (n) toast.success(`${n} ${t('blend steps selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); } },
+          { label: t('Select Blend Endpoints'), onClick: () => { const n = selectBlendEndpointsFromSelection(); if (n) toast.success(`${n} ${t('blend endpoints selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); } },
+          { label: t('Select All Blend Endpoints'), onClick: () => { const n = selectAllBlendEndpoints(); if (n) toast.success(`${n} ${t('blend endpoints selected')}`); else toast.warn(t('No generated blend steps found.')); } },
+          { label: t('Select Blend Group'), onClick: () => { const n = selectBlendGroupFromSelection(); if (n) toast.success(`${n} ${t('blend objects selected')}`); else toast.warn(t('Select a generated blend step or endpoint first.')); } },
+          { label: t('Select All Blend Groups'), onClick: () => { const n = selectAllBlendGroups(); if (n) toast.success(`${n} ${t('blend objects selected')}`); else toast.warn(t('No generated blend steps found.')); } },
+          { label: t('Select Orphan Blend Steps'), onClick: () => { const n = selectOrphanBlendSteps('document'); if (n) toast.success(`${n} ${t('orphan blend steps selected')}`); else toast.success(t('No orphan blend steps found.')); } },
+          { label: t('Update Blend Steps'), onClick: () => { const n = updateBlendSteps(); if (n) toast.success(`${n} ${t('blend steps updated')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
+          { label: t('Relink Blend Endpoint'), onClick: () => { const n = relinkBlendEndpointFromSelection(); if (n) toast.success(`${n} ${t('blend steps relinked')}`); else toast.warn(t('Select one blend endpoint and one replacement object.')); } },
+          { label: t('Update All Blend Steps'), onClick: () => { const n = updateBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps updated')}`); else toast.warn(t('No generated blend steps found.')); } },
+          { label: t('Reverse Blend Steps'), onClick: () => { const n = reverseBlendSteps(); if (n) toast.success(`${n} ${t('blend steps reversed')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
+          { label: t('Reverse All Blend Steps'), onClick: () => { const n = reverseBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps reversed')}`); else toast.warn(t('No generated blend steps found.')); } },
+          { label: t('Expand Blend Steps'), onClick: () => { const n = expandBlendSteps(); if (n) toast.success(`${n} ${t('blend steps expanded')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
+          { label: t('Expand All Blend Steps'), onClick: () => { const n = expandBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps expanded')}`); else toast.warn(t('No generated blend steps found.')); } },
+          { label: t('Release Blend Steps'), onClick: () => { const n = releaseBlendSteps(); if (n) toast.success(`${n} ${t('blend steps released')}`); else toast.warn(t('Select generated blend steps or endpoints first.')); } },
+          { label: t('Release All Blend Steps'), onClick: () => { const n = releaseBlendSteps('document'); if (n) toast.success(`${n} ${t('blend steps released')}`); else toast.warn(t('No generated blend steps found.')); } },
+          { label: t('Remove Orphan Blend Steps'), onClick: () => { const n = removeOrphanBlendSteps('document'); if (n) toast.success(`${n} ${t('orphan blend steps removed')}`); else toast.success(t('No orphan blend steps found.')); } },
+        ] },
+        { sep: true },
+        { label: t('Freeform Gradient…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showFreeformGradient', true); } },
+        { label: t('Drop shadow'), sub: [
+          { label: t('Soft Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.35)', blur: 12, offsetX: 4, offsetY: 6 })) },
+          { label: t('Hard Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.45)', blur: 0, offsetX: 5, offsetY: 5 })) },
+          { label: t('Glow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 })) },
+          { sep: true },
+          { label: t('Clear Shadow'), onClick: () => openWithSelectionAction(() => applyShadowToSelection(null)) },
+          { label: t('Expand Drop Shadow'), onClick: () => { void expandDropShadowSelection().then((n) => { if (n) toast.success(`${n} ${t('drop shadows expanded')}`); else toast.warn(t('Select objects with drop shadows first.')); }); } },
+        ] },
+        { label: t('Pattern Fill'), sub: [
+          { label: t('Checker'), onClick: () => openWithSelectionAction(() => applyPatternFill('checker', 16, '#ffffff', '#111827')) },
+          { label: t('Stripes'), onClick: () => openWithSelectionAction(() => applyPatternFill('stripes', 16, '#ffffff', '#111827')) },
+          { label: t('Dots'), onClick: () => openWithSelectionAction(() => applyPatternFill('dots', 16, '#ffffff', '#111827')) },
+          { label: t('Crosshatch'), onClick: () => openWithSelectionAction(() => applyPatternFill('crosshatch', 16, '#ffffff', '#111827')) },
+          { sep: true },
+          { label: t('Clear Pattern Fill'), onClick: () => { const n = clearPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills cleared')}`); else toast.warn(t('Select objects with pattern fills first.')); } },
+          { label: t('Expand Pattern Fill'), onClick: () => { const n = expandPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills expanded')}`); else toast.warn(t('Select objects with pattern fills first.')); } },
+        ] },
+        { label: t('Multi-outline…'), onClick: () => openWithSelection('showOutline') },
+      ]} />
+
+      <Dropdown label={t('Production')} width="w-64" items={[
+        { label: t('Send to Plotter…'), onClick: () => setModal('showPlotter', true), kbd: getBinding('window.plotter') },
+        { label: t('Cut Contour…'), onClick: () => openWithSelection('showCutContour'), kbd: getBinding('window.cutContour') },
+        { label: t('Trace to Vector Art…'), onClick: () => setModal('showTraceArt', true) },
+        { label: t('Production Preview…'), onClick: () => openWithSelection('showProductionPreview') },
+        { label: t('Separations…'), onClick: () => setModal('showSeparations', true) },
+        { label: t('Print Prep…'), onClick: openPrintPrep },
+        { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true), kbd: getBinding('file.tilePrint') },
+        { label: t('Add Print Marks'), onClick: () => { const n = addPrintMarksToArtboard(); if (n) toast.success(`${n} ${t('print marks added')}`); else toast.warn(t('No artboard for print marks.')); } },
+        { label: t('Clear Print Marks'), onClick: () => { const n = clearPrintMarks(); if (n) toast.success(`${n} ${t('print marks cleared')}`); else toast.warn(t('No print marks.')); } },
+        { label: t('Epson maintenance…'), onClick: () => setModal('showEpsonMaint', true) },
+        { sep: true },
+        { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
+        { label: t('Nest (rotation-aware)'), onClick: runRotationNest },
+        { label: t('Nest cut paths (vinyl)'), onClick: async () => (await import('../lib/cutPrepActions')).nestCutPathsVinyl(t) },
+        { label: t('Nest cut paths (raster true-shape)'), onClick: async () => (await import('../lib/cutPrepActions')).nestCutPathsRaster(t) },
+        { label: t('Gang Sheet Builder…'), onClick: () => setModal('showGangSheet', true) },
+        { sep: true },
+        { label: t('Make Sticker…'), onClick: () => openWithSelection('showMakeSticker'), kbd: getBinding('document.makeSticker') },
+            { label: t('Rhinestone Template…'), onClick: () => openWithSelection('showRhinestone') },
+            { label: t('Rhinestone presets'), sub: [
+              { label: t('Fine stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 2, 3) },
+              { label: t('Standard stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 2.8, 4) },
+              { label: t('Bold stones'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRhinestones(t, 4.7, 6) },
+              { label: t('Custom…'), onClick: () => openWithSelection('showRhinestone') },
+            ] },
+        { label: t('Single-line Text…'), onClick: () => setModal('showSingleLineText', true), kbd: getBinding('text.singleLine') },
+            { label: t('Variable Data…'), onClick: () => openWithSelection('showVariableData'), kbd: getBinding('text.variableData') },
+        { sep: true },
+        { label: t('Cut prep'), sub: [
+          { label: t('Add positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
+          {
+            label: t('Weed border'),
+            sub: [
+              { label: t('Border only'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t) },
+              { label: t('Weed rows'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 2, 0) },
+              { label: t('Weed columns'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 0, 2) },
+              { label: t('2×2'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 2, 2) },
+              { label: t('3×2'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t, 3, 2) },
+            ],
+          },
+          {
+            label: t('Bridges'),
+            sub: [
+              { label: t('Light'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 2, 0.6) },
+              { label: t('Standard'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1) },
+              { label: t('Heavy'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterBridges(t, 6, 1.5) },
+            ],
+          },
+          {
+            label: t('Banner Grommet presets'),
+            sub: [
+              { label: t('Small banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 15, 300, 8) },
+              { label: t('Standard banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 20, 500, 10) },
+              { label: t('Large banner'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterGrommets(t, 25, 750, 12) },
+              { label: t('Custom…'), onClick: () => openWithSelection('showGrommets') },
+            ],
+          },
+          { label: t('Save Test Cut File'), onClick: async () => (await import('../lib/cutPrepActions')).savePlotterTestCut(t) },
+          { sep: true },
+          { label: t('Clear positioning marks'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterRegistrationMarks(t) },
+          { label: t('Clear weed borders'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterWeedBorders(t) },
+          { label: t('Clear bridges'), onClick: async () => (await import('../lib/cutPrepActions')).clearPlotterBridges(t) },
+          { label: t('Clear contour'), onClick: () => clearCutKind('outline'), disabled: contourCutCount === 0 },
+          { label: t('Clear trace'), onClick: () => clearCutKind('trace'), disabled: traceCutCount === 0 },
+          { label: t('Clear regmarks'), onClick: () => clearCutKind('regmark'), disabled: regmarkCutCount === 0 },
+          { label: t('Clear cut paths'), onClick: () => clearCutJob(), disabled: cutPathCount === 0 },
+        ] },
+        { sep: true },
+        { label: t('Proof'), sub: [
+          { label: t('Add selection margin frame'), onClick: async () => { const raw = window.prompt(t('Set selection margin frame in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); if ((await import('../lib/tools/measureTool')).addSelectionMarginFrame(marginMm)) toast.success(t('Margin frame added')); else toast.warn(Number.isFinite(marginMm) ? t('Select something first.') : t('Invalid margin value.')); } },
+          { label: t('Add selection inset frame'), onClick: async () => { const raw = window.prompt(t('Set selection inset frame in mm'), '5'); if (raw == null) return; const insetMm = Number(raw); if ((await import('../lib/tools/measureTool')).addSelectionInsetFrame(insetMm)) toast.success(t('Inset frame added')); else toast.warn(Number.isFinite(insetMm) ? t('Select something first.') : t('Invalid inset value.')); } },
+          { sep: true },
+          { label: t('Lock measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).lockMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations locked')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Unlock measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).unlockMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations unlocked')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Hide measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).hideMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations hidden')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Show measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).showMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations shown')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Bring measure annotations to front'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).bringMeasureAnnotationsToFront(); if (n) toast.success(`${n} ${t('measure annotations brought to front')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Prepare measure annotations for proof'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).proofMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations proof-ready')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Edit measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).editMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations editable')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Duplicate measure annotations to selection'), onClick: async () => { const n = await (await import('../lib/tools/measureTool')).duplicateMeasureAnnotationsToSelection(); if (n) toast.success(`${n} ${t('measure annotations duplicated')}`); else toast.warn(t('Select artwork and keep measure annotations.')); } },
+          { sep: true },
+          { label: t('Make guides from measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).makeGuidesFromMeasureAnnotations(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Make margin guides from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure guide margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); const n = (await import('../lib/tools/measureTool')).makeMarginGuidesFromMeasureAnnotations(marginMm); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
+          { label: t('Make center guides from measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).makeCenterGuidesFromMeasureAnnotations(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Make full guide set from measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).makeFullGuidesFromMeasureAnnotations(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Make margin full guide set from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure guide margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); const n = (await import('../lib/tools/measureTool')).makeMarginFullGuidesFromMeasureAnnotations(marginMm); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
+          { sep: true },
+          { label: t('Add print marks from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure print bleed in mm'), '3'); if (raw == null) return; const bleedMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addPrintMarksFromMeasureAnnotations(bleedMm); if (n) toast.success(`${n} ${t('print marks added')}`); else toast.warn(Number.isFinite(bleedMm) ? t('No measure annotations.') : t('Invalid bleed value.')); } },
+          { label: t('Add cut contour from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (raw == null) return; const offsetMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addCutContourFromMeasureAnnotations(offsetMm); if (n) toast.success(`${n} ${t('contour(s) added')}`); else toast.warn(Number.isFinite(offsetMm) ? t('No measure annotations.') : t('Invalid offset value.')); } },
+          { label: t('Add bridged cut contour from measure annotations'), onClick: async () => { const offsetRaw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (offsetRaw == null) return; const countRaw = window.prompt(t('Set measure bridge count'), '4'); if (countRaw == null) return; const gapRaw = window.prompt(t('Set measure bridge gap in mm'), '1'); if (gapRaw == null) return; const offsetMm = Number(offsetRaw); const count = Number(countRaw); const gapMm = Number(gapRaw); const n = (await import('../lib/tools/measureTool')).addBridgedCutContourFromMeasureAnnotations(offsetMm, count, gapMm); if (n) toast.success(`${n} ${t('bridged contours added')}`); else toast.warn(Number.isFinite(offsetMm) && Number.isFinite(count) && Number.isFinite(gapMm) ? t('No measure annotations.') : t('Invalid bridge value.')); } },
+          { label: t('Add positioning marks from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure positioning mark offset in mm'), '5'); if (raw == null) return; const offsetMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addRegistrationMarksFromMeasureAnnotations(offsetMm); if (n) toast.success(t('4-corner registration marks added.')); else toast.warn(Number.isFinite(offsetMm) ? t('No measure annotations.') : t('Invalid offset value.')); } },
+          { label: t('Add weed border from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure weed margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); const n = (await import('../lib/tools/measureTool')).addWeedBorderFromMeasureAnnotations(marginMm); if (n) toast.success(t('Weed border added.')); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
+          { label: t('Add weed grid from measure annotations'), onClick: async () => { const marginRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (marginRaw == null) return; const rowsRaw = window.prompt(t('Set measure weed rows'), '1'); if (rowsRaw == null) return; const colsRaw = window.prompt(t('Set measure weed columns'), '1'); if (colsRaw == null) return; const marginMm = Number(marginRaw); const rows = Number(rowsRaw); const cols = Number(colsRaw); const n = (await import('../lib/tools/measureTool')).addWeedBorderFromMeasureAnnotations(marginMm, rows, cols); if (n) toast.success(t('Weed grid added.')); else toast.warn(Number.isFinite(marginMm) && Number.isFinite(rows) && Number.isFinite(cols) ? t('No measure annotations.') : t('Invalid weed grid value.')); } },
+          { label: t('Add grommets from measure annotations'), onClick: async () => { const insetRaw = window.prompt(t('Set measure grommet inset in mm'), '20'); if (insetRaw == null) return; const spacingRaw = window.prompt(t('Set measure grommet max spacing in mm'), '500'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure grommet diameter in mm'), '10'); if (diameterRaw == null) return; const insetMm = Number(insetRaw); const spacingMm = Number(spacingRaw); const diameterMm = Number(diameterRaw); const n = (await import('../lib/tools/measureTool')).addGrommetsFromMeasureAnnotations(insetMm, spacingMm, diameterMm); if (n) toast.success(`${n} ${t('grommets added')}`); else toast.warn(Number.isFinite(insetMm) && Number.isFinite(spacingMm) && Number.isFinite(diameterMm) ? t('No measure annotations.') : t('Invalid grommet value.')); } },
+          { label: t('Add rhinestones from measure annotations'), onClick: async () => { const spacingRaw = window.prompt(t('Set measure rhinestone spacing in mm'), '4'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure rhinestone diameter in mm'), '2.8'); if (diameterRaw == null) return; const spacingMm = Number(spacingRaw); const diameterMm = Number(diameterRaw); const n = (await import('../lib/tools/measureTool')).addRhinestonesFromMeasureAnnotations(spacingMm, diameterMm); if (n) toast.success(`${n} ${t('stones placed')}`); else toast.warn(Number.isFinite(spacingMm) && Number.isFinite(diameterMm) ? t('No measure annotations.') : t('Invalid rhinestone value.')); } },
+          { label: t('Prepare print and cut from measure annotations'), onClick: async () => { const bleedRaw = window.prompt(t('Set measure print bleed in mm'), '3'); if (bleedRaw == null) return; const contourRaw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (contourRaw == null) return; const regRaw = window.prompt(t('Set measure positioning mark offset in mm'), '5'); if (regRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const result = (await import('../lib/tools/measureTool')).preparePrintAndCutFromMeasureAnnotations(Number(bleedRaw), Number(contourRaw), Number(regRaw), Number(weedRaw)); if (result) toast.success(`${result.printMarks} ${t('print marks added')} · ${result.cutPaths} ${t('cut paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid print and cut prep value.')); } },
+          { label: t('Prepare banner finishing from measure annotations'), onClick: async () => { const insetRaw = window.prompt(t('Set measure grommet inset in mm'), '20'); if (insetRaw == null) return; const spacingRaw = window.prompt(t('Set measure grommet max spacing in mm'), '500'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure grommet diameter in mm'), '10'); if (diameterRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const rowsRaw = window.prompt(t('Set measure weed rows'), '0'); if (rowsRaw == null) return; const colsRaw = window.prompt(t('Set measure weed columns'), '0'); if (colsRaw == null) return; const result = (await import('../lib/tools/measureTool')).prepareBannerFinishingFromMeasureAnnotations(Number(insetRaw), Number(spacingRaw), Number(diameterRaw), Number(weedRaw), Number(rowsRaw), Number(colsRaw)); if (result) toast.success(`${result.grommets} ${t('grommets added')} · ${result.weedPaths} ${t('weed paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid banner finishing value.')); } },
+          { label: t('Prepare stencil cut from measure annotations'), onClick: async () => { const offsetRaw = window.prompt(t('Set measure cut contour offset in mm'), '0'); if (offsetRaw == null) return; const countRaw = window.prompt(t('Set measure bridge count'), '4'); if (countRaw == null) return; const gapRaw = window.prompt(t('Set measure bridge gap in mm'), '1'); if (gapRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const rowsRaw = window.prompt(t('Set measure weed rows'), '1'); if (rowsRaw == null) return; const colsRaw = window.prompt(t('Set measure weed columns'), '1'); if (colsRaw == null) return; const result = (await import('../lib/tools/measureTool')).prepareStencilCutFromMeasureAnnotations(Number(offsetRaw), Number(countRaw), Number(gapRaw), Number(weedRaw), Number(rowsRaw), Number(colsRaw)); if (result) toast.success(`${result.bridgedContours} ${t('bridged contours added')} · ${result.weedPaths} ${t('weed paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid stencil cut value.')); } },
+          { label: t('Prepare rhinestone template from measure annotations'), onClick: async () => { const spacingRaw = window.prompt(t('Set measure rhinestone spacing in mm'), '4'); if (spacingRaw == null) return; const diameterRaw = window.prompt(t('Set measure rhinestone diameter in mm'), '2.8'); if (diameterRaw == null) return; const weedRaw = window.prompt(t('Set measure weed margin in mm'), '5'); if (weedRaw == null) return; const result = (await import('../lib/tools/measureTool')).prepareRhinestoneTemplateFromMeasureAnnotations(Number(spacingRaw), Number(diameterRaw), Number(weedRaw)); if (result) toast.success(`${result.stones} ${t('stones placed')} · ${result.weedPaths} ${t('weed paths added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid rhinestone template value.')); } },
+          { sep: true },
+          { label: t('Prepare proof page from measure annotations'), onClick: async () => { const marginRaw = window.prompt(t('Set measure proof page margin in mm'), '5'); if (marginRaw == null) return; const bleedRaw = window.prompt(t('Set measure print bleed in mm'), '3'); if (bleedRaw == null) return; const result = (await import('../lib/tools/measureProof')).prepareProofPageFromMeasureAnnotations(Number(marginRaw), Number(bleedRaw)); if (result) toast.success(`${t('Artboard added')} · ${result.printMarks} ${t('print marks added')} · ${result.proofFrames} ${t('proof frames added')} · ${result.proofLabels} ${t('proof labels added')} · ${result.proofLegends} ${t('proof legends added')} · ${result.proofChecklists} ${t('proof checklists added')} · ${result.proofApprovalStamps} ${t('proof approval stamps added')} · ${result.proofColorBars} ${t('proof color bars added')} · ${result.proofScales} ${t('proof scales added')} · ${result.proofJobInfos} ${t('proof job info panels added')} · ${result.proofFilenames} ${t('proof filename labels added')} · ${result.proofPreflights} ${t('proof preflight summaries added')} · ${result.proofSpecs} ${t('proof specs panels added')} · ${result.proofSafetyNotes} ${t('proof safety notes added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid proof page value.')); } },
+          { label: t('Prepare proof pages from measure annotations'), onClick: async () => { const marginRaw = window.prompt(t('Set measure proof page margin in mm'), '5'); if (marginRaw == null) return; const bleedRaw = window.prompt(t('Set measure print bleed in mm'), '3'); if (bleedRaw == null) return; const result = (await import('../lib/tools/measureProof')).prepareProofPagesFromMeasureAnnotations(Number(marginRaw), Number(bleedRaw)); if (result) toast.success(`${result.artboards} ${t('artboards added')} · ${result.printMarks} ${t('print marks added')} · ${result.proofFrames} ${t('proof frames added')} · ${result.proofLabels} ${t('proof labels added')} · ${result.proofLegends} ${t('proof legends added')} · ${result.proofChecklists} ${t('proof checklists added')} · ${result.proofApprovalStamps} ${t('proof approval stamps added')} · ${result.proofColorBars} ${t('proof color bars added')} · ${result.proofScales} ${t('proof scales added')} · ${result.proofJobInfos} ${t('proof job info panels added')} · ${result.proofFilenames} ${t('proof filename labels added')} · ${result.proofPreflights} ${t('proof preflight summaries added')} · ${result.proofSpecs} ${t('proof specs panels added')} · ${result.proofSafetyNotes} ${t('proof safety notes added')} · ${result.guides} ${t('guides added')}`); else toast.warn(t('Invalid proof pages value.')); } },
+          { label: t('Make artboard from measure annotations'), onClick: async () => { if ((await import('../lib/tools/measureTool')).makeArtboardFromMeasureAnnotations()) toast.success(t('Artboard added')); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Make margin artboard from measure annotations'), onClick: async () => { const raw = window.prompt(t('Set measure artboard margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); if ((await import('../lib/tools/measureTool')).makeMarginArtboardFromMeasureAnnotations(marginMm)) toast.success(t('Artboard added')); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
+          { label: t('Resize artboard to measure annotations'), onClick: async () => { if ((await import('../lib/tools/measureTool')).resizeArtboardToMeasureAnnotations()) toast.success(t('Artboard resized')); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Resize artboard to measure annotations with margin'), onClick: async () => { const raw = window.prompt(t('Set measure artboard margin in mm'), '5'); if (raw == null) return; const marginMm = Number(raw); if ((await import('../lib/tools/measureTool')).resizeArtboardToMeasureAnnotations(marginMm)) toast.success(t('Artboard resized')); else toast.warn(Number.isFinite(marginMm) ? t('No measure annotations.') : t('Invalid margin value.')); } },
+          { sep: true },
+          { label: t('Add measure proof manifest'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofManifest(); if (n) toast.success(`${n} ${t('proof manifests updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Add measure proof revision history'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofRevisionHistory(); if (n) toast.success(`${n} ${t('proof revision histories updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Add measure proof approval audit'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofApprovalAudit(); if (n) toast.success(`${n} ${t('proof approval audits updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Add measure proof package cover'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofPackageCover(); if (n) toast.success(`${n} ${t('proof package covers updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Add measure proof delivery checklist'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliveryChecklist(); if (n) toast.success(`${n} ${t('proof delivery checklists updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Add measure proof release stamp'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofReleaseStamp(); if (n) toast.success(`${n} ${t('proof release stamps updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Add measure proof package index'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofPackageIndex(); if (n) toast.success(`${n} ${t('proof package indexes updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Add measure proof delivery contact'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliveryContact(); if (n) toast.success(`${n} ${t('proof delivery contacts updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof delivery contact'), onClick: async () => { const client = window.prompt(t('Set measure proof client'), ''); if (client == null) return; const contact = window.prompt(t('Set measure proof contact name'), ''); if (contact == null) return; const email = window.prompt(t('Set measure proof contact email'), ''); if (email == null) return; const phone = window.prompt(t('Set measure proof contact phone'), ''); if (phone == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofDeliveryContact({ client, contact, email, phone }); if (n) toast.success(`${n} ${t('proof delivery contacts updated')}`); else toast.warn(t('No measure proof delivery contact panels.')); } },
+          { label: t('Add measure proof delivery schedule'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliverySchedule(); if (n) toast.success(`${n} ${t('proof delivery schedules updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof delivery schedule'), onClick: async () => { const due = window.prompt(t('Set measure proof due date'), ''); if (due == null) return; const ship = window.prompt(t('Set measure proof ship date'), ''); if (ship == null) return; const method = window.prompt(t('Set measure proof delivery method'), ''); if (method == null) return; const notes = window.prompt(t('Set measure proof delivery notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofDeliverySchedule({ due, ship, method, notes }); if (n) toast.success(`${n} ${t('proof delivery schedules updated')}`); else toast.warn(t('No measure proof delivery schedule panels.')); } },
+          { label: t('Add measure proof delivery route'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofDeliveryRoute(); if (n) toast.success(`${n} ${t('proof delivery routes updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof delivery route'), onClick: async () => { const carrier = window.prompt(t('Set measure proof route carrier'), ''); if (carrier == null) return; const service = window.prompt(t('Set measure proof route service'), ''); if (service == null) return; const account = window.prompt(t('Set measure proof route account'), ''); if (account == null) return; const address = window.prompt(t('Set measure proof route address'), ''); if (address == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofDeliveryRoute({ carrier, service, account, address }); if (n) toast.success(`${n} ${t('proof delivery routes updated')}`); else toast.warn(t('No measure proof delivery route panels.')); } },
+          { label: t('Add measure proof fulfillment handoff'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofFulfillmentHandoff(); if (n) toast.success(`${n} ${t('proof fulfillment handoffs updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof fulfillment handoff'), onClick: async () => { const quantity = window.prompt(t('Set measure proof fulfillment quantity'), ''); if (quantity == null) return; const packaging = window.prompt(t('Set measure proof fulfillment packaging'), ''); if (packaging == null) return; const owner = window.prompt(t('Set measure proof fulfillment owner'), ''); if (owner == null) return; const tracking = window.prompt(t('Set measure proof fulfillment tracking'), ''); if (tracking == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofFulfillmentHandoff({ quantity, packaging, owner, tracking }); if (n) toast.success(`${n} ${t('proof fulfillment handoffs updated')}`); else toast.warn(t('No measure proof fulfillment handoff panels.')); } },
+          { label: t('Add measure proof install handoff'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofInstallHandoff(); if (n) toast.success(`${n} ${t('proof install handoffs updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof install handoff'), onClick: async () => { const installer = window.prompt(t('Set measure proof install installer'), ''); if (installer == null) return; const date = window.prompt(t('Set measure proof install date'), ''); if (date == null) return; const site = window.prompt(t('Set measure proof install site'), ''); if (site == null) return; const notes = window.prompt(t('Set measure proof install notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofInstallHandoff({ installer, date, site, notes }); if (n) toast.success(`${n} ${t('proof install handoffs updated')}`); else toast.warn(t('No measure proof install handoff panels.')); } },
+          { label: t('Add measure proof site readiness'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofSiteReadiness(); if (n) toast.success(`${n} ${t('proof site readiness panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof site readiness'), onClick: async () => { const permit = window.prompt(t('Set measure proof site permit'), ''); if (permit == null) return; const access = window.prompt(t('Set measure proof site access'), ''); if (access == null) return; const power = window.prompt(t('Set measure proof site power'), ''); if (power == null) return; const risks = window.prompt(t('Set measure proof site risks'), ''); if (risks == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofSiteReadiness({ permit, access, power, risks }); if (n) toast.success(`${n} ${t('proof site readiness panels updated')}`); else toast.warn(t('No measure proof site readiness panels.')); } },
+          { label: t('Add measure proof install punch list'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofInstallPunchList(); if (n) toast.success(`${n} ${t('proof install punch lists updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof install punch list'), onClick: async () => { const open = window.prompt(t('Set measure proof punch list open items'), ''); if (open == null) return; const owner = window.prompt(t('Set measure proof punch list owner'), ''); if (owner == null) return; const due = window.prompt(t('Set measure proof punch list due date'), ''); if (due == null) return; const resolution = window.prompt(t('Set measure proof punch list resolution'), ''); if (resolution == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofInstallPunchList({ open, owner, due, resolution }); if (n) toast.success(`${n} ${t('proof install punch lists updated')}`); else toast.warn(t('No measure proof install punch list panels.')); } },
+          { label: t('Add measure proof client acceptance'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofClientAcceptance(); if (n) toast.success(`${n} ${t('proof client acceptances updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof client acceptance'), onClick: async () => { const acceptedBy = window.prompt(t('Set measure proof accepted by'), ''); if (acceptedBy == null) return; const date = window.prompt(t('Set measure proof acceptance date'), ''); if (date == null) return; const status = window.prompt(t('Set measure proof acceptance status'), ''); if (status == null) return; const notes = window.prompt(t('Set measure proof acceptance notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofClientAcceptance({ acceptedBy, date, status, notes }); if (n) toast.success(`${n} ${t('proof client acceptances updated')}`); else toast.warn(t('No measure proof client acceptance panels.')); } },
+          { label: t('Add measure proof warranty info'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofWarrantyInfo(); if (n) toast.success(`${n} ${t('proof warranty info panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof warranty info'), onClick: async () => { const term = window.prompt(t('Set measure proof warranty term'), ''); if (term == null) return; const coverage = window.prompt(t('Set measure proof warranty coverage'), ''); if (coverage == null) return; const contact = window.prompt(t('Set measure proof warranty contact'), ''); if (contact == null) return; const notes = window.prompt(t('Set measure proof warranty notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofWarrantyInfo({ term, coverage, contact, notes }); if (n) toast.success(`${n} ${t('proof warranty info panels updated')}`); else toast.warn(t('No measure proof warranty info panels.')); } },
+          { label: t('Add measure proof care instructions'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofCareInstructions(); if (n) toast.success(`${n} ${t('proof care instruction panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof care instructions'), onClick: async () => { const cleaning = window.prompt(t('Set measure proof care cleaning'), ''); if (cleaning == null) return; const chemicals = window.prompt(t('Set measure proof care chemicals'), ''); if (chemicals == null) return; const inspection = window.prompt(t('Set measure proof care inspection'), ''); if (inspection == null) return; const notes = window.prompt(t('Set measure proof care notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofCareInstructions({ cleaning, chemicals, inspection, notes }); if (n) toast.success(`${n} ${t('proof care instruction panels updated')}`); else toast.warn(t('No measure proof care instruction panels.')); } },
+          { label: t('Add measure proof asset archive'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofAssetArchive(); if (n) toast.success(`${n} ${t('proof asset archive panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof asset archive'), onClick: async () => { const source = window.prompt(t('Set measure proof archive source'), ''); if (source == null) return; const exports = window.prompt(t('Set measure proof archive exports'), ''); if (exports == null) return; const photos = window.prompt(t('Set measure proof archive photos'), ''); if (photos == null) return; const notes = window.prompt(t('Set measure proof archive notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofAssetArchive({ source, exports, photos, notes }); if (n) toast.success(`${n} ${t('proof asset archive panels updated')}`); else toast.warn(t('No measure proof asset archive panels.')); } },
+          { label: t('Add measure proof file verification'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).addMeasureProofFileVerification(); if (n) toast.success(`${n} ${t('proof file verification panels updated')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+          { label: t('Set measure proof file verification'), onClick: async () => { const version = window.prompt(t('Set measure proof verification version'), ''); if (version == null) return; const checksum = window.prompt(t('Set measure proof verification checksum'), ''); if (checksum == null) return; const reviewed = window.prompt(t('Set measure proof verification reviewed'), ''); if (reviewed == null) return; const notes = window.prompt(t('Set measure proof verification notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofFileVerification({ version, checksum, reviewed, notes }); if (n) toast.success(`${n} ${t('proof file verification panels updated')}`); else toast.warn(t('No measure proof file verification panels.')); } },
+          { label: t('Set measure proof job information'), onClick: async () => { const job = window.prompt(t('Set measure proof job name'), ''); if (job == null) return; const revision = window.prompt(t('Set measure proof revision'), ''); if (revision == null) return; const prepared = window.prompt(t('Set measure proof prepared by'), ''); if (prepared == null) return; const notes = window.prompt(t('Set measure proof notes'), ''); if (notes == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofJobInfo({ job, revision, prepared, notes }); if (n) toast.success(`${n} ${t('proof job info panels updated')}`); else toast.warn(t('No measure proof job info panels.')); } },
+          { label: t('Set measure proof signoff'), onClick: async () => { const signer = window.prompt(t('Set measure proof signer'), ''); if (signer == null) return; const date = window.prompt(t('Set measure proof signoff date'), ''); if (date == null) return; const note = window.prompt(t('Set measure proof signoff note'), ''); if (note == null) return; const n = (await import('../lib/tools/measureProof')).setMeasureProofSignoff({ signer, date, note }); if (n) toast.success(`${n} ${t('proof signoffs updated')}`); else toast.warn(t('No measure proof checklists.')); } },
+          { sep: true },
+          { label: t('Select draft measure proof objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofObjectsByStatus('draft'); if (n) toast.success(`${n} ${t('proof objects selected')}`); else toast.warn(t('No matching measure proof objects.')); } },
+          { label: t('Select approved measure proof objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofObjectsByStatus('approved'); if (n) toast.success(`${n} ${t('proof objects selected')}`); else toast.warn(t('No matching measure proof objects.')); } },
+          { label: t('Select changes-required measure proof objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofObjectsByStatus('changes'); if (n) toast.success(`${n} ${t('proof objects selected')}`); else toast.warn(t('No matching measure proof objects.')); } },
+          { label: t('Select measure proof delivery blockers'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).selectMeasureProofDeliveryBlockers(); if (n) toast.success(`${n} ${t('proof blockers selected')}`); else toast.warn(t('No measure proof blockers.')); } },
+          { label: t('Mark proof sheet as draft'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).setMeasureProofApprovalStatus('draft'); if (n) toast.success(`${n} ${t('proof approval stamps updated')}`); else toast.warn(t('No measure proof approval stamps.')); } },
+          { label: t('Mark proof sheet as approved'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).setMeasureProofApprovalStatus('approved'); if (n) toast.success(`${n} ${t('proof approval stamps updated')}`); else toast.warn(t('No measure proof approval stamps.')); } },
+          { label: t('Mark proof sheet as changes required'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).setMeasureProofApprovalStatus('changes'); if (n) toast.success(`${n} ${t('proof approval stamps updated')}`); else toast.warn(t('No measure proof approval stamps.')); } },
+          { label: t('Clear measure proof sheet objects'), onClick: async () => { const n = (await import('../lib/tools/measureProof')).clearMeasureProofSheetObjects(); if (n) toast.success(`${n} ${t('proof sheet objects cleared')}`); else toast.warn(t('No measure proof sheet objects.')); } },
+        ] },
+      ]} />
+
+      <Dropdown label={t('View')} items={[
+        { label: t('Zoom In'), onClick: () => zoomBy(1.25), kbd: getBinding('view.zoomIn') },
+        { label: t('Zoom Out'), onClick: () => zoomBy(1 / 1.25), kbd: getBinding('view.zoomOut') },
+        { label: t('Actual Size'), onClick: () => zoomToPercent(100), kbd: getBinding('view.actualSize') },
+        { label: t('Fit to Page'), onClick: () => zoomFit(), kbd: getBinding('view.zoomFit') },
+        { label: t('Fit All Artboards in Window'), onClick: () => { if (!zoomToAllArtboards()) toast.warn(t('No artboards to navigate.')); } },
+        { label: t('Zoom to Active Artboard'), onClick: () => { if (!zoomToActiveArtboard()) toast.warn(t('Select an object on or near an artboard first.')); } },
+        { label: t('Previous Artboard'), onClick: () => { if (!zoomToAdjacentArtboard(-1)) toast.warn(t('No artboards to navigate.')); } },
+        { label: t('Next Artboard'), onClick: () => { if (!zoomToAdjacentArtboard(1)) toast.warn(t('No artboards to navigate.')); } },
+        { label: t('Zoom to Selection'), onClick: () => { if (!zoomToSelection()) toast.warn(t('Select something first.')); }, kbd: getBinding('view.zoomSelection') },
+        { sep: true },
+        { label: t('Outline View'), onClick: () => setOutlineMode(!outlineMode), kbd: getBinding('view.outline'), checked: outlineMode },
+        { sep: true },
+        { label: t('Measure'), sub: [
+          { label: t('Pin measurement as dimension'), onClick: async () => { if ((await import('../lib/tools/measureTool')).commitDimension()) toast.success(t('Dimension added')); else toast.warn(t('No measurement to pin.')); }, kbd: 'Enter' },
+          { label: t('Add selection dimensions'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).addSelectionDimensions(); if (n) toast.success(`${n} ${t('dimensions added')}`); else toast.warn(t('Select something first.')); } },
+          { label: t('Add selection area label'), onClick: async () => { if ((await import('../lib/tools/measureTool')).addSelectionAreaLabel()) toast.success(t('Area label added')); else toast.warn(t('Select something first.')); } },
+          { label: t('Add selection center mark'), onClick: async () => { if ((await import('../lib/tools/measureTool')).addSelectionCenterMark()) toast.success(t('Center mark added')); else toast.warn(t('Select something first.')); } },
+          { label: t('Add selection corner marks'), onClick: async () => { if ((await import('../lib/tools/measureTool')).addSelectionCornerMarks()) toast.success(t('Corner marks added')); else toast.warn(t('Select something first.')); } },
+          { label: t('Add production mark set'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).addSelectionProductionMarks(); if (n) toast.success(`${n} ${t('production mark sets added')}`); else toast.warn(t('Select something first.')); } },
+          { label: t('Select measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).selectMeasureAnnotations(); if (n) toast.success(`${n} ${t('selected')}`); else toast.warn(t('No measure annotations.')); } },
+          { label: t('Clear measure annotations'), onClick: async () => { const n = (await import('../lib/tools/measureTool')).clearMeasureAnnotations(); if (n) toast.success(`${n} ${t('measure annotations cleared')}`); else toast.warn(t('No measure annotations.')); } },
+        ] },
+        { label: t('Show Rulers'), onClick: () => setRulersVisible(!rulersVisible), checked: rulersVisible },
+        { label: t('Show Grid'), onClick: () => setGridVisible(!gridVisible), checked: gridVisible },
+        { label: t('Snap to Grid'), onClick: () => setSnapEnabled(!snapEnabled), checked: snapEnabled },
+        { label: t('Smart Guides'), onClick: () => setSmartGuidesEnabled(!smartGuidesEnabled), checked: smartGuidesEnabled },
+        { label: t('Anchor Snap'), onClick: () => setAnchorSnapEnabled(!anchorSnapEnabled), checked: anchorSnapEnabled },
+        { sep: true },
+        { label: t('Make Guides from Selection'), onClick: () => { const n = makeGuidesFromSelection(); if (n) toast.success(`${n} ${t('guides added')}`); else toast.warn(t('Select something first.')); } },
+        { label: t('Margin Guides…'), onClick: () => setModal('showMarginGuides', true) },
+        { label: t('Release Guides'), onClick: () => { const n = releaseGuides(); if (n) toast.success(`${n} ${t('guides released')}`); else toast.warn(t('No guides to release.')); } },
+        { label: t('Show Guides'), onClick: () => { const s = useEditor.getState(); s.setGuidesVisible(!s.guidesVisible); }, checked: guidesVisible, kbd: getBinding('view.toggleGuides') },
+        { label: t('Lock Guides'), onClick: () => useEditor.getState().setGuidesLocked(!useEditor.getState().guidesLocked), checked: guidesLocked },
+        { label: t('Clear Guides'), onClick: () => useEditor.getState().clearUserGuides() },
+      ]} />
+
+      <Dropdown label={t('Insert')} items={[
+        { label: t('Star / Polygon…'), onClick: () => setModal('showStar', true) },
+        { label: t('Split Into Grid…'), onClick: () => setModal('showSplitGrid', true) },
+        { label: t('Repeat (Grid / Radial / Mirror)…'), onClick: () => { if ((getCanvas()?.getActiveObjects().length ?? 0) < 1) toast.warn(t('Select something first.')); else setModal('showRepeat', true); } },
+        { sep: true },
+        // Image intake doubles as an insert (same handler as File > Import).
+        { label: t('Import Image…'), onClick: () => imageRef.current?.click(), kbd: getBinding('file.importImage') },
+        { label: t('Import PDF…'), onClick: () => pdfRef.current?.click() },
       ]} />
 
       <Dropdown label={t('Help')} items={[
@@ -1322,7 +1011,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
 
       <span className="topbar-sep" aria-hidden="true" />
       <div
-        className="flex items-center gap-1"
+        className="flex items-center gap-1 shrink-0"
         role="toolbar"
         aria-label={t('History actions')}
         title={t('Use arrow keys to review top bar actions')}
@@ -1333,62 +1022,17 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       </div>
 
       <span className="topbar-sep" aria-hidden="true" />
-      {/* Grid / Snap / Guides — single segmented control. Each pip is independently
-          toggleable; the group reads as one cluster. */}
-      <div
-        className="segmented"
-        role="toolbar"
-        aria-label={t('Canvas helper actions')}
-        title={t('Use arrow keys to review top bar actions')}
-        onKeyDown={handleTopbarActionKeys}
-      >
-        <button
-          type="button"
-          data-topbar-action
-          title={t('Grid')}
-          aria-label={t('Grid')}
-          aria-pressed={gridVisible}
-          onClick={() => setGridVisible(!gridVisible)}
-        >
-          <Hash size={12} aria-hidden="true" />
-          <span>{t('Grid')}</span>
-        </button>
-        <button
-          type="button"
-          data-topbar-action
-          title={t('Snap to Grid')}
-          aria-label={t('Snap to Grid')}
-          aria-pressed={snapEnabled}
-          onClick={() => setSnapEnabled(!snapEnabled)}
-        >
-          <Magnet size={12} aria-hidden="true" />
-          <span>{t('Snap')}</span>
-        </button>
-        <button
-          type="button"
-          data-topbar-action
-          title={t('Smart Guides')}
-          aria-label={t('Smart Guides')}
-          aria-pressed={smartGuidesEnabled}
-          onClick={() => setSmartGuidesEnabled(!smartGuidesEnabled)}
-        >
-          <Crosshair size={12} aria-hidden="true" />
-          <span>{t('Guides')}</span>
-        </button>
-        <button
-          type="button"
-          data-topbar-action
-          title={t('Snap to anchor points')}
-          aria-label={t('Snap to anchor points')}
-          aria-pressed={anchorSnapEnabled}
-          onClick={() => setAnchorSnapEnabled(!anchorSnapEnabled)}
-        >
-          <Target size={12} aria-hidden="true" />
-          <span>{t('Anchor')}</span>
-        </button>
-      </div>
+      {/* Grid / Snap / Guides / Anchor moved out of the topbar (wave 5
+          declutter): the StatusBar pips and the View menu are the two
+          remaining, always-available entry points for these toggles. */}
 
-      <div className="ml-auto flex items-center gap-2">
+      {/* Right cluster — min-w-0 (not shrink-0) so it shares width
+          pressure with the menu strip: the output-actions toolbar inside
+          already carries the min-width:0 + overflow-x:auto pattern
+          (index.css), and without min-w-0 here its automatic minimum
+          would push 100% of the shrink onto the menus (measured: menu
+          strip collapsed to 0px at 1440px). */}
+      <div className="ml-auto flex items-center gap-2 min-w-0">
         <SaveIndicator />
         {/* Zoom indicator — click to edit %, Enter applies, Escape cancels, blur commits.
             Right-click / shift-click fits the page. */}
@@ -1402,54 +1046,46 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           title={t('Use arrow keys to review top bar actions')}
           onKeyDown={handleTopbarActionKeys}
         >
+          {/* Wave-5 declutter: the old strip exposed 16 always-visible
+              buttons and scrolled horizontally — now the two highest-traffic
+              actions stay one-click and everything else folds into the
+              grouped "More…" dropdown below (all still ≤2 clicks away). */}
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Send to Plotter…')} (${getBinding('window.plotter')})`} aria-label={t('Send to Plotter…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('window.plotter'))} onClick={() => setModal('showPlotter', true)}>
             <Send size={12} aria-hidden="true" />{t('Plotter')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Cut Contour…')} (${getBinding('window.cutContour')})`} aria-label={t('Cut Contour…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('window.cutContour'))} onClick={() => openWithSelection('showCutContour')}>
-            <Target size={12} aria-hidden="true" />{t('Contour')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Add positioning marks')} aria-label={`${t('Reg')} — ${t('Add positioning marks')}`} onClick={async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t)}>
-            <Target size={12} aria-hidden="true" />{t('Reg')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Weed border')} aria-label={t('Weed border')} onClick={async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t)}>
-            <Grid3X3 size={12} aria-hidden="true" />{t('Weed')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Bridges')} — ${t('Standard')}`} aria-label={`${t('Bridge')} — ${t('Standard')}`} onClick={async () => { (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1); }}>
-            <Grid3X3 size={12} aria-hidden="true" />{t('Bridge')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Clear bridges')} aria-label={t('Clear bridges')} onClick={async () => { (await import('../lib/cutPrepActions')).clearPlotterBridges(t); }}>
-            <Grid3X3 size={12} aria-hidden="true" />{t('Clear')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Banner Grommets…')} aria-label={t('Banner Grommets…')} onClick={() => openWithSelection('showGrommets')}>
-            <Target size={12} aria-hidden="true" />{t('Grommet')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Rhinestone Template…')} aria-label={t('Rhinestone Template…')} onClick={() => openWithSelection('showRhinestone')}>
-            <Sparkles size={12} aria-hidden="true" />{t('Stone')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Variable Data…')} (${getBinding('text.variableData')})`} aria-label={t('Variable Data…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('text.variableData'))} onClick={() => openWithSelection('showVariableData')}>
-            <Hash size={12} aria-hidden="true" />{t('Data')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Save Test Cut File')} aria-label={t('Save Test Cut File')} onClick={async () => (await import('../lib/cutPrepActions')).savePlotterTestCut(t)}>
-            <Send size={12} aria-hidden="true" />{t('Test')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Auto-arrange (Nest)')} aria-label={t('Auto-arrange (Nest)')} onClick={runAutoNest}>
-            <Grid3X3 size={12} aria-hidden="true" />{t('Nest')}
           </button>
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Print…')} (${getBinding('file.print')})`} aria-label={t('Print…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.print'))} onClick={() => setModal('showPrint', true)}>
             <Printer size={12} aria-hidden="true" />{t('Print')}
           </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={t('Print Prep…')} aria-label={t('Print Prep…')} onClick={openPrintPrep}>
-            <Printer size={12} aria-hidden="true" />{t('Prep')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Tile Print…')} (${getBinding('file.tilePrint')})`} aria-label={t('Tile Print…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.tilePrint'))} onClick={() => setModal('showTilePrint', true)}>
-            <Sheet size={12} aria-hidden="true" />{t('Tile')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Export SVG')} (${getBinding('file.exportSvg')})`} aria-label={t('Export SVG')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.exportSvg'))} onClick={async () => { void getFormat('svg')?.export?.(); }}>
-            <FileImage size={12} aria-hidden="true" />{t('Export')}
-          </button>
-          <button type="button" data-topbar-action className="btn flex items-center justify-center w-7 h-7 p-0" title={t('Document Settings…')} aria-label={t('Document Settings…')} onClick={() => setModal('showDocSettings', true)}>
-            <Settings2 size={12} aria-hidden="true" />
-          </button>
+          {/* role=group keeps the dropdown markup grouped for the roving
+              toolbar semantics; the trigger itself renders as a plain
+              button (see Dropdown's triggerRole note). */}
+          <span role="group" className="inline-flex">
+            <Dropdown
+              label={t('More…')}
+              width="w-64"
+              triggerRole="button"
+              triggerProps={{ 'data-topbar-action': true, className: 'btn flex items-center gap-1' }}
+              items={[
+              { label: t('Cut Contour…'), onClick: () => openWithSelection('showCutContour'), kbd: getBinding('window.cutContour') },
+              { label: `${t('Reg')} — ${t('Add positioning marks')}`, onClick: async () => (await import('../lib/cutPrepActions')).addPlotterRegistrationMarks(t) },
+              { label: t('Weed border'), onClick: async () => (await import('../lib/cutPrepActions')).addPlotterWeedBorder(t) },
+              { label: `${t('Bridge')} — ${t('Standard')}`, onClick: async () => { (await import('../lib/cutPrepActions')).addPlotterBridges(t, 4, 1); } },
+              { label: t('Clear bridges'), onClick: async () => { (await import('../lib/cutPrepActions')).clearPlotterBridges(t); } },
+              { label: t('Banner Grommets…'), onClick: () => openWithSelection('showGrommets') },
+              { label: t('Save Test Cut File'), onClick: async () => (await import('../lib/cutPrepActions')).savePlotterTestCut(t) },
+              { sep: true },
+              { label: t('Auto-arrange (Nest)'), onClick: runAutoNest },
+              { label: t('Rhinestone Template…'), onClick: () => openWithSelection('showRhinestone') },
+              { label: t('Variable Data…'), onClick: () => openWithSelection('showVariableData'), kbd: getBinding('text.variableData') },
+              { sep: true },
+              { label: t('Print Prep…'), onClick: openPrintPrep },
+              { label: t('Tile Print…'), onClick: () => setModal('showTilePrint', true), kbd: getBinding('file.tilePrint') },
+              { sep: true },
+              { label: t('Export SVG'), onClick: async () => { void getFormat('svg')?.export?.(); }, kbd: getBinding('file.exportSvg') },
+              { label: t('Document Settings…'), onClick: () => setModal('showDocSettings', true) },
+            ]}
+            />
+          </span>
           {/* Primary — AI. */}
           <button type="button" data-topbar-action className="btn-primary flex items-center gap-1" title={t('AI Assistant')} aria-label={t('AI Assistant')} onClick={onToggleAI}>
             <Sparkles size={12} aria-hidden="true" />{t('AI')}
@@ -1466,7 +1102,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
       {showAbout && (
         <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 backdrop-blur-xs" onClick={() => setShowAbout(false)}>
           <div
-            className="w-[380px] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden"
+            className="w-[380px] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden max-h-[calc(100vh-4rem)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -1550,7 +1186,10 @@ function LanguageSwitcher() {
         // Pill-style language switcher — rounded-full sets it apart from rectangular buttons.
         className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] bg-panel2 border border-border text-muted hover:text-ink hover:border-border/80 transition-colors"
         title={t('Language')}
-        aria-label={t('Language')}
+        // Accessible name embeds the visible wordmark ("EN"/"中文") so the
+        // pill satisfies WCAG 2.5.3 Label in Name (label-content-name-
+        // mismatch) — same em-dash convention as the About/Logo button.
+        aria-label={`${t('Language')} — ${labelFor(lang)}`}
         aria-haspopup="menu"
         aria-expanded={open}
         onKeyDown={(event) => {
@@ -1790,7 +1429,7 @@ function SaveIndicator() {
   return (
     <button
       type="button"
-      className="btn-ghost flex items-center gap-1.5"
+      className="btn-ghost flex items-center gap-1.5 shrink-0 whitespace-nowrap"
       onClick={async () => { void (await import('../lib/projectFile')).saveProjectQuick(); }}
       // Title carries the action hint ("Save now"); the visible span + aria-
       // label both surface the *status* ("Saved 3m ago" / "Unsaved changes")
@@ -1837,11 +1476,45 @@ interface MenuItem {
   /** Nested submenu — renders a flyout panel on hover/focus. */
   sub?: MenuItem[];
 }
-function Dropdown({ label, items, width }: { label: string; items: MenuItem[]; width?: string }) {
+function Dropdown({ label, items, width, triggerProps, triggerRole }: { label: string; items: MenuItem[]; width?: string; triggerProps?: ButtonHTMLAttributes<HTMLButtonElement> & { 'data-topbar-action'?: boolean }; triggerRole?: 'menuitem' | 'button' }) {
+  // Pull className out so the spread below can't clobber the explicit prop.
+  const { className: triggerClass, ...triggerRest } = triggerProps ?? {};
   // Track open state so aria-expanded reflects reality. The visual
   // transition is still CSS (group-hover / group-focus-within) — this
   // state mirrors those triggers so screen readers know the menu state.
   const [open, setOpen] = useState(false);
+  // The menubar strip scrolls horizontally when the window is narrow, and
+  // an overflow container clips absolutely-positioned descendants — which
+  // would cut off the flyout panel that hangs below the strip. So once
+  // open, the panel is pinned with `position: fixed` at the trigger's
+  // current viewport rect (measured here, not in CSS). DOM order — and
+  // with it the hover / focus-within containment that drives visibility —
+  // is unchanged; only the paint coordinates move. Until the measurement
+  // lands the panel parks off-screen so it never flashes at (0,0).
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [panelPos, setPanelPos] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => {
+    if (!open) {
+      setPanelPos(null);
+      return;
+    }
+    const measure = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (rect) setPanelPos({ left: rect.left, top: rect.bottom + 4 });
+    };
+    measure();
+    // `position: fixed` decouples the panel from the trigger's layout, so
+    // anything that moves the trigger while open must re-measure — window
+    // resize, and horizontal scrolling of the overflow-x-auto menubar strip
+    // (element scroll doesn't bubble; capture catches it). Without this the
+    // panel hangs at stale viewport coordinates, visually detached.
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, [open]);
   return (
     <div
       className="relative group"
@@ -1856,16 +1529,27 @@ function Dropdown({ label, items, width }: { label: string; items: MenuItem[]; w
     >
       <button
         type="button"
-        className="px-2 py-1 rounded hover:bg-panel2 text-ink/90 hover:text-ink transition-colors"
+        ref={triggerRef}
+        // triggerProps lets toolbar callers restyle the trigger (.btn look)
+        // and join roving sets (data-topbar-action) without forking the
+        // hover/focus/fixed-panel logic; className, when passed, replaces the
+        // menubar default so the caller owns the visuals.
+        className={triggerClass ?? 'px-2 py-1 rounded hover:bg-panel2 text-ink/90 hover:text-ink transition-colors'}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        role="menuitem"
+        // In a menubar strip the trigger reads as a menu item; in a toolbar
+        // (the output cluster's "More…") a plain button + aria-haspopup is
+        // the correct semantics — axe requires menuitem parents to be
+        // menu/menubar, which a toolbar is not (LanguageSwitcher precedent).
+        role={triggerRole ?? 'menuitem'}
+        {...triggerRest}
       >
         {label}
       </button>
       <div
-        className={`absolute left-0 top-full mt-1 bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all z-50 ${width ?? 'w-56'} py-1`}
+        className={`fixed bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all z-50 ${width ?? 'w-56'} py-1 max-h-[calc(100vh-6rem)] overflow-y-auto`}
+        style={panelPos ? { left: panelPos.left, top: panelPos.top } : { left: -9999, top: -9999 }}
         role="menu"
         aria-label={label}
       >

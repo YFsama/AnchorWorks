@@ -390,6 +390,7 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&MenuItem::with_id(app, "file.exportJson", "Export JSON", true, None::<&str>)?)
         .separator()
         .item(&MenuItem::with_id(app, "file.print", "Print…", true, Some("CmdOrCtrl+P"))?)
+        .item(&MenuItem::with_id(app, "doc.settings", "Document Settings…", true, None::<&str>)?)
         .item(&MenuItem::with_id(app, "file.plotter", "Send to Plotter…", true, None::<&str>)?)
         .separator()
         .item(&PredefinedMenuItem::quit(app, Some("Quit"))?)
@@ -402,8 +403,6 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&MenuItem::with_id(app, "edit.duplicate", "Duplicate", true, Some("CmdOrCtrl+D"))?)
         .item(&MenuItem::with_id(app, "edit.selectAll", "Select All", true, Some("CmdOrCtrl+A"))?)
-        .item(&MenuItem::with_id(app, "edit.group", "Group", true, Some("CmdOrCtrl+G"))?)
-        .item(&MenuItem::with_id(app, "edit.ungroup", "Ungroup", true, Some("CmdOrCtrl+Shift+G"))?)
         .build()?;
 
     // View menu — zoom + outline.
@@ -416,9 +415,12 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&MenuItem::with_id(app, "view.toggleTheme", "Toggle Theme", true, Some("CmdOrCtrl+Shift+L"))?)
         .build()?;
 
-    // Document menu — Settings + Repeat.
-    let document = SubmenuBuilder::new(app, "Document")
-        .item(&MenuItem::with_id(app, "doc.settings", "Document Settings…", true, None::<&str>)?)
+    // Object menu — grouping lives here in the DOM MenuBar's 9-menu layout
+    // (2026-11 reorg); Repeat is a transform dialog, so it follows Group.
+    let object = SubmenuBuilder::new(app, "Object")
+        .item(&MenuItem::with_id(app, "edit.group", "Group", true, Some("CmdOrCtrl+G"))?)
+        .item(&MenuItem::with_id(app, "edit.ungroup", "Ungroup", true, Some("CmdOrCtrl+Shift+G"))?)
+        .separator()
         .item(&MenuItem::with_id(app, "doc.repeat", "Repeat (Grid / Radial / Mirror)…", true, None::<&str>)?)
         .build()?;
 
@@ -435,8 +437,8 @@ fn build_app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     MenuBuilder::new(app)
         .item(&file)
         .item(&edit)
+        .item(&object)
         .item(&view)
-        .item(&document)
         .item(&help)
         .build()
 }

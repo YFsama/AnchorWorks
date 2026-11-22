@@ -2,10 +2,12 @@
  * Native-menu bridge for the Tauri shell.
  *
  * `src-tauri/src/lib.rs#build_app_menu` defines a top-level menu (File /
- * Edit / View / Document / Help) whose every item carries a stable string
- * id ("file.save", "edit.undo", …). When the user picks an item, the Rust
- * side broadcasts `menu-action` with the id; this module listens for the
- * event and dispatches to the same handlers the DOM MenuBar uses.
+ * Edit / Object / View / Help — same shape as the 2026-11 nine-menu DOM
+ * reorg, curated to the native-shell subset) whose every item carries a
+ * stable string id ("file.save", "edit.undo", …). When the user picks an
+ * item, the Rust side broadcasts `menu-action` with the id; this module
+ * listens for the event and dispatches to the same handlers the DOM
+ * MenuBar uses.
  *
  * Keeping the two surfaces in sync means the in-DOM MenuBar can stay
  * visible (Windows/Linux convention) or be hidden under macOS — both
