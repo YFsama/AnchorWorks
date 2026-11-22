@@ -4,7 +4,9 @@ import {
   buildJog,
   buildSetOrigin,
   buildAbortSnippet,
+  buildCornerTour,
   buildForceSpeed,
+  buildLaserTest,
   isQueryCommand,
   decodeReply,
   lintJob,
@@ -12,6 +14,7 @@ import {
   explainStep,
   parsePositionReply,
   parsePageReply,
+  parseTravelReply,
   sniffFormat,
   QUICK_COMMANDS,
 } from '../hpglDebug';
@@ -64,7 +67,10 @@ describe('isQueryCommand', () => {
   it('recognises grbl report requests', () => {
     expect(isQueryCommand('gcode', '?')).toBe(true);
     expect(isQueryCommand('gcode', '$I')).toBe(true);
+    expect(isQueryCommand('gcode', '$$')).toBe(true);
+    expect(isQueryCommand('gcode', '$#')).toBe(true);
     expect(isQueryCommand('gcode', 'G0 X10')).toBe(false);
+    expect(isQueryCommand('gcode', '$100=250')).toBe(false);
   });
 });
 
@@ -100,6 +106,17 @@ describe('decodeReply', () => {
     expect(decodeReply('gcode', '?', 'ok')).toBe('ok');
     expect(decodeReply('gcode', '?', 'error:9')).toContain('Locked');
     expect(decodeReply('gcode', '?', '<Idle|MPos:0.000,0.000,0.000|FS:0,0>')).toBe('State: Idle');
+  });
+
+  it('decodes a $$ settings table into a readable key=value list', () => {
+    const out = decodeReply('gcode', '$$', '$0=10\r\n$32=1\r\n$130=300.000\r\nok');
+    expect(out).toContain('3 settings');
+    expect(out).toContain('$0=10');
+    expect(out).toContain('$32=1');
+    expect(out).toContain('$130=300.000');
+    // long tables are truncated, not dumped wholesale
+    const many = Array.from({ length: 20 }, (_, i) => `$${i}=1`).join('\r\n') + '\r\nok';
+    expect(decodeReply('gcode', '$$', many)).toContain('…');
   });
 
   it('flags silence instead of an empty string', () => {
@@ -448,5 +465,110 @@ describe('buildMoveTo', () => {
   it('emits an absolute grbl jog for gcode', () => {
     expect(buildMoveTo('gcode', 10, 5, 'mm', 1500)).toBe('$J=G90 G21 X10.00 Y5.00 F1500');
     expect(buildMoveTo('gcode', 1, 0, 'in', 1500)).toBe('$J=G90 G20 X1.000 Y0.000 F1500');
+  });
+});
+
+describe('buildCornerTour', () => {
+  it('gcode: absolute G0 corner visits, centre Z tap, then home + M30', () => {
+    const out = buildCornerTour('gcode', 100, 100);
+    const lines = out.split('\n');
+    expect(lines).toContain('G21 ; mm');
+    expect(lines).toContain('G90 ; absolute');
+    expect(lines).toContain('G0 X10 Y10 F3000');
+    expect(lines).toContain('G0 X90 Y10');
+    expect(lines).toContain('G0 X90 Y90');
+    expect(lines).toContain('G0 X10 Y90');
+    expect(lines).toContain('G0 X50.00 Y50.00');
+    expect(lines).toContain('G1 Z-1.000 F600'); // centre tap down
+    expect(lines).toContain('G0 Z5.000');       // …and back up
+    expect(lines[lines.length - 2]).toBe('G0 X0 Y0');
+    expect(lines[lines.length - 1]).toBe('M30 ; end');
+    // Parseable machine code: the run parser sees the motion statements.
+    const lint = lintJob('gcode', out);
+    expect(lint.stats.statements).toBeGreaterThan(0);
+  });
+
+  it('hpgl: PU/PA corner visits + centre PD;PU blade tap, returns home', () => {
+    const out = buildCornerTour('hpgl', 100, 80);
+    expect(out).toContain('IN;PU;PA;');
+    expect(out).toContain('PU400,400;');   // 10,10 mm in plotter units
+    expect(out).toContain('PU3600,400;');  // 90,10
+    expect(out).toContain('PU3600,2800;'); // 90,70
+    expect(out).toContain('PU400,2800;');  // 10,70
+    expect(out).toContain('PU2000,1600;'); // centre 50,40
+    expect(out).toContain('PD;PU;');       // the visible centre tap
+    expect(out.endsWith('PU0,0;')).toBe(true);
+    const lint = lintJob('hpgl', out);
+    expect(lint.stats.statements).toBeGreaterThan(0);
+  });
+
+  it('clamps degenerate sizes so the tour never leaves a tiny work area', () => {
+    const out = buildCornerTour('gcode', 5, 5);
+    // x1 = max(m+1, w-m) keeps corners inside even for a 5 mm square.
+    expect(out).toContain('G0 X11 Y11');
+  });
+});
+
+describe('buildLaserTest', () => {
+  it('burns gradient segments between M3/M5 pairs and homes with the laser off', () => {
+    const out = buildLaserTest(10, { count: 3, stepPct: 10 });
+    const lines = out.split('\n');
+    expect(lines[0]).toBe('G21 ; mm');
+    expect(lines).toContain('M3 S100'); // 10% of $30=1000
+    expect(lines).toContain('M3 S200');
+    expect(lines).toContain('M3 S300');
+    // M3 always immediately followed by a G1 burn, then M5 — the laser is
+    // never on during a G0 travel.
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('M3 ')) {
+        expect(lines[i + 1].startsWith('G1 ')).toBe(true);
+        expect(lines[i + 2]).toBe('M5');
+      }
+    }
+    // Return home AFTER the final M5.
+    const home = lines.indexOf('G0 X0 Y0');
+    const lastM5 = lines.map((l, i) => [l, i] as const).filter(([l]) => l === 'M5').pop();
+    expect(home).toBeGreaterThan(lastM5![1]);
+    expect(lines[lines.length - 1]).toBe('M30 ; end');
+  });
+
+  it('maps percent onto the configured max spindle and clamps to 100%', () => {
+    expect(buildLaserTest(10, { maxPower: 255 })).toContain('M3 S26'); // round(0.1×255)
+    expect(buildLaserTest(150, { maxPower: 1000 })).toContain('M3 S1000');
+  });
+
+  it('is parseable machine code (motion statements for the run parser)', () => {
+    const out = buildLaserTest(20, { count: 2 });
+    const lint = lintJob('gcode', out);
+    expect(lint.stats.statements).toBeGreaterThan(0);
+    expect(out.match(/M3 S\d+/g)?.length).toBe(2);
+  });
+});
+
+describe('parseTravelReply', () => {
+  it('reads the $130/$131 max-travel pair (mm)', () => {
+    expect(parseTravelReply('$130=300.000\r\n$131=210.000')).toEqual({ x: 300, y: 210 });
+    // Also accepts the values riding in a fuller $$ dump.
+    expect(parseTravelReply('$0=10\n$32=1\n$130=300.000\n$131=210.000\nok')).toEqual({ x: 300, y: 210 });
+  });
+
+  it('returns null when the travel lines are missing or degenerate', () => {
+    expect(parseTravelReply('$0=10\r\nok')).toBeNull();
+    expect(parseTravelReply('')).toBeNull();
+    expect(parseTravelReply('$130=0.000\n$131=210.000')).toBeNull();
+    expect(parseTravelReply('$130=abc\n$131=210.000')).toBeNull();
+  });
+});
+
+describe('QUICK_COMMANDS — grbl settings / parameters', () => {
+  it('exposes $$ and $# as gcode-side reply-awaiting commands', () => {
+    const settings = QUICK_COMMANDS.find(c => c.id === 'grbl-settings')!;
+    expect(settings.command).toBe('$$');
+    expect(settings.formats).toEqual(['gcode']);
+    expect(settings.expectsReply).toBe(true);
+    const params = QUICK_COMMANDS.find(c => c.id === 'gcode-params')!;
+    expect(params.command).toBe('$#');
+    expect(params.formats).toEqual(['gcode']);
+    expect(params.expectsReply).toBe(true);
   });
 });

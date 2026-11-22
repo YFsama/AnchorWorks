@@ -21,6 +21,7 @@
 
 import type { NativeSerialPort } from './plotter';
 import type { PlotterLink } from './plotterLink';
+import { PROBE_BAUD_RATES } from './plotterDiag';
 
 export interface ChipInfo {
   chip: string;
@@ -98,8 +99,8 @@ export interface IdentifyResult {
 }
 
 /** Query a connected machine for its identity: OI; (model), OE; (error),
- *  OH; (page). Silent replies are normal for clones — the summary says
- *  so instead of claiming a fault. */
+ *  OH; (page) — or $I (firmware build) on grbl. Silent replies are normal
+ *  for clones — the summary says so instead of claiming a fault. */
 export async function identifyMachine(link: Pick<PlotterLink, 'status' | 'query'>, format: 'gcode' | 'hpgl'): Promise<IdentifyResult> {
   if (format === 'gcode') {
     const build = await link.query('$I', 1200).catch(() => '');
@@ -108,7 +109,7 @@ export async function identifyMachine(link: Pick<PlotterLink, 'status' | 'query'
       model,
       error: null,
       page: null,
-      suggestedProfileId: null,
+      suggestedProfileId: model ? 'grbl-generic' : null,
       summary: model
         ? `grbl firmware: ${model}`
         : 'No reply — the controller may be locked (try Unlock) or the baud is wrong.',
@@ -135,6 +136,10 @@ export interface DetectedCutter {
   model: string;
   /** True when it answered like a grbl controller. */
   grbl: boolean;
+  /** Machine language to switch the app to: grbl → G-code, else HP-GL. */
+  format: 'gcode' | 'hpgl';
+  /** grbl $I build string when the controller answered it. */
+  grblBuild?: string;
   baud: number;
   suggestedProfileId: string | null;
 }
@@ -161,9 +166,12 @@ export interface AutoDetectOptions {
 
 /**
  * Scan ranked ports for something that answers like a cutter. For each
- * candidate: open at the chip-suggested baud (then the other common one),
- * send `OI;` and `?`, wait briefly, close. Restores any connection that
- * was open when the scan started. Returns the first responder, or null.
+ * candidate: open at the chip-suggested baud, then the remaining probe
+ * rates (chip suggestion + PROBE_BAUD_RATES, deduped — callers can pin
+ * the list with `opts.bauds`), send `OI;` and `?`, wait briefly, close.
+ * A grbl responder also gets a `$I` build query while the port is still
+ * open. Restores any connection that was open when the scan started.
+ * Returns the first responder, or null.
  *
  * Native (Tauri) only — Web Serial cannot enumerate ports.
  */
@@ -182,8 +190,13 @@ export async function autoDetectCutter(
   outer:
   for (const { port, chip } of rankCutterPorts(ports)) {
     const chipName = chip ? chip.chip : 'USB serial';
-    const bauds = opts.bauds ?? [chip?.probeBaud ?? 9600, ...(chip?.probeBaud === 9600 ? [115200] : [9600])];
-    for (const baud of [...new Set(bauds)]) {
+    const defaultBauds = [
+      chip?.probeBaud ?? 9600,
+      ...(chip?.probeBaud === 9600 ? [115200] : [9600]),
+      ...PROBE_BAUD_RATES,
+    ];
+    const bauds = opts.bauds ?? [...new Set(defaultBauds)];
+    for (const baud of bauds) {
       try {
         await link.open({ portPath: port.path, baud, flowControl: flow });
       } catch {
@@ -192,9 +205,15 @@ export async function autoDetectCutter(
       }
       const model = (await link.query('OI;', 700).catch(() => '')).replace(/[\r\n;]+/g, '').trim();
       let grbl = false;
+      let grblBuild = '';
       if (!model) {
         const q = (await link.query('?', 700).catch(() => '')).trim();
         grbl = q.startsWith('<');
+        // Firmware build while the port is open — feeds the identify
+        // report and the grbl profile suggestion.
+        if (grbl) {
+          grblBuild = (await link.query('$I', 900).catch(() => '')).replace(/[\r\n]+/g, ' ').trim();
+        }
       }
       await link.close();
       if (model || grbl) {
@@ -204,8 +223,12 @@ export async function autoDetectCutter(
           chip,
           model,
           grbl,
+          format: grbl ? 'gcode' : 'hpgl',
+          ...(grblBuild ? { grblBuild } : {}),
           baud,
-          suggestedProfileId: model ? suggestProfileFromModel(model) : (chip?.likelihood === 'high' ? 'china-clone' : null),
+          suggestedProfileId: model
+            ? suggestProfileFromModel(model)
+            : (grbl ? 'grbl-generic' : chip?.likelihood === 'high' ? 'china-clone' : null),
         };
         break outer;
       }

@@ -1,5 +1,6 @@
 /**
- * Machine profiles — per-brand compatibility layer for HP-GL cutters.
+ * Machine profiles — per-brand compatibility layer for HP-GL cutters and
+ * grbl (G-code) engravers / pen plotters.
  *
  * A profile bundles everything that differs between cutter brands beyond
  * the three dialects the HP-GL generator already knows (bare /
@@ -7,6 +8,11 @@
  * clones ONLY work at 9600 with no flow control), brand force/speed
  * commands, what to send right after connecting, the eject command, and
  * operator notes ("quirks") from the field.
+ *
+ * `dialect` is OPTIONAL: profiles without one target grbl-class machines
+ * that speak G-code (format 'gcode'), where HP-GL dialects, FS/VS and
+ * IN;/!PG statements simply don't apply — their connect-init and
+ * force/speed builders resolve to nothing.
  *
  * Honesty rule: only commands that are broadly documented go in here.
  * Machines whose force/speed can't be set reliably over HP-GL carry
@@ -28,7 +34,8 @@ export interface MachineProfile {
   label: string;
   /** Representative models — search bait for the operator. */
   models: string;
-  dialect: HpglDialect;
+  /** HP-GL dialect. Undefined = G-code (grbl) machine — no HP-GL quirks. */
+  dialect?: HpglDialect;
   baud: number;
   flowControl: FlowControl;
   /** Sane force (gf) / speed (cm/s) starting points for sign vinyl. */
@@ -236,6 +243,42 @@ export const MACHINE_PROFILES: MachineProfile[] = [
       'Force/speed/offset are set from the machine panel or GCC AAS software.',
     ],
   },
+  {
+    id: 'grbl-generic',
+    brand: 'grbl',
+    label: 'grbl pen plotter / spindle engraver',
+    models: 'grbl 0.9 / 1.1 pen plotters, 3018-style CNC engravers',
+    baud: 115200,
+    flowControl: 'none',
+    defaultForce: 0,
+    defaultSpeed: 0,
+    statusQueries: true,
+    panelOnly: true,
+    quirks: [
+      'G-code output with the Z-axis pen model — set pen-down/pen-up Z to match your tool.',
+      'Serial is 115200 8N1 on virtually every grbl board (CP2102 / STM32 CDC adapters).',
+      'After an alarm, run Unlock ($X) before motion; $H homes when limit switches are fitted.',
+      'Spindle power % in the machine options adds M3/M5 with an S value; leave it empty for pen plotters.',
+    ],
+  },
+  {
+    id: 'grbl-laser',
+    brand: 'grbl',
+    label: 'grbl laser engraver',
+    models: 'diode / CO2 laser boards running grbl (EleksMaker, Ortur-style)',
+    baud: 115200,
+    flowControl: 'none',
+    defaultForce: 0,
+    defaultSpeed: 0,
+    statusQueries: true,
+    panelOnly: true,
+    quirks: [
+      'Laser mode must be enabled on the controller: $32=1 (grbl laser mode) — otherwise M3 S… modulates the spindle instead.',
+      'Set $30 (max spindle speed) to 1000 so power % maps cleanly: S = percent × 10.',
+      'Spindle power % in the machine options adds M3 S…/M5 around the job — start low (10%) and step up with the laser gradient test.',
+      'Eye protection: never run the laser without rated safety glasses for the diode/CO2 wavelength.',
+    ],
+  },
 ];
 
 export function getMachineProfile(id: string | undefined): MachineProfile | null {
@@ -244,18 +287,23 @@ export function getMachineProfile(id: string | undefined): MachineProfile | null
 }
 
 /** Force+speed statement for the profile's dialect (may be empty when
- *  the machine is panel-only). Falls back to the generic FS/VS pair. */
+ *  the machine is panel-only). Falls back to the generic FS/VS pair for
+ *  profile-less HP-GL setups; grbl (no-dialect) profiles have no HP-GL
+ *  force/speed at all — G-code power is carried by M3/S in the job. */
 export function profileForceSpeed(profile: MachineProfile | null, force: number, speed: number): string {
   if (!profile) return (force > 0 ? `FS${Math.round(force)};` : '') + (speed > 0 ? `VS${Math.round(speed)};` : '');
+  if (!profile.dialect) return '';
   const f = profile.forceCommand?.(force) ?? '';
   const s = profile.speedCommand?.(speed) ?? '';
   return f + s;
 }
 
 /** Post-connect statement (IN + force/speed) or '' when the machine has
- *  nothing special to prime. */
+ *  nothing special to prime. grbl (no-dialect) profiles prime nothing —
+ *  IN; is an HP-GL statement and would be an error on G-code machines. */
 export function profileConnectInit(profile: MachineProfile | null, force: number, speed: number): string {
   if (!profile) return '';
+  if (!profile.dialect) return '';
   if (profile.connectInit) return profile.connectInit(force, speed);
   if (profile.panelOnly) return 'IN;';
   return `IN;${profileForceSpeed(profile, force, speed)}`;

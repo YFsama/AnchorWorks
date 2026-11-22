@@ -43,6 +43,14 @@ function mountDialog(): HTMLDivElement {
   return container;
 }
 
+/** Switch to a section tab (2026-11 reorg: the Machine / Cut / Output panes
+ *  mount one at a time — queries must target the active pane). No-op when
+ *  already active. */
+function openPlotterTab(c: HTMLElement, id: 'machine' | 'cut' | 'output'): void {
+  const btn = c.querySelector<HTMLButtonElement>(`#plotter-tab-${id}`)!;
+  if (btn.getAttribute('aria-selected') !== 'true') click(btn);
+}
+
 const armsCheckbox = (c: HTMLElement) =>
   Array.from(c.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'))
     .find(cb => cb.closest('label')?.textContent?.includes('ARMS registration'))!;
@@ -102,6 +110,7 @@ afterEach(() => {
 describe('PlotterDialog blade offset', () => {
   it('preset chips flow into the options state and the summary (only when > 0)', () => {
     const c = mountDialog();
+    openPlotterTab(c, 'cut');
     expect(summaryText(c)).not.toContain('blade offset');
 
     click(bladeOffsetGroup(c).querySelector('button[data-value="0.25"]')!);
@@ -115,6 +124,7 @@ describe('PlotterDialog blade offset', () => {
 
   it('the numeric input carries the drag-knife hint and clamps into 0–5', () => {
     const c = mountDialog();
+    openPlotterTab(c, 'cut');
     const input = c.querySelector<HTMLInputElement>('input[title="Drag-knife swivel compensation — 0.25 mm typical for a 45° blade"]')!;
     expect(input).toBeTruthy();
     expect(input.value).toBe('0');
@@ -126,6 +136,7 @@ describe('PlotterDialog blade offset', () => {
 describe('PlotterDialog ARMS section', () => {
   it('is visible but disabled with the reason on non-Graphtec dialects', () => {
     const c = mountDialog();
+    openPlotterTab(c, 'cut');
     // Default dialect is 'bare'.
     expect(c.textContent).toContain('ARMS registration (print & cut)');
     expect(c.textContent).toContain('ARMS registration marks require the Graphtec dialect.');
@@ -135,7 +146,9 @@ describe('PlotterDialog ARMS section', () => {
 
   it('enables under the Graphtec dialect, shows defaults and the summary entry', () => {
     const c = mountDialog();
+    openPlotterTab(c, 'machine');
     click(dialectButton(c, 'graphtec-fc'));
+    openPlotterTab(c, 'cut');
     expect(armsCheckbox(c).disabled).toBe(false);
     expect(c.textContent).not.toContain('ARMS registration marks require the Graphtec dialect.');
 
@@ -161,7 +174,9 @@ describe('PlotterDialog ARMS section', () => {
   it('Auto fills the expected rectangle from the cut-path bounding box (mm)', () => {
     useEditor.setState({ cutPaths: [rectCutPath()] });
     const c = mountDialog();
+    openPlotterTab(c, 'machine');
     click(dialectButton(c, 'graphtec-fc'));
+    openPlotterTab(c, 'cut');
     click(armsCheckbox(c));
 
     const auto = Array.from(c.querySelectorAll<HTMLButtonElement>('button'))
@@ -177,12 +192,16 @@ describe('PlotterDialog ARMS section', () => {
     useEditor.setState({ cutPaths: [rectCutPath()] });
     const errorSpy = vi.spyOn(toast, 'error');
     const c = mountDialog();
+    openPlotterTab(c, 'machine');
     click(dialectButton(c, 'graphtec-fc'));
+    openPlotterTab(c, 'cut');
     click(armsCheckbox(c));
     // Stale-enabled ARMS: switch the dialect away, then build the preview.
     // effectiveOpts strips the block (the toggle is disabled under 'bare'),
     // so the job builds without the ARMS handshake instead of throwing.
+    openPlotterTab(c, 'machine');
     click(dialectButton(c, 'bare'));
+    openPlotterTab(c, 'output');
     click(c.querySelector('#plotter-preview-tab-code')!);
     expect(errorSpy).not.toHaveBeenCalled();
     const code = c.querySelector('#plotter-code-view')?.textContent
@@ -195,6 +214,7 @@ describe('PlotterDialog ARMS section', () => {
 describe('PlotterDialog material preset new fields', () => {
   it('shows blade angle / passes in the card hint and applies defaultOvercutMm', () => {
     const c = mountDialog();
+    openPlotterTab(c, 'cut');
     const glitter = c.querySelector<HTMLButtonElement>('#plotter-material-glitter-htv')!;
     expect(glitter.textContent).toContain('60° blade');
     expect(glitter.textContent).toContain('2 passes');

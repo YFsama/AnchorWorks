@@ -39,6 +39,8 @@ export const QUICK_COMMANDS: QuickCommand[] = [
   { id: 'unlock', label: 'Unlock', command: '$X', description: 'Clear the grbl alarm lock so the machine accepts motion.', expectsReply: false, formats: ['gcode'] },
   { id: 'status', label: 'Status', command: '?', description: 'Request a grbl status report.', expectsReply: true, formats: ['gcode'] },
   { id: 'build', label: 'Build info', command: '$I', description: 'Ask grbl for firmware version info.', expectsReply: true, formats: ['gcode'] },
+  { id: 'grbl-settings', label: 'Settings', command: '$$', description: 'Read the grbl settings table ($$) — every $key=value, incl. travel ($130-132) and laser mode ($32).', expectsReply: true, formats: ['gcode'] },
+  { id: 'gcode-params', label: 'Parameters', command: '$#', description: 'Read the grbl parameter / offset data ($#) — G54.. work offsets, probe and tool-length values.', expectsReply: true, formats: ['gcode'] },
   { id: 'home', label: 'Home', command: '$H', description: 'Run the grbl homing cycle (needs limit switches).', expectsReply: false, formats: ['gcode'] },
   { id: 'feed-hold', label: 'Pause', command: '!', description: 'Feed hold — decelerate and pause motion (grbl).', expectsReply: false, formats: ['gcode'] },
   { id: 'resume', label: 'Resume', command: '~', description: 'Cycle resume — continue after a feed hold (grbl).', expectsReply: false, formats: ['gcode'] },
@@ -89,10 +91,88 @@ export function buildForceSpeed(force: number, speed: number): string {
   return parts.join('');
 }
 
+/** Corner-location tour — G0/PU visits of the four corners of a w×h
+ *  rectangle plus a centre mark, then returns to the origin. The classic
+ *  "did I pick the right port / are the axes mapped right" check before
+ *  any real job: everything travels with the pen/blade up except one tap
+ *  in the centre so the operator can see where the work area sits.
+ *  Coordinates are in mm from the current origin. */
+export function buildCornerTour(format: OutputFormat, w = 100, h = 100, feedMmMin = 3000): string {
+  const m = 10; // corner inset so the tour works even on small machines
+  const x1 = Math.max(m + 1, w - m);
+  const y1 = Math.max(m + 1, h - m);
+  if (format === 'hpgl') {
+    const U = (v: number) => Math.round(v * 40); // plotter units (mm)
+    return [
+      'IN;PU;PA;',
+      `PU${U(m)},${U(m)};`, `PU${U(x1)},${U(m)};`, `PU${U(x1)},${U(y1)};`, `PU${U(m)},${U(y1)};`,
+      `PU${U(w / 2)},${U(h / 2)};`,
+      'PD;PU;', // centre blade tap — the visible anchor point
+      'PU0,0;',
+    ].join('');
+  }
+  const cx = (w / 2).toFixed(2);
+  const cy = (h / 2).toFixed(2);
+  const feed = Math.max(100, Math.round(feedMmMin));
+  return [
+    'G21 ; mm', 'G90 ; absolute',
+    `G0 X${m} Y${m} F${feed}`,
+    `G0 X${x1} Y${m}`,
+    `G0 X${x1} Y${y1}`,
+    `G0 X${m} Y${y1}`,
+    `G0 X${cx} Y${cy}`,
+    'G1 Z-1.000 F600', 'G0 Z5.000', // centre pen tap
+    'G0 X0 Y0',
+    'M30 ; end',
+  ].join('\n');
+}
+
+export interface LaserTestOptions {
+  /** grbl $30 max spindle speed — power % maps to S = pct/100 × max. */
+  maxPower?: number;
+  /** Segment count for the strip (default 1). Powers step by `stepPct`. */
+  count?: number;
+  /** Percent added per segment (default 0 — one power, count times). */
+  stepPct?: number;
+  /** Segment length in mm (default 10). */
+  segmentMm?: number;
+  /** Feed rate mm/min for the burnt segments (default 600). */
+  feedMmMin?: number;
+}
+
+/** Laser trial strip — M3 S<power> short segments with M5 between them,
+ *  finished with M5 + M30. Diode/CO2 boards running grbl laser mode
+ *  ($32=1): each segment burns at `powerPct` (+`stepPct` per segment for
+ *  a gradient strip) so the operator can pick a working power by eye.
+ *  The laser is only ever ON while the head moves along a segment —
+ *  every travel between segments happens after M5. */
+export function buildLaserTest(powerPct = 10, opts: LaserTestOptions = {}): string {
+  const maxPower = opts.maxPower ?? 1000;
+  const count = Math.max(1, Math.min(12, Math.round(opts.count ?? 1)));
+  const stepPct = opts.stepPct ?? 0;
+  const segLen = Math.max(1, opts.segmentMm ?? 10);
+  const feed = Math.max(100, Math.round(opts.feedMmMin ?? 600));
+  const clampPct = (p: number) => Math.max(0, Math.min(100, Math.round(p)));
+  const lines: string[] = ['G21 ; mm', 'G90 ; absolute', 'M5 ; laser off'];
+  let x = 0;
+  for (let i = 0; i < count; i++) {
+    const pct = clampPct(powerPct + stepPct * i);
+    const s = Math.max(0, Math.round((pct / 100) * maxPower));
+    x += 2; // 2 mm gap between segments, travelled with the laser off
+    lines.push(`G0 X${x.toFixed(2)} Y0.00 F${feed}`);
+    lines.push(`M3 S${s}`);
+    lines.push(`G1 X${(x + segLen).toFixed(2)} Y0.00 F${feed}`);
+    lines.push('M5');
+    x += segLen;
+  }
+  lines.push('G0 X0 Y0', 'M30 ; end');
+  return lines.join('\n');
+}
+
 /** Does this machine text expect a reply we should wait for? */
 export function isQueryCommand(format: OutputFormat, text: string): boolean {
   if (format === 'hpgl') return /\b(OE|OH|OA|OC|OS|OF|OP|OD)\s*;/i.test(text);
-  return /^\s*(\?|\$I|\$#|\$G|\$SS?)/i.test(text);
+  return /^\s*(\?|\$I|\$#|\$G|\$\$|\$SS?)/i.test(text);
 }
 
 const HPGL_ERRORS: Record<number, string> = {
@@ -137,7 +217,19 @@ const ETX = String.fromCharCode(3);
 export function decodeReply(format: OutputFormat, command: string, reply: string, unit: 'mm' | 'in' = 'mm'): string {
   const raw = reply.replace(/[\r\n;]+$/g, '').replaceAll(ETX, '').trim();
   if (!raw) return '(no reply)';
-  if (format === 'gcode') return decodeGrbl(raw);
+  if (format === 'gcode') {
+    // $$ → the settings table; render the key=value pairs readably
+    // (travel $130-132, laser mode $32, max spindle $30 are the ones
+    // operators actually look for).
+    if (command.trim() === '$$') {
+      const pairs = [...raw.matchAll(/\$(\d+)=([^\r\n]*)/g)].map(m => `$${m[1]}=${m[2].trim()}`);
+      if (pairs.length > 0) {
+        const shown = pairs.slice(0, 12).join(' · ');
+        return `${pairs.length} settings: ${shown}${pairs.length > 12 ? ' · …' : ''}`;
+      }
+    }
+    return decodeGrbl(raw);
+  }
 
   const cmd = command.trim().toUpperCase();
   const perUnit = unit === 'mm' ? 40 : 1016;
@@ -884,9 +976,23 @@ export function parsePageReply(reply: string, unit: 'mm' | 'in' = 'mm'): { x0: n
   const raw = reply.replace(/[\r\n;]+$/g, '').replaceAll(ETX, '').trim();
   if (!raw) return null;
   const nums = raw.split(',').map(Number);
-  if (nums.length < 4 || !nums.slice(0, 4).every(Number.isFinite)) return null;
+  if (nums.length < 4 || !nums.slice(0, 4).every(n => Number.isFinite(n))) return null;
   const per = unit === 'in' ? 1016 : 40;
   return { x0: nums[0] / per, y0: nums[1] / per, x1: nums[2] / per, y1: nums[3] / per };
+}
+
+/** X/Y travel limits from a grbl `$$` settings reply — $130/$131 are the
+ *  max-travel soft limits in mm (grbl's `$#` prints offsets instead, so
+ *  travel genuinely lives in `$$`). Null when the lines aren't there;
+ *  callers skip the off-page jog warning rather than guessing. */
+export function parseTravelReply(reply: string): { x: number; y: number } | null {
+  const x = reply.match(/\$130=([\d.]+)/);
+  const y = reply.match(/\$131=([\d.]+)/);
+  if (!x || !y) return null;
+  const xv = Number(x[1]);
+  const yv = Number(y[1]);
+  if (!Number.isFinite(xv) || !Number.isFinite(yv) || xv <= 0 || yv <= 0) return null;
+  return { x: xv, y: yv };
 }
 
 /** Best-effort format sniff for loaded machine-code files: HP-GL vs grbl

@@ -168,6 +168,12 @@ export interface DiagReportInput {
   unit: string;
   profileLabel?: string;
   machineCount: number;
+  /** Result of the last machine identification (OI; / $I), when one ran. */
+  identify?: { model: string; summary: string } | null;
+  /** Steps of the last connection self-test, when one ran. */
+  selfTestSteps?: DiagStep[];
+  /** grbl $$ settings snapshot ($key=value pairs), when one was read. */
+  grblSettings?: Array<{ key: string; value: string }>;
   jobs: Array<{ ts: number; kind: string; target: string; format: string; baud: number; paths: number; bytes: number; seconds: number; result: string }>;
   /** Pre-formatted console lines (most recent last). */
   logLines: string[];
@@ -205,6 +211,24 @@ export function buildDiagnosticsReport(input: DiagReportInput): string {
   );
   if (input.profileLabel) lines.push(`- Machine profile: ${input.profileLabel}`);
   lines.push(`- Saved machines: ${input.machineCount}`, '');
+
+  if (input.identify) {
+    lines.push('Machine identification');
+    lines.push(`- Model: ${input.identify.model || '—'}`);
+    lines.push(`- Summary: ${input.identify.summary}`, '');
+  }
+  if (input.grblSettings && input.grblSettings.length > 0) {
+    lines.push(`grbl settings (last $$ snapshot, ${input.grblSettings.length} keys)`);
+    for (const s of input.grblSettings) lines.push(`  ${s.key}=${s.value}`);
+    lines.push('');
+  }
+  if (input.selfTestSteps && input.selfTestSteps.length > 0) {
+    lines.push(`Connection self-test (${input.selfTestSteps.length} steps)`);
+    for (const s of input.selfTestSteps) {
+      lines.push(`  [${s.status}] ${s.label}${s.ms !== undefined ? ` (${s.ms} ms)` : ''} — ${s.detail}`);
+    }
+    lines.push('');
+  }
 
   lines.push(`Job history (last ${input.jobs.length})`);
   if (input.jobs.length === 0) lines.push('- none');

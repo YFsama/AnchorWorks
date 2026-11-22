@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { chipForVidPid, chipForPort, suggestProfileFromModel, rankCutterPorts } from '../plotterIdentify';
+import { autoDetectCutter, chipForVidPid, chipForPort, identifyMachine, suggestProfileFromModel, rankCutterPorts } from '../plotterIdentify';
 import type { NativeSerialPort } from '../plotter';
+import type { LinkStatus } from '../plotterLink';
 
 const port = (path: string, vid?: number, pid?: number, kind: NativeSerialPort['kind'] = 'usb'): NativeSerialPort =>
   ({ path, kind, vid, pid });
@@ -74,5 +75,90 @@ describe('rankCutterPorts', () => {
     ]);
     expect(ranked.map(r => r.port.path)).toEqual(['COM5', 'COM7', 'COM1']);
     expect(ranked[0].chip!.likelihood).toBe('high');
+  });
+});
+
+/* ---------------- identifyMachine ---------------- */
+
+describe('identifyMachine', () => {
+  it('suggests grbl-generic when $I answers on gcode format', async () => {
+    const r = await identifyMachine({
+      status: 'connected',
+      query: async (cmd) => (cmd === '$I' ? '[VER:1.1h.20190825:]' : ''),
+    }, 'gcode');
+    expect(r.model).toContain('1.1h');
+    expect(r.suggestedProfileId).toBe('grbl-generic');
+    expect(r.summary).toContain('grbl firmware');
+  });
+
+  it('keeps gcode silence honest (no suggestion, no fault claim)', async () => {
+    const r = await identifyMachine({ status: 'connected', query: async () => '' }, 'gcode');
+    expect(r.model).toBe('');
+    expect(r.suggestedProfileId).toBeNull();
+    expect(r.summary).toContain('No reply');
+  });
+});
+
+/* ---------------- autoDetectCutter with a stubbed link ---------------- */
+
+type ReplyFn = (cmd: string, baud: number) => string;
+
+function detectStubLink(reply: ReplyFn): Parameters<typeof autoDetectCutter>[0] & { openCalls: Array<{ baud: number }> } {
+  const link = {
+    status: 'idle' as LinkStatus,
+    baud: 0,
+    openCalls: [] as Array<{ baud: number }>,
+    async open(o: { baud: number }) {
+      link.openCalls.push({ baud: o.baud });
+      link.baud = o.baud;
+      link.status = 'connected' as const;
+    },
+    async close() { link.status = 'idle' as const; },
+    async query(cmd: string) { return reply(cmd, link.baud); },
+  };
+  return link;
+}
+
+describe('autoDetectCutter', () => {
+  it('detects a grbl responder: format gcode, $I build captured, grbl-generic suggested', async () => {
+    const link = detectStubLink((cmd) => {
+      if (cmd === '?') return '<Idle|MPos:0.000,0.000,0.000>';
+      if (cmd === '$I') return '[VER:1.1h.20190825:]\r\nok';
+      return '';
+    });
+    const found = await autoDetectCutter(link, [port('COM5', 0x10c4, 0xea60)], { bauds: [115200] });
+    expect(found).not.toBeNull();
+    expect(found!.grbl).toBe(true);
+    expect(found!.format).toBe('gcode');
+    expect(found!.grblBuild).toContain('1.1h');
+    expect(found!.model).toBe(''); // grbl: the build lives in grblBuild, not OI;
+    expect(found!.suggestedProfileId).toBe('grbl-generic');
+  });
+
+  it('reports hpgl format for an OI; responder with its model', async () => {
+    const link = detectStubLink((cmd) => (cmd === 'OI;' ? 'GX-24\r\n' : ''));
+    const found = await autoDetectCutter(link, [port('COM3', 0x0403, 0x6001)], { bauds: [9600] });
+    expect(found).not.toBeNull();
+    expect(found!.grbl).toBe(false);
+    expect(found!.format).toBe('hpgl');
+    expect(found!.model).toBe('GX-24');
+    expect(found!.suggestedProfileId).toBe('roland-camm1');
+  });
+
+  it('default bauds = chip suggestion + common rates, deduped in chip-first order', async () => {
+    // Machine only answers OI; at 38400 — the extended default list must
+    // reach it (previously only 9600/115200 were tried).
+    const link = detectStubLink((cmd, baud) => (cmd === 'OI;' && baud === 38400 ? 'CE6000-60\r\n' : ''));
+    const found = await autoDetectCutter(link, [port('COM3', 0x1a86, 0x7523)]);
+    expect(found).not.toBeNull();
+    expect(found!.baud).toBe(38400);
+    // 9600 (chip) → 115200 (the other convention) → 19200 → 38400: no repeats.
+    expect(link.openCalls.map(c => c.baud)).toEqual([9600, 115200, 19200, 38400]);
+  });
+
+  it('returns null when every port stays silent', async () => {
+    const link = detectStubLink(() => '');
+    const found = await autoDetectCutter(link, [port('COM3', 0x1a86, 0x7523)], { bauds: [9600] });
+    expect(found).toBeNull();
   });
 });

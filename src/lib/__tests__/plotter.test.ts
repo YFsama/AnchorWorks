@@ -152,6 +152,65 @@ describe('generateGCode', () => {
   });
 });
 
+describe('generateGCode — spindle / laser option', () => {
+  const polylines = [
+    { points: [[0, 0], [10, 0]] as Array<[number, number]>, closed: false },
+  ];
+
+  it('outputs the classic pen model byte-for-byte when spindle is undefined', () => {
+    const expected = [
+      '; Anchorworks — G-code output',
+      'G21 ; mm',
+      'G90 ; absolute',
+      'G0 Z5.000 F3000',
+      'G0 X0.000 Y0.000 F3000',
+      'G1 Z-1.000 F1500',
+      'G1 X10.000 Y0.000 F1500',
+      'G0 Z5.000 F3000',
+      'G0 X0 Y0',
+      'M30 ; end',
+    ].join('\n');
+    expect(generateGCode(polylines, defaultPlotterOptions)).toBe(expected);
+    expect(generateGCode(polylines, { ...defaultPlotterOptions, spindle: undefined })).toBe(expected);
+  });
+
+  it('wraps the job in M3 S… / M5, with M5 before the return-to-origin travel', () => {
+    const out = generateGCode(polylines, { ...defaultPlotterOptions, spindle: { rpm: 800 } });
+    const lines = out.split('\n');
+    expect(lines[4]).toBe('M3 S800');
+    const m5 = lines.indexOf('M5');
+    const home = lines.indexOf('G0 X0 Y0');
+    expect(m5).toBeGreaterThan(0);
+    expect(m5).toBe(home - 1); // laser/spindle off BEFORE travelling home
+    expect(out).not.toContain('laser on');
+  });
+
+  it('laser mode keeps the M3/M5 shape and tags the M3 line', () => {
+    const out = generateGCode(polylines, { ...defaultPlotterOptions, spindle: { rpm: 250, laserMode: true } });
+    expect(out).toContain('M3 S250 ; laser on');
+    expect(out).toContain('M5');
+  });
+
+  it('ignores a zero-rpm spindle block (falls back to the pen model)', () => {
+    const plain = generateGCode(polylines, defaultPlotterOptions);
+    expect(generateGCode(polylines, { ...defaultPlotterOptions, spindle: { rpm: 0 } })).toBe(plain);
+  });
+
+  it('round-trips a valid spindle block and drops invalid ones through prefs', async () => {
+    savePlotterPrefs({
+      opts: { ...defaultPlotterOptions, spindle: { rpm: 800, laserMode: true } },
+      format: 'gcode', materialId: '', baud: 115200, flowControl: 'none', lastPort: '', profileId: 'grbl-laser',
+    });
+    expect(loadPlotterPrefs().opts?.spindle).toEqual({ rpm: 800, laserMode: true });
+    window.localStorage.setItem(
+      'vector.plotter.prefs',
+      JSON.stringify({ opts: { ...defaultPlotterOptions, spindle: { rpm: -5 } } }),
+    );
+    expect(loadPlotterPrefs().opts?.spindle).toBeUndefined();
+    window.localStorage.clear();
+  });
+});
+
 describe('generateHPGL', () => {
   it('emits IN; and SP1; prelude', () => {
     const out = generateHPGL([], defaultPlotterOptions);

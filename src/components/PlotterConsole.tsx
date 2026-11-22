@@ -9,9 +9,10 @@ import { download } from '../lib/io';
 import type { FlowControl, PlotterLink } from '../lib/plotterLink';
 import { lineRateBytesPerSec, toHex } from '../lib/plotterLink';
 import type { NativeSerialPort } from '../lib/plotter';
-import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildMoveTo, buildSetOrigin, decodeReply, isQueryCommand, parsePageReply, parsePositionReply, type MachinePosition, type QuickCommand } from '../lib/hpglDebug';
-import { buildDiagnosticsReport, probeBaud, runConnectionSelfTest } from '../lib/plotterDiag';
-import { autoDetectCutter, chipForPort, identifyMachine } from '../lib/plotterIdentify';
+import { QUICK_COMMANDS, buildForceSpeed, buildJog, buildMoveTo, buildSetOrigin, decodeReply, isQueryCommand, parsePageReply, parsePositionReply, parseTravelReply, type MachinePosition, type QuickCommand } from '../lib/hpglDebug';
+import { buildDiagnosticsReport, probeBaud, runConnectionSelfTest, type DiagStep } from '../lib/plotterDiag';
+import { runAutoSetup, parseGrblSettings, type GrblSetting } from '../lib/plotterAutoSetup';
+import { chipForPort, identifyMachine, type IdentifyResult } from '../lib/plotterIdentify';
 import { clearJobLog, deleteMachine, listJobLog, listMachines, saveMachine, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
 import type { MachineProfile } from '../lib/machineProfiles';
 import { getMachineProfile } from '../lib/machineProfiles';
@@ -37,6 +38,8 @@ interface Entry {
 export interface PlotterConsoleProps {
   link: PlotterLink;
   format: 'gcode' | 'hpgl';
+  /** Switch the output format (auto-detect applies the machine's language). */
+  setFormat: (f: 'gcode' | 'hpgl') => void;
   unit: 'mm' | 'in';
   /** True under the Tauri desktop shell (OS port picker available). */
   native: boolean;
@@ -73,6 +76,8 @@ export interface PlotterConsoleProps {
   jobLogVersion: number;
   /** Apply a machine profile id (used by identify's suggestion). */
   applyProfile: (id: string) => void;
+  /** Machine-name prefill from the dialog's auto-detect (model / chip). */
+  machineNameHint?: string;
 }
 
 let entrySeq = 1;
@@ -82,10 +87,10 @@ const nowMs = (): number => Date.now();
 
 export function PlotterConsole(props: PlotterConsoleProps) {
   const {
-    link, format, unit, native, webSerial, sending,
+    link, format, setFormat, unit, native, webSerial, sending,
     nativePorts, selectedPort, setSelectedPort, refreshPorts, portsLoading, portsError,
     baud, setBaud, flow, setFlow, force, speed, feedRate,
-    profile, connectInit, forceSpeedCommand, snapshotConfig, applyConfig, jobLogVersion, applyProfile,
+    profile, connectInit, forceSpeedCommand, snapshotConfig, applyConfig, jobLogVersion, applyProfile, machineNameHint,
   } = props;
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -121,6 +126,11 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   // Model string reported by the last identify run (OI; reply).
   const [identified, setIdentified] = useState('');
+  // Last diagnostic context for the downloadable report (plotterDiag):
+  // identify result, self-test steps and the grbl $$ snapshot.
+  const [lastIdentify, setLastIdentify] = useState<IdentifyResult | null>(null);
+  const [lastSelfTest, setLastSelfTest] = useState<DiagStep[] | null>(null);
+  const [lastGrblSettings, setLastGrblSettings] = useState<GrblSetting[] | null>(null);
   const [, forceTick] = useReducer((x: number) => x + 1, 0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +146,12 @@ export function PlotterConsole(props: PlotterConsoleProps) {
   // external log store, so exhaustive-deps can't see why they matter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const jobHistory = useMemo(() => listJobLog(), [jobLogVersion, logRefresh]);
+
+  // Auto-detect name prefill (model / chip from the dialog's scan), as a
+  // derived value rather than an effect: the save-machine input shows the
+  // hint until the operator types or loads a record, and saves pick it
+  // up untouched. (Removing a record may re-reveal the hint — harmless.)
+  const machineNameValue = machineName || machineNameHint || '';
 
   const fmtBytes = (n: number): string =>
     n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : n >= 1024 ? `${(n / 1024).toFixed(1)} KB` : `${n} B`;
@@ -231,6 +247,34 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     }
   };
 
+  /** Diagnostic steps → traffic log, one entry each (self-test format). */
+  const pushSteps = (steps: DiagStep[]) => {
+    for (const s of steps) {
+      const mark = s.status === 'pass' ? '✓' : s.status === 'fail' ? '✕' : '·';
+      push({
+        ts: nowMs(),
+        dir: s.status === 'fail' ? 'err' : 'info',
+        text: `${mark} ${s.label}${s.ms !== undefined ? ` (${s.ms} ms)` : ''} ${s.detail}`,
+      });
+    }
+  };
+
+  /** grbl machines have no OH; page query — their work area comes from
+   *  the $130/$131 max-travel settings (single-line replies, so the
+   *  link's query() gets them reliably). Read both once; silence just
+   *  leaves the off-page jog warning without limits (skipped, no error). */
+  const fetchTravelPage = async () => {
+    try {
+      const x = await link.query('$130', 900).catch(() => '');
+      const y = await link.query('$131', 900).catch(() => '');
+      const travel = parseTravelReply(`${x}\n${y}`);
+      if (travel) {
+        setPage({ x0: 0, y0: 0, x1: travel.x, y1: travel.y });
+        push({ ts: nowMs(), dir: 'info', text: `${t('Loaded page')}: ${Math.round(travel.x)} × ${Math.round(travel.y)} ${unit} ($130/$131)` });
+      }
+    } catch { /* no $$-class settings → the jog warning stays without limits */ }
+  };
+
   const connect = async () => {
     setBusy(true);
     try {
@@ -255,6 +299,10 @@ export function PlotterConsole(props: PlotterConsoleProps) {
           push({ ts: nowMs(), dir: 'info', text: `${t('Loaded page')}: ${Math.round(parsed.x1 - parsed.x0)} × ${Math.round(parsed.y1 - parsed.y0)} ${unit}` });
         }
       }
+      // grbl: read the travel limits instead ($130/$131).
+      if (format === 'gcode' && link.status === 'connected') {
+        await fetchTravelPage();
+      }
     } catch {
       /* status event already logged the message */
     } finally {
@@ -276,6 +324,9 @@ export function PlotterConsole(props: PlotterConsoleProps) {
       if (expectsReply || isQueryCommand(format, text)) {
         const reply = await link.query(text);
         push({ ts: nowMs(), dir: 'info', text: `→ ${decodeReply(format, text, reply, unit)}` });
+        // Keep the diagnostics report's $$ snapshot fresh when the
+        // operator re-reads the grbl settings by hand.
+        if (format === 'gcode' && text.trim() === '$$') setLastGrblSettings(parseGrblSettings(reply));
       } else {
         await link.send(text);
       }
@@ -323,14 +374,8 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     push({ ts: nowMs(), dir: 'info', text: `— ${t('Connection self-test')} —` });
     try {
       const steps = await runConnectionSelfTest(link, format);
-      for (const s of steps) {
-        const mark = s.status === 'pass' ? '✓' : s.status === 'fail' ? '✕' : '·';
-        push({
-          ts: nowMs(),
-          dir: s.status === 'fail' ? 'err' : 'info',
-          text: `${mark} ${s.label}${s.ms !== undefined ? ` (${s.ms} ms)` : ''} ${s.detail}`,
-        });
-      }
+      setLastSelfTest(steps);
+      pushSteps(steps);
     } finally { setBusy(false); }
   };
 
@@ -357,8 +402,11 @@ export function PlotterConsole(props: PlotterConsoleProps) {
     }
   };
 
-  /** Identify the machine: OI; query when connected, port scan when not.
-   *  Suggests the matching brand profile with a one-click apply toast. */
+  /** Identify the machine: OI; (HP-GL) / $I (grbl) query when connected,
+   *  the full auto-setup scan when not (port probe → identify → $$
+   *  snapshot → self-test, see plotterAutoSetup.ts). Suggests the matching
+   *  brand profile with a one-click apply toast and switches the output
+   *  format to the machine's language (grbl → G-code). */
   const identify = async () => {
     setBusy(true);
     push({ ts: nowMs(), dir: 'info', text: `— ${t('Identify machine')} —` });
@@ -366,20 +414,34 @@ export function PlotterConsole(props: PlotterConsoleProps) {
       if (link.status === 'connected') {
         const r = await identifyMachine(link, format);
         setIdentified(r.model);
+        setLastIdentify(r);
         push({ ts: nowMs(), dir: r.model ? 'info' : 'warn', text: r.summary });
         offerProfile(r.suggestedProfileId);
       } else if (native && nativePorts.length > 0) {
-        const found = await autoDetectCutter(link, nativePorts, {
+        const result = await runAutoSetup(link, nativePorts, {
           flowControl: flow,
+          currentFormat: format,
           onLog: (line) => push({ ts: nowMs(), dir: 'info', text: line }),
         });
-        if (found) {
-          setSelectedPort(found.portPath);
-          setBaud(found.baud);
-          setIdentified(found.model);
-          const chip = found.chip ? ` (${found.chip.chip})` : '';
-          push({ ts: nowMs(), dir: 'info', text: `${t('Cutter found')}: ${found.portPath}${chip} @ ${found.baud}${found.model ? ` — ${found.model}` : ''}` });
-          offerProfile(found.suggestedProfileId);
+        if (result.grblSettings.length > 0) setLastGrblSettings(result.grblSettings);
+        pushSteps(result.steps);
+        if (result.found || result.suspectedClone) {
+          setSelectedPort(result.port);
+          setBaud(result.baud);
+          if (result.format !== format) {
+            setFormat(result.format);
+            push({ ts: nowMs(), dir: 'info', text: `${t('Format set to')} ${result.format === 'gcode' ? 'G-code' : 'HP-GL'}` });
+          }
+          setIdentified(result.model || result.grblBuild);
+          const chip = result.chip ? ` (${result.chip.chip})` : '';
+          push({
+            ts: nowMs(),
+            dir: result.found ? 'info' : 'warn',
+            text: result.found
+              ? `${t('Cutter found')}: ${result.port}${chip} @ ${result.baud}${result.model ? ` — ${result.model}` : result.grblBuild ? ` — ${result.grblBuild}` : ''}`
+              : `${result.port}${chip} — ${t('No reply — suspected Chinese clone (they ignore queries). Try 9600 + a test cut.')}`,
+          });
+          offerProfile(result.profileId);
         } else {
           push({ ts: nowMs(), dir: 'warn', text: t('No cutter answered on any port — check power / cable, or connect manually and run the self-test.') });
         }
@@ -418,6 +480,9 @@ export function PlotterConsole(props: PlotterConsoleProps) {
       unit,
       profileLabel: profile?.label,
       machineCount: machines.length,
+      identify: lastIdentify,
+      selfTestSteps: lastSelfTest ?? undefined,
+      ...(lastGrblSettings ? { grblSettings: lastGrblSettings } : {}),
       jobs: jobHistory.slice(0, 20),
       logLines: plainLog().split('\n').slice(-200),
     });
@@ -427,7 +492,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
 
   /** Saved-machine rows — one record per physical cutter. */
   const saveMachineAsNew = () => {
-    const name = machineName.trim();
+    const name = machineNameValue.trim();
     if (!name) { toast.warn(t('Enter a machine name first.'), { title: t('Saved machines') }); return; }
     const rec = saveMachine({ ...snapshotConfig(), name });
     setSelectedMachineId(rec.id);
@@ -437,7 +502,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
 
   const updateSelectedMachine = () => {
     if (!selectedMachine) return;
-    saveMachine({ ...snapshotConfig(), id: selectedMachine.id, name: machineName.trim() || selectedMachine.name });
+    saveMachine({ ...snapshotConfig(), id: selectedMachine.id, name: machineNameValue.trim() || selectedMachine.name });
     setMachines(listMachines());
     toast.success(t('Machine updated'));
   };
@@ -463,6 +528,10 @@ export function PlotterConsole(props: PlotterConsoleProps) {
 
   const jog = (dx: number, dy: number) => {
     warnIfJogExitsPage(dx, dy);
+    // grbl has no OH; page query — fetch the $130/$131 travel limits
+    // lazily so later jogs get the same off-page warning (skipped, not
+    // an error, when the controller doesn't answer them).
+    if (format === 'gcode' && position && !page) void fetchTravelPage();
     void exec(buildJog(format, dx * jogStep, dy * jogStep, unit, feedRate));
   };
 
@@ -824,7 +893,7 @@ export function PlotterConsole(props: PlotterConsoleProps) {
             <input
               type="text"
               className="input py-0.5! text-[10px]! w-28!"
-              value={machineName}
+              value={machineNameValue}
               onChange={(e) => setMachineName(e.target.value)}
               placeholder={t('Machine name')}
               aria-label={t('Machine name')}

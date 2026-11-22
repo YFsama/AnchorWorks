@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network, Save, Trash2, Upload } from 'lucide-react';
+import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network, Save, Trash2, Upload, ScanSearch, Zap } from 'lucide-react';
 import { useEditor, type CutPath } from '../store/editor';
 import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { driftPreviewAt } from '../lib/cutDrift';
@@ -7,7 +7,8 @@ import { addUserMaterial, allMaterials, deleteUserMaterial, exportUserMaterialsJ
 import { recordLibError } from '../lib/errorLog';
 import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
 import { connectDataLink, dataLinkHandshake, validateJobName, type DataLinkHandle } from '../lib/dataLink';
-import { buildAbortSnippet, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
+import { buildAbortSnippet, buildCornerTour, buildLaserTest, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
+import { runAutoSetup, type AutoSetupResult } from '../lib/plotterAutoSetup';
 import { MACHINE_PROFILES, getMachineProfile, profileConnectInit, profileForceSpeed } from '../lib/machineProfiles';
 import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotterRecords';
 import { estimateEtaSeconds, estimateTransferSeconds } from '../lib/plotterDiag';
@@ -91,6 +92,12 @@ const CUT_STRATEGY_OPTIONS = [
 ] as const;
 const PREVIEW_MODES = ['outline', 'code'] as const;
 type PreviewMode = typeof PREVIEW_MODES[number];
+/** Dialog sections (2026-11 reorg): Machine (connection + profile + output
+ *  format), Cut (material / speed / blade / strategy parameters), Output
+ *  (preview + job prep + send). One pane mounts at a time — the former flat
+ *  17-input form was the "too many sliders" noise complaint. */
+const PLOTTER_TABS = ['machine', 'cut', 'output'] as const;
+type PlotterTab = typeof PLOTTER_TABS[number];
 /** Code-tab sub-views: raw text / per-statement explanation / animated
  *  replay of the machine code itself (see PlotterCodeViews.tsx). */
 const CODE_VIEW_OPTIONS = [
@@ -133,6 +140,9 @@ export function PlotterDialog() {
   // it's what a cutter operator actually wants to verify), 'code' = the
   // raw G-code / HP-GL text for the machine.
   const [previewMode, setPreviewMode] = useState<PreviewMode>('outline');
+  // Active dialog section — see PLOTTER_TABS. Landing tab on open is set by
+  // the effect below (Machine when nothing is linked, Output when connected).
+  const [tab, setTab] = useState<PlotterTab>('machine');
   const [showPrint, setShowPrint] = useState(true);
   const [showOrder, setShowOrder] = useState(false);
   // Animated cut simulation replaying the optimized job order.
@@ -191,6 +201,12 @@ export function PlotterDialog() {
   // of the operator. '' = generic / manual.
   const [profileId, setProfileId] = useState(savedPrefs.profileId ?? '');
   const profile = getMachineProfile(profileId);
+  // One-click auto-detect (plotterAutoSetup.ts): scan state + the result
+  // panel shown under the machine settings, + the machine-name prefill
+  // handed to the console's saved-machine row.
+  const [autoDetecting, setAutoDetecting] = useState(false);
+  const [autoDetectResult, setAutoDetectResult] = useState<AutoSetupResult | null>(null);
+  const [machineNameHint, setMachineNameHint] = useState('');
   // Bumped after every job-log entry so the console's history list refetches.
   const [jobLogVersion, setJobLogVersion] = useState(0);
   // Data-Link (network cutter, dataLink.ts): collapsed by default, native
@@ -224,20 +240,37 @@ export function PlotterDialog() {
     savePlotterPrefs({ opts, format, materialId, baud, flowControl: flow, lastPort: selectedPort, profileId });
   }, [opts, format, materialId, baud, flow, selectedPort, profileId]);
 
+  // Open-time landing tab (2026-11 reorg): Machine while nothing is linked
+  // (the operator's first job here is picking a profile and connecting), and
+  // straight to Output once a link is already up (past setup — preview and
+  // Send are what they opened the dialog for). Re-evaluated on every open;
+  // the singleton link's status is read live at that moment.
+  useEffect(() => {
+    if (!open) return;
+    setTab(link.status === 'connected' ? 'output' : 'machine');
+  }, [open, link]);
+
   // Apply a brand profile: dialect + serial knobs + force/speed starting
   // points. Every field stays manually overridable afterwards — a profile
-  // is a starting point, not a lock.
+  // is a starting point, not a lock. Profiles without a dialect are
+  // grbl (G-code) machines: they keep the Z-pen options untouched and
+  // switch the output format; HP-GL profiles switch it back.
   const applyProfile = (id: string) => {
     setProfileId(id);
     const p = getMachineProfile(id);
     if (!p) return;
     setOpts(o => ({
       ...o,
-      dialect: p.dialect,
+      ...(p.dialect ? { dialect: p.dialect } : {}),
       ...(p.panelOnly ? {} : { graphtecForce: p.defaultForce, graphtecSpeed: p.defaultSpeed }),
+      // Keep an existing spindle block's laser tag in sync with the profile.
+      ...(o.spindle && !p.dialect
+        ? { spindle: { ...o.spindle, ...(id === 'grbl-laser' ? { laserMode: true } : { laserMode: false }) } }
+        : {}),
     }));
     setBaud(p.baud);
     setFlow(p.flowControl);
+    setFormat(p.dialect ? 'hpgl' : 'gcode');
   };
 
   // Snapshot / restore the full cutter setup — backs the console's saved
@@ -478,9 +511,13 @@ export function PlotterDialog() {
   // feature remains discoverable.
   const armsAvailable = format === 'hpgl' && opts.dialect === 'graphtec-fc';
   const armsActive = armsEnabled && !!opts.arms && armsAvailable;
-  // The block rides along only while the toggle is on AND the current
-  // format/dialect can emit it; otherwise strip it so a stale prefs blob or
-  // a format switch to G-code can never claim ARMS it isn't sending.
+  // Spindle / laser power lives in `opts.spindle` directly: the field
+  // writes it (tagged laserMode under the grbl-laser profile) and the
+  // prefs blob round-trips it. Only generateGCode reads it — the HP-GL
+  // generator never does — so no stripping is needed here. The ARMS
+  // block below is the only thing effectiveOpts conditionally removes,
+  // so a stale prefs blob or a format switch to G-code can never claim
+  // ARMS it isn't sending.
   const effectiveOpts: PlotterOptions = armsActive ? opts : { ...opts, arms: undefined };
   const buildOut = () => buildPlotterOutput(format, effectiveOpts, overrideCuts);
   /** GenerateHPGL throws when ARMS is armed against a non-Graphtec dialect —
@@ -563,6 +600,22 @@ export function PlotterDialog() {
     if (event.key === 'End') { focusPreviewTab(PREVIEW_MODES[PREVIEW_MODES.length - 1]); return; }
     const delta = event.key === 'ArrowRight' ? 1 : -1;
     focusPreviewTab(PREVIEW_MODES[(index + delta + PREVIEW_MODES.length) % PREVIEW_MODES.length]);
+  };
+
+  // Roving focus for the Machine / Cut / Output section tabs — the same
+  // CutContourDialog / RepeatDialog tablist idiom (Left/Right/Home/End).
+  const focusPlotterTab = (next: PlotterTab) => {
+    setTab(next);
+    requestAnimationFrame(() => document.getElementById(`plotter-tab-${next}`)?.focus());
+  };
+  const handleTabListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const index = PLOTTER_TABS.indexOf(tab);
+    if (event.key === 'Home') { focusPlotterTab(PLOTTER_TABS[0]); return; }
+    if (event.key === 'End') { focusPlotterTab(PLOTTER_TABS[PLOTTER_TABS.length - 1]); return; }
+    const delta = event.key === 'ArrowRight' ? 1 : -1;
+    focusPlotterTab(PLOTTER_TABS[(index + delta + PLOTTER_TABS.length) % PLOTTER_TABS.length]);
   };
 
   const handleSegmentKeys = <T extends string>(
@@ -822,6 +875,9 @@ export function PlotterDialog() {
       if (!ok) {
         setLint(check);
         setPreviewMode('code');
+        // The code pane with the rejection details is on the Output tab —
+        // without this the user stays on Machine/Cut and sees nothing change.
+        setTab('output');
         return;
       }
     }
@@ -903,6 +959,7 @@ export function PlotterDialog() {
       if (!ok) {
         setLint(check);
         setPreviewMode('code');
+        setTab('output'); // see the send() twin above
         return false;
       }
     }
@@ -1057,7 +1114,8 @@ export function PlotterDialog() {
   const speedSummaryLabel = `${t('Feed')} ${opts.feedRate} · ${t('Travel')} ${opts.travelRate} · ${t('Overcut')} ${opts.overcutMm}mm`
     + (bladeOffsetMm > 0 ? ` · ${t('blade offset')} ${bladeOffsetMm} mm` : '')
     + (driftActive ? ` · ${t('Drift compensation active')}` : '')
-    + (armsActive ? ` · ${t('ARMS 4-mark')}` : '');
+    + (armsActive ? ` · ${t('ARMS 4-mark')}` : '')
+    + (format === 'gcode' && opts.spindle ? ` · ${t('Spindle')} S${opts.spindle.rpm}${profileId === 'grbl-laser' ? ` (${t('laser')})` : ''}` : '');
   const cutterPressureSummaryLabel = format === 'hpgl' && opts.dialect === 'graphtec-fc'
     ? ` · ${t('Force')} ${opts.graphtecForce} · ${t('Speed')} ${opts.graphtecSpeed}`
     : '';
@@ -1298,8 +1356,88 @@ export function PlotterDialog() {
     finally { setBusy(false); }
   };
 
-  const addWeedBorder = () => addPlotterWeedBorder(t, weedRows, weedCols);
-  const clearWeedBorders = () => clearPlotterWeedBorders(t);
+  // Laser gradient strip (grbl laser profile): five short segments at
+  // 10–50 % power — the laser twin of the force test. Runs on scrap with
+  // the laser OFF between segments (see buildLaserTest).
+  const laserTest = async () => {
+    const out = buildLaserTest(10, { count: 5, stepPct: 10 });
+    if (!canSend) { download(stampedFileName('laser-test'), out, 'text/plain'); return; }
+    setBusy(true);
+    try {
+      await streamJob(out, t('✅ Laser test sent'), 'test-cut');
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  // Corner tour: pen-up visits of a 100×100 mm rectangle + a centre tap —
+  // proves port / axis mapping before any real job (both formats).
+  const cornerTour = async () => {
+    const out = buildCornerTour(format);
+    if (!canSend) { download(stampedFileName('corner-tour'), out, 'text/plain'); return; }
+    setBusy(true);
+    try {
+      await streamJob(out, t('✅ Corner tour sent'), 'test-cut');
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  /** One-click machine auto-detect (plotterAutoSetup.ts): scan every USB
+   *  port, identify the responder, apply profile + format + port + baud —
+   *  but NEVER auto-connect; the operator presses Connect (and can then
+   *  Save machine with the prefilled name). Native only: Web Serial
+   *  cannot enumerate ports without a requestPort gesture. */
+  const autoDetect = async () => {
+    if (!native || autoDetecting || busy) return;
+    setAutoDetecting(true);
+    setAutoDetectResult(null);
+    try {
+      let ports = nativePorts;
+      if (ports.length === 0) {
+        ports = (await listSerialPorts()) ?? [];
+        setNativePorts(ports);
+      }
+      if (ports.length === 0) {
+        toast.warn(t('No serial ports detected — plug in the plotter and try again.'), { title: t('Auto-detect machine') });
+        return;
+      }
+      const result = await runAutoSetup(link, ports, { flowControl: flow, currentFormat: format });
+      setAutoDetectResult(result);
+      if (result.found || result.suspectedClone) {
+        if (result.profileId) applyProfile(result.profileId);
+        // Format/baud straight from the detection (applyProfile just set
+        // the profile's defaults — the live-detected values win).
+        setFormat(result.format);
+        setSelectedPort(result.port);
+        setBaud(result.baud);
+        setMachineNameHint(result.model || result.grblBuild || result.chip?.chip || '');
+        toast.success(
+          result.found
+            ? t('Machine detected — profile and serial settings applied. Connect when ready, then Save machine.')
+            : t('No reply — applied the Chinese-clone defaults (9600, HP-GL). Judge the link with a test cut.'),
+          { title: t('Auto-detect machine') },
+        );
+      } else {
+        toast.warn(t('No cutter answered on any port — check power / cable, or connect manually and run the self-test.'), { title: t('Auto-detect machine') });
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setAutoDetecting(false);
+    }
+  };
+
+  // Footer action order for arrow-key roving — grows with the conditional
+  // test buttons (force test on HP-GL, laser gradient test on the grbl
+  // laser profile, corner tour everywhere). Plain array (no hook): this
+  // sits after the dialog's `if (!open) return null` early return.
+  const outputActionValues: Array<string> = [
+    'cancel', 'test-cut',
+    ...(format === 'hpgl' ? ['force-test'] : []),
+    ...(format === 'gcode' && profileId === 'grbl-laser' ? ['laser-test'] : []),
+    'corner-tour', 'save-file', 'send-usb',
+  ];
+
+  const addWeedBorder = () => addPlotterWeedBorder(t, weedRows, weedCols);  const clearWeedBorders = () => clearPlotterWeedBorders(t);
 
   // Bridges — break closed cut paths with small uncut gaps so the cut-out
   // pieces stay attached to the material (stencils / no-shift weeding).
@@ -1316,9 +1454,9 @@ export function PlotterDialog() {
       aria-modal="true"
       aria-labelledby="plotter-dialog-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[720px] max-w-[96%] shadow-2xl overflow-hidden">
+      <div className="bg-panel border border-border rounded-lg w-[720px] max-w-[96%] shadow-2xl overflow-hidden max-h-[calc(100vh-4rem)] flex flex-col">
         {/* Title row — consistent with Print / Templates dialogs. */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2 shrink-0">
           <h2 id="plotter-dialog-title" className="dialog-title flex items-center gap-2">
             <Scissors size={14} aria-hidden="true" className="text-[#ff2e9a]" />
             {t('Send to Plotter / Cutter')}
@@ -1328,9 +1466,292 @@ export function PlotterDialog() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 px-4 py-4">
-          {/* ---- Left column: machine options ---- */}
-          <div className="grid grid-cols-2 gap-x-3 gap-y-3 text-xs content-start">
+        {/* Section tabs (2026-11 reorg) — the flat 17-input form became
+            Machine / Cut / Output. Same WAI-ARIA tablist idiom as
+            CutContourDialog / RepeatDialog: roving tabindex +
+            Left/Right/Home/End switching. Pinned under the header so the
+            switch stays reachable at any scroll position. */}
+        <div
+          role="tablist"
+          className="flex border-b border-border px-2 bg-panel2/40 text-xs shrink-0"
+          onKeyDown={handleTabListKeyDown}
+          aria-label={t('Plotter sections')}
+        >
+          <PlotterTabButton id="machine" active={tab === 'machine'} onClick={() => setTab('machine')} icon={<Usb size={12} aria-hidden="true" />} label={t('Machine')} />
+          <PlotterTabButton id="cut" active={tab === 'cut'} onClick={() => setTab('cut')} icon={<Scissors size={12} aria-hidden="true" />} label={t('Cut settings')} />
+          <PlotterTabButton id="output" active={tab === 'output'} onClick={() => setTab('output')} icon={<Eye size={12} aria-hidden="true" />} label={t('Output')} />
+        </div>
+
+        {/* Scrollable middle — ONE section pane mounts at a time; the job
+            summary rows and the output action row at the bottom stay pinned
+            (short-window layout). */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* ---- Machine pane: auto setup / profile / format / connection ---- */}
+          {tab === 'machine' && (
+          <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-4 py-4 text-xs content-start" role="tabpanel" aria-labelledby="plotter-tab-machine" data-plotter-pane="machine">
+            {/* One-click auto-detect — native path scans + identifies + applies
+                everything except the connection itself; Web Serial can't
+                enumerate ports, so it degrades to guidance. */}
+            <div className="col-span-2">
+              <div className="field-label mb-1!">{t('Auto setup')}</div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {native ? (
+                  <button
+                    type="button"
+                    className="btn-primary flex items-center gap-1 py-1! px-2! text-[11px]!"
+                    onClick={() => { void autoDetect(); }}
+                    disabled={autoDetecting || busy}
+                    aria-busy={autoDetecting}
+                    title={t('Scan every USB port for a cutter or engraver, identify it, and apply the right profile, format, baud and port. Nothing is sent — you stay in charge of connecting.')}
+                  >
+                    {autoDetecting ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <ScanSearch size={12} aria-hidden="true" />}
+                    {autoDetecting ? t('Detecting…') : t('Auto-detect machine')}
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-muted" title={t('Web Serial needs a user gesture per port — browsers cannot scan silently.')}>
+                    {t('Browsers cannot scan ports — connect with the browser chooser, then run Identify machine in the console.')}
+                  </span>
+                )}
+              </div>
+              {autoDetectResult && (
+                <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] leading-relaxed" role="status">
+                  <div className={autoDetectResult.found ? 'text-success' : 'text-muted'}>
+                    {autoDetectResult.found
+                      ? `${t('Cutter found')}: ${autoDetectResult.port} @ ${autoDetectResult.baud}${autoDetectResult.model ? ` — ${autoDetectResult.model}` : autoDetectResult.grblBuild ? ` — ${autoDetectResult.grblBuild}` : ''}`
+                      : autoDetectResult.suspectedClone
+                        ? t('No reply — suspected Chinese clone (they ignore queries). Try 9600 + a test cut.')
+                        : t('No cutter answered on any port — check power / cable, or connect manually and run the self-test.')}
+                  </div>
+                  <ul className="mt-0.5 list-none space-y-0.5 text-muted">
+                    {autoDetectResult.steps.map((s, i) => (
+                      <li key={i}>
+                        <span className={s.status === 'pass' ? 'text-success' : s.status === 'fail' ? 'text-danger' : 'text-muted'}>
+                          {s.status === 'pass' ? '✓' : s.status === 'fail' ? '✕' : '·'}
+                        </span>{' '}{s.label} — {s.detail}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="col-span-2">
+              <Field label={t('Machine profile')}>
+                  <select
+                    className="input"
+                    value={profileId}
+                    onChange={(e) => applyProfile(e.target.value)}
+                    aria-label={t('Machine profile')}
+                    title={t('Pick your machine brand — loads dialect, baud, flow control, force/speed defaults and field notes.')}
+                  >
+                    <option value="">{t('Generic / manual')}</option>
+                    {MACHINE_PROFILES.map((p) => (
+                      <option key={p.id} value={p.id}>{`${t(p.brand)} — ${t(p.label)}`}</option>
+                    ))}
+                  </select>
+                  {profile && (
+                    <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] text-muted leading-relaxed">
+                      <div className="text-ink/80">{t(profile.models)}</div>
+                      <div>{t('Recommends')} {profile.baud} {t('Baud').toLowerCase()} · {t(profile.flowControl === 'none' ? 'None (paced)' : profile.flowControl === 'hardware' ? 'Hardware RTS/CTS' : 'Software XON/XOFF')}{profile.panelOnly ? ` · ${t('force/speed on the machine panel')}` : ` · FS/VS ${profile.defaultForce}g/${profile.defaultSpeed}`}</div>
+                      <ul className="mt-0.5 list-none space-y-0.5">
+                        {profile.quirks.map((q) => (
+                          <li key={q}>· {t(q)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Field>
+              </div>
+            {/* ---- Output format group (wave-4 noise reduction): the
+                format / dialect / unit segmented picks share one caption. ---- */}
+            <div className="col-span-2 field-label">{t('Output format')}</div>
+            <Field label={t('Format')}>
+              <div
+                className="grid grid-cols-2 gap-1"
+                role="group"
+                aria-label={t('Format')}
+                title={t('Use Left/Right arrows to switch options')}
+                onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_FORMAT_OPTIONS.map(option => option.value), format, setFormat)}
+              >
+                {OUTPUT_FORMAT_OPTIONS.map((option) => {
+                  const active = format === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-value={option.value}
+                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                      onClick={() => setFormat(option.value)}
+                      title={`${t('Set output format to')} ${t(option.label)}`}
+                      aria-pressed={active}
+                    >
+                      {t(option.label)}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            {format === 'hpgl' && (
+              <Field label={t('Cutter dialect')}>
+                <div
+                  className="grid grid-cols-3 gap-1"
+                  role="group"
+                  aria-label={t('Cutter dialect')}
+                  title={t('Use Left/Right arrows to switch options')}
+                  onKeyDown={(event) => handleSegmentKeys(event, HPGL_DIALECT_OPTIONS.map(option => option.value), opts.dialect, (value) => setOpts({ ...opts, dialect: value }))}
+                >
+                  {HPGL_DIALECT_OPTIONS.map((option) => {
+                    const active = opts.dialect === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        data-value={option.value}
+                        className={`rounded-md border px-2 py-1 text-[11px] leading-tight transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                        onClick={() => setOpts({ ...opts, dialect: option.value })}
+                        title={`${t('Set cutter dialect to')} ${t(option.label)}`}
+                        aria-pressed={active}
+                      >
+                        {t(option.label)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
+            <Field label={t('Unit')}>
+              <div
+                className="grid grid-cols-2 gap-1"
+                role="group"
+                aria-label={t('Unit')}
+                title={t('Use Left/Right arrows to switch options')}
+                onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_UNIT_OPTIONS.map(option => option.value), opts.unit, (value) => {
+                  const option = OUTPUT_UNIT_OPTIONS.find(item => item.value === value);
+                  if (option) setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit });
+                })}
+              >
+                {OUTPUT_UNIT_OPTIONS.map((option) => {
+                  const active = opts.unit === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-value={option.value}
+                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                      onClick={() => setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit })}
+                      title={`${t('Set output unit to')} ${t(option.label)}`}
+                      aria-pressed={active}
+                    >
+                      {t(option.label)}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            {/* ---- Pen / spindle group: G-code-only head parameters. ---- */}
+            <div className="col-span-2 field-label">{t('Pen & spindle (G-code)')}</div>
+            <Field label={t('Pen down Z')}>
+              <input type="number" step={0.1} className="input-num" value={opts.penDownZ} onChange={(e) => setOpts({ ...opts, penDownZ: +e.target.value })} />
+            </Field>
+            <Field label={t('Pen up Z')}>
+              <input type="number" step={0.1} className="input-num" value={opts.penUpZ} onChange={(e) => setOpts({ ...opts, penUpZ: +e.target.value })} />
+            </Field>
+            {format === 'gcode' && (
+              <Field label={t('Spindle / laser power %')}>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  className="input-num"
+                  value={opts.spindle ? Math.round(opts.spindle.rpm / 10) : ''}
+                  placeholder={t('off')}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const pct = Number(raw);
+                    setOpts(o => ({
+                      ...o,
+                      spindle: raw !== '' && Number.isFinite(pct) && pct > 0 && pct <= 100
+                        ? { rpm: Math.round(pct * 10), ...(profileId === 'grbl-laser' ? { laserMode: true } : {}) }
+                        : undefined,
+                    }));
+                  }}
+                  title={t('Spindle/laser power for G-code jobs — M3 S…/M5 around the job; S = percent × 10 (grbl $30=1000). Empty = plain Z-axis pen model.')}
+                />
+              </Field>
+            )}
+            {/* ---- Page & geometry group: page size / curve fidelity / origin. ---- */}
+            <div className="col-span-2 field-label">{t('Page & geometry')}</div>
+            <Field label={`${t('Paper height')} (${opts.unit})`}>
+              <input type="number" className="input-num" value={opts.paperHeightUnits} onChange={(e) => setOpts({ ...opts, paperHeightUnits: +e.target.value })} />
+            </Field>
+            <Field label={t('Curve tolerance (px)')}>
+              <input type="number" step={0.1} className="input-num" value={opts.curveTolerance} onChange={(e) => setOpts({ ...opts, curveTolerance: +e.target.value })} />
+              <div
+                className="grid grid-cols-4 gap-1 mt-1"
+                role="group"
+                aria-label={t('Curve tolerance presets')}
+                aria-describedby="plotter-tolerance-preset-review-status"
+                title={t('Use Left/Right arrows to switch options')}
+                onKeyDown={(event) => handleSegmentKeys(event, CURVE_TOLERANCE_PRESETS_PX.map(String), `${opts.curveTolerance}`, (value) => setOpts({ ...opts, curveTolerance: Number(value) }), (_value, button) => setReviewedTolerancePreset(button?.dataset.review ?? ''))}
+              >
+                <span id="plotter-tolerance-preset-review-status" className="sr-only" aria-live="polite">
+                  {`${t('Reviewing')} ${reviewedTolerancePreset || `${t('Curve tolerance')} ${opts.curveTolerance} px`}`}
+                </span>
+                {CURVE_TOLERANCE_PRESETS_PX.map((value) => {
+                  const active = Math.abs(opts.curveTolerance - value) < 0.001;
+                  const review = `${t('Curve tolerance')} ${value} px`;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      data-value={`${value}`}
+                      data-review={review}
+                      className={`rounded border px-1 py-0.5 text-[10px] transition-colors ${active ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                      onFocus={(event) => setReviewedTolerancePreset(event.currentTarget.dataset.review ?? '')}
+                      onClick={() => setOpts({ ...opts, curveTolerance: value })}
+                      title={`${t('Set curve tolerance to')} ${value} px`}
+                      aria-pressed={active}
+                    >
+                      {value}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            <div className="col-span-2">
+              <div className="field-label mb-1!">{t('Origin')}</div>
+              <div
+                className="grid grid-cols-2 gap-1"
+                role="group"
+                aria-label={t('Origin')}
+                title={t('Use Left/Right arrows to switch options')}
+                onKeyDown={(event) => handleSegmentKeys(event, ORIGIN_OPTIONS.map(option => option.value), opts.originBottomLeft ? 'bottom-left' : 'top-left', (value) => {
+                  const option = ORIGIN_OPTIONS.find(item => item.value === value);
+                  if (option) setOpts({ ...opts, originBottomLeft: option.bottomLeft });
+                })}
+              >
+                {ORIGIN_OPTIONS.map((option) => {
+                  const active = opts.originBottomLeft === option.bottomLeft;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-value={option.value}
+                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                      onClick={() => setOpts({ ...opts, originBottomLeft: option.bottomLeft })}
+                      title={t(option.title)}
+                      aria-pressed={active}
+                    >
+                      {t(option.label)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          )}
+          {/* ---- Cut pane: material / speed / blade / strategy ---- */}
+          {tab === 'cut' && (
+          <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-4 py-4 text-xs content-start" role="tabpanel" aria-labelledby="plotter-tab-cut" data-plotter-pane="cut">
             <div className="col-span-2">
               <Field label={t('Material')}>
                 <div className="input-num mb-1 flex items-center gap-1.5 px-2 py-1 focus-within:border-accent2">
@@ -1532,118 +1953,8 @@ export function PlotterDialog() {
                 )}
               </Field>
             </div>
-            {format === 'hpgl' && (
-              <div className="col-span-2">
-                <Field label={t('Machine profile')}>
-                  <select
-                    className="input"
-                    value={profileId}
-                    onChange={(e) => applyProfile(e.target.value)}
-                    aria-label={t('Machine profile')}
-                    title={t('Pick your cutter brand — loads dialect, baud, flow control, force/speed defaults and field notes.')}
-                  >
-                    <option value="">{t('Generic / manual')}</option>
-                    {MACHINE_PROFILES.map((p) => (
-                      <option key={p.id} value={p.id}>{`${t(p.brand)} — ${t(p.label)}`}</option>
-                    ))}
-                  </select>
-                  {profile && (
-                    <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] text-muted leading-relaxed">
-                      <div className="text-ink/80">{t(profile.models)}</div>
-                      <div>{t('Recommends')} {profile.baud} {t('Baud').toLowerCase()} · {t(profile.flowControl === 'none' ? 'None (paced)' : profile.flowControl === 'hardware' ? 'Hardware RTS/CTS' : 'Software XON/XOFF')}{profile.panelOnly ? ` · ${t('force/speed on the machine panel')}` : ` · FS/VS ${profile.defaultForce}g/${profile.defaultSpeed}`}</div>
-                      <ul className="mt-0.5 list-none space-y-0.5">
-                        {profile.quirks.map((q) => (
-                          <li key={q}>· {t(q)}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </Field>
-              </div>
-            )}
-            <Field label={t('Format')}>
-              <div
-                className="grid grid-cols-2 gap-1"
-                role="group"
-                aria-label={t('Format')}
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_FORMAT_OPTIONS.map(option => option.value), format, setFormat)}
-              >
-                {OUTPUT_FORMAT_OPTIONS.map((option) => {
-                  const active = format === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-value={option.value}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onClick={() => setFormat(option.value)}
-                      title={`${t('Set output format to')} ${t(option.label)}`}
-                      aria-pressed={active}
-                    >
-                      {t(option.label)}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-            {format === 'hpgl' && (
-              <Field label={t('Cutter dialect')}>
-                <div
-                  className="grid grid-cols-3 gap-1"
-                  role="group"
-                  aria-label={t('Cutter dialect')}
-                  title={t('Use Left/Right arrows to switch options')}
-                  onKeyDown={(event) => handleSegmentKeys(event, HPGL_DIALECT_OPTIONS.map(option => option.value), opts.dialect, (value) => setOpts({ ...opts, dialect: value }))}
-                >
-                  {HPGL_DIALECT_OPTIONS.map((option) => {
-                    const active = opts.dialect === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        data-value={option.value}
-                        className={`rounded-md border px-2 py-1 text-[11px] leading-tight transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                        onClick={() => setOpts({ ...opts, dialect: option.value })}
-                        title={`${t('Set cutter dialect to')} ${t(option.label)}`}
-                        aria-pressed={active}
-                      >
-                        {t(option.label)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Field>
-            )}
-            <Field label={t('Unit')}>
-              <div
-                className="grid grid-cols-2 gap-1"
-                role="group"
-                aria-label={t('Unit')}
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_UNIT_OPTIONS.map(option => option.value), opts.unit, (value) => {
-                  const option = OUTPUT_UNIT_OPTIONS.find(item => item.value === value);
-                  if (option) setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit });
-                })}
-              >
-                {OUTPUT_UNIT_OPTIONS.map((option) => {
-                  const active = opts.unit === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-value={option.value}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onClick={() => setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit })}
-                      title={`${t('Set output unit to')} ${t(option.label)}`}
-                      aria-pressed={active}
-                    >
-                      {t(option.label)}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
+            {/* ---- Speed group: feed / travel rates with preset chips. ---- */}
+            <div className="col-span-2 field-label">{t('Speed')}</div>
             <Field label={`${t('Feed rate')} (${opts.unit}/min)`}>
               <input type="number" className="input-num" value={opts.feedRate} onChange={(e) => setOpts({ ...opts, feedRate: +e.target.value })} />
               <div
@@ -1712,79 +2023,6 @@ export function PlotterDialog() {
                 })}
               </div>
             </Field>
-            <Field label={t('Pen down Z')}>
-              <input type="number" step={0.1} className="input-num" value={opts.penDownZ} onChange={(e) => setOpts({ ...opts, penDownZ: +e.target.value })} />
-            </Field>
-            <Field label={t('Pen up Z')}>
-              <input type="number" step={0.1} className="input-num" value={opts.penUpZ} onChange={(e) => setOpts({ ...opts, penUpZ: +e.target.value })} />
-            </Field>
-            <Field label={`${t('Paper height')} (${opts.unit})`}>
-              <input type="number" className="input-num" value={opts.paperHeightUnits} onChange={(e) => setOpts({ ...opts, paperHeightUnits: +e.target.value })} />
-            </Field>
-            <Field label={t('Curve tolerance (px)')}>
-              <input type="number" step={0.1} className="input-num" value={opts.curveTolerance} onChange={(e) => setOpts({ ...opts, curveTolerance: +e.target.value })} />
-              <div
-                className="grid grid-cols-4 gap-1 mt-1"
-                role="group"
-                aria-label={t('Curve tolerance presets')}
-                aria-describedby="plotter-tolerance-preset-review-status"
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, CURVE_TOLERANCE_PRESETS_PX.map(String), `${opts.curveTolerance}`, (value) => setOpts({ ...opts, curveTolerance: Number(value) }), (_value, button) => setReviewedTolerancePreset(button?.dataset.review ?? ''))}
-              >
-                <span id="plotter-tolerance-preset-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedTolerancePreset || `${t('Curve tolerance')} ${opts.curveTolerance} px`}`}
-                </span>
-                {CURVE_TOLERANCE_PRESETS_PX.map((value) => {
-                  const active = Math.abs(opts.curveTolerance - value) < 0.001;
-                  const review = `${t('Curve tolerance')} ${value} px`;
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      data-value={`${value}`}
-                      data-review={review}
-                      className={`rounded border px-1 py-0.5 text-[10px] transition-colors ${active ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onFocus={(event) => setReviewedTolerancePreset(event.currentTarget.dataset.review ?? '')}
-                      onClick={() => setOpts({ ...opts, curveTolerance: value })}
-                      title={`${t('Set curve tolerance to')} ${value} px`}
-                      aria-pressed={active}
-                    >
-                      {value}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-            <div className="col-span-2">
-              <div className="field-label mb-1!">{t('Origin')}</div>
-              <div
-                className="grid grid-cols-2 gap-1"
-                role="group"
-                aria-label={t('Origin')}
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, ORIGIN_OPTIONS.map(option => option.value), opts.originBottomLeft ? 'bottom-left' : 'top-left', (value) => {
-                  const option = ORIGIN_OPTIONS.find(item => item.value === value);
-                  if (option) setOpts({ ...opts, originBottomLeft: option.bottomLeft });
-                })}
-              >
-                {ORIGIN_OPTIONS.map((option) => {
-                  const active = opts.originBottomLeft === option.bottomLeft;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-value={option.value}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onClick={() => setOpts({ ...opts, originBottomLeft: option.bottomLeft })}
-                      title={t(option.title)}
-                      aria-pressed={active}
-                    >
-                      {t(option.label)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             <div className="col-span-2">
               <div className="field-label mb-1!">{t('Cut strategy')}</div>
               <div
@@ -1914,6 +2152,8 @@ export function PlotterDialog() {
                 </div>
               )}
             </div>
+            {/* ---- Blade group: overcut / blade offset with preset chips. ---- */}
+            <div className="col-span-2 field-label">{t('Blade')}</div>
             <Field label={`${t('Overcut')} (mm)`}>
               <input
                 type="number" step={0.05} min={0} max={5} className="input-num"
@@ -1921,6 +2161,36 @@ export function PlotterDialog() {
                 onChange={(e) => setOpts({ ...opts, overcutMm: Math.max(0, parseFloat(e.target.value) || 0) })}
                 title={t('Extend closed cuts slightly past the start so corners fully release.')}
               />
+              <div
+                className="grid grid-cols-6 gap-1 mt-1"
+                role="group"
+                aria-label={t('Overcut presets')}
+                aria-describedby="plotter-overcut-preset-review-status"
+                title={t('Use Left/Right arrows to switch options')}
+                onKeyDown={(event) => handleSegmentKeys(event, OVERCUT_PRESETS_MM.map(String), `${opts.overcutMm}`, (value) => setOpts({ ...opts, overcutMm: Number(value) }), (_value, button) => setReviewedOvercutPreset(button?.dataset.review ?? ''))}
+              >
+                <span id="plotter-overcut-preset-review-status" className="sr-only" aria-live="polite">
+                  {`${t('Reviewing')} ${reviewedOvercutPreset || `${t('Overcut')} ${opts.overcutMm} mm`}`}
+                </span>
+                {OVERCUT_PRESETS_MM.map((value) => {
+                  const review = `${t('Overcut')} ${value} mm`;
+                  return (
+                  <button
+                    key={value}
+                    type="button"
+                    data-value={`${value}`}
+                    data-review={review}
+                    className={`btn py-1! px-1! text-[10px]! ${Math.abs(opts.overcutMm - value) < 0.001 ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
+                    onFocus={(event) => setReviewedOvercutPreset(event.currentTarget.dataset.review ?? '')}
+                    onClick={() => setOpts({ ...opts, overcutMm: value })}
+                    aria-pressed={Math.abs(opts.overcutMm - value) < 0.001}
+                    title={t('Apply overcut preset')}
+                  >
+                    {value.toFixed(value === 1 ? 0 : 1)}
+                  </button>
+                  );
+                })}
+              </div>
             </Field>
             <Field label={`${t('Blade offset')} (mm)`}>
               <input
@@ -2025,43 +2295,12 @@ export function PlotterDialog() {
                 </div>
               )}
             </div>
-            <div className="col-span-2">
-              <div className="field-label mb-1!">{t('Overcut presets')}</div>
-              <div
-                className="grid grid-cols-6 gap-1"
-                role="group"
-                aria-label={t('Overcut presets')}
-                aria-describedby="plotter-overcut-preset-review-status"
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, OVERCUT_PRESETS_MM.map(String), `${opts.overcutMm}`, (value) => setOpts({ ...opts, overcutMm: Number(value) }), (_value, button) => setReviewedOvercutPreset(button?.dataset.review ?? ''))}
-              >
-                <span id="plotter-overcut-preset-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedOvercutPreset || `${t('Overcut')} ${opts.overcutMm} mm`}`}
-                </span>
-                {OVERCUT_PRESETS_MM.map((value) => {
-                  const review = `${t('Overcut')} ${value} mm`;
-                  return (
-                  <button
-                    key={value}
-                    type="button"
-                    data-value={`${value}`}
-                    data-review={review}
-                    className={`btn py-1! px-1! text-[10px]! ${Math.abs(opts.overcutMm - value) < 0.001 ? 'border-accent2 text-accent2 bg-accent2/10' : ''}`}
-                    onFocus={(event) => setReviewedOvercutPreset(event.currentTarget.dataset.review ?? '')}
-                    onClick={() => setOpts({ ...opts, overcutMm: value })}
-                    aria-pressed={Math.abs(opts.overcutMm - value) < 0.001}
-                    title={t('Apply overcut preset')}
-                  >
-                    {value.toFixed(value === 1 ? 0 : 1)}
-                  </button>
-                  );
-                })}
-              </div>
-            </div>
           </div>
+          )}
 
-          {/* ---- Right column: visual / code preview ---- */}
-          <div className="flex flex-col">
+          {/* ---- Output pane: preview / colours / layers / job prep ---- */}
+          {tab === 'output' && (
+          <div className="flex flex-col px-4 py-4 text-xs" role="tabpanel" aria-labelledby="plotter-tab-output" data-plotter-pane="output">
             <div className="flex items-center justify-between mb-1.5">
               <div>
                 <div className="field-label mb-1">{t('Graphical cut preview')}</div>
@@ -2384,11 +2623,9 @@ export function PlotterDialog() {
               </div>
             )}
 
-            {/* Preview controls — print overlay + quick positioning marks. */}
+            {/* Preview controls — print overlay / order / simulate toggles
+                (code mode: generate / preflight / load). */}
             <div className="flex items-center gap-2 mt-2 text-[10px]">
-              <span id="plotter-prep-action-review-status" className="sr-only" aria-live="polite">
-                {`${t('Reviewing')} ${reviewedPrepAction || t('Plotter prep actions')}`}
-              </span>
               {previewMode === 'outline' && (
                 <span
                   className="inline-flex items-center gap-1"
@@ -2508,7 +2745,17 @@ export function PlotterDialog() {
                   )}
                 </>
               )}
-              <div className="flex-1" />
+            </div>
+
+            {/* Job prep — weed grid / positioning marks / bridges / cleanup
+                grouped under one caption (2026-11 reorg); the prep actions
+                keep their single arrow-key roving toolbar. */}
+            <div className="mt-3">
+              <div className="field-label mb-1!">{t('Job prep')}</div>
+              <span id="plotter-prep-action-review-status" className="sr-only" aria-live="polite">
+                {`${t('Reviewing')} ${reviewedPrepAction || t('Plotter prep actions')}`}
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
               <span className="flex items-center gap-0.5 text-muted" title={t('Weed grid dividers (rows × columns).')}>
                 <input
                   type="number" min={0} max={20} value={weedRows}
@@ -2695,7 +2942,7 @@ export function PlotterDialog() {
                   {t('Reset output settings')}
                 </button>
               </span>
-            </div>
+              </div>
 
             {/* Bridges — leave small uncut gaps so cut pieces / stencil islands
                 stay attached to the material. */}
@@ -2781,38 +3028,23 @@ export function PlotterDialog() {
                 </button>
               </span>
             </div>
-          </div>
-        </div>
-
-        {/* Capability hint + footer. */}
-        <div className="px-4 pb-4">
-          <div className="text-[10px] text-muted mb-3 flex items-start gap-1.5 leading-relaxed">
-            <HardDriveDownload size={12} aria-hidden="true" className="mt-px shrink-0 text-success" />
-            <span>
-              {native
-                ? t('Desktop app — direct USB sending is available.')
-                : webSerial
-                  ? t('Save the .plt/.gcode file to open in your cutter software, or send straight over USB.')
-                  : t('Save the file (works in any browser) and open it in your cutter software. Direct USB sending needs the desktop app or Chrome/Edge.')}
-            </span>
-          </div>
-          <div className="mb-3 rounded border border-accent2/40 bg-accent2/10 px-2 py-1.5 text-[10px] text-accent2 flex items-center gap-1.5 tabular-nums" title={t('Final output summary before Save or Send')}>
-            <Scissors size={12} aria-hidden="true" className="shrink-0" />
-            <span className="font-medium">{t('Ready to output')}:</span>
-            <span>{jobSummaryLabel}{transferEstimateLabel}</span>
-          </div>
-          {outputBlocked && (
-            <div className="-mt-2 mb-3 rounded border border-warning/50 bg-warning/10 px-2 py-1.5 text-[10px] text-warning">
-              {outputBlockedReason}
             </div>
+          </div>
           )}
 
+          {/* ---- Machine pane (continued): connection strip + debug console
+              + Data-Link. A separate fragment that follows the Output pane
+              in source order — when the Machine tab is active the other
+              panes unmount, so the fragments join seamlessly. ---- */}
+          {tab === 'machine' && (
+          <div className="px-4 pb-4" data-plotter-pane="machine">
           {/* Connection + debug console. The native port picker lives here
               now, alongside baud / flow control, quick machine commands,
               jog, and the TX/RX traffic log. */}
           <PlotterConsole
             link={link}
             format={format}
+            setFormat={setFormat}
             unit={opts.unit}
             native={native}
             webSerial={webSerial}
@@ -2837,6 +3069,7 @@ export function PlotterDialog() {
             applyConfig={applyConfig}
             jobLogVersion={jobLogVersion}
             applyProfile={applyProfile}
+            machineNameHint={machineNameHint}
           />
 
           {/* Data-Link (network cutter): the Graphtec TCP-9100 barcode
@@ -2928,8 +3161,36 @@ export function PlotterDialog() {
             </div>
           )}
 
+          </div>
+          )}
+        </div>
+
+        {/* Pinned footer — capability hint / job summary / stream progress
+            and the Cancel…Send via USB action row stay reachable on every
+            tab, at any scroll position and window height. */}
+        <div className="px-4 pb-4 shrink-0">
+          <div className="text-[10px] text-muted mt-3 flex items-start gap-1.5 leading-relaxed">
+            <HardDriveDownload size={12} aria-hidden="true" className="mt-px shrink-0 text-success" />
+            <span>
+              {native
+                ? t('Desktop app — direct USB sending is available.')
+                : webSerial
+                  ? t('Save the .plt/.gcode file to open in your cutter software, or send straight over USB.')
+                  : t('Save the file (works in any browser) and open it in your cutter software. Direct USB sending needs the desktop app or Chrome/Edge.')}
+            </span>
+          </div>
+          <div className="mt-2 mb-2 rounded border border-accent2/40 bg-accent2/10 px-2 py-1.5 text-[10px] text-accent2 flex items-center gap-1.5 tabular-nums" title={t('Final output summary before Save or Send')}>
+            <Scissors size={12} aria-hidden="true" className="shrink-0" />
+            <span className="font-medium">{t('Ready to output')}:</span>
+            <span>{jobSummaryLabel}{transferEstimateLabel}</span>
+          </div>
+          {outputBlocked && (
+            <div className="-mt-1 mb-2 rounded border border-warning/50 bg-warning/10 px-2 py-1.5 text-[10px] text-warning">
+              {outputBlockedReason}
+            </div>
+          )}
           {jobProgress && (
-            <div className="mb-3 flex items-center gap-2 text-[10px] text-muted tabular-nums" role="status" aria-live="polite">
+            <div className="mb-2 flex items-center gap-2 text-[10px] text-muted tabular-nums" role="status" aria-live="polite">
               <span className={`shrink-0 ${jobPaused ? 'text-warning' : ''}`}>
                 {jobPaused ? t('Paused') : t('Sending')} {jobProgress.sent}/{jobProgress.total} B ({Math.floor((jobProgress.sent / Math.max(1, jobProgress.total)) * 100)}%){jobProgress.eta !== null ? ` · ETA ~${jobProgress.eta}s` : ''}
               </span>
@@ -2952,14 +3213,13 @@ export function PlotterDialog() {
               </button>
             </div>
           )}
-
           <div
             className="flex items-center gap-2 pt-3 border-t border-border"
             role="group"
             aria-label={t('Plotter output actions')}
             aria-describedby="plotter-output-action-review-status"
             title={t('Use Left/Right arrows to switch options')}
-            onKeyDown={(event) => handleToolbarKeys(event, ['cancel', 'test-cut', 'save-file', 'send-usb'] as const, (button) => setReviewedOutputAction(button?.dataset.review ?? ''))}
+            onKeyDown={(event) => handleToolbarKeys(event, outputActionValues, (button) => setReviewedOutputAction(button?.dataset.review ?? ''))}
           >
             <span id="plotter-output-action-review-status" className="sr-only" aria-live="polite">
               {`${t('Reviewing')} ${reviewedOutputAction || `${t('Plotter output actions')} · ${jobSummaryLabel}`}`}
@@ -2991,6 +3251,32 @@ export function PlotterDialog() {
                 <FlaskConical size={12} aria-hidden="true" />{t('Force test')}
               </button>
             )}
+            {format === 'gcode' && profileId === 'grbl-laser' && (
+              <button
+                type="button"
+                data-value="laser-test"
+                data-review={`${t('Laser test')} · ${t('Burn a strip of 5 short segments at 10–50% power to find the working laser setting in one pass.')}`}
+                className="btn flex items-center gap-1"
+                onFocus={(event) => setReviewedOutputAction(event.currentTarget.dataset.review ?? '')}
+                onClick={laserTest}
+                disabled={busy}
+                title={t('Burn a strip of 5 short segments at 10–50% power to find the working laser setting in one pass. Needs grbl laser mode ($32=1); the laser is off between segments.')}
+              >
+                <Zap size={12} aria-hidden="true" />{t('Laser test')}
+              </button>
+            )}
+            <button
+              type="button"
+              data-value="corner-tour"
+              data-review={`${t('Corner tour')} · ${t('Visit the corners of a 100×100 mm square and tap the centre, blade up.')}`}
+              className="btn flex items-center gap-1"
+              onFocus={(event) => setReviewedOutputAction(event.currentTarget.dataset.review ?? '')}
+              onClick={cornerTour}
+              disabled={busy}
+              title={t('Visit the corners of a 100×100 mm square and tap the centre, blade up — proves the port and axis mapping before any real job.')}
+            >
+              <Crosshair size={12} aria-hidden="true" />{t('Corner tour')}
+            </button>
             <div className="flex-1" />
             {/* Save File is the primary action when direct USB isn't
                 available, so non-Chrome / PWA users get an unmistakable
@@ -3182,6 +3468,31 @@ function PreviewTab({ id, active, onClick, icon, label }: { id: PreviewMode; act
       }`}
     >
       {icon}{label}
+    </button>
+  );
+}
+
+/** Machine / Cut / Output section tab — the CutContourDialog TabButton
+ *  idiom (underline strip, roving tabindex, arrow-key switching). */
+function PlotterTabButton({ id, active, onClick, icon, label }: { id: PlotterTab; active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      role="tab"
+      id={`plotter-tab-${id}`}
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
+      onClick={onClick}
+      title={t('Use Left/Right arrows to switch modes')}
+      className={`px-3 py-2 flex items-center gap-1.5 border-b-2 transition-colors -mb-px ${
+        active
+          ? 'border-[#ff2e9a] text-ink'
+          : 'border-transparent text-muted hover:text-ink'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
     </button>
   );
 }

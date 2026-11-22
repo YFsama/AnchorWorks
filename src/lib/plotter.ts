@@ -78,6 +78,12 @@ export interface PlotterOptions {
    *  Registration marks are excluded (the sensor's reference frame).
    *  Undefined / all-zero = off. Band ±20 mm per axis. */
   drift?: { topDxMm: number; topDyMm: number; bottomDxMm: number; bottomDyMm: number };
+  /** G-code only — spindle / laser power. Present → the job opens with
+   *  `M3 S<rpm>` and closes with `M5` (same M3/M5 shape in laser mode;
+   *  grbl laser boards modulate the laser tube through the spindle pin).
+   *  Undefined → pure Z-axis pen model, byte-identical to the classic
+   *  output. `rpm` maps 1:1 to the grbl S value ($30 max spindle). */
+  spindle?: { rpm: number; laserMode?: boolean };
   /** Reverse the cut direction of every path. */
   reverse: boolean;
   /** Cut contours contained inside others first (print-and-cut weeding order). */
@@ -231,6 +237,7 @@ function sanitizePlotterOptions(o: Partial<PlotterOptions>): PlotterOptions {
     bladeOffsetMm: num(o.bladeOffsetMm, 0, 0, 5),
     arms: sanitizeArms(o.arms),
     drift: sanitizeDrift(o.drift),
+    spindle: sanitizeSpindle(o.spindle),
     reverse: Boolean(o.reverse),
     insideFirst: Boolean(o.insideFirst),
     ejectAfter: typeof o.ejectAfter === 'boolean' ? o.ejectAfter : d.ejectAfter,
@@ -263,6 +270,18 @@ function sanitizeDrift(a: unknown): PlotterOptions['drift'] {
   if (topDxMm === null || topDyMm === null || bottomDxMm === null || bottomDyMm === null) return undefined;
   if (topDxMm === 0 && topDyMm === 0 && bottomDxMm === 0 && bottomDyMm === 0) return undefined;
   return { topDxMm, topDyMm, bottomDxMm, bottomDyMm };
+}
+
+/** Spindle block survives only with a finite in-band S value (1–10000) —
+ *  a missing, zero or out-of-band `rpm` drops the whole block back to the
+ *  plain pen model, which is the default for grbl pen plotters. No
+ *  clamping: a bogus value hides corruption better dropped than coerced. */
+function sanitizeSpindle(a: unknown): PlotterOptions['spindle'] {
+  if (!a || typeof a !== 'object') return undefined;
+  const r = a as Record<string, unknown>;
+  const rpm = typeof r.rpm === 'number' && Number.isFinite(r.rpm) ? Math.round(r.rpm) : NaN;
+  if (!Number.isFinite(rpm) || rpm < 1 || rpm > 10000) return undefined;
+  return { rpm, ...(r.laserMode === true ? { laserMode: true } : {}) };
 }
 
 interface Polyline { points: Array<[number, number]>; closed: boolean; }
@@ -493,13 +512,21 @@ function flattenEllipse(cx: number, cy: number, rx: number, ry: number, m: DOMMa
   return { points: pts, closed: true };
 }
 
-/** Generate G-code from polylines (CNC-style, pen on Z axis). */
+/** Generate G-code from polylines (CNC-style, pen on Z axis). With
+ *  `opts.spindle` set, the job additionally opens with `M3 S…` and
+ *  stops the tool with `M5` BEFORE the return-to-origin travel (so a
+ *  laser never burns its way home) — laser mode keeps the same M3/M5
+ *  shape. Without it the output is the classic pen model, unchanged. */
 export function generateGCode(polylines: Polyline[], opts: PlotterOptions): string {
   const lines: string[] = [];
   lines.push('; Anchorworks — G-code output');
   lines.push(opts.unit === 'mm' ? 'G21 ; mm' : 'G20 ; inches');
   lines.push('G90 ; absolute');
   lines.push(`G0 Z${opts.penUpZ.toFixed(3)} F${opts.travelRate}`);
+  const spindle = opts.spindle && opts.spindle.rpm > 0 ? opts.spindle : undefined;
+  if (spindle) {
+    lines.push(`M3 S${Math.round(spindle.rpm)}${spindle.laserMode ? ' ; laser on' : ''}`);
+  }
 
   for (const pl of polylines) {
     if (pl.points.length < 2) continue;
@@ -512,6 +539,7 @@ export function generateGCode(polylines: Polyline[], opts: PlotterOptions): stri
     }
     lines.push(`G0 Z${opts.penUpZ.toFixed(3)} F${opts.travelRate}`);
   }
+  if (spindle) lines.push('M5');
   lines.push('G0 X0 Y0');
   lines.push('M30 ; end');
   return lines.join('\n');

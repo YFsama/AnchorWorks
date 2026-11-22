@@ -7,7 +7,8 @@ describe('MACHINE_PROFILES', () => {
     for (const p of MACHINE_PROFILES) {
       expect(ids.has(p.id)).toBe(false);
       ids.add(p.id);
-      expect(['bare', 'roland-camm', 'graphtec-fc']).toContain(p.dialect);
+      // dialect is optional — absent means a grbl (G-code) machine.
+      expect(p.dialect === undefined || ['bare', 'roland-camm', 'graphtec-fc'].includes(p.dialect)).toBe(true);
       expect(p.baud).toBeGreaterThanOrEqual(1200);
       expect(p.baud).toBeLessThanOrEqual(250000);
       expect(['none', 'hardware', 'software']).toContain(p.flowControl);
@@ -71,6 +72,36 @@ describe('profile command builders', () => {
     const generic = getMachineProfile('generic-hpgl')!;
     expect(profileConnectInit(generic, 0, 0)).toBe('IN;');
     expect(profileConnectInit(null, 0, 0)).toBe('');
+  });
+
+  it('grbl (no-dialect) profiles prime nothing and emit no HP-GL force/speed', () => {
+    expect(profileConnectInit(getMachineProfile('grbl-generic')!, 50, 30)).toBe('');
+    expect(profileConnectInit(getMachineProfile('grbl-laser')!, 50, 30)).toBe('');
+    expect(profileForceSpeed(getMachineProfile('grbl-generic')!, 50, 30)).toBe('');
+    expect(profileForceSpeed(getMachineProfile('grbl-laser')!, 50, 30)).toBe('');
+  });
+});
+
+describe('grbl (G-code) profiles', () => {
+  it('ships grbl-generic and grbl-laser without an HP-GL dialect', () => {
+    const generic = getMachineProfile('grbl-generic')!;
+    expect(generic.dialect).toBeUndefined();
+    expect(generic.baud).toBe(115200);
+    expect(generic.flowControl).toBe('none');
+    const laser = getMachineProfile('grbl-laser')!;
+    expect(laser.dialect).toBeUndefined();
+    expect(laser.baud).toBe(115200);
+  });
+
+  it('the laser profile documents $32=1 and the max-power mapping', () => {
+    const notes = getMachineProfile('grbl-laser')!.quirks.join(' ');
+    expect(notes).toMatch(/\$32=1/);
+    expect(notes).toMatch(/\$30/);
+  });
+
+  it('HP-GL profiles keep their dialect (the option changes nothing for them)', () => {
+    expect(getMachineProfile('roland-camm1')!.dialect).toBe('roland-camm');
+    expect(getMachineProfile('generic-hpgl')!.dialect).toBe('bare');
   });
 });
 

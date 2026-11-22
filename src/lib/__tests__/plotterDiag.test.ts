@@ -183,6 +183,30 @@ describe('buildDiagnosticsReport', () => {
     expect(report).toContain('(empty)');
     expect(report).toContain('- Last transfer: —');
   });
+
+  it('renders identify / grbl settings / self-test sections when provided', () => {
+    const report = buildDiagnosticsReport({
+      ...base,
+      identify: { model: 'GX-24', summary: 'Machine answered: model "GX-24"' },
+      grblSettings: [{ key: '$32', value: '1' }, { key: '$130', value: '300.000' }],
+      selfTestSteps: [{ label: 'Link', status: 'pass', detail: 'Connected.' }],
+    });
+    expect(report).toContain('Machine identification');
+    expect(report).toContain('- Model: GX-24');
+    expect(report).toContain('Machine answered: model "GX-24"');
+    expect(report).toContain('grbl settings (last $$ snapshot, 2 keys)');
+    expect(report).toContain('$32=1');
+    expect(report).toContain('$130=300.000');
+    expect(report).toContain('Connection self-test (1 steps)');
+    expect(report).toContain('[pass] Link — Connected.');
+  });
+
+  it('omits the new sections entirely when not provided (legacy shape)', () => {
+    const report = buildDiagnosticsReport({ ...base });
+    expect(report).not.toContain('Machine identification');
+    expect(report).not.toContain('grbl settings');
+    expect(report).not.toContain('self-test');
+  });
 });
 
 describe('estimateEtaSeconds', () => {

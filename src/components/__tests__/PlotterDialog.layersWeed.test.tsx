@@ -44,7 +44,7 @@ vi.mock('../../lib/confirm', async (importOriginal) => {
 let host: HTMLDivElement;
 let roots: Root[];
 
-function mountDialog(): HTMLDivElement {
+function mountDialog(tab: 'machine' | 'cut' | 'output' = 'machine'): HTMLDivElement {
   const container = document.createElement('div');
   host.appendChild(container);
   const root = createRoot(container);
@@ -53,6 +53,12 @@ function mountDialog(): HTMLDivElement {
     useEditor.setState({ showPlotter: true });
     root.render(<PlotterDialog />);
   });
+  // 2026-11 reorg: the Machine / Cut / Output panes mount one at a time —
+  // switch to the pane under test (no-op when already active).
+  const btn = container.querySelector<HTMLButtonElement>(`#plotter-tab-${tab}`);
+  if (btn && btn.getAttribute('aria-selected') !== 'true') {
+    act(() => { btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
+  }
   return container;
 }
 
@@ -154,20 +160,20 @@ afterEach(() => {
 describe('PlotterDialog layers (multi-colour vinyl)', () => {
   it('stays hidden until the job has ≥2 vinyl colours', () => {
     useEditor.setState({ cutPaths: [rectPath('red', '#ff0000', 0, 0, 100, 100), regmark('mark')] });
-    const c = mountDialog();
+    const c = mountDialog('output');
     expect(layerSection(c)).toBeNull();
 
     // Store update wrapped in act — the first dialog is still mounted and
     // subscribed to cutPaths.
     act(() => { useEditor.setState({ cutPaths: layeredJob() }); });
-    const c2 = mountDialog();
+    const c2 = mountDialog('output');
     expect(layerSection(c2)).not.toBeNull();
     expect(c2.querySelectorAll('div[data-plotter-layer]')).toHaveLength(2);
   });
 
   it('orders rows bottom-first with the "1 = bottom" badge and per-colour stats', () => {
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('output');
     const rows = Array.from(c.querySelectorAll<HTMLElement>('div[data-plotter-layer]'));
     // Largest area (red, 10 000 mm²) is the bottom layer, order 1.
     expect(rows[0].getAttribute('data-plotter-layer')).toBe('#ff0000');
@@ -188,7 +194,7 @@ describe('PlotterDialog layers (multi-colour vinyl)', () => {
 
   it('Save downloads a stamped per-layer file, and Save all staggers one per layer', () => {
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('output');
 
     click(rowButton(layerRow(c, '#ff0000'), 'Save'));
     expect(vi.mocked(download)).toHaveBeenCalledTimes(1);
@@ -212,7 +218,7 @@ describe('PlotterDialog layers (multi-colour vinyl)', () => {
 
   it('Send all layers confirms between vinyl swaps; declining stops the sequence', async () => {
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('output');
     const sendAll = Array.from(c.querySelectorAll('button')).find(b => b.textContent === 'Send all layers')!;
 
     // Decline the swap after layer 1 → only one job streams.
@@ -241,7 +247,7 @@ describe('PlotterDialog weed check panel', () => {
   it('runs on demand and reports thin features with the summary line', () => {
     // 20 × 0.5 mm ring — a stroke no profile can weed.
     useEditor.setState({ cutPaths: [rectPath('thin', '#ff0000', 0, 0, 20, 0.5)] });
-    const c = mountDialog();
+    const c = mountDialog('output');
     openCodeTab(c);
 
     expect(c.textContent).toContain('Weed check (weeding preflight)');
@@ -261,7 +267,7 @@ describe('PlotterDialog weed check panel', () => {
     // 20 × 2 mm band — a stroke vinyl can weed (floor 1.5 mm) but glitter
     // HTV cannot (floor 3 mm): flagged only under that profile.
     useEditor.setState({ cutPaths: [rectPath('band', '#ff0000', 0, 0, 20, 2)] });
-    const c = mountDialog();
+    const c = mountDialog('output');
     openCodeTab(c);
 
     click(checkWeedingButton(c));
@@ -277,7 +283,7 @@ describe('PlotterDialog weed check panel', () => {
     const many: CutPath[] = Array.from({ length: 401 }, (_, i) =>
       rectPath(`p${i}`, undefined, i * 2, 0, 1, 1));
     useEditor.setState({ cutPaths: many });
-    const c = mountDialog();
+    const c = mountDialog('output');
     openCodeTab(c);
 
     click(checkWeedingButton(c));
@@ -286,7 +292,7 @@ describe('PlotterDialog weed check panel', () => {
 
   it('collapses and expands', () => {
     useEditor.setState({ cutPaths: [rectPath('thin', '#ff0000', 0, 0, 20, 0.5)] });
-    const c = mountDialog();
+    const c = mountDialog('output');
     openCodeTab(c);
     click(checkWeedingButton(c));
     expect(c.textContent).toContain('1 issues · 1 paths checked');
@@ -311,14 +317,14 @@ describe('PlotterDialog estimate accuracy', () => {
 
     seedPrefs({ feedRate: 10, travelRate: 10 }); // overcut 0 / blade 0
     useEditor.setState({ cutPaths: job });
-    const baseline = mountDialog();
+    const baseline = mountDialog('output');
     const baselineSeconds = summarySeconds(baseline);
     // 320 mm cut + ~14 mm travel at 10 mm/min + 0.15 s overhead ≈ 2005 s.
     expect(baselineSeconds).toBeGreaterThan(1990);
     expect(baselineSeconds).toBeLessThan(2020);
 
     seedPrefs({ feedRate: 10, travelRate: 10, overcutMm: 0.5, bladeOffsetMm: 0.25 });
-    const adjusted = mountDialog();
+    const adjusted = mountDialog('output');
     const adjustedSeconds = summarySeconds(adjusted);
     // Delta has three real components at 10 mm/min (1 mm = 6 s):
     //  1. extra cut LENGTH from loops + retrace ≈ 3.5 mm → ≈ 21 s;
@@ -378,7 +384,7 @@ describe('PlotterDialog physics estimate (trapezoidal twin)', () => {
     // Without a material preset (no accel constant) there is no physics twin.
     seedPrefs({ feedRate: 400, travelRate: 3000 });
     useEditor.setState({ cutPaths: job });
-    const plain = mountDialog();
+    const plain = mountDialog('output');
     expect(strip(plain).textContent).toContain('~');
     expect(strip(plain).textContent).not.toContain('≈');
     expect(summarySeconds(plain)).toBeGreaterThan(40); // ≈ 48 s, sanity
@@ -387,7 +393,7 @@ describe('PlotterDialog physics estimate (trapezoidal twin)', () => {
     // and the "Ready to output" summary.
     seedPrefsMaterial({ feedRate: 400, travelRate: 3000 }, 'sign-vinyl');
     useEditor.setState({ cutPaths: job });
-    const withMaterial = mountDialog();
+    const withMaterial = mountDialog('output');
     const row = strip(withMaterial).textContent ?? '';
     expect(row).toContain('≈');
     expect(row).toContain('(physics)');
@@ -403,7 +409,7 @@ describe('PlotterDialog physics estimate (trapezoidal twin)', () => {
 describe('PlotterDialog per-layer mirror + trap', () => {
   it('toggling a layer’s mirror ships that layer’s file with x-coordinates flipped', () => {
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('output');
     const blueRow = layerRow(c, '#0000ff');
     const mirrorBox = blueRow.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
     expect(mirrorBox.checked).toBe(false); // global mirror off
@@ -445,7 +451,7 @@ describe('PlotterDialog per-layer mirror + trap', () => {
 
   it('Trap layers offsets the upper colour’s closed rings in the store', () => {
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('output');
     const original = layeredJob();
 
     click(Array.from(c.querySelectorAll('button')).find(b => b.textContent === 'Trap layers')!);
@@ -472,7 +478,7 @@ describe('PlotterDialog per-layer DXF + trap preview', () => {
 
   it('DXF downloads a stamped per-layer DXF with LAYER content, and Save all (DXF) staggers', () => {
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('output');
 
     click(rowButton(layerRow(c, '#ff0000'), 'DXF'));
     expect(vi.mocked(download)).toHaveBeenCalledTimes(1);
@@ -509,7 +515,7 @@ describe('PlotterDialog per-layer DXF + trap preview', () => {
       regmark('mark'),
     ];
     useEditor.setState({ cutPaths: threeColour });
-    const c = mountDialog();
+    const c = mountDialog('output');
 
     // Tolerance guidance rides under the section header.
     expect(c.textContent).toContain('Layer alignment tolerance is ~0.5 mm');
