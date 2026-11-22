@@ -77,6 +77,7 @@ export function ErrorLogDialog() {
   // and with it ToastHost — is gone, so a toast alone would be invisible.
   const [copyState, setCopyState] = useState<'idle' | 'ok' | 'fail'>('idle');
   const copyBtnRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => subscribeErrors(() => setTick(n => n + 1)), []);
   // The dialog listener carries no payload (confirm.ts style) — read the new
@@ -86,7 +87,13 @@ export function ErrorLogDialog() {
   useFocusRestore(open);
 
   useEffect(() => {
-    if (open) copyBtnRef.current?.focus();
+    if (!open) return;
+    // Copy-all is disabled when the log is empty (Clear/Download too), and
+    // the browser refuses to focus disabled controls — without the fallback
+    // focus stayed on the menu item behind the modal. Land on the
+    // always-enabled Close instead.
+    if (!copyBtnRef.current?.disabled) copyBtnRef.current?.focus();
+    else closeBtnRef.current?.focus();
   }, [open]);
 
   if (!open) return null;
@@ -123,6 +130,7 @@ export function ErrorLogDialog() {
           <h2 id="error-log-title" className="dialog-title">{t('Error Log')}</h2>
           <button
             type="button"
+            ref={closeBtnRef}
             className="text-muted hover:text-ink p-1 transition-colors"
             aria-label={t('Close')}
             onClick={closeErrorLogDialog}

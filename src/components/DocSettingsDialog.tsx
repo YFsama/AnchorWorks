@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { resizeCanvas, setBackground, zoomFit } from '../lib/canvasEngine';
@@ -37,20 +37,21 @@ export function DocSettingsDialog() {
   const [initialDoc, setInitialDoc] = useState(() => ({ ...doc }));
 
   // Re-seed the dropdown from the current size exactly once per open
-  // transition. React's documented "adjust state when a prop changes"
-  // pattern: store the previous `open` in state and reconcile during
-  // render — no effect (which would fight the user on every width tweak)
-  // and no ref access.
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) {
-      setInitialDoc({ ...doc });
-      const m = matchPreset(doc.width, doc.height, doc.dpi);
-      setPresetId(m?.id ?? 'custom');
-      setLandscape(m?.landscape ?? doc.width > doc.height);
-    }
-  }
+  // transition — an effect on the `open` edge only. Deliberately NOT
+  // dep-tracked on `doc`: applyPreset writes `doc` live while the dialog is
+  // open (orientation swaps, preset picks), and an effect that re-ran on
+  // doc changes would fight the user's edits. The previous render-time
+  // reconciliation (setState during render) froze the page intermittently
+  // under react-compiler; the effect commits one frame later, which is
+  // imperceptible next to that.
+  useEffect(() => {
+    if (!open) return;
+    setInitialDoc({ ...doc });
+    const m = matchPreset(doc.width, doc.height, doc.dpi);
+    setPresetId(m?.id ?? 'custom');
+    setLandscape(m?.landscape ?? doc.width > doc.height);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed on the open edge only; see comment above
+  }, [open]);
 
   const normalizedPresetSearch = presetSearch.trim().toLowerCase();
   const filteredPresets = useMemo(() => {
@@ -148,7 +149,7 @@ export function DocSettingsDialog() {
       aria-modal="true"
       aria-labelledby="doc-settings-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[380px] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[380px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h2 id="doc-settings-title" className="dialog-title">{t('Document Settings')}</h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>

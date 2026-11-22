@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { answerConfirm, getCurrentConfirm, subscribeConfirm } from '../lib/confirm';
+import { restoreDialogFocus } from '../lib/hooks/useFocusRestore';
 import { useT } from '../lib/i18n';
 
 /**
@@ -51,9 +52,11 @@ export function ConfirmHost() {
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
-      if (restoreTo && document.contains(restoreTo) && typeof restoreTo.focus === 'function') {
-        restoreTo.focus();
-      }
+      // Shared restore: a confirm triggered from a menubar dropdown must not
+      // restore into the panel's rows (they hide with focus-within, and the
+      // :hover race eats the focus either way) — it goes to the menu's
+      // trigger button. See restoreDialogFocus for the full analysis.
+      restoreDialogFocus(restoreTo);
     };
   }, [opts]);
 
@@ -88,7 +91,7 @@ export function ConfirmHost() {
       {...(opts.title ? { 'aria-labelledby': 'confirm-host-title' } : { 'aria-label': t('Confirm') })}
       aria-describedby="confirm-host-message"
     >
-      <div className="bg-panel border border-border rounded-lg w-[360px] max-w-[90%] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[360px] max-w-[90%] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">
         {opts.title && <h2 id="confirm-host-title" className="dialog-title mb-2">{opts.title}</h2>}
         <div
           id="confirm-host-message"
