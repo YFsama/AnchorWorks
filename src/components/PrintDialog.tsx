@@ -275,13 +275,16 @@ export function PrintDialog() {
       aria-modal="true"
       aria-labelledby="print-dialog-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[680px] max-w-[95%] p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel border border-border rounded-lg w-[680px] max-w-[95%] p-4 shadow-2xl max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <h2 id="print-dialog-title" className="dialog-title">{t('Print')}</h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
-        <div className="flex gap-4">
-        <div className="w-[320px] shrink-0">
+        {/* Left column scrolls; the footer stays pinned at its bottom and the
+            preview column keeps its own sizing — short-window layout. */}
+        <div className="flex gap-4 flex-1 min-h-0">
+        <div className="w-[320px] shrink-0 flex flex-col min-h-0">
+        <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="mb-2">
           <div className="field-label">{t('Print job presets')}</div>
           <PresetRow
@@ -730,10 +733,11 @@ export function PrintDialog() {
           <span className="font-medium">{t('Ready to print')}:</span>
           <span>{printSummaryLabel}</span>
         </div>
+        </div>
 
         <ReviewedFooter
           statusId="print-output-action-review-status"
-          className="flex justify-end gap-2 mt-3"
+          className="flex justify-end gap-2 mt-3 shrink-0"
           label={t('Print output actions')}
           title={t('Use Left/Right arrows to switch options')}
           onKeyDown={handleOutputActionKeys}

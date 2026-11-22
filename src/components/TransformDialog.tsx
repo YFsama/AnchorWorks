@@ -180,14 +180,15 @@ export function TransformDialog() {
       aria-modal="true"
       aria-labelledby="transform-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[320px] p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel border border-border rounded-lg w-[320px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col p-4 shadow-2xl">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <h2 id="transform-title" className="dialog-title flex items-center gap-2">
             <Move3D size={14} aria-hidden="true" /> {t('Transform')}
           </h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Radiogroups are kit rows: PresetItem(radio) members inside a
             role="radiogroup" ActionToolbar. The keydown handler stays the
             focus-roving makeRovingKeys shape (not makeSegmentKeys): these
@@ -365,10 +366,11 @@ export function TransformDialog() {
           <input type="checkbox" checked={scaleStrokesEffects} onChange={(e) => setScaleStrokesEffects(e.target.checked)} />
           {t('Scale Strokes & Effects')}
         </label>
+        </div>
 
         <ReviewedFooter
           statusId="transform-action-review-status"
-          className="flex justify-end gap-2 mt-4"
+          className="flex justify-end gap-2 mt-4 shrink-0"
           label={t('Transform actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}

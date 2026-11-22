@@ -235,8 +235,10 @@ const FROZEN_LAYOUT_TOOLBAR =
   + '<button type="button" data-variable-data-layout-action="true" class="btn py-1! px-2! text-[10px]! " aria-pressed="false">Link gaps</button>'
   + '</div>';
 
+// shrink-0 on the footer (I-A1 short-window layout: header/scroll/footer)
+// is the one intended class delta since the original freeze.
 const FROZEN_FOOTER =
-  '<div class="flex justify-end gap-2 mt-3" role="toolbar" aria-label="Variable Data actions" aria-describedby="variable-data-action-review-status" title="Use arrow keys to review dialog actions">'
+  '<div class="flex justify-end gap-2 mt-3 shrink-0" role="toolbar" aria-label="Variable Data actions" aria-describedby="variable-data-action-review-status" title="Use arrow keys to review dialog actions">'
   + '<span id="variable-data-action-review-status" class="sr-only" aria-live="polite">Reviewing Variable Data actions</span>'
   + '<button type="button" data-variable-data-action="true" data-variable-data-action-review="Cancel" class="btn">Cancel</button>'
   + '<button type="button" data-variable-data-action="true" data-variable-data-action-review="Generate" class="btn-primary">Generate</button>'

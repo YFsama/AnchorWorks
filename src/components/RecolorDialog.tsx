@@ -106,7 +106,7 @@ export function RecolorDialog() {
       aria-modal="true"
       aria-labelledby="recolor-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[360px] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[360px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h2 id="recolor-title" className="dialog-title flex items-center gap-2">
             <Palette size={14} aria-hidden="true" /> {t('Recolor Artwork')}

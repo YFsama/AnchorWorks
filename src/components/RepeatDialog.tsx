@@ -201,11 +201,11 @@ export function RepeatDialog() {
       aria-labelledby="repeat-dialog-title"
     >
       <div
-        className="bg-panel border border-border rounded-lg w-[560px] max-w-[95%] shadow-2xl overflow-hidden"
+        className="bg-panel border border-border rounded-lg w-[560px] max-w-[95%] shadow-2xl overflow-hidden max-h-[calc(100vh-4rem)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Title row */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2 shrink-0">
           <h2 id="repeat-dialog-title" className="dialog-title">{t('Repeat')}</h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}>
             <X size={14} aria-hidden="true" />
@@ -216,7 +216,7 @@ export function RepeatDialog() {
          *  pattern in PreferencesDialog (which also implements arrow-key
          *  nav, copied below). */}
         <div
-          className="flex border-b border-border bg-panel/60"
+          className="flex border-b border-border bg-panel/60 shrink-0"
           role="tablist"
           aria-label={t('Repeat')}
           aria-orientation="horizontal"
@@ -240,7 +240,7 @@ export function RepeatDialog() {
 
         <div
           id="repeat-tab-panel"
-          className="px-4 py-4 grid grid-cols-[1fr_180px] gap-4"
+          className="px-4 py-4 grid grid-cols-[1fr_180px] gap-4 flex-1 min-h-0 overflow-y-auto"
           role="tabpanel"
           aria-labelledby={`repeat-tab-${tab}`}
         >
@@ -385,7 +385,7 @@ export function RepeatDialog() {
 
         {/* Footer */}
         <div
-          className="flex items-center gap-2 px-4 py-3 border-t border-border"
+          className="flex items-center gap-2 px-4 py-3 border-t border-border shrink-0"
           role="toolbar"
           aria-label={t('Repeat actions')}
           aria-describedby="repeat-action-review-status"

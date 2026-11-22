@@ -140,7 +140,7 @@ export function TemplatesDialog() {
       aria-labelledby="templates-dialog-title"
     >
       <div
-        className="bg-panel border border-border rounded-lg shadow-2xl w-[760px] max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-panel border border-border rounded-lg shadow-2xl w-[760px] max-w-[92vw] max-h-[80vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2">

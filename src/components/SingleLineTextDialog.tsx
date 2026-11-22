@@ -68,7 +68,7 @@ export function SingleLineTextDialog() {
 
   return (
     <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) close(); }} role="dialog" aria-modal="true" aria-labelledby="single-line-title">
-      <div className="bg-panel border border-border rounded-lg w-[360px] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[360px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h2 id="single-line-title" className="dialog-title flex items-center gap-2"><Type size={14} aria-hidden="true" /> {t('Single-line Text')}</h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>

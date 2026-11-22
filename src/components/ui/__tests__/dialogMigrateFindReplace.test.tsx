@@ -81,7 +81,7 @@ function press(el: Element, key: string): boolean {
 
 const FROZEN_PANEL_INITIAL =
   '<div class="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="findreplace-title">'
-  + '<div class="bg-panel border border-border rounded-lg w-[340px] p-4 shadow-2xl">'
+  + '<div class="bg-panel border border-border rounded-lg w-[340px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">'
   + '<div class="flex items-center justify-between mb-3">'
   + '<h2 id="findreplace-title" class="dialog-title flex items-center gap-2">'
   + '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search" aria-hidden="true"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg> Find &amp; Replace</h2>'

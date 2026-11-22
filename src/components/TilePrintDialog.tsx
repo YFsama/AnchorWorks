@@ -332,14 +332,16 @@ export function TilePrintDialog() {
       aria-modal="true"
       aria-labelledby="tile-print-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[640px] max-w-[95%] p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel border border-border rounded-lg w-[640px] max-w-[95%] p-4 shadow-2xl max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <h2 id="tile-print-title" className="dialog-title">{t('Tile Print…')}</h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
-        <div className="flex gap-4">
-          <div className="w-[280px] shrink-0">
+        {/* Left column scrolls; the preview column keeps its own sizing
+            (svg min-height) — short-window layout, header/footer pinned. */}
+        <div className="flex gap-4 flex-1 min-h-0">
+          <div className="w-[280px] shrink-0 min-h-0 overflow-y-auto">
             <Field label={t('Page size')}>
               <div className="space-y-1">
                 <div className="input-num flex items-center gap-1.5 px-2 py-1 focus-within:border-accent2">
@@ -736,7 +738,7 @@ export function TilePrintDialog() {
           </div>
         </div>
 
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-2 shrink-0">
           <div
             className="rounded border border-accent2/40 bg-accent2/10 px-3 py-2 text-[11px] text-ink"
             role="status"

@@ -61,7 +61,7 @@ export function SimplifyDialog() {
       aria-modal="true"
       aria-labelledby="simplify-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[320px] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[320px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h2 id="simplify-title" className="dialog-title flex items-center gap-2">
             <Spline size={14} aria-hidden="true" /> {t('Simplify Path')}

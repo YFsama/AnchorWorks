@@ -396,8 +396,8 @@ export function CutContourDialog() {
       aria-modal="true"
       aria-labelledby="cut-dialog-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[920px] max-w-[96%] shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2">
+      <div className="bg-panel border border-border rounded-lg w-[920px] max-w-[96%] shadow-2xl overflow-hidden max-h-[calc(100vh-4rem)] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2 shrink-0">
           <h2 id="cut-dialog-title" className="dialog-title flex items-center gap-2">
             <Scissors size={14} aria-hidden="true" className="text-[#ff2e9a]" />
             {t('Cut Contour')}
@@ -410,7 +410,7 @@ export function CutContourDialog() {
         {/* Tab strip — three operations sharing the same dialog. Reads
             and feels exactly like a mini-toolbar inside the dialog so
             switching modes doesn't navigate the user anywhere. */}
-        <div role="tablist" className="flex border-b border-border px-2 bg-panel2/40 text-xs" onKeyDown={handleTabListKeyDown} aria-label={t('Cut Contour modes')}>
+        <div role="tablist" className="flex border-b border-border px-2 bg-panel2/40 text-xs shrink-0" onKeyDown={handleTabListKeyDown} aria-label={t('Cut Contour modes')}>
           <TabButton id="contour" active={tab === 'contour'} onClick={() => setTab('contour')} icon={<Scissors size={12} aria-hidden="true" />} label={t('Outline')} />
           <TabButton id="trace" active={tab === 'trace'} onClick={() => setTab('trace')} icon={<ImageDown size={12} aria-hidden="true" />} label={t('Trace Bitmap')} />
           <TabButton id="regmark" active={tab === 'regmark'} onClick={() => setTab('regmark')} icon={<Crosshair size={12} aria-hidden="true" />} label={t('Reg Marks')} />
@@ -429,7 +429,9 @@ export function CutContourDialog() {
           </button>
         </div>
 
-        <div className="px-4 py-4 text-xs">
+        {/* Scrollable body — panes + preview + status row scroll; the
+            output action row below stays pinned (short-window layout). */}
+        <div className="px-4 py-4 text-xs flex-1 min-h-0 overflow-y-auto">
           <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-4">
             <div>
               {tab === 'contour' && (
@@ -562,9 +564,11 @@ export function CutContourDialog() {
             )}
           </div>
 
-          {/* Footer — Cancel + Send-to-Plotter handoff. */}
+        </div>
+
+        {/* Footer — Cancel + Send-to-Plotter handoff. */}
           <div
-            className="flex items-center gap-2 mt-4"
+            className="flex items-center gap-2 px-4 pb-4 shrink-0"
             role="toolbar"
             aria-label={t('Cut Contour output actions')}
             aria-describedby="cut-contour-output-action-review-status"
@@ -602,7 +606,6 @@ export function CutContourDialog() {
               {t('Send to Plotter…')}
             </button>
           </div>
-        </div>
       </div>
     </div>
   );

@@ -115,8 +115,9 @@ export function FreeformGradientDialog() {
 
   return (
     <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50" onClick={(e) => { if (e.target === e.currentTarget) close(); }} role="dialog" aria-modal="true" aria-labelledby="freeform-gradient-title">
-      <div className="bg-panel border border-border rounded-lg w-[460px] p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3"><h2 id="freeform-gradient-title" className="dialog-title flex items-center gap-2"><Sparkles size={14} aria-hidden="true" /> {t('Freeform Gradient')}</h2><button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button></div>
+      <div className="bg-panel border border-border rounded-lg w-[460px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col p-4 shadow-2xl">
+        <div className="flex items-center justify-between mb-3 shrink-0"><h2 id="freeform-gradient-title" className="dialog-title flex items-center gap-2"><Sparkles size={14} aria-hidden="true" /> {t('Freeform Gradient')}</h2><button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button></div>
+        <div className="flex-1 min-h-0 overflow-y-auto">
         <p className="text-xs text-muted leading-relaxed mb-3">{t('Creates rasterized freeform and mesh-style gradients from color stops; they export reliably where SVG mesh gradients are unsupported.')}</p>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <label>
@@ -174,9 +175,10 @@ export function FreeformGradientDialog() {
           ))}
         </div>
         <button type="button" className="btn mt-2 flex items-center gap-1" onClick={() => setStops([...stops, { x: 0.5, y: 0.5, color: '#ffffff', radius: 0.5 }])}><Plus size={12} aria-hidden="true" /> {t('Add stop')}</button>
+        </div>
         <ReviewedFooter
           statusId="freeform-gradient-action-review-status"
-          className="flex justify-end gap-2 mt-3"
+          className="flex justify-end gap-2 mt-3 shrink-0"
           label={t('Freeform Gradient actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}

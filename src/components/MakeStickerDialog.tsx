@@ -203,14 +203,15 @@ export function MakeStickerDialog() {
       aria-modal="true"
       aria-labelledby="sticker-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[380px] p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel border border-border rounded-lg w-[380px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col p-4 shadow-2xl">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <h2 id="sticker-title" className="dialog-title flex items-center gap-2">
             <Sticker size={14} aria-hidden="true" /> {t('Make Sticker')}
           </h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <div className="field-label">{t('Border (mm)')}</div>
@@ -337,10 +338,11 @@ export function MakeStickerDialog() {
           {`${underlaySummary} ${borderMm.toFixed(1)} mm · ${t('round joins')} · ${cutSummary}`
             + (bleedMm > 0 ? ` · ${t('bleed')} ${bleedMm.toFixed(1)} mm` : '')}
         </div>
+        </div>
 
         <ReviewedFooter
           statusId="sticker-action-review-status"
-          className="flex justify-end gap-2 mt-4"
+          className="flex justify-end gap-2 mt-4 shrink-0"
           label={t('Make Sticker actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}

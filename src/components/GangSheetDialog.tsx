@@ -206,14 +206,15 @@ export function GangSheetDialog() {
       aria-modal="true"
       aria-labelledby="gangsheet-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[560px] max-h-[92vh] overflow-y-auto p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel border border-border rounded-lg w-[560px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col p-4 shadow-2xl">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <h2 id="gangsheet-title" className="dialog-title flex items-center gap-2">
             <Layers size={14} aria-hidden="true" /> {t('Gang Sheet Builder')}
           </h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Intake: drop zone + file picker (multi-select). */}
         <div
           className={`flex items-center justify-center gap-2 rounded border border-dashed px-3 py-3 text-[11px] transition-colors ${dragOver ? 'border-[#ff2e9a] bg-[#ff2e9a]/10 text-ink' : 'border-border text-muted'}`}
@@ -347,8 +348,9 @@ export function GangSheetDialog() {
             </div>
           )}
         </div>
+        </div>
 
-        <div className="flex justify-end gap-2 mt-4">
+        <div className="flex justify-end gap-2 mt-4 shrink-0">
           <button type="button" className="btn" onClick={close}>{t('Close')}</button>
           <button
             type="button" className="btn" onClick={() => { void exportPng(); }}

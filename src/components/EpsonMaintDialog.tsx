@@ -420,8 +420,8 @@ export default function EpsonMaintDialog() {
       aria-modal="true"
       aria-labelledby="epson-maint-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[560px] max-w-[96%] max-h-[92%] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2">
+      <div className="bg-panel border border-border rounded-lg w-[560px] max-w-[96%] max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2 shrink-0">
           <h2 id="epson-maint-title" className="dialog-title flex items-center gap-2">
             <Printer size={14} aria-hidden="true" className="text-[#ff2e9a]" />
             {t('Epson maintenance')}
@@ -431,7 +431,7 @@ export default function EpsonMaintDialog() {
           </button>
         </div>
 
-        <div className="px-4 py-3 text-xs">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 text-xs">
           {!native && (
             <div className="mb-2 rounded border border-warning/50 bg-warning/10 px-2 py-1.5 text-[10px] text-warning">
               {t('Epson maintenance needs the Windows desktop app (RAW spooler jobs).')}

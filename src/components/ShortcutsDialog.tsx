@@ -233,10 +233,10 @@ export function ShortcutsDialog() {
       aria-labelledby="shortcuts-dialog-title"
     >
       <div
-        className="w-[760px] max-w-[95vw] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden"
+        className="w-[760px] max-w-[95vw] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden max-h-[calc(100vh-4rem)] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-panel2 shrink-0">
           <h2 id="shortcuts-dialog-title" className="dialog-title">{t('Keyboard Shortcuts')}</h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}>
             <X size={14} aria-hidden="true" />
@@ -273,7 +273,7 @@ export function ShortcutsDialog() {
             />
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-2 border-b border-border bg-panel2/60">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-2 border-b border-border bg-panel2/60 shrink-0">
           <div className="input-num flex items-center gap-1.5 px-2 py-1 flex-1 min-w-0 focus-within:border-accent2">
             <Search size={12} className="text-muted shrink-0" aria-hidden="true" />
             <input
@@ -347,7 +347,7 @@ export function ShortcutsDialog() {
             : t('No shortcuts found.')}
         </div>
         <div
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 p-4 md:p-5 max-h-[70vh] overflow-y-auto"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 p-4 md:p-5 flex-1 min-h-0 overflow-y-auto"
           role="listbox"
           aria-label={t('Shortcut results')}
           aria-describedby="shortcut-review-status"
@@ -377,7 +377,7 @@ export function ShortcutsDialog() {
             </div>
           )}
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2 border-t border-border bg-panel2 text-[10px] text-muted">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-2 border-t border-border bg-panel2 text-[10px] text-muted shrink-0">
           <span className="text-center sm:text-left">
             {t('Press')} <kbd className="kbd-inline">?</kbd> {t('anytime to open this dialog.')}
           </span>

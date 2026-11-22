@@ -220,7 +220,10 @@ export function AIPanel({ onClose }: Props) {
   };
 
   return (
-    <div className="w-[380px] shrink-0 bg-panel border-l border-border flex flex-col text-xs">
+    // max-w shrinks the panel on medium windows (≤ 1200px) instead of
+    // stealing canvas width — mirrors the .aside-right 32vw cap in
+    // index.css. Full 380px from 1200px up.
+    <div className="w-[380px] max-w-[32vw] shrink-0 bg-panel border-l border-border flex flex-col text-xs">
       <div className="h-11 border-b border-border px-3 flex items-center justify-between">
         <h2 className="dialog-title flex items-center gap-2">
           <span className="relative inline-flex" aria-hidden="true">
@@ -614,7 +617,7 @@ function Modal({ children, title, onClose }: { children: React.ReactNode; title:
       aria-modal="true"
       aria-labelledby="ai-modal-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[360px] max-w-[90%] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[360px] max-w-[90%] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h2 id="ai-modal-title" className="dialog-title">{title}</h2>
           <button

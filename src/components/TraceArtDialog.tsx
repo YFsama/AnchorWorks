@@ -306,14 +306,15 @@ export function TraceArtDialog() {
       aria-modal="true"
       aria-labelledby="traceart-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[560px] max-h-[92vh] overflow-y-auto p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel border border-border rounded-lg w-[560px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col p-4 shadow-2xl">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <h2 id="traceart-title" className="dialog-title flex items-center gap-2">
             <Shapes size={14} aria-hidden="true" /> {t('Trace to Vector Art')}
           </h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
+        <div className="flex-1 min-h-0 overflow-y-auto">
         <p className="text-muted text-[11px] leading-relaxed mb-3">
           {t('Convert a bitmap into editable vector art — one filled path per colour, ready for clean outlines, layered vinyl and infinite scaling.')}
         </p>
@@ -440,8 +441,9 @@ export function TraceArtDialog() {
         {progress && (
           <p className="mt-2 text-[10px] text-[#ff2e9a] tabular-nums" aria-live="polite">{progress}</p>
         )}
+        </div>
 
-        <div className="flex justify-end gap-2 mt-4">
+        <div className="flex justify-end gap-2 mt-4 shrink-0">
           <button type="button" className="btn" onClick={close}>{t('Close')}</button>
           <button
             type="button" className="btn-primary flex items-center gap-1.5" onClick={() => { void runTrace(); }}

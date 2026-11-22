@@ -81,7 +81,7 @@ export function RecoveryDialog() {
       aria-labelledby="recovery-title"
       aria-describedby="recovery-body"
     >
-      <div className="bg-panel border border-border rounded-lg shadow-2xl w-[420px] p-5">
+      <div className="bg-panel border border-border rounded-lg shadow-2xl w-[420px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-y-auto p-5">
         <h2 id="recovery-title" className="dialog-title mb-2">{t('Recover unsaved work?')}</h2>
         <div id="recovery-body" className="text-muted text-xs mb-4">
           <div>{t('We found an auto-saved copy of your previous session from')} {when}</div>

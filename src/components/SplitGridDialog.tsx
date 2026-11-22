@@ -111,7 +111,7 @@ export function SplitGridDialog() {
       aria-modal="true"
       aria-labelledby="splitgrid-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[320px] p-4 shadow-2xl">
+      <div className="bg-panel border border-border rounded-lg w-[320px] max-w-[92vw] max-h-[calc(100vh-4rem)] overflow-y-auto p-4 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h2 id="splitgrid-title" className="dialog-title flex items-center gap-2">
             <Grid3x3 size={14} aria-hidden="true" /> {t('Split Into Grid')}

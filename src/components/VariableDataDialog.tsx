@@ -306,14 +306,17 @@ export function VariableDataDialog() {
       aria-modal="true"
       aria-labelledby="vardata-title"
     >
-      <div className="bg-panel border border-border rounded-lg w-[380px] p-4 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel border border-border rounded-lg w-[380px] max-w-[92vw] p-4 shadow-2xl max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between mb-3 shrink-0">
           <h2 id="vardata-title" className="dialog-title flex items-center gap-2">
             <Hash size={14} aria-hidden="true" /> {t('Variable Data')}
           </h2>
           <button onClick={close} className="btn-dialog-close" aria-label={t('Close')}><X size={14} aria-hidden="true" /></button>
         </div>
 
+        {/* Scrollable middle — header and footer stay pinned at short
+            window heights (PreferencesDialog / ErrorLogDialog layout). */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
         <p className="text-[10px] text-muted mb-2 leading-relaxed">
           {mode === 'csv'
             ? t('Bind CSV columns to named text objects (Rename Selection…). Use {{Column}} tokens in the text; a "#" run still substitutes.')
@@ -593,10 +596,11 @@ export function VariableDataDialog() {
           <GapField axis="X" value={gapX} linked={linkGaps} reviewedPreset={reviewedGapXPreset} onChange={(value) => setGapValue('X', value)} setReviewedPreset={setReviewedGapXPreset} />
           <GapField axis="Y" value={gapY} linked={linkGaps} reviewedPreset={reviewedGapYPreset} onChange={(value) => setGapValue('Y', value)} setReviewedPreset={setReviewedGapYPreset} />
         </div>
+        </div>
 
         <ReviewedFooter
           statusId="variable-data-action-review-status"
-          className="flex justify-end gap-2 mt-3"
+          className="flex justify-end gap-2 mt-3 shrink-0"
           label={t('Variable Data actions')}
           title={t('Use arrow keys to review dialog actions')}
           onKeyDown={handleFooterActionKeys}

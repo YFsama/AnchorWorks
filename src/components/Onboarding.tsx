@@ -147,7 +147,7 @@ export function Onboarding({ open, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs" onClick={close}>
       <div
-        className="w-[460px] max-w-[95vw] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden"
+        className="w-[460px] max-w-[95vw] bg-panel border border-border rounded-lg shadow-2xl overflow-hidden max-h-[calc(100vh-4rem)] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
