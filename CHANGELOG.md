@@ -4,7 +4,54 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.19.0] — 2026-11-24
+
+### Fixed — pre-release audit (2026-11, ahead of 0.19.0)
+- The release gates (ESLint had not been run during waves 3–5) plus
+  pointer-driven probes turned up four defects that are fixed here. Two of
+  them existed in every release so far; one was a regression that would have
+  shipped with the wave-3 changes.
+- **Recolor Artwork was unusable** (all releases ≤ 0.18.0). App.tsx mounts
+  dialogs conditionally, so every open is a fresh mount with the store flag
+  already true — and the codebase's "re-seed on open transition" idiom (a
+  `prevOpen` reconciliation during render) never fires on a first mount. The
+  colour harvest lived only in that block: the dialog opened with zero
+  colours — "No solid colors in the selection to recolor", Reset/Apply
+  disabled — for every selection. It had no tests, and the wave-4 harness had
+  pinned that broken state as a "negative contract". Same mechanism, smaller
+  effect: **Variable Data** never estimated its grid gaps from the selected
+  text and **Document Settings** always opened on Custom / Portrait
+  (disagreeing with Reset). All three now seed through `useState`
+  initializers. Guarded by unit tests that mount each dialog exactly like
+  App.tsx (flag set before the first render) and by a pixel-level Recolor e2e
+  (two coloured shapes → rows → Map to gray → Apply → one undo restores).
+  *Correction:* the wave-4 entry below used to claim Document Settings'
+  render-time seeding "froze the page intermittently" — that was never
+  established; the pattern is the standard idiom in sibling dialogs and
+  cannot livelock.
+- **Nested submenus could not be opened by mouse.** A flyout that hangs
+  outside a scrolling ancestor is clipped by it (`overflow-y: auto` clips
+  both axes even when nothing overflows): the panel still reported
+  "visible", but clicks on its rows landed on the canvas. Affected: the
+  menubar's top-level panel (clipping *every* nested submenu — introduced by
+  the wave-3b height cap, caught before release), the menubar's own nested
+  panels (depth 3+, in 0.18.0), and the context menu's root (all of its
+  submenus, in 0.18.0). Every flyout level is now `position: fixed`, placed
+  from its anchor's viewport rect and flipped/clamped at the window edges.
+  Existing e2e never noticed because Playwright scrolls clipped targets into
+  view before hovering; the new `menu-flyout.spec.ts` drives menus with real
+  pointer movement and hit-tests each flyout instead.
+- **The context menu closed on the first turn of the mouse wheel over it**
+  (in 0.18.0): its "close when the page scrolls" listener also caught the
+  menu's own box scrolling, leaving everything below its first screen
+  unreachable. Scrolls inside the menu no longer dismiss it.
+- **Below ~1310px wide, three menus and three toolbar buttons were
+  unreachable by mouse** — View / Insert / Help sat in the menubar strip's
+  horizontal scroll and the output toolbar was squeezed to 73px, with no
+  scroll affordance. The topbar now steps down for narrow windows (mark-only
+  logo below 1100px; icon-only toolbar, dot-only save state and tighter gaps
+  below 1400px): all nine menus and all seven right-hand controls are
+  reachable down to the 960px window minimum.
 
 ### Changed — topbar declutter + Plotter dialog tabs (2026-11 wave 5)
 - **Topbar right side: 24 controls → 7.** The Grid/Snap/Guides/Anchor
@@ -69,8 +116,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 - `tests/e2e/card-behavior.spec.ts` (three batches, ~90s): every dialog that
   previously only had open/close coverage now asserts a behavioral contract
   — initial focus (where the card defines one), footer inventory (incl.
-  negative disabled pins like Recolor's Reset/Apply before a mapping, Trace
-  Art's Trace/Insert without a bitmap, Plotter's Send before a connection),
+  negative disabled pins like Trace Art's Trace/Insert without a bitmap,
+  Plotter's Send before a connection),
   safe preset-chip interaction (aria-pressed flip + linked field value),
   Reset regression where present, Cancel/Escape closes, focus returns to the
   menu trigger, and the canvas object count is unchanged — plus zero new
@@ -78,11 +125,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
   contract (alertdialog role, Escape answers false without reload, danger
   defaults focus to Cancel, focus returns on both binding and menu paths).
   dialog-fit gained Zig Zag and Multi-outline entries.
-- Harness-driven src fixes: **DocSettings orientation seeding moved from a
-  render-time setState reconciliation to an open-edge effect** (the old
-  pattern froze the page intermittently under react-compiler and left
-  orientation inconsistent with Reset); **Error Log focuses the enabled
-  Close when the log is empty** (disabled Copy-all silently refused focus);
+- Harness-driven src fixes: **Error Log focuses the enabled Close when the
+  log is empty** (disabled Copy-all silently refused focus);
   **useFocusRestore now routes menu-row restores to the menu's trigger
   button** — the row is hidden the moment a dialog steals focus-within, and
   focusing it raced :hover recomputation into focus-drops-to-body in both

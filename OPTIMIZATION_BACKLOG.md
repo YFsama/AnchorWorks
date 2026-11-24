@@ -2,6 +2,18 @@
 
 Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js` 1,143 kB raw / 217 kB gzip; 141 eager sources totaling 2,112 kB of source text. A parallel session is mid-edit on `epson*/plotter*/src-tauri` — those files are measured but excluded from recommendations.
 
+**Status update (2026-11-24, pre-release audit before 0.19.0):**
+- **Process gap, fixed in practice:** ESLint is a stated release gate (see the 0.18.0 commit) but is NOT run in CI and had not been run during waves 3–5 — it was red with 4 errors (`react-hooks/set-state-in-effect` ×3, `react-hooks/globals` ×1), all from those waves. Run `npx eslint .` with the other gates; adding it to the CI `test` job is an open item.
+- **Verification gap, fixed in practice:** Playwright's `hover()`/`click()` scroll clipped targets into a scrollable ancestor's visible box, so every e2e that navigated nested menus passed while the flyouts were unclickable for a real mouse. Menu checks now use pointer coordinates + `elementFromPoint` (`tests/e2e/menu-flyout.spec.ts`, mutation-checked).
+- **Fixed (details in CHANGELOG › pre-release audit):** Recolor Artwork unusable since it shipped (harvest only in an open-transition block that never fires under App.tsx's conditional mount); Variable Data gap estimate + Document Settings preset/orientation seeding (same mechanism); nested flyouts clipped by their panels' `overflow-y-auto` (menubar top-level = wave-3b regression; menubar depth-3+ and the whole context menu = pre-existing) → every flyout level `position: fixed` via `src/components/ui/useFlyoutPosition.ts`; context menu closing on its own wheel scroll; topbar controls unreachable below ~1310px → stepped compact mode.
+- **Rule going forward:** any dialog mounted as `{showX && <Dialog/>}` must seed open-time state in `useState` initializers — a `prevOpen` reconciliation alone is dead code there. `src/components/__tests__/openSeed.productionMount.test.tsx` is the template (mount with the flag already set).
+- **OPEN after the audit:**
+  1. **Context menu is ~1800px tall** (43 direct rows + 20 submenus; visible box 540–810px). It now scrolls and every flyout works, but a context menu that needs scrolling is still poor UX — restructure to ≤ ~20 direct rows (group clipboard/z-order/etc. into submenus). In 0.18.0 everything below the first screen was unreachable.
+  2. **Diagonal pointer moves across cascading submenus** switch to the sibling row's flyout (pure CSS hover, no intent delay / safe-triangle) — pre-existing; users must move right into a flyout before moving down. Needs a hover-intent design + tests.
+  3. **ESLint in CI** (add `npm run lint` to the `test` job).
+  4. The one-off "page freeze" the wave-4 harness saw while toggling Document Settings orientation (3-worker load, never reproduced singly) remains unexplained — the seeding bug it was blamed on is now fixed; re-run that interaction under load.
+  5. v0.18.0 impact of the flyout/wheel defects is established by identical source structure, not by running a 0.18.0 build — worth a one-off confirmation on the tag.
+
 **Status update (2026-11-21, wave-5 topbar declutter + Plotter tabs):**
 - **Topbar right 24→7 DONE** — view toggles delegated to StatusBar/View menu; 16-button output strip → Plotter + Print + grouped More… dropdown (trigger = button + aria-haspopup; menuitem-in-toolbar fails aria-required-parent). print.spec entry path updated to the dropdown (same handshake, one extra hover).
 - **Plotter dialog 3-tab reorg DONE** — Machine / Cut settings / Output, ≤8 numeric inputs per tab (was 17 flat), pinned action footer on every tab, smart default tab by connection state, preflight rejection jumps to Output. Unit suites (450) + card-behavior/dialog-fit green with assertion strength preserved.
@@ -17,7 +29,7 @@ Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js`
   - `$$` full-table snapshots truncate to the first line on real links (query() returns at the first CR/LF); single-key fallbacks ($32/$130/$131) carry the decisions.
   - gcode jog re-queries travel limits per jog when the controller doesn't answer (fire-and-forget 2×900 ms).
   - Plotter/Epson still use native `window.confirm` in 3 spots alongside ConfirmHost (double-track confirm UX).
-- **Card deep-tests DONE** — card-behavior.spec (44 dialogs × focus/footer/preset/reset/cancel/focus-return/objects-unchanged contracts, 3 batches ~90 s), confirm-behavior.spec (4 tests incl. the menu path), dialog-fit +Zig Zag/Multi-outline. Harness surfaced and wave fixed three src defects: DocSettings render-time setState freeze (→ open-edge effect), ErrorLog empty-log focus no-op (→ Close fallback), and the menu-row focus-restore :hover race (→ shared `restoreDialogFocus`, menu rows resolve to their `aria-haspopup` trigger). Known residual:
+- **Card deep-tests DONE** — card-behavior.spec (44 dialogs × focus/footer/preset/reset/cancel/focus-return/objects-unchanged contracts, 3 batches ~90 s), confirm-behavior.spec (4 tests incl. the menu path), dialog-fit +Zig Zag/Multi-outline. Harness surfaced and the wave fixed two src defects: ErrorLog empty-log focus no-op (→ Close fallback), and the menu-row focus-restore :hover race (→ shared `restoreDialogFocus`, menu rows resolve to their `aria-haspopup` trigger). A third "fix" from that wave was wrong: Document Settings' seeding was moved to an open-edge effect and blamed for an unreproduced "render-time setState freeze" — the real defect was the conditional-mount seeding bug (see the 2026-11-24 audit), corrected there. Known residual:
   - **Reset semantics are three-headed** (Twist/Shear reset to 0 rather than the open value; SplitGrid/MarginGuides/TilePrint load a canonical preset rather than the open state) — a product decision to unify, not touched.
   - RecoveryDialog still has no UI-path test (mounts only from crash-recovery state; needs injection).
   - AIPanel with no API key auto-opens its Configuration modal on "Open AI Panel" — by design, pinned as-is.
@@ -39,7 +51,7 @@ Evidence-based audit (sourcemap build + code read). Baseline: entry `index-*.js`
   3. **`aria-valuemax` on the panel drag handle is static 560** while the effective ceiling is viewport-aware (`App.tsx` handle; SR users get a stale capability range on narrow windows).
   4. **Electron `loadWindowState` clamps a sub-960 restored width but not `x`** — a right-edge window restores 60px off-screen right (work-area intersection only rescues fully-offscreen).
   5. ~~**Dropdown panels lack max-height**~~ — **DONE in wave 3b** (`max-h-[calc(100vh-6rem)] overflow-y-auto`, guarded by dialog-fit.spec).
-  6. **First-open dropdown plays a ~150ms slide-in** from the off-screen parking spot (`transition-all` + JS-set left/top; `transition-[opacity,visibility]` would silence it).
+  6. ~~**First-open dropdown plays a ~150ms slide-in** from the off-screen parking spot~~ — **DONE in the 2026-11-24 audit** (panels transition opacity/visibility only, via the fixed-flyout positioning).
   7. **AIPanel ≤900px** still renders inline-capped (`max-w-[32vw]`) rather than joining the mobile slide-over mechanism.
 
 **Status update (2026-10-31, dependency-refresh + tailwind v4 session):**
