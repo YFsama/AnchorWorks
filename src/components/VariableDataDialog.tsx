@@ -46,6 +46,15 @@ function selectedText() {
   return (o.type === 'i-text' || o.type === 'text' || o.type === 'textbox') ? o : null;
 }
 
+/** Grid gaps estimated from the selected text object's size — the seed for
+ *  the gap fields when the dialog opens; null without a single text object. */
+function selectionGapSeed(): { gapX: number; gapY: number } | null {
+  const o = selectedText();
+  if (!o) return null;
+  const r = o.getBoundingRect();
+  return estimateVariableDataGaps(r.width, r.height);
+}
+
 /**
  * Variable Data / serial numbering — duplicate a selected text object into a
  * grid where each copy carries the next number in a sequence or the next line
@@ -65,8 +74,16 @@ export function VariableDataDialog() {
   const [listText, setListText] = useState('');
   const [cols, setCols] = useState(5);
   const [fillOrder, setFillOrder] = useState<VariableDataFillOrder>('rows');
-  const [gapX, setGapX] = useState(40);
-  const [gapY, setGapY] = useState(20);
+  // Gap fields open on values estimated from the selected text. App.tsx
+  // mounts this dialog conditionally (`{showVariableData && …}`), so each
+  // open is a fresh mount with `open` already true — the initializers are
+  // the production path. The prevOpen reconciliation further down is the
+  // codebase's open-transition idiom and only does work if the mount ever
+  // becomes unconditional; on its own it never fired, and the fields always
+  // sat on the 40 / 20 defaults.
+  const [openGaps] = useState(() => (open ? selectionGapSeed() : null));
+  const [gapX, setGapX] = useState(openGaps?.gapX ?? 40);
+  const [gapY, setGapY] = useState(openGaps?.gapY ?? 20);
   const [linkGaps, setLinkGaps] = useState(false);
   // CSV data-merge state: pasted/loaded CSV text, header flag, and the
   // column → object-name binding rows.
@@ -81,15 +98,15 @@ export function VariableDataDialog() {
   const [reviewedListAction, setReviewedListAction] = useState('');
   const [reviewedFooterAction, setReviewedFooterAction] = useState('');
 
-  // Seed sensible grid gaps from the selected text's size, once per open.
+  // Re-seed sensible grid gaps from the selected text's size on every open
+  // TRANSITION (see the openGaps note above for why the initializers are
+  // what run under today's conditional mount).
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {
-      const o = selectedText();
-      if (o) {
-        const r = o.getBoundingRect();
-        const gaps = estimateVariableDataGaps(r.width, r.height);
+      const gaps = selectionGapSeed();
+      if (gaps) {
         setGapX(gaps.gapX);
         setGapY(gaps.gapY);
       }

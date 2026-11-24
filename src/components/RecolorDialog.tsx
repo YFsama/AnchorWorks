@@ -28,13 +28,20 @@ export function RecolorDialog() {
   const open = useEditor(s => s.showRecolor);
   const close = useCallback(() => useEditor.getState().setModal('showRecolor', false), []);
 
-  // Re-harvest source colours once per open transition (React's "adjust state
-  // on prop change" pattern — no effect).
-  const [prevOpen, setPrevOpen] = useState(open);
-  const [sources, setSources] = useState<string[]>([]);
-  const [targets, setTargets] = useState<Record<string, string>>({});
+  // Harvest the selection's colours when the dialog opens. App.tsx mounts
+  // this dialog conditionally (`{showRecolor && …}`), so every open is a
+  // fresh mount with `open` already true — the state initializers are what
+  // run in production. The prevOpen reconciliation further down is the
+  // codebase's open-transition idiom (PreferencesDialog, ShortcutsDialog)
+  // and only does work if the mount ever becomes unconditional: on its own
+  // it never fired here, and the dialog opened with zero sources — "No
+  // solid colors in the selection to recolor" for every selection.
+  const [harvested] = useState<string[]>(() => (open ? collectSelectionColors() : []));
+  const [sources, setSources] = useState<string[]>(harvested);
+  const [targets, setTargets] = useState<Record<string, string>>(() => Object.fromEntries(harvested.map(c => [c, c])));
   const [reviewedPalettePreset, setReviewedPalettePreset] = useReviewedAction();
   const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
+  const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
     if (open) {

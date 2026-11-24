@@ -20,11 +20,21 @@ import { useResizableWidth } from '../useResizableWidth';
 
 const KEY = 'test.aside.width';
 
-let api: ReturnType<typeof useResizableWidth> | null = null;
+type Api = ReturnType<typeof useResizableWidth>;
+let captured: Api | null = null;
+/** Module-level capture: the probe must not assign an outer variable during
+ *  render itself (react-hooks/globals) — the write happens in here instead. */
+function capture(api: Api): void {
+  captured = api;
+}
 function Probe() {
   // Same shape as the right properties panel in App.tsx.
-  api = useResizableWidth({ storageKey: KEY, edge: 'left', min: 240, max: 560, initial: 288 });
+  capture(useResizableWidth({ storageKey: KEY, edge: 'left', min: 240, max: 560, initial: 288 }));
   return null;
+}
+function api(): Api {
+  if (!captured) throw new Error('Probe is not mounted');
+  return captured;
 }
 
 function setViewport(px: number) {
@@ -42,7 +52,7 @@ async function mount(): Promise<{ root: Root; host: HTMLDivElement }> {
 async function unmount({ root, host }: { root: Root; host: HTMLDivElement }) {
   await act(async () => { root.unmount(); });
   host.remove();
-  api = null;
+  captured = null;
 }
 
 /** Let the stubbed rAF callbacks (throttled drag reflow, resize fallback) run. */
@@ -52,7 +62,7 @@ async function flushFrames() {
 
 /** Press the drag handle at `startX`, move to each x in `moves`, release. */
 async function drag(startX: number, ...moves: number[]) {
-  await act(async () => { api!.onMouseDown({ button: 0, clientX: startX, preventDefault() {} } as React.MouseEvent); });
+  await act(async () => { api().onMouseDown({ button: 0, clientX: startX, preventDefault() {} } as React.MouseEvent); });
   for (const x of moves) {
     await act(async () => { window.dispatchEvent(new MouseEvent('mousemove', { clientX: x })); });
   }
@@ -74,14 +84,14 @@ describe('useResizableWidth', () => {
     localStorage.setItem(KEY, '560'); // chosen on a 1920 display
     setViewport(1024); // ceiling: min(560, 1024−720, 320, 32vw≈328) = 304
     const ctx = await mount();
-    expect(api!.width).toBe(304);
+    expect(api().width).toBe(304);
     await unmount(ctx);
   });
 
   it('degrades to min (never 0/negative) when the window is narrower than min + reserve', async () => {
     setViewport(800); // everything spareable: 80px — below min
     const ctx = await mount();
-    expect(api!.width).toBe(240);
+    expect(api().width).toBe(240);
     await unmount(ctx);
   });
 
@@ -90,7 +100,7 @@ describe('useResizableWidth', () => {
     const ctx = await mount();
     // edge 'left': dragging left (clientX decreasing) widens the panel.
     await drag(600, 100, 0, -500);
-    expect(api!.width).toBe(320); // min(560, 1100−720=380, 320, 0.32·1100=352)
+    expect(api().width).toBe(320); // min(560, 1100−720=380, 320, 0.32·1100=352)
     await unmount(ctx);
   });
 
@@ -98,7 +108,7 @@ describe('useResizableWidth', () => {
     setViewport(1440);
     const ctx = await mount();
     await drag(600, 360); // widen to 528 and persist on mouseup
-    expect(api!.width).toBe(528);
+    expect(api().width).toBe(528);
     expect(localStorage.getItem(KEY)).toBe('528');
     // Shrink the window: the live width falls to the new ceiling, but the
     // stored preference survives so the chosen width returns when the window
@@ -106,13 +116,13 @@ describe('useResizableWidth', () => {
     setViewport(1024);
     await act(async () => { window.dispatchEvent(new Event('resize')); });
     await flushFrames();
-    expect(api!.width).toBe(304); // min(560, 1024−720=304, 320, 32vw≈328)
+    expect(api().width).toBe(304); // min(560, 1024−720=304, 320, 32vw≈328)
     expect(localStorage.getItem(KEY)).toBe('528');
     // Growing back must NOT auto-restore: shrink-only by design.
     setViewport(1440);
     await act(async () => { window.dispatchEvent(new Event('resize')); });
     await flushFrames();
-    expect(api!.width).toBe(304);
+    expect(api().width).toBe(304);
     await unmount(ctx);
   });
 
@@ -120,9 +130,9 @@ describe('useResizableWidth', () => {
     localStorage.setItem(KEY, '560');
     setViewport(1024);
     const ctx = await mount();
-    expect(api!.width).toBe(304);
-    await act(async () => { api!.reset(); });
-    expect(api!.width).toBe(288); // initial, still under the 304 ceiling
+    expect(api().width).toBe(304);
+    await act(async () => { api().reset(); });
+    expect(api().width).toBe(288); // initial, still under the 304 ceiling
     await unmount(ctx);
   });
 });

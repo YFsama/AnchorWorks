@@ -140,9 +140,11 @@ export function PlotterDialog() {
   // it's what a cutter operator actually wants to verify), 'code' = the
   // raw G-code / HP-GL text for the machine.
   const [previewMode, setPreviewMode] = useState<PreviewMode>('outline');
-  // Active dialog section — see PLOTTER_TABS. Landing tab on open is set by
-  // the effect below (Machine when nothing is linked, Output when connected).
-  const [tab, setTab] = useState<PlotterTab>('machine');
+  // Active dialog section — see PLOTTER_TABS. The landing tab (Machine when
+  // nothing is linked, Output when connected) is decided when the dialog
+  // opens: by the initializer below under today's conditional mount, and by
+  // the open-transition reconciliation further down otherwise.
+  const [tab, setTab] = useState<PlotterTab>(() => (link.status === 'connected' ? 'output' : 'machine'));
   const [showPrint, setShowPrint] = useState(true);
   const [showOrder, setShowOrder] = useState(false);
   // Animated cut simulation replaying the optimized job order.
@@ -243,12 +245,18 @@ export function PlotterDialog() {
   // Open-time landing tab (2026-11 reorg): Machine while nothing is linked
   // (the operator's first job here is picking a profile and connecting), and
   // straight to Output once a link is already up (past setup — preview and
-  // Send are what they opened the dialog for). Re-evaluated on every open;
-  // the singleton link's status is read live at that moment.
-  useEffect(() => {
-    if (!open) return;
-    setTab(link.status === 'connected' ? 'output' : 'machine');
-  }, [open, link]);
+  // Send are what they opened the dialog for); the singleton link's status
+  // is read live at that moment. App.tsx mounts the dialog conditionally
+  // (`{showPlotter && …}`), so each open is a fresh mount and the tab's
+  // useState initializer above already lands correctly — this
+  // reconciliation is the codebase's open-transition idiom
+  // (PreferencesDialog et al.) for an always-mounted future. Not an effect:
+  // the set-state-in-effect rule forbids that form.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setTab(link.status === 'connected' ? 'output' : 'machine');
+  }
 
   // Apply a brand profile: dialect + serial knobs + force/speed starting
   // points. Every field stays manually overridable afterwards — a profile

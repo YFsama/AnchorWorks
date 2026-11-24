@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { resizeCanvas, setBackground, zoomFit } from '../lib/canvasEngine';
@@ -25,33 +25,39 @@ export function DocSettingsDialog() {
 
   // Preset selection is local UI state — the source of truth stays the px
   // width/height on `doc`. We seed the dropdown by reverse-matching the
-  // current size so re-opening the dialog reflects reality instead of
-  // snapping back to "Custom".
-  const [presetId, setPresetId] = useState<string>('custom');
-  const [landscape, setLandscape] = useState(false);
+  // current size so opening the dialog reflects reality instead of snapping
+  // back to "Custom" / Portrait.
+  const [initialDoc, setInitialDoc] = useState(() => ({ ...doc }));
+  const [openMatch] = useState(() => matchPreset(doc.width, doc.height, doc.dpi));
+  const [presetId, setPresetId] = useState<string>(() => openMatch?.id ?? 'custom');
+  const [landscape, setLandscape] = useState(() => openMatch?.landscape ?? doc.width > doc.height);
   const [presetSearch, setPresetSearch] = useState('');
   const [reviewedPresetSearchAction, setReviewedPresetSearchAction] = useReviewedAction();
   const [reviewedOrientation, setReviewedOrientation] = useReviewedAction();
   const [reviewedFooterAction, setReviewedFooterAction] = useReviewedAction();
   const presetSelectRef = useRef<HTMLSelectElement>(null);
-  const [initialDoc, setInitialDoc] = useState(() => ({ ...doc }));
 
-  // Re-seed the dropdown from the current size exactly once per open
-  // transition — an effect on the `open` edge only. Deliberately NOT
-  // dep-tracked on `doc`: applyPreset writes `doc` live while the dialog is
-  // open (orientation swaps, preset picks), and an effect that re-ran on
-  // doc changes would fight the user's edits. The previous render-time
-  // reconciliation (setState during render) froze the page intermittently
-  // under react-compiler; the effect commits one frame later, which is
-  // imperceptible next to that.
-  useEffect(() => {
-    if (!open) return;
-    setInitialDoc({ ...doc });
-    const m = matchPreset(doc.width, doc.height, doc.dpi);
-    setPresetId(m?.id ?? 'custom');
-    setLandscape(m?.landscape ?? doc.width > doc.height);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed on the open edge only; see comment above
-  }, [open]);
+  // Re-seed on every open TRANSITION as well. App.tsx mounts this dialog
+  // conditionally (`{showDocSettings && …}`), so in practice each open is a
+  // fresh mount and the useState initializers above do the seeding — a
+  // reconciliation-only seed never ran here (first mount already has
+  // `open === prevOpen`), which left the dialog on its Custom / Portrait
+  // defaults, disagreeing with Reset. The block below is the codebase's
+  // open-transition idiom (PreferencesDialog, RecolorDialog) so an
+  // always-mounted future keeps working: React's documented "adjust state
+  // when a prop changes" pattern, during render and without an effect (the
+  // set-state-in-effect rule forbids the effect form, and an effect keyed on
+  // `doc` would fight the user's live preset picks).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setInitialDoc({ ...doc });
+      const m = matchPreset(doc.width, doc.height, doc.dpi);
+      setPresetId(m?.id ?? 'custom');
+      setLandscape(m?.landscape ?? doc.width > doc.height);
+    }
+  }
 
   const normalizedPresetSearch = presetSearch.trim().toLowerCase();
   const filteredPresets = useMemo(() => {

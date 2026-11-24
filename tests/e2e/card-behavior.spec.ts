@@ -418,9 +418,24 @@ const BATCH2: CardCase[] = [
   },
   {
     id: 'Recolor Artwork', dialog: 'Recolor Artwork', via: { palette: 'Recolor Artwork…' },
-    // Probed reality on a plain rect selection: Reset and Apply start
-    // disabled (no swatch sources loaded) — pinned as the negative contract.
-    footer: { buttons: [{ name: 'Reset', disabled: true }, { name: 'Cancel' }, { name: 'Apply', disabled: true }], closeBy: 'Cancel' },
+    // The two selected rects carry the default fill + stroke, so the dialog
+    // opens with harvested sources and Reset/Apply ENABLED. This entry used
+    // to pin the opposite ("no swatch sources loaded") as a negative
+    // contract — that was a real defect, not a design: the harvest lived in
+    // an open-transition block that never fired under App.tsx's conditional
+    // mount. src/components/__tests__/openSeed.productionMount.test.tsx
+    // guards the mechanism; recolor.spec.ts drives the full apply flow.
+    footer: { buttons: [{ name: 'Reset' }, { name: 'Cancel' }, { name: 'Apply' }], closeBy: 'Cancel' },
+    custom: async (_page, dialog) => {
+      const failures: string[] = [];
+      try {
+        await expect(dialog.locator('input[type="color"]').first()).toBeVisible();
+        await expect(dialog).not.toContainText('No solid colors in the selection');
+      } catch (e) {
+        failures.push(`Recolor harvest: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
+      }
+      return failures;
+    },
   },
   {
     id: 'Split Into Grid', dialog: 'Split Into Grid', via: { palette: 'Split Into Grid…' },
