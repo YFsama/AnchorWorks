@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent } from 'react';
-import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Layers, X, Globe, Check, ChevronRight } from 'lucide-react';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type ReactNode } from 'react';
+import { Undo2, Redo2, Sparkles, Printer, Send, FileImage, Layers, X, Globe, Check, ChevronRight, Ellipsis } from 'lucide-react';
 import { useEditor } from '../store/editor';
 import { undo, redo, zoomBy, zoomFit, zoomToPoint, zoomToPercent, zoomToAllArtboards, zoomToActiveArtboard, zoomToAdjacentArtboard, zoomToSelection, getCanvas, duplicateSelection, deleteSelection, autoArrangeSelection, flipSelection, lockSelection, lockOthers, lockActiveArtboard, lockOtherArtboards, unlockSelection, unlockActiveArtboard, unlockOtherArtboards, unlockAll, hideSelection, hideOthers, hideActiveArtboard, hideOtherArtboards, showSelection, showActiveArtboard, showOtherArtboards, showAll, makeGuidesFromSelection, releaseGuides, selectAllObjects, fixAllCleanupObjects, fixStrayPointObjects, fixAllPrepressRisks, deselectAll, promptRenameSelection, selectSame, selectSameType, selectInverse, selectObjectInStack, fixEmptyTextObjects, fixMissingLinkedImageObjects, fixAllImagePreflightObjects, groupSelection, ungroupSelection, ungroupAll, bringForward, sendBackward, sendToBack, bringToFront, applyStyleToSelection, swapFillStroke, defaultColors, alignSelection, distributeSelection, distributeInArtboard, centerOnArtboard, setKeyObject } from '../lib/canvasEngine';
 import { joinSelection } from '../lib/pathJoin';
@@ -32,6 +32,7 @@ import { copySelection, cutSelection, pasteFromClipboard } from '../lib/clipboar
 import { resetOnboarding } from '../lib/onboarding';
 import { useT, useI18n, LANGUAGES, t as tStatic, type Lang } from '../lib/i18n';
 import { Logo } from './Logo';
+import { FLYOUT_PARKED, useFlyoutPosition } from './ui/useFlyoutPosition';
 import { showConfirm } from '../lib/confirm';
 import { isTauri, isMac, getOSLabel, platformInfo, ariaKeyshortcuts, type NativePlatformInfo } from '../lib/runtime';
 import { canInstall, subscribeInstallAvailability, promptInstall } from '../lib/pwaInstall';
@@ -288,7 +289,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
     // dropdowns below) with toolbar buttons, which axe's `aria-required-children`
     // rule rightly objects to — so `role="menubar"` is re-attached to the
     // focused dropdown cluster only, not on the outer banner.
-    <header className="topbar h-11 flex items-center px-3 gap-2 text-xs" aria-label={t('Application chrome')}>
+    <header className="topbar h-11 flex items-center px-2 min-[1400px]:px-3 gap-1 min-[1400px]:gap-2 text-xs" aria-label={t('Application chrome')}>
       <button
         type="button"
         onClick={() => setShowAbout(true)}
@@ -297,7 +298,11 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         // Embeds the visible wordmark (WCAG 2.5.3 Label in Name).
         aria-label={`${t('About')} Anchorworks`}
       >
-        <Logo size={20} variant="full" />
+        {/* Compact below 1320px (mark only, wordmark hidden) — part of the
+            narrow-topbar budget that keeps all nine menus reachable; see
+            the output-toolbar note further down. */}
+        <span className="min-[1100px]:hidden"><Logo size={20} variant="mark" /></span>
+        <span className="hidden min-[1100px]:inline-flex"><Logo size={20} variant="full" /></span>
       </button>
       <span className="topbar-sep" aria-hidden="true" />
 
@@ -1032,7 +1037,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           (index.css), and without min-w-0 here its automatic minimum
           would push 100% of the shrink onto the menus (measured: menu
           strip collapsed to 0px at 1440px). */}
-      <div className="ml-auto flex items-center gap-2 min-w-0">
+      <div className="ml-auto flex items-center gap-1 min-[1400px]:gap-2 min-w-0">
         <SaveIndicator />
         {/* Zoom indicator — click to edit %, Enter applies, Escape cancels, blur commits.
             Right-click / shift-click fits the page. */}
@@ -1040,7 +1045,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         <span className="topbar-sep" aria-hidden="true" />
         {/* Secondary — output actions. */}
         <div
-          className="output-actions-toolbar flex items-center gap-2"
+          className="output-actions-toolbar flex items-center gap-1 min-[1400px]:gap-2"
           role="toolbar"
           aria-label={t('Output actions')}
           title={t('Use arrow keys to review top bar actions')}
@@ -1049,12 +1054,28 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           {/* Wave-5 declutter: the old strip exposed 16 always-visible
               buttons and scrolled horizontally — now the two highest-traffic
               actions stay one-click and everything else folds into the
-              grouped "More…" dropdown below (all still ≤2 clicks away). */}
+              grouped "More…" dropdown below (all still ≤2 clicks away).
+
+              Narrow-window budget (so every topbar control stays reachable by
+              mouse down to the 960px shell minimum). With full labels the
+              nine menus + this cluster + the logo need ~1400px. Measured
+              before this was added: at 960–1100px wide (and again at ~1280
+              with labels restored) View / Insert / Help were pushed into the
+              menubar strip's horizontal scroll and this toolbar was squeezed
+              to 73px — three menus and three buttons could not be reached at
+              all, with no scroll affordance to hint at it. So, stepped:
+                < 1100px  logo shows the mark only (no wordmark)
+                < 1400px  toolbar labels hidden (icons + aria-label/title),
+                           save indicator is its status dot only, gaps are
+                           gap-1 instead of gap-2 everywhere in the bar
+                < 1000px  menu triggers tighten to px-1 (px-1.5 to 1399, px-2
+                           from 1400)
+              tests/e2e/menu-flyout.spec.ts asserts reachability at 960×600. */}
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Send to Plotter…')} (${getBinding('window.plotter')})`} aria-label={t('Send to Plotter…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('window.plotter'))} onClick={() => setModal('showPlotter', true)}>
-            <Send size={12} aria-hidden="true" />{t('Plotter')}
+            <Send size={12} aria-hidden="true" /><span className="hidden min-[1400px]:inline">{t('Plotter')}</span>
           </button>
           <button type="button" data-topbar-action className="btn flex items-center gap-1" title={`${t('Print…')} (${getBinding('file.print')})`} aria-label={t('Print…')} aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.print'))} onClick={() => setModal('showPrint', true)}>
-            <Printer size={12} aria-hidden="true" />{t('Print')}
+            <Printer size={12} aria-hidden="true" /><span className="hidden min-[1400px]:inline">{t('Print')}</span>
           </button>
           {/* role=group keeps the dropdown markup grouped for the roving
               toolbar semantics; the trigger itself renders as a plain
@@ -1062,6 +1083,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           <span role="group" className="inline-flex">
             <Dropdown
               label={t('More…')}
+              icon={<Ellipsis size={12} aria-hidden="true" />}
               width="w-64"
               triggerRole="button"
               triggerProps={{ 'data-topbar-action': true, className: 'btn flex items-center gap-1' }}
@@ -1088,7 +1110,7 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
           </span>
           {/* Primary — AI. */}
           <button type="button" data-topbar-action className="btn-primary flex items-center gap-1" title={t('AI Assistant')} aria-label={t('AI Assistant')} onClick={onToggleAI}>
-            <Sparkles size={12} aria-hidden="true" />{t('AI')}
+            <Sparkles size={12} aria-hidden="true" /><span className="hidden min-[1400px]:inline">{t('AI')}</span>
           </button>
         </div>
         <LanguageSwitcher />
@@ -1440,7 +1462,9 @@ function SaveIndicator() {
       aria-keyshortcuts={ariaKeyshortcuts(getBinding('file.saveProject'))}
     >
       <span className={`inline-block w-1.5 h-1.5 rounded-full transition-colors ${dotClass}`} aria-hidden="true" />
-      <span className="type-caption">{label}</span>
+      {/* Label hidden below 1320px (compact topbar): the dot still shows the
+          state and title / aria-label carry the full text. */}
+      <span className="type-caption hidden min-[1400px]:inline">{label}</span>
     </button>
   );
 }
@@ -1476,7 +1500,7 @@ interface MenuItem {
   /** Nested submenu — renders a flyout panel on hover/focus. */
   sub?: MenuItem[];
 }
-function Dropdown({ label, items, width, triggerProps, triggerRole }: { label: string; items: MenuItem[]; width?: string; triggerProps?: ButtonHTMLAttributes<HTMLButtonElement> & { 'data-topbar-action'?: boolean }; triggerRole?: 'menuitem' | 'button' }) {
+function Dropdown({ label, items, width, triggerProps, triggerRole, icon }: { label: string; items: MenuItem[]; width?: string; triggerProps?: ButtonHTMLAttributes<HTMLButtonElement> & { 'data-topbar-action'?: boolean }; triggerRole?: 'menuitem' | 'button'; icon?: ReactNode }) {
   // Pull className out so the spread below can't clobber the explicit prop.
   const { className: triggerClass, ...triggerRest } = triggerProps ?? {};
   // Track open state so aria-expanded reflects reality. The visual
@@ -1484,57 +1508,41 @@ function Dropdown({ label, items, width, triggerProps, triggerRole }: { label: s
   // state mirrors those triggers so screen readers know the menu state.
   const [open, setOpen] = useState(false);
   // The menubar strip scrolls horizontally when the window is narrow, and
-  // an overflow container clips absolutely-positioned descendants — which
-  // would cut off the flyout panel that hangs below the strip. So once
-  // open, the panel is pinned with `position: fixed` at the trigger's
-  // current viewport rect (measured here, not in CSS). DOM order — and
-  // with it the hover / focus-within containment that drives visibility —
-  // is unchanged; only the paint coordinates move. Until the measurement
-  // lands the panel parks off-screen so it never flashes at (0,0).
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [panelPos, setPanelPos] = useState<{ left: number; top: number } | null>(null);
-  useEffect(() => {
-    if (!open) {
-      setPanelPos(null);
-      return;
-    }
-    const measure = () => {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (rect) setPanelPos({ left: rect.left, top: rect.bottom + 4 });
-    };
+  // that overflow container would clip an absolutely-positioned panel — so
+  // the panel is `position: fixed` at the trigger's viewport rect. The
+  // panel's own height cap (overflow-y-auto) is exactly why every flyout
+  // below it is fixed as well: see useFlyoutPosition.
+  const { anchorRef, panelRef, pos, measure, clear } = useFlyoutPosition<HTMLButtonElement>('below', open);
+  // Measured from the event handlers (not an effect), in the same batch as
+  // the open flag — so the panel is placed before the first paint.
+  const openIt = () => {
+    setOpen(true);
     measure();
-    // `position: fixed` decouples the panel from the trigger's layout, so
-    // anything that moves the trigger while open must re-measure — window
-    // resize, and horizontal scrolling of the overflow-x-auto menubar strip
-    // (element scroll doesn't bubble; capture catches it). Without this the
-    // panel hangs at stale viewport coordinates, visually detached.
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, true);
-    return () => {
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, true);
-    };
-  }, [open]);
+  };
+  const close = () => {
+    setOpen(false);
+    clear();
+  };
   return (
     <div
       className="relative group"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
+      onMouseEnter={openIt}
+      onMouseLeave={close}
+      onFocus={openIt}
       onBlur={(e) => {
         // Only collapse when focus leaves the dropdown subtree entirely —
         // tabbing between menu items stays "open".
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) close();
       }}
     >
       <button
         type="button"
-        ref={triggerRef}
+        ref={anchorRef}
         // triggerProps lets toolbar callers restyle the trigger (.btn look)
         // and join roving sets (data-topbar-action) without forking the
         // hover/focus/fixed-panel logic; className, when passed, replaces the
         // menubar default so the caller owns the visuals.
-        className={triggerClass ?? 'px-2 py-1 rounded hover:bg-panel2 text-ink/90 hover:text-ink transition-colors'}
+        className={triggerClass ?? 'px-1 min-[1000px]:px-1.5 min-[1400px]:px-2 py-1 rounded hover:bg-panel2 text-ink/90 hover:text-ink transition-colors'}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -1545,15 +1553,73 @@ function Dropdown({ label, items, width, triggerProps, triggerRole }: { label: s
         role={triggerRole ?? 'menuitem'}
         {...triggerRest}
       >
-        {label}
+        {/* With an icon the trigger is compact below 1200px (icon only) and
+            shows the label from there up — see the output-toolbar note. */}
+        {icon}
+        {icon ? <span className="hidden min-[1400px]:inline">{label}</span> : label}
       </button>
       <div
-        className={`fixed bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all z-50 ${width ?? 'w-56'} py-1 max-h-[calc(100vh-6rem)] overflow-y-auto`}
-        style={panelPos ? { left: panelPos.left, top: panelPos.top } : { left: -9999, top: -9999 }}
+        ref={panelRef}
+        // transition-[opacity,visibility], not transition-all: left/top are
+        // set from JS, and `all` animated the panel in from its off-screen
+        // parking spot on every first open.
+        className={`fixed bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-[opacity,visibility] z-50 ${width ?? 'w-56'} py-1 max-h-[calc(100vh-6rem)] overflow-y-auto`}
+        style={pos ?? FLYOUT_PARKED}
         role="menu"
         aria-label={label}
       >
         {items.map((it, i) => <MenuRow key={i} it={it} />)}
+      </div>
+    </div>
+  );
+}
+
+/** A nested flyout: a row that reveals a panel flush with its right edge on
+ *  hover / focus. `position: fixed` at every nesting level — see
+ *  useFlyoutPosition for why an `absolute` flyout inside the panels'
+ *  scroll containers was unclickable. DOM order (flyout inside the row's
+ *  wrapper) keeps the hover / focus-within chain intact across levels. */
+function SubMenu({ label, items }: { label: string; items: MenuItem[] }) {
+  const [open, setOpen] = useState(false);
+  const { anchorRef, panelRef, pos, measure, clear } = useFlyoutPosition<HTMLButtonElement>('aside', open);
+  const openIt = () => {
+    setOpen(true);
+    measure();
+  };
+  const close = () => {
+    setOpen(false);
+    clear();
+  };
+  return (
+    <div
+      className="group/sub"
+      onMouseEnter={openIt}
+      onMouseLeave={close}
+      onFocus={openIt}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) close();
+      }}
+    >
+      <button
+        type="button"
+        ref={anchorRef}
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 gap-2 transition-colors"
+      >
+        <span className="flex items-center gap-1.5 flex-1 min-w-0 truncate">{label}</span>
+        <ChevronRight size={12} aria-hidden="true" className="shrink-0 text-muted" />
+      </button>
+      <div
+        ref={panelRef}
+        className="fixed bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-[opacity,visibility] z-50 w-56 py-1 max-h-[calc(100vh-4rem)] overflow-y-auto"
+        style={pos ?? FLYOUT_PARKED}
+        role="menu"
+        aria-label={label}
+      >
+        {items.map((s, j) => <MenuRow key={j} it={s} />)}
       </div>
     </div>
   );
@@ -1564,29 +1630,7 @@ function MenuRow({ it }: { it: MenuItem }) {
   if (it.sep) return <div className="my-1 border-t border-border" role="separator" />;
   if (it.node) return <div>{it.node}</div>;
 
-  if (it.sub) {
-    return (
-      <div className="relative group/sub">
-        <button
-          type="button"
-          role="menuitem"
-          aria-haspopup="menu"
-          aria-label={it.label}
-          className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 gap-2 transition-colors"
-        >
-          <span className="flex items-center gap-1.5 flex-1 min-w-0 truncate">{it.label}</span>
-          <ChevronRight size={12} aria-hidden="true" className="shrink-0 text-muted" />
-        </button>
-        <div
-          className="absolute left-full top-0 -mt-1 bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-all z-50 w-56 py-1 max-h-[70vh] overflow-y-auto"
-          role="menu"
-          aria-label={it.label}
-        >
-          {it.sub.map((s, j) => <MenuRow key={j} it={s} />)}
-        </div>
-      </div>
-    );
-  }
+  if (it.sub) return <SubMenu label={it.label ?? ''} items={it.sub} />;
 
   const isToggle = typeof it.checked === 'boolean';
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import * as fabric from 'fabric';
+import { FLYOUT_PARKED, useFlyoutPosition } from './ui/useFlyoutPosition';
 import {
   getCanvas, duplicateSelection, alignSelection, distributeSelection, groupSelection,
   ungroupSelection, bringForward, sendBackward, bringToFront, sendToBack, deleteSelection,
@@ -78,8 +79,8 @@ export function CanvasContextMenu(_props: Props) {
     return () => window.removeEventListener('vector:context-menu', onShow as EventListener);
   }, []);
 
-  // Close on Escape, scroll (page or any nested scroller), window blur, or
-  // any click outside the menu.
+  // Close on Escape, scroll of the page / panels / canvas underneath, window
+  // blur, or any click outside the menu.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -93,7 +94,16 @@ export function CanvasContextMenu(_props: Props) {
       if (el && el.contains(e.target as Node)) return;
       setOpen(false);
     };
-    const onScroll = () => setOpen(false);
+    // A scroll INSIDE the menu — its own height-capped box, or a flyout's —
+    // is the user reading this menu and must not dismiss it. The listener is
+    // captured on window, so without this check the first wheel notch over
+    // the menu scrolled its box and closed it in the same instant, leaving
+    // everything below the fold unreachable by mouse.
+    const onScroll = (e: Event) => {
+      const el = menuRef.current;
+      if (el && e.target instanceof Node && el.contains(e.target)) return;
+      setOpen(false);
+    };
     const onBlur = () => setOpen(false);
     window.addEventListener('keydown', onKey);
     // mousedown (not click) so we close before the original target processes
@@ -666,14 +676,42 @@ function Separator() {
 }
 
 /** A right-click menu row that reveals a nested flyout panel on hover/focus.
- *  `openLeft` flips the flyout to the left when the menu hugs the right edge. */
-function SubMenu({ label, openLeft, disabled, children }: { label: string; openLeft: boolean; disabled?: boolean; children: React.ReactNode }) {
+ *
+ *  The flyout is `position: fixed` at the row's viewport rect (see
+ *  useFlyoutPosition): this menu's root carries `overflow-y-auto` for its
+ *  height cap, and an `absolute` flyout hanging outside that box was clipped
+ *  — CSS called it visible, but its rows were not hit-testable, so no
+ *  submenu of this menu could be opened by mouse. Fixed at every nesting
+ *  level, no ancestor overflow can cut it off. Flipping to the row's left
+ *  near the right viewport edge happens at measure time, so the `openLeft`
+ *  hint callers pass is accepted for signature compatibility and unused. */
+function SubMenu({ label, disabled, children }: { label: string; openLeft?: boolean; disabled?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const { anchorRef, panelRef, pos, measure, clear } = useFlyoutPosition<HTMLButtonElement>('aside', open);
+  const openIt = () => {
+    setOpen(true);
+    measure();
+  };
+  const close = () => {
+    setOpen(false);
+    clear();
+  };
   return (
-    <div className="relative group/sub">
+    <div
+      className="group/sub"
+      onMouseEnter={openIt}
+      onMouseLeave={close}
+      onFocus={openIt}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) close();
+      }}
+    >
       <button
         type="button"
+        ref={anchorRef}
         role="menuitem"
         aria-haspopup="menu"
+        aria-expanded={open}
         aria-label={label}
         disabled={disabled}
         className="w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-panel3 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
@@ -683,7 +721,9 @@ function SubMenu({ label, openLeft, disabled, children }: { label: string; openL
       </button>
       {!disabled && (
         <div
-          className={`absolute top-0 -mt-1 ${openLeft ? 'right-full' : 'left-full'} bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-all z-1001 w-56 py-1 max-h-[70vh] overflow-y-auto overscroll-contain`}
+          ref={panelRef}
+          className="fixed bg-panel border border-border rounded-md shadow-xl opacity-0 invisible group-hover/sub:opacity-100 group-hover/sub:visible group-focus-within/sub:opacity-100 group-focus-within/sub:visible transition-[opacity,visibility] z-1001 w-56 py-1 max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain"
+          style={pos ?? FLYOUT_PARKED}
           role="menu"
           aria-label={label}
         >

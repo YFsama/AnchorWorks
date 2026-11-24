@@ -777,24 +777,26 @@ function LayersSkeleton() {
 
 /**
  * Skeleton for the lazy MenuBar — same root element and class string as the
- * real bar (<header class="topbar h-11 flex items-center px-3 gap-2 text-xs">)
- * so the swap at chunk-load reads as a recolour of the same strip, not a
- * layout shift: identical height (h-11 = 44px), gradient, and bottom border
- * come free from .topbar. Placeholder blocks approximate the left cluster
- * (logo + separator + the six dropdown labels) plus one trailing right-side
- * chip. Decorative only: aria-hidden, plain divs/spans — no banner landmark,
- * no buttons or inputs, so nothing joins the tab order or the accessibility
- * tree while the chunk streams in (same contract as PlotterChipSkeleton /
- * LayersSkeleton). Exported for the menubarLazy test, which pins the
- * same-shape contract against the real MenuBar's root classes.
+ * real bar (<header class="topbar h-11 flex items-center px-2 min-[1400px]:px-3
+ * gap-1 min-[1400px]:gap-2 text-xs">) so the swap at chunk-load reads as a
+ * recolour of the same strip, not a layout shift: identical height (h-11 =
+ * 44px), gradient, and bottom border come free from .topbar. Placeholder
+ * blocks approximate the left cluster (logo + separator + the nine menu
+ * labels) plus one trailing right-side chip, and follow the bar's narrow-window
+ * steps: the logo block is mark-width below 1100px (no wordmark there) and
+ * full width from 1100px up. Decorative only: aria-hidden, plain divs/spans —
+ * no banner landmark, no buttons or inputs, so nothing joins the tab order or
+ * the accessibility tree while the chunk streams in (same contract as
+ * PlotterChipSkeleton / LayersSkeleton). Exported for the menubarLazy test,
+ * which pins the same-shape contract against the real MenuBar's root classes.
  */
 export function MenuBarSkeleton() {
   return (
-    <header className="topbar h-11 flex items-center px-3 gap-2 text-xs" aria-hidden="true">
-      <div className="h-4 w-20 rounded bg-panel3 animate-pulse" />
+    <header className="topbar h-11 flex items-center px-2 min-[1400px]:px-3 gap-1 min-[1400px]:gap-2 text-xs" aria-hidden="true">
+      <div className="h-4 w-8 min-[1100px]:w-[112px] rounded bg-panel3 animate-pulse" />
       <span className="topbar-sep" />
-      <div className="flex items-center gap-2 animate-pulse">
-        {[22, 22, 30, 28, 54, 28].map((w, i) => (
+      <div className="flex items-center gap-1 min-[1400px]:gap-2 animate-pulse">
+        {[36, 36, 52, 44, 56, 76, 44, 48, 44].map((w, i) => (
           <div key={i} className="h-3 rounded bg-panel3" style={{ width: `${w}px` }} />
         ))}
       </div>

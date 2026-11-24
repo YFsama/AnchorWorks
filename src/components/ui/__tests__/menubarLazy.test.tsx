@@ -63,7 +63,7 @@ describe('MenuBar lazy mount (App.tsx Suspense contract)', () => {
     expect(skeleton).not.toBeNull();
     // Same chrome classes as the real MenuBar root — .topbar supplies the
     // identical gradient/border strip and h-11 the identical 44px height.
-    expect(skeleton!.className).toBe('topbar h-11 flex items-center px-3 gap-2 text-xs');
+    expect(skeleton!.className).toBe('topbar h-11 flex items-center px-2 min-[1400px]:px-3 gap-1 min-[1400px]:gap-2 text-xs');
     expect(skeleton!.className).toContain('h-11');
     // Decorative only: invisible to AT entirely.
     expect(skeleton!.getAttribute('aria-hidden')).toBe('true');
@@ -72,7 +72,7 @@ describe('MenuBar lazy mount (App.tsx Suspense contract)', () => {
     expect(
       skeleton!.querySelector('button, a, input, select, textarea, [role], [tabindex]'),
     ).toBeNull();
-    // Shape: logo block + separator + the six dropdown-label blocks + a
+    // Shape: logo block + separator + the nine menu-label blocks + a
     // trailing right-side chip (>= 6 muted placeholder blocks total).
     expect(skeleton!.querySelectorAll('.bg-panel3').length).toBeGreaterThanOrEqual(6);
   });
@@ -90,7 +90,7 @@ describe('MenuBar lazy mount (App.tsx Suspense contract)', () => {
     // (the dynamic import cannot resolve inside the synchronous act flush).
     const skeletonAtFirstPaint = container.querySelector('header[aria-hidden="true"]');
     expect(skeletonAtFirstPaint).not.toBeNull();
-    expect(skeletonAtFirstPaint!.className).toBe('topbar h-11 flex items-center px-3 gap-2 text-xs');
+    expect(skeletonAtFirstPaint!.className).toBe('topbar h-11 flex items-center px-2 min-[1400px]:px-3 gap-1 min-[1400px]:gap-2 text-xs');
     expect(container.querySelector('[role="menubar"]')).toBeNull();
 
     // Once the import resolves the real MenuBar takes over…
