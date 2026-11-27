@@ -34,13 +34,16 @@ export function ToastHost() {
         if (additions.length === 0) return prevLeaving;
         return [...prevLeaving, ...additions];
       });
-      // Schedule cleanup after exit animation.
-      const timeouts = removed.map(t =>
+      // Schedule cleanup after exit animation. Deliberately NOT cleared in an
+      // effect cleanup: this effect re-runs whenever `live` changes, so a new
+      // toast arriving within the 200ms window used to cancel the removal
+      // timers of the toasts that were already leaving — they stayed mounted
+      // forever as invisible, pointer-events:auto blocks over the UI.
+      for (const removedToast of removed) {
         window.setTimeout(() => {
-          setLeaving(prevLeaving => prevLeaving.filter(x => x.id !== t.id));
-        }, 200),
-      );
-      return () => { for (const h of timeouts) window.clearTimeout(h); };
+          setLeaving(prevLeaving => prevLeaving.filter(x => x.id !== removedToast.id));
+        }, 200);
+      }
     }
   }, [live]);
 

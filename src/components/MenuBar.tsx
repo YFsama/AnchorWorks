@@ -36,7 +36,7 @@ import { FLYOUT_PARKED, useFlyoutPosition } from './ui/useFlyoutPosition';
 import { showConfirm } from '../lib/confirm';
 import { isTauri, isMac, getOSLabel, platformInfo, ariaKeyshortcuts, type NativePlatformInfo } from '../lib/runtime';
 import { canInstall, subscribeInstallAvailability, promptInstall } from '../lib/pwaInstall';
-import { getAutoSaveStatus, subscribeAutoSaveStatus, type AutoSaveStatus } from '../lib/autosave';
+import { discardSessionAndReload, getAutoSaveStatus, hasAutoSaveEntry, restoreLastSession, subscribeAutoSaveStatus, type AutoSaveStatus } from '../lib/autosave';
 import { setOutlineMode } from '../lib/outlineView';
 import type { RecentFile } from '../lib/recentFiles';
 import { envelopeSelection } from '../lib/envelope';
@@ -118,6 +118,11 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
   // and Electron sessions never fire the event — the entry never shows.
   const [installable, setInstallable] = useState(canInstall());
   useEffect(() => subscribeInstallAvailability(() => setInstallable(canInstall())), []);
+  // File ▸ Restore Last Session… renders only while an autosave entry exists.
+  // The autosave status feed re-emits on every write and every clear, so it
+  // doubles as the change signal; the existence check is a bare key lookup.
+  const [hasLastSession, setHasLastSession] = useState(() => hasAutoSaveEntry());
+  useEffect(() => subscribeAutoSaveStatus(() => setHasLastSession(hasAutoSaveEntry())), []);
   const setModal = useEditor(s => s.setModal);
   const zoom = useEditor(s => s.zoom);
   const canUndo = useEditor(s => s.canUndo);
@@ -320,8 +325,13 @@ export function MenuBar({ onToggleAI, onToggleDebug, onShowOnboarding }: Props) 
         { label: t('Save Project'), onClick: async () => { void (await import('../lib/projectFile')).saveProjectQuick(); }, kbd: getBinding('file.saveProject') },
         { label: t('Save Project As…'), onClick: async () => { void (await import('../lib/projectFile')).saveProjectToFile(); }, kbd: getBinding('file.saveProjectAs') },
         { label: t('Open Project…'), onClick: async () => { void (await import('../lib/projectFile')).openProjectFromFile(); }, kbd: getBinding('file.openProject') },
+        // Manual route back to the last session — always available while an
+        // autosave entry exists, including after the quiet prompt is ignored.
+        ...(hasLastSession ? [{ label: t('Restore Last Session…'), onClick: () => { void restoreLastSession(); } }] : []),
         { sep: true },
-        { label: t('New'), onClick: async () => { if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) location.reload(); }, kbd: getBinding('file.new') },
+        // discardSessionAndReload(): clears the autosave entry before the
+        // reload, otherwise the new document is greeted by a restore prompt.
+        { label: t('New'), onClick: async () => { if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) discardSessionAndReload(); }, kbd: getBinding('file.new') },
         { label: t('New from Template…'), onClick: () => setModal('showTemplates', true), kbd: getBinding('file.newFromTemplate') },
         { label: t('Open SVG / JSON…'), onClick: () => fileRef.current?.click(), kbd: getBinding('file.open') },
         { label: t('Import'), sub: [

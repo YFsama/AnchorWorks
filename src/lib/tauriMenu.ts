@@ -22,6 +22,9 @@ import { isTauri, callNative } from './runtime';
 import {
   zoomBy, zoomFit, undo, redo, duplicateSelection, groupSelection, ungroupSelection, getCanvas,
 } from './canvasEngine';
+import { discardSessionAndReload } from './autosave';
+import { showConfirm } from './confirm';
+import { t } from './i18n';
 import * as fabric from 'fabric';
 import { isOutlineMode, setOutlineMode } from './outlineView';
 import { getFormat } from './formats';
@@ -41,7 +44,14 @@ const HANDLERS: Record<string, Handler> = {
   'file.save': () => { void import('./projectFile').then(m => m.saveProjectQuick()); },
   'file.saveAs': () => { void import('./projectFile').then(m => m.saveProjectToFile()); },
   'file.open': () => { void import('./projectFile').then(m => m.openProjectFromFile()); },
-  'file.new': () => { location.reload(); },
+  'file.new': async () => {
+    // Same guard as the DOM menu's File ▸ New — confirm first (a bare
+    // location.reload() used to discard the canvas with no prompt), then drop
+    // the recoverable session before the reload so the new document is not
+    // greeted by a restore prompt for the one just thrown away.
+    const ok = await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true });
+    if (ok) discardSessionAndReload();
+  },
   'file.newFromTemplate': () => useEditor.getState().setModal('showTemplates', true),
   'file.importImage': () => {
     // Tauri side will land an OS file picker in a later T1 slice; for now

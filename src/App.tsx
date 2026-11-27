@@ -132,7 +132,11 @@ registerBuiltInTools();
 import { logger } from './lib/debug';
 import * as fabric from 'fabric';
 import { getCanvas, pushHistory } from './lib/canvasEngine';
-import { startAutoSave, stopAutoSave, subscribeAutoSaveStatus } from './lib/autosave';
+import {
+  beginSession, discardSessionAndReload, installSessionExitTracking, isCanvasEmpty, probeInstanceLiveness,
+  resolveSessionOffer, showQuietSessionOffer,
+  startAutoSave, stopAutoSave, subscribeAutoSaveStatus, type AutoSaveEntry,
+} from './lib/autosave';
 import { ToastHost } from './components/ToastHost';
 import { TooltipHost } from './components/TooltipHost';
 import { ConfirmHost } from './components/ConfirmHost';
@@ -852,8 +856,9 @@ export default function App() {
   const [showAI, setShowAI] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !hasOnboarded());
-  // Delay-mount RecoveryDialog so its chunk loads lazily after first paint.
-  const [recoveryMounted, setRecoveryMounted] = useState(false);
+  // Crash-recovery modal: the autosave entry being offered (null = closed).
+  // Its chunk only loads when a crash really left unsaved work behind.
+  const [recoveryEntry, setRecoveryEntry] = useState<AutoSaveEntry | null>(null);
   // LayersPanel mounts one beat after boot — first canvas paint stays
   // unblocked while the panel + layerOps chunk streams in behind a skeleton.
   const [layersMounted, setLayersMounted] = useState(false);
@@ -1074,7 +1079,7 @@ export default function App() {
       if (match('file.new')) {
         e.preventDefault();
         void showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true }).then(ok => {
-          if (ok) location.reload();
+          if (ok) discardSessionAndReload();
         });
         announce(t('New'));
         return;
@@ -1363,7 +1368,11 @@ export default function App() {
       // can't be expressed as a single rebindable combo. Text tracking/leading
       // Alt+arrows live above as rebindable Type shortcuts.
       const arrowMap: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-      if (arrowMap[e.key]) {
+      // `defaultPrevented`: roving toolbars, menus and listboxes handle the
+      // arrow keys themselves and call preventDefault(). This window-level
+      // handler runs after them, and without the check it nudged the selected
+      // objects by 1px on every arrow press made anywhere in the UI.
+      if (arrowMap[e.key] && !e.defaultPrevented) {
         e.preventDefault();
         const [dx, dy] = arrowMap[e.key];
         const inc = getKeyboardIncrement(); const step = e.shiftKey ? inc * 10 : inc; nudgeSelection(dx * step, dy * step); return;
@@ -1429,6 +1438,16 @@ export default function App() {
     return () => stopAutoSave();
   }, []);
 
+  // Session exit mark. Boot arms `vector.sessionExit` as "not clean"; every
+  // normal-exit path (page unload, Tauri window-close request) clears it.
+  // Only a mark that was never cleared turns unsaved work into the blocking
+  // recovery modal — that is what tells a crash from an ordinary close.
+  // Both calls are idempotent, so the StrictMode double-invoke is a no-op.
+  useEffect(() => {
+    beginSession();
+    return installSessionExitTracking();
+  }, []);
+
   // Sync document.title with autosave dirty state + open project name.
   // VSCode-style "●" prefix when there are unsaved changes; project name
   // (when one is open) is prepended so users browsing tabs / window list
@@ -1469,15 +1488,29 @@ export default function App() {
     };
   }, []);
 
-  // Defer mounting the RecoveryDialog so its chunk is fetched after the
-  // initial paint completes — keeps the critical render path lean.
+  // Session-restore decision, once per page load, after the canvas has had a
+  // chance to initialise (same beat the old dialog used to mount at):
+  //   modal — the last session crashed with unsaved work (RecoveryDialog),
+  //   quiet — it closed normally with unsaved work (non-blocking toast),
+  //   none  — nothing to offer (an empty leftover entry is dropped).
   useEffect(() => {
-    const id = window.setTimeout(() => setRecoveryMounted(true), 250);
-    return () => window.clearTimeout(id);
+    let cancelled = false;
+    const id = window.setTimeout(() => {
+      // Liveness probe first (a second tab / window must not read the first
+      // one's armed exit mark as a crash); it resolves in a microtask or two
+      // and never rejects.
+      void probeInstanceLiveness().then(() => {
+        if (cancelled) return;
+        const { offer, entry } = resolveSessionOffer(isCanvasEmpty());
+        if (offer === 'modal' && entry) setRecoveryEntry(entry);
+        else if (offer === 'quiet' && entry) showQuietSessionOffer(entry);
+      });
+    }, 550);
+    return () => { cancelled = true; window.clearTimeout(id); };
   }, []);
 
-  // LayersPanel mounts after RecoveryDialog — visible chrome, but one beat
-  // later than first paint so canvas boot never waits on the panel chunk.
+  // LayersPanel mounts one beat after boot — visible chrome, but later than
+  // first paint so canvas boot never waits on the panel chunk.
   useEffect(() => {
     const id = window.setTimeout(() => setLayersMounted(true), 400);
     return () => window.clearTimeout(id);
@@ -1854,9 +1887,9 @@ export default function App() {
           <KeymapEditor />
         </Suspense>
       )}
-      {recoveryMounted && (
+      {recoveryEntry && (
         <Suspense fallback={null}>
-          <RecoveryDialog />
+          <RecoveryDialog entry={recoveryEntry} onDone={() => setRecoveryEntry(null)} />
         </Suspense>
       )}
       <Suspense fallback={null}>
@@ -1878,7 +1911,7 @@ export default function App() {
       <LazyCanvasContextMenu
         onNewDocument={async () => {
           if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) {
-            location.reload();
+            discardSessionAndReload();
           }
         }}
         onOpenFile={() => paletteOpenRef.current?.click()}
@@ -1893,7 +1926,7 @@ export default function App() {
             onShowOnboarding={() => setShowOnboarding(true)}
             onNewDocument={async () => {
               if (await showConfirm({ title: t('New document'), message: t('Clear canvas?'), confirmLabel: t('Clear'), danger: true })) {
-                location.reload();
+                discardSessionAndReload();
               }
             }}
             onOpenFile={() => paletteOpenRef.current?.click()}

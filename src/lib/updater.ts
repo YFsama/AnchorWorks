@@ -22,6 +22,7 @@
 
 import { toast } from './toast';
 import { isTauri, isElectron } from './runtime';
+import { markSessionExit } from './autosave';
 import { t } from './i18n';
 
 /** Version string the user dismissed with "Skip this version". Cleared
@@ -234,10 +235,17 @@ async function runInstall(info: UpdateInfo): Promise<void> {
 }
 
 async function relaunch(): Promise<void> {
+  // relaunch() restarts the process without a page unload or a window-close
+  // request, so nothing else would clear the session exit mark — the restart
+  // would read as a crash on the next launch.
+  markSessionExit(true);
   try {
     const mod = await import('@tauri-apps/plugin-process');
     await mod.relaunch();
   } catch (err) {
+    // The relaunch failed and this session is still running: re-arm the mark
+    // so a later real crash is still recognised.
+    markSessionExit(false);
     toast.error((err as Error).message, { title: t('Restart failed') });
   }
 }
