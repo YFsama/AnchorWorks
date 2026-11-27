@@ -359,9 +359,14 @@ test('every context-menu submenu is clickable by mouse, and Pathfinder ▸ Union
   await page.waitForTimeout(450);
   const failures = await crawlFlyouts(page, CONTEXT_ROOT, 'context menu');
   expect(failures, failures.join('\n')).toEqual([]);
-  // The root is far taller than the viewport (its content runs to ~1800px): the
-  // crawl above only passed because wheel-scrolling the menu's own box keeps
-  // it open — it used to close on the first wheel notch over it.
+  // A wheel notch over the menu's own box must not dismiss it. It used to close
+  // on the first notch — fatal while the root ran to ~1800px (everything below
+  // the fold was unreachable by mouse), and still the right behaviour for the
+  // short windows where the regrouped 22-line root does need to scroll.
+  const beforeWheel = await rootAndRows(page, CONTEXT_ROOT);
+  await page.mouse.move(beforeWheel!.root.x + 6, beforeWheel!.root.y + beforeWheel!.root.h / 2);
+  await page.mouse.wheel(0, 120);
+  await page.waitForTimeout(200);
   const scrolledRoot = await rootAndRows(page, CONTEXT_ROOT);
   expect(scrolledRoot, 'the context menu is still open after wheel-scrolling it').not.toBeNull();
 
@@ -404,7 +409,8 @@ test('a context-menu flyout flips to the left instead of leaving the viewport ne
   expect(rows, 'context menu opened').not.toBeNull();
   const align = rows!.rows.findIndex((r) => r.label === 'Align & Distribute');
   expect(align).toBeGreaterThanOrEqual(0);
-  // The row sits below the root's visible box at this height — scroll the menu to it.
+  // The row is in view already (the regrouped root is 22 lines), so this wheel
+  // step is a no-op here — it still covers any layout that needs it.
   const inView = await wheelRowIntoView(page, CONTEXT_ROOT, align);
   expect(inView, 'Align & Distribute row scrolled into view').not.toBeNull();
   const fly = await flyoutOfRow(page, CONTEXT_ROOT, align);

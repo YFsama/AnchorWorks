@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import * as fabric from 'fabric';
 import { FLYOUT_PARKED, useFlyoutPosition } from './ui/useFlyoutPosition';
@@ -61,6 +61,9 @@ export function CanvasContextMenu(_props: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<Pos>({ x: 0, y: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
+  // Wraps the rows so a ResizeObserver can see the CONTENT change height (the
+  // root box itself stops growing once its height cap is reached).
+  const contentRef = useRef<HTMLDivElement>(null);
   // We subscribe to selection state so disabled items refresh whenever the
   // canvas selection changes (mostly relevant after a copy/cut completed).
   const selectionIds = useEditor((s) => s.selectionIds);
@@ -144,6 +147,29 @@ export function CanvasContextMenu(_props: Props) {
     }
     setAdjustedPos({ x, y });
   }, [open, pos, selectionIds, clipboardTick]);
+
+  // Scroll hints for the root height cap — the fallback for content that really
+  // is taller than the viewport. A native scrollbar is not a reliable "there is
+  // more" cue: overlay scrollbars (macOS, embedded webviews) stay invisible until
+  // the user scrolls. So each edge that can still be scrolled to gets a fade.
+  const [edges, setEdges] = useState({ up: false, down: false });
+  const syncEdges = useCallback(() => {
+    const el = menuRef.current;
+    if (!el) return;
+    const next = { up: el.scrollTop > 0, down: el.scrollTop + el.clientHeight < el.scrollHeight - 1 };
+    setEdges((prev) => (prev.up === next.up && prev.down === next.down ? prev : next));
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    const rootEl = menuRef.current;
+    const content = contentRef.current;
+    // Without ResizeObserver (jsdom, very old webviews) the hints still follow scroll.
+    if (!rootEl || !content || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(syncEdges);
+    observer.observe(rootEl);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [open, syncEdges]);
 
   if (!open) return null;
 
@@ -247,399 +273,428 @@ export function CanvasContextMenu(_props: Props) {
     });
   }
 
+  // Grouped so a selection's menu fits on one screen. The root is 22 direct
+  // lines (20 rows + 2 separators, 586px) for a plain shape; it used to be a
+  // 67-line / ~1800px flat list whose lower submenu rows could not be seen
+  // without scrolling. Every former command lives one level down, under the
+  // group that describes it, and keeps the enable condition it always had.
+  // Only Edit Text and Type ▸ come and go with the object type (a text
+  // selection is two lines taller). The whole tree is pinned by
+  // src/lib/__tests__/contextMenuStructure.test.tsx.
   return (
     <div
       ref={menuRef}
       role="menu"
       aria-label={t('Canvas')}
+      onScroll={syncEdges}
       className="fixed z-1000 bg-panel border border-border rounded-md shadow-xl py-1 text-xs max-h-[90vh] overflow-y-auto overscroll-contain"
       style={{ left: adjustedPos.x, top: adjustedPos.y, width: MENU_WIDTH }}
     >
-      <Item
-        label={t('Undo')}
-        kbd={getBinding('edit.undo')}
-        disabled={!canUndo}
-        onClick={() => run(() => { undo(); }, canUndo)}
-      />
-      <Item
-        label={t('Redo')}
-        kbd={`${getBinding('edit.redo')} / ${getBinding('edit.redoShift')}`}
-        disabled={!canRedo}
-        onClick={() => run(() => { redo(); }, canRedo)}
-      />
-      <Separator />
-      <Item
-        label={t('Cut')}
-        kbd={getBinding('edit.cut')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { cutSelection(); }, hasSelection)}
-      />
-      <Item
-        label={t('Copy')}
-        kbd={getBinding('edit.copy')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { copySelection(); setClipboardTick((n) => n + 1); }, hasSelection)}
-      />
-      <Item
-        label={t('Paste')}
-        kbd={getBinding('edit.paste')}
-        disabled={!canPaste}
-        onClick={() => run(() => pasteFromClipboard(), canPaste)}
-      />
-      <Item
-        label={t('Paste Here')}
-        disabled={!canPaste}
-        onClick={() => run(() => pasteFromClipboard({ x: pos.x, y: pos.y }), canPaste)}
-      />
-      <Item
-        label={t('Paste in Place')}
-        kbd={getBinding('edit.pasteInPlace')}
-        disabled={!canPaste}
-        onClick={() => run(() => pasteFromClipboard(undefined, true), canPaste)}
-      />
-      <Item
-        label={t('Paste in Front')}
-        kbd={getBinding('edit.pasteInFront')}
-        disabled={!canPaste}
-        onClick={() => run(() => pasteFromClipboard(undefined, true, 'front'), canPaste)}
-      />
-      <Item
-        label={t('Paste in Back')}
-        kbd={getBinding('edit.pasteInBack')}
-        disabled={!canPaste}
-        onClick={() => run(() => pasteFromClipboard(undefined, true, 'back'), canPaste)}
-      />
-      <Item
-        label={t('Paste from Clipboard')}
-        onClick={() => run(() => { void pasteFromSystemClipboard().then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }); }, true)}
-      />
-      <Separator />
-      <Item
-        label={t('Duplicate')}
-        kbd={getBinding('edit.duplicate')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { duplicateSelection(); }, hasSelection)}
-      />
-      <Item
-        label={t('Delete')}
-        kbd="Del / Backspace"
-        disabled={!hasSelection}
-        onClick={() => run(() => { deleteSelection(); }, hasSelection)}
-      />
-      <Item
-        label={t('Rename Selection…')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const renamed = promptRenameSelection(t('Object name')); if (renamed) toast.success(`${renamed} ${t('objects renamed')}`); }, hasSelection)}
-      />
-      <Separator />
-      <Item
-        label={t('Group')}
-        kbd={getBinding('edit.group')}
-        disabled={!canGroup}
-        onClick={() => run(() => { groupSelection(); }, canGroup)}
-      />
-      <Item
-        label={t('Ungroup')}
-        kbd={getBinding('edit.ungroup')}
-        disabled={!canUngroup}
-        onClick={() => run(() => { ungroupSelection(); }, canUngroup)}
-      />
-      <Item
-        label={t('Isolation Mode')}
-        kbd={getBinding('object.isolation')}
-        disabled={!canUngroup}
-        onClick={() => run(() => { toggleIsolationMode(); }, canUngroup)}
-      />
-      <Item
-        label={t('Make Clipping Mask')}
-        kbd={getBinding('edit.clipMask')}
-        disabled={!canClip}
-        onClick={() => run(() => { applyClipMask(); }, canClip)}
-      />
-      <Item
-        label={t('Release Clipping Mask')}
-        kbd={getBinding('edit.releaseClip')}
-        disabled={!canReleaseClip}
-        onClick={() => run(() => { releaseClipMask(); }, canReleaseClip)}
-      />
-      <Item
-        label={t('Make Compound Path')}
-        kbd={getBinding('edit.compoundPath')}
-        disabled={!canClip}
-        onClick={() => run(() => { makeCompoundPath(); }, canClip)}
-      />
-      <Item
-        label={t('Release Compound Path')}
-        kbd={getBinding('edit.releaseCompound')}
-        disabled={!canReleaseCompound}
-        onClick={() => run(() => { releaseCompoundPath(); }, canReleaseCompound)}
-      />
-      <SubMenu label={t('Pathfinder')} openLeft={openLeft} disabled={!canBool}>
-        <Item label={t('Union')} disabled={!canBool} onClick={() => run(() => { void booleanOp('union').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
-        <Item label={t('Subtract')} disabled={!canBool} onClick={() => run(() => { void booleanOp('subtract').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
-        <Item label={t('Intersect')} disabled={!canBool} onClick={() => run(() => { void booleanOp('intersect').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
-        <Item label={t('Exclude')} disabled={!canBool} onClick={() => run(() => { void booleanOp('exclude').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
-        <Separator />
-        <Item label={t('Divide')} disabled={!canBool} onClick={() => run(() => { divideSelection(); }, canBool)} />
-        <Item label={t('Trim')} disabled={!canBool} onClick={() => run(() => { trimSelection(); }, canBool)} />
-        <Item label={t('Merge')} disabled={!canBool} onClick={() => run(() => { mergeSelection(); }, canBool)} />
-        <Item label={t('Crop')} disabled={!canBool} onClick={() => run(() => { cropSelection(); }, canBool)} />
-      </SubMenu>
-      <Separator />
-      <SubMenu label={t('Align & Distribute')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Align left')} kbd={getBinding('align.left')} disabled={!canAlign} onClick={() => run(() => alignSelection('left'), canAlign)} />
-        <Item label={t('Align center horizontally')} kbd={getBinding('align.centerH')} disabled={!canAlign} onClick={() => run(() => alignSelection('centerH'), canAlign)} />
-        <Item label={t('Align right')} kbd={getBinding('align.right')} disabled={!canAlign} onClick={() => run(() => alignSelection('right'), canAlign)} />
-        <Item label={t('Align top')} kbd={getBinding('align.top')} disabled={!canAlign} onClick={() => run(() => alignSelection('top'), canAlign)} />
-        <Item label={t('Align center vertically')} kbd={getBinding('align.centerV')} disabled={!canAlign} onClick={() => run(() => alignSelection('centerV'), canAlign)} />
-        <Item label={t('Align bottom')} kbd={getBinding('align.bottom')} disabled={!canAlign} onClick={() => run(() => alignSelection('bottom'), canAlign)} />
-        <Separator />
-        <Item label={t('Distribute horizontally (equal spacing)')} kbd={getBinding('distribute.horizontal')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal'), canDistribute)} />
-        <Item label={t('Distribute vertically (equal spacing)')} kbd={getBinding('distribute.vertical')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical'), canDistribute)} />
-      </SubMenu>
-      <SubMenu label={t('Transform')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Transform…')} disabled={!hasSelection} onClick={() => run(() => openModal('showTransform'), hasSelection)} />
-        <Item label={t('Flip Horizontal')} kbd={getBinding('edit.flipH')} disabled={!hasSelection} onClick={() => run(() => flip('x'), hasSelection)} />
-        <Item label={t('Flip Vertical')} kbd={getBinding('edit.flipV')} disabled={!hasSelection} onClick={() => run(() => flip('y'), hasSelection)} />
-        <Item label={t('Rotate 90° CW')} disabled={!hasSelection} onClick={() => run(() => { void rotateSelection(90); }, hasSelection)} />
-        <Item label={t('Rotate 90° CCW')} disabled={!hasSelection} onClick={() => run(() => { void rotateSelection(-90); }, hasSelection)} />
-      </SubMenu>
-      <Separator />
-      <Item
-        label={t('Bring to Front')}
-        kbd={`${getBinding('arrange.forwardFront').replace(/]$/, 'Shift+]')}`}
-        disabled={!hasSelection}
-        onClick={() => run(() => { bringToFront(); }, hasSelection)}
-      />
-      <Item
-        label={t('Bring Forward')}
-        kbd={getBinding('arrange.forwardFront')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { bringForward(); }, hasSelection)}
-      />
-      <Item
-        label={t('Send Backward')}
-        kbd={getBinding('arrange.backwardBack')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { sendBackward(); }, hasSelection)}
-      />
-      <Item
-        label={t('Send to Back')}
-        kbd={`${getBinding('arrange.backwardBack').replace(/[[]$/, 'Shift+[')}`}
-        disabled={!hasSelection}
-        onClick={() => run(() => { sendToBack(); }, hasSelection)}
-      />
-      <Separator />
-      <Item
-        label={t('Lock Selection')}
-        kbd={getBinding('edit.lockSelection')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); }, hasSelection)}
-      />
-      <Item
-        label={t('Lock Others')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const n = lockOthers(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('No other unlocked objects.')); }, hasSelection)}
-      />
-      <Item
-        label={t('Unlock Selection')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const n = unlockSelection(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked selection.')); }, hasSelection)}
-      />
-      <Item
-        label={t('Unlock All')}
-        kbd={getBinding('edit.unlockAll')}
-        onClick={() => run(() => { const n = unlockAll(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked objects.')); }, true)}
-      />
-      <Item
-        label={t('Hide Selection')}
-        kbd={getBinding('edit.hideSelection')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); }, hasSelection)}
-      />
-      <Item
-        label={t('Hide Others')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); }, hasSelection)}
-      />
-      <Item
-        label={t('Show Selection')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { const n = showSelection(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden selection.')); }, hasSelection)}
-      />
-      <Item
-        label={t('Show All')}
-        kbd={getBinding('edit.showAll')}
-        onClick={() => run(() => { const n = showAll(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden objects.')); }, true)}
-      />
-      <Separator />
-      {editableText && (
+      {edges.up && <ScrollHint edge="top" />}
+      <div ref={contentRef}>
         <Item
-          label={t('Edit Text')}
-          kbd="Enter"
-          onClick={() => run(() => editText(), true)}
+          label={t('Undo')}
+          kbd={getBinding('edit.undo')}
+          disabled={!canUndo}
+          onClick={() => run(() => { undo(); }, canUndo)}
         />
-      )}
-      <SubMenu label={t('Type')} openLeft={openLeft}>
-        <Item label={t('Create Outlines')} kbd={getBinding('text.createOutlines')} disabled={!hasTextSelection} onClick={() => run(() => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); }, hasTextSelection)} />
-        <Item label={t('Break Text into Letters')} kbd={getBinding('text.splitLetters')} disabled={!hasTextSelection} onClick={() => run(() => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); }, hasTextSelection)} />
-        <Item label={t('Text on Arc (Up)')} kbd={getBinding('text.arcUp')} disabled={!hasTextSelection} onClick={() => run(() => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); }, hasTextSelection)} />
-        <Item label={t('Text on Arc (Down)')} kbd={getBinding('text.arcDown')} disabled={!hasTextSelection} onClick={() => run(() => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); }, hasTextSelection)} />
-      </SubMenu>
-      <Item
-        label={t('Create Contour')}
-        disabled={!hasSelection}
-        onClick={() => run(() => oneClickContour(), hasSelection)}
-      />
-      <Item
-        label={t('Weld')}
-        disabled={!hasSelection}
-        onClick={() => run(() => weld(), hasSelection)}
-      />
-      <Item
-        label={t('Outline Stroke')}
-        disabled={!hasSelection}
-        onClick={() => run(() => outlineStroke(), hasSelection)}
-      />
-      <Item
-        label={t('Trace Image')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { void traceSelectedImage().then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }); }, hasSelection)}
-      />
-      <SubMenu label={t('Image Filters')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Blur')} disabled={!hasSelection} onClick={() => run(() => applyBlur(0.08), hasSelection)} />
-        <Item label={t('Sepia')} disabled={!hasSelection} onClick={() => run(() => applySepia(), hasSelection)} />
-        <Item label={t('Grayscale')} disabled={!hasSelection} onClick={() => run(() => applyImageGrayscale(), hasSelection)} />
-        <Item label={t('Brightness +')} disabled={!hasSelection} onClick={() => run(() => applyImageBrightness(0.12), hasSelection)} />
-        <Item label={t('Clear Image Filters')} disabled={!hasSelection} onClick={() => run(() => clearFilters(), hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Fill / Stroke')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Swap Fill / Stroke')} kbd={getBinding('edit.swapFillStroke')} disabled={!hasSelection} onClick={() => run(() => { if (!swapFillStroke()) toast.warn(t('Select an object first.')); }, hasSelection)} />
-        <Item label={t('Default Fill / Stroke')} kbd={getBinding('edit.defaultColors')} disabled={!hasSelection} onClick={() => run(() => defaultColors(), hasSelection)} />
+        <Item
+          label={t('Redo')}
+          kbd={`${getBinding('edit.redo')} / ${getBinding('edit.redoShift')}`}
+          disabled={!canRedo}
+          onClick={() => run(() => { redo(); }, canRedo)}
+        />
         <Separator />
-        <Item label={t('No Fill')} kbd={getBinding('appearance.noFill')} disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ fill: '' }), hasSelection)} />
-        <Item label={t('No Stroke')} kbd={getBinding('appearance.noStroke')} disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ stroke: '', strokeWidth: 0 }), hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Stroke alignment')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Center')} disabled={!hasSelection} onClick={() => run(() => applyStrokeAlign('center'), hasSelection)} />
-        <Item label={t('Inside')} disabled={!hasSelection} onClick={() => run(() => applyStrokeAlign('inside'), hasSelection)} />
-        <Item label={t('Outside')} disabled={!hasSelection} onClick={() => run(() => applyStrokeAlign('outside'), hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Stroke width')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label="0.5 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 0.5 }), hasSelection)} />
-        <Item label="1 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 1 }), hasSelection)} />
-        <Item label="2 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 2 }), hasSelection)} />
-        <Item label="4 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 4 }), hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Stroke style')} openLeft={openLeft} disabled={!hasSelection}>
-        <SubMenu label={t('Dash')} openLeft={openLeft} disabled={!hasSelection}>
-          <Item label={t('Solid')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeDashArray: [] }), hasSelection)} />
-          <Item label={t('Dashed')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeDashArray: [10, 5] }), hasSelection)} />
-          <Item label={t('Dotted')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeDashArray: [2, 6] }), hasSelection)} />
+        <Item
+          label={t('Cut')}
+          kbd={getBinding('edit.cut')}
+          disabled={!hasSelection}
+          onClick={() => run(() => { cutSelection(); }, hasSelection)}
+        />
+        <Item
+          label={t('Copy')}
+          kbd={getBinding('edit.copy')}
+          disabled={!hasSelection}
+          onClick={() => run(() => { copySelection(); setClipboardTick((n) => n + 1); }, hasSelection)}
+        />
+        <Item
+          label={t('Paste')}
+          kbd={getBinding('edit.paste')}
+          disabled={!canPaste}
+          onClick={() => run(() => pasteFromClipboard(), canPaste)}
+        />
+        <SubMenu label={t('Paste special')} openLeft={openLeft}>
+          <Item
+            label={t('Paste Here')}
+            disabled={!canPaste}
+            onClick={() => run(() => pasteFromClipboard({ x: pos.x, y: pos.y }), canPaste)}
+          />
+          <Item
+            label={t('Paste in Place')}
+            kbd={getBinding('edit.pasteInPlace')}
+            disabled={!canPaste}
+            onClick={() => run(() => pasteFromClipboard(undefined, true), canPaste)}
+          />
+          <Item
+            label={t('Paste in Front')}
+            kbd={getBinding('edit.pasteInFront')}
+            disabled={!canPaste}
+            onClick={() => run(() => pasteFromClipboard(undefined, true, 'front'), canPaste)}
+          />
+          <Item
+            label={t('Paste in Back')}
+            kbd={getBinding('edit.pasteInBack')}
+            disabled={!canPaste}
+            onClick={() => run(() => pasteFromClipboard(undefined, true, 'back'), canPaste)}
+          />
+          <Separator />
+          <Item
+            label={t('Paste from Clipboard')}
+            onClick={() => run(() => { void pasteFromSystemClipboard().then(r => { if (r === 'empty') toast.warn(t('No image or SVG on the clipboard.')); else if (r === 'failed') toast.warn(t('Clipboard unavailable.')); }); }, true)}
+          />
         </SubMenu>
-        <SubMenu label={t('Line cap')} openLeft={openLeft} disabled={!hasSelection}>
-          <Item label={t('Butt')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeLineCap: 'butt' }), hasSelection)} />
-          <Item label={t('Round')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeLineCap: 'round' }), hasSelection)} />
-          <Item label={t('Square')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeLineCap: 'square' }), hasSelection)} />
+        <Item
+          label={t('Duplicate')}
+          kbd={getBinding('edit.duplicate')}
+          disabled={!hasSelection}
+          onClick={() => run(() => { duplicateSelection(); }, hasSelection)}
+        />
+        <Item
+          label={t('Delete')}
+          kbd="Del / Backspace"
+          disabled={!hasSelection}
+          onClick={() => run(() => { deleteSelection(); }, hasSelection)}
+        />
+        <Item
+          label={t('Rename Selection…')}
+          disabled={!hasSelection}
+          onClick={() => run(() => { const renamed = promptRenameSelection(t('Object name')); if (renamed) toast.success(`${renamed} ${t('objects renamed')}`); }, hasSelection)}
+        />
+        <Item
+          label={t('Group')}
+          kbd={getBinding('edit.group')}
+          disabled={!canGroup}
+          onClick={() => run(() => { groupSelection(); }, canGroup)}
+        />
+        <Item
+          label={t('Ungroup')}
+          kbd={getBinding('edit.ungroup')}
+          disabled={!canUngroup}
+          onClick={() => run(() => { ungroupSelection(); }, canUngroup)}
+        />
+        <SubMenu label={t('Arrange')} openLeft={openLeft} disabled={!hasSelection}>
+          <Item
+            label={t('Bring to Front')}
+            kbd={`${getBinding('arrange.forwardFront').replace(/]$/, 'Shift+]')}`}
+            disabled={!hasSelection}
+            onClick={() => run(() => { bringToFront(); }, hasSelection)}
+          />
+          <Item
+            label={t('Bring Forward')}
+            kbd={getBinding('arrange.forwardFront')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { bringForward(); }, hasSelection)}
+          />
+          <Item
+            label={t('Send Backward')}
+            kbd={getBinding('arrange.backwardBack')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { sendBackward(); }, hasSelection)}
+          />
+          <Item
+            label={t('Send to Back')}
+            kbd={`${getBinding('arrange.backwardBack').replace(/[[]$/, 'Shift+[')}`}
+            disabled={!hasSelection}
+            onClick={() => run(() => { sendToBack(); }, hasSelection)}
+          />
+          <Separator />
+          <Item
+            label={t('Isolation Mode')}
+            kbd={getBinding('object.isolation')}
+            disabled={!canUngroup}
+            onClick={() => run(() => { toggleIsolationMode(); }, canUngroup)}
+          />
         </SubMenu>
-      </SubMenu>
-      <SubMenu label={t('Blend mode')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Normal')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('source-over'), hasSelection)} />
-        <Item label={t('Multiply')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('multiply'), hasSelection)} />
-        <Item label={t('Screen')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('screen'), hasSelection)} />
-        <Item label={t('Overlay')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('overlay'), hasSelection)} />
-        <Item label={t('Darken')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('darken'), hasSelection)} />
-        <Item label={t('Lighten')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('lighten'), hasSelection)} />
-        <Item label={t('Difference')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('difference'), hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Appearance')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Clear Appearance')} disabled={!hasSelection} onClick={() => run(() => { const n = clearAppearanceFromSelection(); if (n) toast.success(`${n} ${t('appearances cleared')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
-        <Item label={t('Flatten Transparency')} disabled={!hasSelection} onClick={() => run(() => { const n = flattenTransparencySelection(); if (n) toast.success(`${n} ${t('objects flattened')}`); else toast.warn(t('Select transparent or blended objects first.')); }, hasSelection)} />
-        <Item label={t('Expand Appearance')} disabled={!hasSelection} onClick={() => run(() => { void expandAppearanceSelection().then((n) => { if (n) toast.success(`${n} ${t('appearances expanded')}`); else toast.warn(t('Select objects with expandable appearance first.')); }); }, hasSelection)} />
-        <Item label={t('Clear Gradient Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = clearGradientFillSelection(); if (n) toast.success(`${n} ${t('gradient fills cleared')}`); else toast.warn(t('Select objects with gradient fills first.')); }, hasSelection)} />
+        <SubMenu label={t('Lock & Hide')} openLeft={openLeft}>
+          <Item
+            label={t('Lock Selection')}
+            kbd={getBinding('edit.lockSelection')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { const n = lockSelection(); if (n) toast.success(`${n} ${t('locked')}`); }, hasSelection)}
+          />
+          <Item
+            label={t('Lock Others')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { const n = lockOthers(); if (n) toast.success(`${n} ${t('locked')}`); else toast.warn(t('No other unlocked objects.')); }, hasSelection)}
+          />
+          <Item
+            label={t('Unlock Selection')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { const n = unlockSelection(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked selection.')); }, hasSelection)}
+          />
+          <Item
+            label={t('Unlock All')}
+            kbd={getBinding('edit.unlockAll')}
+            onClick={() => run(() => { const n = unlockAll(); if (n) toast.success(`${n} ${t('unlocked')}`); else toast.warn(t('No locked objects.')); }, true)}
+          />
+          <Separator />
+          <Item
+            label={t('Hide Selection')}
+            kbd={getBinding('edit.hideSelection')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { const n = hideSelection(); if (n) toast.success(`${n} ${t('hidden')}`); }, hasSelection)}
+          />
+          <Item
+            label={t('Hide Others')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { const n = hideOthers(); if (n) toast.success(`${n} ${t('hidden')}`); else toast.warn(t('Select something first.')); }, hasSelection)}
+          />
+          <Item
+            label={t('Show Selection')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { const n = showSelection(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden selection.')); }, hasSelection)}
+          />
+          <Item
+            label={t('Show All')}
+            kbd={getBinding('edit.showAll')}
+            onClick={() => run(() => { const n = showAll(); if (n) toast.success(`${n} ${t('revealed')}`); else toast.warn(t('No hidden objects.')); }, true)}
+          />
+        </SubMenu>
         <Separator />
-        <SubMenu label={t('Graphic Styles')} openLeft={openLeft} disabled={!hasSelection}>
-          {loadGraphicStyles().map((style) => (
-            <Item key={style.id} label={style.name} disabled={!hasSelection} onClick={() => run(() => { const n = applyGraphicStyleToSelection(style); if (n) toast.success(`${n} ${t('graphic styles applied')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
-          ))}
+        {editableText && (
+          <Item
+            label={t('Edit Text')}
+            kbd="Enter"
+            onClick={() => run(() => editText(), true)}
+          />
+        )}
+        {hasTextSelection && (
+          <SubMenu label={t('Type')} openLeft={openLeft}>
+            <Item label={t('Create Outlines')} kbd={getBinding('text.createOutlines')} disabled={!hasTextSelection} onClick={() => run(() => { void createOutlinesFromText().then(ok => { if (ok) toast.success(t('Text converted to outlines')); else toast.warn(t('Select a single text object to enable')); }); }, hasTextSelection)} />
+            <Item label={t('Break Text into Letters')} kbd={getBinding('text.splitLetters')} disabled={!hasTextSelection} onClick={() => run(() => { const n = splitTextToLetters(); if (n) toast.success(`${n} ${t('letters created')}`); else toast.warn(t('Select a text object first.')); }, hasTextSelection)} />
+            <Item label={t('Text on Arc (Up)')} kbd={getBinding('text.arcUp')} disabled={!hasTextSelection} onClick={() => run(() => { if (!applyTextOnArc(false)) toast.warn(t('Select a text object first.')); }, hasTextSelection)} />
+            <Item label={t('Text on Arc (Down)')} kbd={getBinding('text.arcDown')} disabled={!hasTextSelection} onClick={() => run(() => { if (!applyTextOnArc(true)) toast.warn(t('Select a text object first.')); }, hasTextSelection)} />
+          </SubMenu>
+        )}
+        <SubMenu label={t('Pathfinder')} openLeft={openLeft} disabled={!canBool}>
+          <Item label={t('Union')} disabled={!canBool} onClick={() => run(() => { void booleanOp('union').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
+          <Item label={t('Subtract')} disabled={!canBool} onClick={() => run(() => { void booleanOp('subtract').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
+          <Item label={t('Intersect')} disabled={!canBool} onClick={() => run(() => { void booleanOp('intersect').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
+          <Item label={t('Exclude')} disabled={!canBool} onClick={() => run(() => { void booleanOp('exclude').then((ok) => { if (!ok) toast.warn(t('Select 2 or more objects first.')); }); }, canBool)} />
+          <Separator />
+          <Item label={t('Divide')} disabled={!canBool} onClick={() => run(() => { divideSelection(); }, canBool)} />
+          <Item label={t('Trim')} disabled={!canBool} onClick={() => run(() => { trimSelection(); }, canBool)} />
+          <Item label={t('Merge')} disabled={!canBool} onClick={() => run(() => { mergeSelection(); }, canBool)} />
+          <Item label={t('Crop')} disabled={!canBool} onClick={() => run(() => { cropSelection(); }, canBool)} />
         </SubMenu>
-        <SubMenu label={t('Swatches')} openLeft={openLeft}>
-          <Item label={t('Add current fill')} onClick={() => run(() => { const fill = useEditor.getState().style.fill; if (typeof fill !== 'string' || !fill) { toast.warn(t('Select an object with a solid colour first.')); return; } const before = loadSwatches().length; const next = addSavedSwatchColor(fill); if (next.length > before) toast.success(t('Swatch added')); else toast.warn(t('Swatch already exists.')); }, true)} />
-          <Item label={t('Collect colours from selection')} onClick={() => run(() => { const result = collectSelectionColorsIntoSwatches(); if (result.added) toast.success(`${result.added} ${t('swatches added')}`); else toast.warn(t('Select an object with a solid colour first.')); }, true)} />
+        <SubMenu label={t('Align & Distribute')} openLeft={openLeft} disabled={!hasSelection}>
+          <Item label={t('Align left')} kbd={getBinding('align.left')} disabled={!canAlign} onClick={() => run(() => alignSelection('left'), canAlign)} />
+          <Item label={t('Align center horizontally')} kbd={getBinding('align.centerH')} disabled={!canAlign} onClick={() => run(() => alignSelection('centerH'), canAlign)} />
+          <Item label={t('Align right')} kbd={getBinding('align.right')} disabled={!canAlign} onClick={() => run(() => alignSelection('right'), canAlign)} />
+          <Item label={t('Align top')} kbd={getBinding('align.top')} disabled={!canAlign} onClick={() => run(() => alignSelection('top'), canAlign)} />
+          <Item label={t('Align center vertically')} kbd={getBinding('align.centerV')} disabled={!canAlign} onClick={() => run(() => alignSelection('centerV'), canAlign)} />
+          <Item label={t('Align bottom')} kbd={getBinding('align.bottom')} disabled={!canAlign} onClick={() => run(() => alignSelection('bottom'), canAlign)} />
+          <Separator />
+          <Item label={t('Distribute horizontally (equal spacing)')} kbd={getBinding('distribute.horizontal')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('horizontal'), canDistribute)} />
+          <Item label={t('Distribute vertically (equal spacing)')} kbd={getBinding('distribute.vertical')} disabled={!canDistribute} onClick={() => run(() => distributeSelection('vertical'), canDistribute)} />
         </SubMenu>
-      </SubMenu>
-      <SubMenu label={t('Pattern Fill')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Checker')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('checker', 16, '#ffffff', '#111827'), hasSelection)} />
-        <Item label={t('Stripes')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('stripes', 16, '#ffffff', '#111827'), hasSelection)} />
-        <Item label={t('Dots')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('dots', 16, '#ffffff', '#111827'), hasSelection)} />
-        <Item label={t('Crosshatch')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('crosshatch', 16, '#ffffff', '#111827'), hasSelection)} />
-        <Separator />
-        <Item label={t('Clear Pattern Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = clearPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills cleared')}`); else toast.warn(t('Select objects with pattern fills first.')); }, hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Drop shadow')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Soft Shadow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.35)', blur: 12, offsetX: 4, offsetY: 6 }), hasSelection)} />
-        <Item label={t('Glow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 }), hasSelection)} />
-        <Separator />
-        <Item label={t('Clear Shadow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection(null), hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Opacity')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label="100%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 1 }), hasSelection)} />
-        <Item label="75%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 0.75 }), hasSelection)} />
-        <Item label="50%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 0.5 }), hasSelection)} />
-        <Item label="25%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 0.25 }), hasSelection)} />
-      </SubMenu>
-      <SubMenu label={t('Edit Colors')} openLeft={openLeft} disabled={!hasSelection}>
-        <Item label={t('Recolor Artwork…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRecolor'), hasSelection)} />
-        <Item label={t('Freeform Gradient…')} disabled={!hasSelection} onClick={() => run(() => openModal('showFreeformGradient'), hasSelection)} />
-        <Item label={t('Invert Colors')} disabled={!hasSelection} onClick={() => run(() => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
-        <Item label={t('Convert to Grayscale')} disabled={!hasSelection} onClick={() => run(() => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
-      </SubMenu>
-      <Item
-        label={t('Join Paths')}
-        kbd={getBinding('edit.join')}
-        disabled={pathCount !== 1 && pathCount !== 2}
-        onClick={() => run(() => { joinSelection(); }, pathCount === 1 || pathCount === 2)}
-      />
-      <SubMenu label={t('Path Effects')} openLeft={openLeft}>
-        <Item label={t('Add Anchor Points')} disabled={!hasSelection} onClick={() => run(() => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
-        <Item label={t('Reverse Path Direction')} disabled={!hasSelection} onClick={() => run(() => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
-        <Item label={t('Simplify Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showSimplify'), hasSelection)} />
-        <Item label={t('Round Corners…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoundCorners'), hasSelection)} />
-        <Item label={t('Offset Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOffsetPath'), hasSelection)} />
-        <Item label={t('Blend…')} disabled={active.length < 2} onClick={() => run(() => openModal('showBlend'), active.length >= 2)} />
-      </SubMenu>
-      <Item
-        label={t('Rasterize')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); }, hasSelection)}
-      />
-      <Separator />
-      <Item
-        label={t('Select All')}
-        kbd={getBinding('edit.selectAll')}
-        onClick={() => run(() => selectAll(), true)}
-      />
-      <Item
-        label={t('Deselect All')}
-        kbd={getBinding('edit.deselectAll')}
-        disabled={!hasSelection}
-        onClick={() => run(() => { deselectAll(); }, hasSelection)}
-      />
-      <Item
-        label={t('Select Inverse')}
-        kbd={getBinding('edit.selectInverse')}
-        onClick={() => run(() => { selectInverse(); }, true)}
-      />
-      <Item
-        label={t('Select Next Object Above')}
-        kbd={getBinding('edit.selectNextAbove')}
-        onClick={() => run(() => { if (!selectObjectInStack('up')) toast.warn(t('Nothing above.')); }, true)}
-      />
-      <Item
-        label={t('Select Next Object Below')}
-        kbd={getBinding('edit.selectNextBelow')}
-        onClick={() => run(() => { if (!selectObjectInStack('down')) toast.warn(t('Nothing below.')); }, true)}
-      />
+        <SubMenu label={t('Transform')} openLeft={openLeft} disabled={!hasSelection}>
+          <Item label={t('Transform…')} disabled={!hasSelection} onClick={() => run(() => openModal('showTransform'), hasSelection)} />
+          <Item label={t('Flip Horizontal')} kbd={getBinding('edit.flipH')} disabled={!hasSelection} onClick={() => run(() => flip('x'), hasSelection)} />
+          <Item label={t('Flip Vertical')} kbd={getBinding('edit.flipV')} disabled={!hasSelection} onClick={() => run(() => flip('y'), hasSelection)} />
+          <Item label={t('Rotate 90° CW')} disabled={!hasSelection} onClick={() => run(() => { void rotateSelection(90); }, hasSelection)} />
+          <Item label={t('Rotate 90° CCW')} disabled={!hasSelection} onClick={() => run(() => { void rotateSelection(-90); }, hasSelection)} />
+        </SubMenu>
+        <SubMenu label={t('Path')} openLeft={openLeft} disabled={!hasSelection}>
+          <Item
+            label={t('Join Paths')}
+            kbd={getBinding('edit.join')}
+            disabled={pathCount !== 1 && pathCount !== 2}
+            onClick={() => run(() => { joinSelection(); }, pathCount === 1 || pathCount === 2)}
+          />
+          <Item
+            label={t('Outline Stroke')}
+            disabled={!hasSelection}
+            onClick={() => run(() => outlineStroke(), hasSelection)}
+          />
+          <Item
+            label={t('Weld')}
+            disabled={!hasSelection}
+            onClick={() => run(() => weld(), hasSelection)}
+          />
+          <Item
+            label={t('Create Contour')}
+            disabled={!hasSelection}
+            onClick={() => run(() => oneClickContour(), hasSelection)}
+          />
+          <Separator />
+          <Item
+            label={t('Make Clipping Mask')}
+            kbd={getBinding('edit.clipMask')}
+            disabled={!canClip}
+            onClick={() => run(() => { applyClipMask(); }, canClip)}
+          />
+          <Item
+            label={t('Release Clipping Mask')}
+            kbd={getBinding('edit.releaseClip')}
+            disabled={!canReleaseClip}
+            onClick={() => run(() => { releaseClipMask(); }, canReleaseClip)}
+          />
+          <Item
+            label={t('Make Compound Path')}
+            kbd={getBinding('edit.compoundPath')}
+            disabled={!canClip}
+            onClick={() => run(() => { makeCompoundPath(); }, canClip)}
+          />
+          <Item
+            label={t('Release Compound Path')}
+            kbd={getBinding('edit.releaseCompound')}
+            disabled={!canReleaseCompound}
+            onClick={() => run(() => { releaseCompoundPath(); }, canReleaseCompound)}
+          />
+          <Separator />
+          <SubMenu label={t('Path Effects')} openLeft={openLeft}>
+            <Item label={t('Add Anchor Points')} disabled={!hasSelection} onClick={() => run(() => { const n = addAnchorsToSelection(); if (n) toast.success(`${n} ${t('paths subdivided')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
+            <Item label={t('Reverse Path Direction')} disabled={!hasSelection} onClick={() => run(() => { const n = reversePathSelection(); if (n) toast.success(`${n} ${t('paths reversed')}`); else toast.warn(t('Select one or more paths first.')); }, hasSelection)} />
+            <Item label={t('Simplify Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showSimplify'), hasSelection)} />
+            <Item label={t('Round Corners…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRoundCorners'), hasSelection)} />
+            <Item label={t('Offset Path…')} disabled={!hasSelection} onClick={() => run(() => openModal('showOffsetPath'), hasSelection)} />
+            <Item label={t('Blend…')} disabled={active.length < 2} onClick={() => run(() => openModal('showBlend'), active.length >= 2)} />
+          </SubMenu>
+        </SubMenu>
+        <SubMenu label={t('Select')} openLeft={openLeft}>
+          <Item
+            label={t('Select All')}
+            kbd={getBinding('edit.selectAll')}
+            onClick={() => run(() => selectAll(), true)}
+          />
+          <Item
+            label={t('Deselect All')}
+            kbd={getBinding('edit.deselectAll')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { deselectAll(); }, hasSelection)}
+          />
+          <Item
+            label={t('Select Inverse')}
+            kbd={getBinding('edit.selectInverse')}
+            onClick={() => run(() => { selectInverse(); }, true)}
+          />
+          <Item
+            label={t('Select Next Object Above')}
+            kbd={getBinding('edit.selectNextAbove')}
+            onClick={() => run(() => { if (!selectObjectInStack('up')) toast.warn(t('Nothing above.')); }, true)}
+          />
+          <Item
+            label={t('Select Next Object Below')}
+            kbd={getBinding('edit.selectNextBelow')}
+            onClick={() => run(() => { if (!selectObjectInStack('down')) toast.warn(t('Nothing below.')); }, true)}
+          />
+        </SubMenu>
+        <SubMenu label={t('Appearance')} openLeft={openLeft} disabled={!hasSelection}>
+          <SubMenu label={t('Fill / Stroke')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label={t('Swap Fill / Stroke')} kbd={getBinding('edit.swapFillStroke')} disabled={!hasSelection} onClick={() => run(() => { if (!swapFillStroke()) toast.warn(t('Select an object first.')); }, hasSelection)} />
+            <Item label={t('Default Fill / Stroke')} kbd={getBinding('edit.defaultColors')} disabled={!hasSelection} onClick={() => run(() => defaultColors(), hasSelection)} />
+            <Separator />
+            <Item label={t('No Fill')} kbd={getBinding('appearance.noFill')} disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ fill: '' }), hasSelection)} />
+            <Item label={t('No Stroke')} kbd={getBinding('appearance.noStroke')} disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ stroke: '', strokeWidth: 0 }), hasSelection)} />
+          </SubMenu>
+          <SubMenu label={t('Stroke alignment')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label={t('Center')} disabled={!hasSelection} onClick={() => run(() => applyStrokeAlign('center'), hasSelection)} />
+            <Item label={t('Inside')} disabled={!hasSelection} onClick={() => run(() => applyStrokeAlign('inside'), hasSelection)} />
+            <Item label={t('Outside')} disabled={!hasSelection} onClick={() => run(() => applyStrokeAlign('outside'), hasSelection)} />
+          </SubMenu>
+          <SubMenu label={t('Stroke width')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label="0.5 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 0.5 }), hasSelection)} />
+            <Item label="1 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 1 }), hasSelection)} />
+            <Item label="2 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 2 }), hasSelection)} />
+            <Item label="4 px" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ strokeWidth: 4 }), hasSelection)} />
+          </SubMenu>
+          <SubMenu label={t('Stroke style')} openLeft={openLeft} disabled={!hasSelection}>
+            <SubMenu label={t('Dash')} openLeft={openLeft} disabled={!hasSelection}>
+              <Item label={t('Solid')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeDashArray: [] }), hasSelection)} />
+              <Item label={t('Dashed')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeDashArray: [10, 5] }), hasSelection)} />
+              <Item label={t('Dotted')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeDashArray: [2, 6] }), hasSelection)} />
+            </SubMenu>
+            <SubMenu label={t('Line cap')} openLeft={openLeft} disabled={!hasSelection}>
+              <Item label={t('Butt')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeLineCap: 'butt' }), hasSelection)} />
+              <Item label={t('Round')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeLineCap: 'round' }), hasSelection)} />
+              <Item label={t('Square')} disabled={!hasSelection} onClick={() => run(() => applyStrokeStyleToSelection({ strokeLineCap: 'square' }), hasSelection)} />
+            </SubMenu>
+          </SubMenu>
+          <Separator />
+          <SubMenu label={t('Blend mode')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label={t('Normal')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('source-over'), hasSelection)} />
+            <Item label={t('Multiply')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('multiply'), hasSelection)} />
+            <Item label={t('Screen')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('screen'), hasSelection)} />
+            <Item label={t('Overlay')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('overlay'), hasSelection)} />
+            <Item label={t('Darken')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('darken'), hasSelection)} />
+            <Item label={t('Lighten')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('lighten'), hasSelection)} />
+            <Item label={t('Difference')} disabled={!hasSelection} onClick={() => run(() => applyBlendModeToSelection('difference'), hasSelection)} />
+          </SubMenu>
+          <SubMenu label={t('Opacity')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label="100%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 1 }), hasSelection)} />
+            <Item label="75%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 0.75 }), hasSelection)} />
+            <Item label="50%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 0.5 }), hasSelection)} />
+            <Item label="25%" disabled={!hasSelection} onClick={() => run(() => applyStyleToSelection({ opacity: 0.25 }), hasSelection)} />
+          </SubMenu>
+          <SubMenu label={t('Pattern Fill')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label={t('Checker')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('checker', 16, '#ffffff', '#111827'), hasSelection)} />
+            <Item label={t('Stripes')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('stripes', 16, '#ffffff', '#111827'), hasSelection)} />
+            <Item label={t('Dots')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('dots', 16, '#ffffff', '#111827'), hasSelection)} />
+            <Item label={t('Crosshatch')} disabled={!hasSelection} onClick={() => run(() => applyPatternFill('crosshatch', 16, '#ffffff', '#111827'), hasSelection)} />
+            <Separator />
+            <Item label={t('Clear Pattern Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = clearPatternFillSelection(); if (n) toast.success(`${n} ${t('pattern fills cleared')}`); else toast.warn(t('Select objects with pattern fills first.')); }, hasSelection)} />
+          </SubMenu>
+          <SubMenu label={t('Drop shadow')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label={t('Soft Shadow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection({ color: 'rgba(0,0,0,0.35)', blur: 12, offsetX: 4, offsetY: 6 }), hasSelection)} />
+            <Item label={t('Glow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection({ color: 'rgba(61,155,255,0.75)', blur: 16, offsetX: 0, offsetY: 0 }), hasSelection)} />
+            <Separator />
+            <Item label={t('Clear Shadow')} disabled={!hasSelection} onClick={() => run(() => applyShadowToSelection(null), hasSelection)} />
+          </SubMenu>
+          <SubMenu label={t('Edit Colors')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label={t('Recolor Artwork…')} disabled={!hasSelection} onClick={() => run(() => openModal('showRecolor'), hasSelection)} />
+            <Item label={t('Freeform Gradient…')} disabled={!hasSelection} onClick={() => run(() => openModal('showFreeformGradient'), hasSelection)} />
+            <Item label={t('Invert Colors')} disabled={!hasSelection} onClick={() => run(() => { const n = invertColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
+            <Item label={t('Convert to Grayscale')} disabled={!hasSelection} onClick={() => run(() => { const n = grayscaleColorsSelection(); if (n) toast.success(`${n} ${t('colours changed')}`); else toast.warn(t('Select an object with a solid colour first.')); }, hasSelection)} />
+          </SubMenu>
+          <Separator />
+            <SubMenu label={t('Graphic Styles')} openLeft={openLeft} disabled={!hasSelection}>
+              {loadGraphicStyles().map((style) => (
+                <Item key={style.id} label={style.name} disabled={!hasSelection} onClick={() => run(() => { const n = applyGraphicStyleToSelection(style); if (n) toast.success(`${n} ${t('graphic styles applied')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
+              ))}
+            </SubMenu>
+            <SubMenu label={t('Swatches')} openLeft={openLeft}>
+              <Item label={t('Add current fill')} onClick={() => run(() => { const fill = useEditor.getState().style.fill; if (typeof fill !== 'string' || !fill) { toast.warn(t('Select an object with a solid colour first.')); return; } const before = loadSwatches().length; const next = addSavedSwatchColor(fill); if (next.length > before) toast.success(t('Swatch added')); else toast.warn(t('Swatch already exists.')); }, true)} />
+              <Item label={t('Collect colours from selection')} onClick={() => run(() => { const result = collectSelectionColorsIntoSwatches(); if (result.added) toast.success(`${result.added} ${t('swatches added')}`); else toast.warn(t('Select an object with a solid colour first.')); }, true)} />
+            </SubMenu>
+          <Separator />
+            <Item label={t('Clear Appearance')} disabled={!hasSelection} onClick={() => run(() => { const n = clearAppearanceFromSelection(); if (n) toast.success(`${n} ${t('appearances cleared')}`); else toast.warn(t('Select something first.')); }, hasSelection)} />
+            <Item label={t('Flatten Transparency')} disabled={!hasSelection} onClick={() => run(() => { const n = flattenTransparencySelection(); if (n) toast.success(`${n} ${t('objects flattened')}`); else toast.warn(t('Select transparent or blended objects first.')); }, hasSelection)} />
+            <Item label={t('Expand Appearance')} disabled={!hasSelection} onClick={() => run(() => { void expandAppearanceSelection().then((n) => { if (n) toast.success(`${n} ${t('appearances expanded')}`); else toast.warn(t('Select objects with expandable appearance first.')); }); }, hasSelection)} />
+            <Item label={t('Clear Gradient Fill')} disabled={!hasSelection} onClick={() => run(() => { const n = clearGradientFillSelection(); if (n) toast.success(`${n} ${t('gradient fills cleared')}`); else toast.warn(t('Select objects with gradient fills first.')); }, hasSelection)} />
+        </SubMenu>
+        <SubMenu label={t('Image')} openLeft={openLeft} disabled={!hasSelection}>
+          <Item
+            label={t('Trace Image')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { void traceSelectedImage().then(ok => { if (ok) toast.success(t('Image traced')); else toast.warn(t('Select a raster image first.')); }); }, hasSelection)}
+          />
+          <Item
+            label={t('Rasterize')}
+            disabled={!hasSelection}
+            onClick={() => run(() => { void rasterizeSelection().then(ok => { if (ok) toast.success(t('Rasterized')); else toast.warn(t('Select an object first.')); }); }, hasSelection)}
+          />
+          <Separator />
+          <SubMenu label={t('Image Filters')} openLeft={openLeft} disabled={!hasSelection}>
+            <Item label={t('Blur')} disabled={!hasSelection} onClick={() => run(() => applyBlur(0.08), hasSelection)} />
+            <Item label={t('Sepia')} disabled={!hasSelection} onClick={() => run(() => applySepia(), hasSelection)} />
+            <Item label={t('Grayscale')} disabled={!hasSelection} onClick={() => run(() => applyImageGrayscale(), hasSelection)} />
+            <Item label={t('Brightness +')} disabled={!hasSelection} onClick={() => run(() => applyImageBrightness(0.12), hasSelection)} />
+            <Item label={t('Clear Image Filters')} disabled={!hasSelection} onClick={() => run(() => clearFilters(), hasSelection)} />
+          </SubMenu>
+        </SubMenu>
+      </div>
+      {edges.down && <ScrollHint edge="bottom" />}
     </div>
   );
 }
@@ -673,6 +728,22 @@ function Item({
 
 function Separator() {
   return <div className="my-1 border-t border-border" role="separator" />;
+}
+
+/** A fade over the root edge that can still be scrolled to ("more rows this
+ *  way"). A sticky zero-height strip pinned to the scrollport edge: it takes
+ *  no layout space, so the hint never changes what fits on one screen. */
+function ScrollHint({ edge }: { edge: 'top' | 'bottom' }) {
+  const top = edge === 'top';
+  return (
+    <div
+      data-scroll-hint={edge}
+      aria-hidden="true"
+      className={`sticky ${top ? 'top-0' : 'bottom-0'} z-10 h-0 pointer-events-none`}
+    >
+      <div className={`absolute inset-x-0 h-5 ${top ? 'top-0 bg-linear-to-b' : 'bottom-0 bg-linear-to-t'} from-panel to-panel/0`} />
+    </div>
+  );
 }
 
 /** A right-click menu row that reveals a nested flyout panel on hover/focus.
