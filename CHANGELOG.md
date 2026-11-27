@@ -4,7 +4,7 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.20.0] — 2026-11-27
 
 ### Added — connecting, setting up and debugging a plotter
 - **Calibrate & test tab** in the Send to Plotter dialog: a workbench for
