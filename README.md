@@ -226,9 +226,9 @@ docker run --rm \
 ```
 
 Output (`out/`):
-- `Anchorworks_0.20.0_amd64.deb` (7.7 MB) + `.sig` — Debian / Ubuntu
-- `Anchorworks-0.20.0-1.x86_64.rpm` (7.7 MB) + `.sig` — Fedora / RHEL / openSUSE
-- `Anchorworks_0.20.0_amd64.AppImage` (85 MB) + `.sig` — distro-agnostic
+- `Anchorworks_0.20.0_amd64.deb` (8.8 MB) + `.sig` — Debian / Ubuntu
+- `Anchorworks-0.20.0-1.x86_64.rpm` (8.8 MB) + `.sig` — Fedora / RHEL / openSUSE
+- `Anchorworks_0.20.0_amd64.AppImage` (87.9 MB) + `.sig` — distro-agnostic
 - `latest.json` — updater manifest the in-app plugin polls
 
 Signing keys live in `.tauri/` (gitignored; only `.pub` is committed). Generate yours via:
@@ -257,7 +257,7 @@ docker run --rm \
 ```
 
 Output (`out-win/`):
-- `Anchorworks_0.20.0_x64-setup.exe` (~4.5 MB) — NSIS installer
+- `Anchorworks_0.20.0_x64-setup.exe` (~5.6 MB) — NSIS installer
 - `Anchorworks_0.20.0_x64-setup.exe.sig` — updater-side minisign
 - `anchorworks.exe` (~17 MB) — portable PE32+ binary
 - `latest-windows.json` — updater manifest for Windows
