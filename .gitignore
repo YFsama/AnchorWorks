@@ -27,6 +27,9 @@ dist-ssr
 playwright-report/
 test-results/
 
+# Vitest JSON reporter output (IDE / tooling runs)
+.vitest/
+
 # Tauri build artifacts (Rust target dir is huge; bundles live elsewhere)
 src-tauri/target/
 src-tauri/gen/schemas/

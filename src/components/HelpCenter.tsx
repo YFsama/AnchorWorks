@@ -1524,8 +1524,11 @@ function buildTopics(t: (k: string) => string): Topic[] {
             <li>Muted dot — nothing has been saved this session yet</li>
           </UL>
           <P>
-            Click the indicator to save immediately. The label shows
-            <em> Saved just now</em>, <em>Saved 12s ago</em>, etc.
+            Click the indicator to save the work as a project file — the first time
+            it asks where to put it, after that it writes to the same file. The label
+            shows <em>Saved just now</em>, <em>Saved 12s ago</em>, etc., for the
+            latest autosave. An empty canvas is never autosaved, so it cannot be
+            "recovered" later.
           </P>
           <H>What's autosaved</H>
           <P>
@@ -1569,15 +1572,30 @@ function buildTopics(t: (k: string) => string): Topic[] {
       body: () => (
         <>
           <P>
-            If Anchorworks crashes or the tab is closed with unsaved changes, the
-            next launch shows a <strong>Recovery</strong> dialog offering to restore
-            the autosaved state. You'll see the timestamp of the saved copy.
+            Anchorworks keeps one autosaved copy of your canvas in local storage
+            (see <em>Autosave</em>). What you see on the next launch depends on how
+            the previous session ended:
           </P>
+          <UL>
+            <li><strong>Crash or forced quit with unsaved changes</strong> — a
+              <strong>Recovery</strong> dialog offers to restore the autosaved copy,
+              showing its timestamp and object count.</li>
+            <li><strong>Normal close with unsaved changes</strong> — a quiet
+              notification in the corner offers <em>Restore</em> or <em>Ignore</em>;
+              nothing blocks the canvas. A session you ignored is not offered again.</li>
+            <li><strong>Everything saved to a project file</strong>, or an empty
+              canvas — no prompt at all.</li>
+          </UL>
           <P>
-            Click <em>Restore</em> to load it, or <em>Discard</em> to start fresh.
-            Choosing discard clears the autosave entry — recovery isn't offered again
-            on the next launch until something new triggers an autosave.
+            Either way the copy stays available until it is restored, discarded or
+            replaced: choose <strong>File ▸ Restore Last Session…</strong> to bring it
+            back at any time.
           </P>
+          <Note>
+            In the Recovery dialog <Kbd>Esc</Kbd> does not discard — it only moves the
+            focus to <em>Restore</em>. Discarding asks you to confirm first, because
+            it deletes the only copy of that unsaved work.
+          </Note>
           <Note>
             Recovery operates on the most recent autosave only. If you want
             longer-term safety, save explicit project files (above) — they're not
@@ -2413,6 +2431,64 @@ function buildTopics(t: (k: string) => string): Topic[] {
             The toast reports how many objects were arranged, how many turned,
             and the material utilisation percentage. Items wider than the sheet
             in both orientations overhang rather than vanish.
+          </P>
+        </>
+      ),
+    },
+    {
+      id: 'plotter-setup',
+      category: t('Plotter & cutter'),
+      title: t('Connect, position & calibrate'),
+      keywords: t('connect scan identify port virtual plotter rehearsal jog position set origin calibrate blade offset overcut force test distance dry run'),
+      body: () => (
+        <>
+          <P>
+            Open <strong>Send to Plotter</strong> and switch to the{' '}
+            <strong>Machine</strong> tab. The <strong>Connection</strong> card
+            looks for a cutter by itself — the serial ports you already
+            authorized in the browser, or the machine's serial ports in the
+            desktop app. Pick a port and press <strong>Connect</strong>: the
+            machine is then identified without asking, and its model and page
+            size appear in the card. When the scan recognises a cutter, a{' '}
+            <strong>Connect</strong> button appears beside the result — pressing
+            it applies the detected profile, language and baud rate and
+            connects. When a brand profile matches, an{' '}
+            <strong>Apply profile</strong> button loads its dialect, baud rate
+            and force defaults.
+          </P>
+          <H>No machine at hand — rehearse</H>
+          <P>
+            <strong>Virtual plotter (rehearsal mode)</strong> is the first entry
+            of the port list. It answers like a cutter — position read-out,
+            page size, travel limits — and nothing sent to it leaves the app.
+            Use it to learn the cards and to try every test pattern with the
+            blade up.
+          </P>
+          <H>Position &amp; test</H>
+          <UL>
+            <li><strong>Jog</strong> — the pad (hold a button to repeat), the arrow keys (10 mm, <Kbd>Shift</Kbd>+arrow 1 mm), or type X / Y and press Go.</li>
+            <li><strong>Set origin</strong> — the current position becomes 0, 0 for the job.</li>
+            <li><strong>Pen up / Blade tap / Feed / Eject</strong> — one-click machine actions. <strong>Test cut</strong>, <strong>Force test</strong> (five squares at rising blade pressure — weed them and the first clean lift is the force to use) and <strong>Corner tour</strong> (pen-up visits of a 100 × 100 mm rectangle) send their pattern.</li>
+          </UL>
+          <H>Calibrate &amp; test</H>
+          <P>
+            Every pattern is cut with the feed, speed and force currently set in
+            the dialog, so what you see is what a job gets. Rehearse first, then
+            cut on scrap:
+          </P>
+          <UL>
+            <li><strong>Blade offset test</strong> — cells cut with a rising blade offset: take the first whose corners close cleanly, or measure the seam and let the <strong>Blade offset calculator</strong> suggest a value.</li>
+            <li><strong>Overcut test</strong> — the same cells with a rising overcut.</li>
+            <li><strong>Distance calibration</strong> — cut a 50, 100 or 200 mm square and measure it: you get the scale error and suggested grbl steps, and the two diagonals show whether the axes are square.</li>
+            <li><strong>Dry run (pen up)</strong> — the whole job with the tool up, to check placement before cutting.</li>
+            <li><strong>Positioning marks</strong> — <strong>Mark origin</strong> draws a bracket at the current origin and <strong>Ruler</strong> a scale along the axes. <strong>Drift test</strong> cuts two rows of crosses near the top and the bottom of the page: how far the lower row sits from where it should is the drift to enter in the Cut settings.</li>
+          </UL>
+          <P>
+            Patterns are anchored to the page (the distance square sits 10 mm in
+            from its top-left corner) and to the current origin, so set{' '}
+            <strong>Paper height</strong> before relying on their placement.{' '}
+            <strong>Show on canvas</strong> (Output tab) draws the job over the
+            artwork with its origin, start points and distance from the corner.
           </P>
         </>
       ),

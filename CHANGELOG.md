@@ -4,6 +4,188 @@ All notable changes to Anchorworks are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and the
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added — connecting, setting up and debugging a plotter
+- **Calibrate & test tab** in the Send to Plotter dialog: a workbench for
+  dialling in a blade and a machine without leaving the app.
+  - *Blade offset test* — a row of cells, each cut with a different blade
+    offset (0 / 0.15 / 0.25 / 0.35 / 0.45 / 0.6 mm, or your own steps); the
+    *Blade offset calculator* turns a measured seam gap or overlap into a
+    suggested offset.
+  - *Overcut test* — the same cells cut with overcut 0 / 0.1 / 0.2 / 0.3 / 0.5 mm
+    through the real overcut pass.
+  - *Force test* — five squares at rising blade pressure in one pass (HP-GL);
+    weed them and the first clean lift is the force to use.
+  - *Distance calibration* — a raw 50 / 100 / 200 mm square (no overcut, no
+    blade offset) with corner crosshairs; enter the measured length and the
+    scale error and corrected grbl `$100` / `$101` values are suggested, and
+    the two diagonals give the axis squareness error.
+  - *Dry run* — the current job with the tool up (HP-GL: every `PD` becomes
+    `PU`; G-code: Z at pen-up height, rapids at the travel rate, spindle and
+    laser commands removed).
+  - *Positioning marks*: *Mark origin* (a 10 mm corner bracket and dot at the
+    current origin) and a *Ruler* (50 / 100 / 200 mm along the machine's axes),
+    plus a *Drift test* (two rows of crosses near the top and the bottom of the
+    page — how far the lower row sits off is the drift to enter in Cut
+    settings).
+  - Every pattern can be rehearsed on the virtual plotter first; the
+    *Rehearsal result* view reports where the head ended up.
+- **Virtual plotter (rehearsal mode)** — `PlotterSimulator` answers HP-GL and
+  grbl like a cutter does. It is the first entry of the port list, connects
+  with no machine and no cable, tracks the carriage position, the page and the
+  travel limits, and reports moves that would leave them. Nothing sent to it
+  reaches a serial port; the connection and positioning cards say so.
+- **Position & test card** (Machine tab): jog pad with hold-to-repeat, keyboard
+  jog (arrows 10 mm, Shift + arrows 1 mm), jog step 1 / 5 / 10 / 25 / 50 mm,
+  typed X / Y with Go, Set origin, Home, a live carriage position, pen up /
+  blade tap / feed / eject, and Test cut / Force test / Corner tour one click
+  away.
+- **Automatic scan and identification**: opening the Machine tab scans by
+  itself — already-authorized Web Serial ports in the browser, the native port
+  list in the desktop app — and never raises the browser's port chooser. The
+  last link is remembered. After connecting, the machine is identified without
+  asking (`OI;`, or `?` and `$I` when it answers like grbl); the model and page
+  size appear in the connection card, and a brand profile is offered when one
+  matches.
+- **Job progress and completion** in the dialog and in the status-bar chip
+  (`plotterJobMonitor`).
+- **Show on canvas**: draws the job over the artwork with its start points, the
+  origin marker and axes, the material band, the job's bounding box with its X
+  / Y distance from the origin, and anything outside the material in red.
+- The Diagnostics & console section of the plotter dialog starts collapsed;
+  the connection and positioning cards come first.
+
+### Added — editing
+- **Artboard size presets**: the Add Artboards picker offers the document sizes
+  and 12 sign and large-format sizes (yard signs, banners, posters, roll-up
+  banner, sticker label, name badge, bumper sticker, door hanger) with search,
+  count and placement; each artboard row resizes to a preset and keeps the
+  artwork outside it.
+- File ▸ **Restore Last Session…** reopens the last autosave by hand.
+
+### Changed
+- **Session recovery stays out of the way.** The recovery dialog now appears
+  only when the previous session crashed with unsaved work. A normal exit that
+  left unsaved work gets a quiet toast. Nothing is shown when the last session
+  ended with everything saved, when the canvas already has content, or when the
+  document is still open in another window of the app (a Web Locks probe tells
+  a live window from a crash). Unsaved is a change counter measured against the
+  last project save, so a document that is already on disk is never offered
+  again, and an empty canvas is never snapshotted. Closing the desktop window
+  goes through the same exit mark (`core:window:allow-destroy`); *New* clears
+  the session.
+- **File drag-and-drop works anywhere in the window**, desktop app included:
+  files land at the cursor on the canvas or at the centre of the view when
+  released over a panel, a dashed overlay says what a drop will do, a drop that
+  lands before the import module has loaded is held and then imported, and
+  every outcome is reported by toasts that name the files — never a raw
+  exception. A drop target with its own handler (the Gang Sheet Builder intake)
+  keeps its files. `tauri.conf.json` sets `dragDropEnabled: false`: with the
+  default, Tauri replaces WebView2's drop handler on Windows and the page never
+  receives the files.
+- **Context menu regrouped** from 67 rows (about 1800 px tall) to 22: Paste
+  special ▸, Arrange ▸, Lock & Hide ▸, Path ▸, Select ▸, Appearance ▸ and
+  Image ▸ hold what moved, and a hint appears when the menu scrolls.
+- The arrow-key nudge no longer fires when the focused control already handled
+  the key.
+
+### Fixed
+- **A plot job built from the canvas lost every object transform** (canvas
+  artwork source) and could emit `PD NaN,NaN`. Transforms are now applied when
+  the artwork is read, non-geometry subtrees are skipped, zero-size and
+  percentage-size rectangles are dropped, and a path with a non-finite point is
+  filtered out.
+- **G-code files ended without a newline**, so the comment on the closing
+  `M30` line could swallow the next command appended to the file.
+- **grbl controllers were misidentified as HP-GL**: an `error:N` reply to `OI;`
+  was read as an HP-GL error string. It now counts as silence, the `?` probe
+  follows, and the machine is suggested as `grbl-generic`.
+- **Inch mode applied overcut and blade offset as inches** — 25.4 times too
+  large. Both are millimetres in every unit.
+- **A project file opened through drag-drop or *Open SVG / JSON…* cleared the
+  canvas and loaded nothing**: it was handed to the raw canvas-JSON loader. A
+  project envelope now opens as a project (the decision ⌘/Ctrl+O already made),
+  asks first when the canvas holds work, and opens before the other files of
+  the same drop so they land inside it.
+
+### Fixed — independent review of the plotter output
+An independent, probe-backed review of everything this release sends to a
+machine. Ordered by what it would have done to a real cutter.
+- **The dry run could cut.** Its rewrites were case-sensitive (HP-GL `PD` →
+  `PU`, G-code Z and M3) and ignored the pen-down selector on `PA`/`PR`, while
+  the Code page is editable and cutters take lower case: a payload written
+  `pd` / `m3` went out with the tool down. The rewrite now matches either
+  spelling, lifts the selector too, and the result is replayed through the
+  machine simulator — a dry run that still marks anywhere is refused with a
+  message, never sent.
+- **A grbl job was reported finished the moment it started.** The progress
+  monitor's own position polls (`?`) went out as sends on the same link, and
+  each one raised the "done" the monitor took for the job's: "Cut finished"
+  16 ms in, Pause and Stop gone for the whole transfer. Every send is now
+  tagged with its job (`plotterJobMonitor.start()` returns the id), and only
+  that send's completion ends the transfer.
+- **Status replies were shared.** `link.query()` had no queue, so a position
+  poll and a status poll on one link could each take the other's answer: a
+  busy machine read as idle — reported complete — or a working machine as
+  "does not report status". Queries are now queued and matched to their
+  command; the completion watch reads the last complete reply and wants two
+  idle polls in a row before it says "Cut complete".
+- **An alarm counted as completion.** grbl `Alarm`, `Door` and `Hold` — and
+  the virtual plotter's travel-limit alarm — mapped to idle, so a job that
+  stopped mid-cut showed "Cut complete". They are a phase of their own now:
+  "Machine alarm — job NOT finished", with the reason.
+- **grbl machines that report machine coordinates (`MPos`)** showed the
+  wrong work position after *Set origin*. Reports are converted to work
+  position (`grblWorkPosition`), and the snapshot says which frame it has.
+- **Rehearsal could reach a blade.** With a real machine linked, *Rehearse on
+  virtual plotter* did nothing (the link was already open) and the next test
+  cut went to the machine. With the virtual plotter picked in the port list,
+  or Rehearse pressed, the real link is now let go first: nothing asked of the
+  virtual plotter is ever sent to a port.
+- **Calibration patterns threw the origin away.** Their HP-GL header carried
+  `IN;`, which resets the scaling points on an HP-GL-compliant plotter — the
+  very origin *Set origin* (`IP;`) had just defined — so *Mark origin* cut at
+  the material corner instead of under the head. Calibration and positioning
+  patterns are now emitted without it; jobs keep their initializer.
+- **Mirrored jobs slid their cut kinds apart.** Through-cuts, kiss-cuts and
+  the perf border were each mirrored about their own centre, so with mirror
+  on a kiss-cut window landed beside the print it belongs to — and off from
+  where the canvas overlay drew it. Every kind now flips about the job's one
+  mirror line (`plotter.ts` `jobMirrorLine`, `mirrorPolys(…, around)`).
+- **Progress ran ahead of the head** on the virtual plotter: a move split
+  across pump ticks had its time booked twice (a blade offset test read
+  "150%"). The played time now adds only what each step still had to play.
+- **Every visit of the Machine tab re-probed the ports and re-applied a
+  guess.** "This list was already probed" lived in a component ref, and the
+  pane remounts on each visit; a silent CH340 port was applied as "suspected
+  clone" — profile, HP-GL and 9600 Bd — without asking. A port list is now
+  probed once per session (`plotterScan.ts` probe memory) and the detection is
+  offered, not imposed: the *Connect* beside it applies it.
+- **A 200 mm distance box did not fit a 210 mm page** — its far crosshair
+  crossed the origin line by 4 mm into the travel limit. The box states the
+  room it needs from the page corner, and sizes that do not fit are disabled.
+- **The canvas cut preview dropped a transform written with a unit**
+  (`translate(50px, 60px)` — how the preview's CSS rewrite spells it): the
+  object was drawn at the page origin while the output went to the right
+  place. Transform arguments now take a unit, and `skewX` / `skewY` are read.
+
+### Verified
+- Gates: ESLint 0, `tsc -b` 0, `cargo check` clean; unit suite 179 files /
+  2,896 tests green; full end-to-end suite on the production build 131 passed,
+  0 failed. Three specs that only ran against a dev server (`dragdrop`,
+  `artboard-presets`, `plotter-calibration`) now observe what is on screen —
+  rows, read-outs, pixels — and run on the build CI ships.
+- Real Tauri shell, debug build under an isolated identifier: the app boots, a
+  PNG dropped into WebView2 imports, the connection card lists the virtual
+  plotter first, the virtual plotter connects and the keyboard jog moves the
+  position read-out, and closing the window writes the clean-exit mark and ends
+  the process.
+- Bundle: the other twelve eager chunks are byte-identical to 0.19.0 and no
+  lazy module became eager; the entry chunk grew 52 kB raw / 17 kB gzip
+  (293 → 345 kB raw), nearly all of it the session system in `autosave.ts`,
+  which runs at boot (OPTIMIZATION_BACKLOG, open item 15).
+
 ## [0.19.0] — 2026-11-24
 
 ### Fixed — pre-release audit (2026-11, ahead of 0.19.0)
