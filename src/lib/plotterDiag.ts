@@ -263,25 +263,76 @@ export function estimateEtaSeconds(sent: number, total: number, elapsedMs: numbe
  * watcher gives up quietly after two silent polls instead of nagging.
  * ------------------------------------------------------------------ */
 
-export type CutState = 'cutting' | 'idle' | 'unknown';
+export type CutState =
+  /** Working on the job (or otherwise moving). */
+  | 'cutting'
+  /** Finished — nothing moving, tool up. */
+  | 'idle'
+  /** No usable answer. */
+  | 'unknown'
+  /** grbl `Alarm`: motion is locked, the rest of the job will not run. */
+  | 'alarm'
+  /** grbl `Hold` / `Door`: stopped in the middle of the job, not finished. */
+  | 'held';
 
-/** Classify a machine's answer to a status poll. */
+/** ETX — the terminator a few cutters use instead of CR/LF; a line break here. */
+const ETX = '\x03';
+
+/** The LAST complete line of a reply — the one the final line break (CR, LF
+ *  or ETX) has closed. Earlier lines are older answers still sitting in the
+ *  buffer and are skipped. A reply without any break is taken whole (the
+ *  link also hands over what it has when a question times out).
+ *
+ *  Returns null when an UNFINISHED line follows the last closed one: the
+ *  newest data is incomplete and the closed line before it is already
+ *  superseded, so neither may be trusted (least of all with "finished"). */
+export function lastCompleteLine(reply: string): string | null {
+  const text = reply.replaceAll(ETX, '\n');
+  let end = -1;
+  for (let i = text.length - 1; i >= 0; i--) {
+    const c = text.charCodeAt(i);
+    if (c === 10 || c === 13) { end = i; break; }
+  }
+  if (end < 0) return text.trim();
+  if (text.slice(end + 1).trim()) return null;
+  const lines = text.slice(0, end + 1).split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
+  return lines[lines.length - 1] ?? '';
+}
+
+/** State word of the LAST grbl status report in the buffer, as the
+ *  controller wrote it ('Run', 'Idle', 'Hold:0', 'Alarm', 'Door:2'…).
+ *  '' when there is no report. */
+export function lastGrblStateWord(reply: string): string {
+  return [...reply.matchAll(/<(\w+(?::\d+)?)/g)].pop()?.[1] ?? '';
+}
+
+/** Classify a machine's answer to a status poll — by its LAST complete
+ *  reply, never by something that merely sits in front of it in the buffer. */
 export function cutStateFromReply(format: 'gcode' | 'hpgl', reply: string): CutState {
-  const raw = reply.trim();
-  if (!raw) return 'unknown';
+  // Not trimmed: a trailing line break is what makes the last line COMPLETE.
+  if (!reply.trim()) return 'unknown';
   if (format === 'gcode') {
-    const m = raw.match(/^<(\w+)/);
-    if (!m) return 'unknown';
-    const state = m[1].toLowerCase();
+    // Leftover `ok` lines / the boot banner sit in front of the report while
+    // a job runs — classify by the LAST report in the buffer.
+    const state = lastGrblStateWord(reply).toLowerCase().split(':')[0];
+    if (!state) return 'unknown';
     if (state === 'run' || state === 'home' || state === 'cycle') return 'cutting';
-    if (state === 'idle' || state === 'hold' || state === 'alarm' || state === 'door') return 'idle';
+    if (state === 'idle') return 'idle';
+    if (state === 'alarm') return 'alarm';
+    if (state === 'hold' || state === 'door') return 'held';
     return 'unknown';
   }
-  const code = raw.match(/-?\d+/);
+  // The status word is the machine's LAST complete reply. An earlier answer
+  // left in front of it ("0\r\n2\r\n": a stale 0, then "busy") must not be
+  // read as the state — that is how a busy plotter used to pass for a
+  // finished one — and a reply still coming in is no answer at all yet.
+  const line = lastCompleteLine(reply);
+  if (line === null) return 'unknown';
+  const code = line.match(/-?\d+/);
   if (!code) return 'unknown';
   const n = Number(code[0]);
-  if (n === 2) return 'cutting';       // busy — drawing/moving
-  if (n === 0 || n === 1) return 'idle'; // powered/ready
+  if (n === 2 || n === 3) return 'cutting';   // moving — pen up (2) or pen down (3)
+  if (n === 0 || n === 1) return 'idle';      // powered / ready
   return 'unknown';
 }
 
@@ -291,32 +342,46 @@ export interface WatchCutOptions {
   onDone?: () => void;
   /** Fired when the machine never answers status polls (clones). */
   onUnsupported?: () => void;
+  /** Fired once when the machine reports a state that is neither working
+   *  nor finished — grbl `Alarm` / `Hold` / `Door`. The job is NOT complete.
+   *  `word` is the controller's own state word ('Alarm', 'Hold:0', …). */
+  onHalt?: (state: 'alarm' | 'held', word: string) => void;
   /** Progress/log line per poll (fed into the console log). */
   onLog?: (line: string) => void;
   intervalMs?: number;
   timeoutMs?: number;
+  /** Consecutive idle polls it takes to call the cut finished (default 2).
+   *  One reply alone — a late answer to an earlier question, a machine caught
+   *  between two moves — must never end the watch. */
+  confirmIdle?: number;
 }
 
 export type WatchCutHandle = { cancel: () => void };
 
 /** Poll the machine until it reports idle (cut finished). Returns a
- *  cancel handle. Two consecutive silent polls → unsupported, stop. */
+ *  cancel handle. Two consecutive silent polls → unsupported, stop.
+ *
+ *  One poll at a time: the next one is scheduled when the previous has its
+ *  answer, so polls never pile up on the (serialised) link. `Alarm` /
+ *  `Hold` / `Door` end the watch through `onHalt` — they are not a finish. */
 export function watchCutCompletion(
   link: Pick<PlotterLink, 'status' | 'query'>,
   opts: WatchCutOptions,
 ): WatchCutHandle {
   const interval = opts.intervalMs ?? 3000;
   const timeout = opts.timeoutMs ?? 15 * 60 * 1000;
+  const confirmIdle = Math.max(1, opts.confirmIdle ?? 2);
   const cmd = opts.format === 'gcode' ? '?' : 'OS;';
   const log = opts.onLog ?? (() => {});
   let silent = 0;
+  let idle = 0;
   let cancelled = false;
   let timer: number | null = null;
   const startedAt = Date.now();
 
   const stop = () => {
     cancelled = true;
-    if (timer !== null) { window.clearInterval(timer); timer = null; }
+    if (timer !== null) { window.clearTimeout(timer); timer = null; }
   };
 
   const poll = async () => {
@@ -331,30 +396,47 @@ export function watchCutCompletion(
     try {
       reply = await link.query(cmd, 1200);
     } catch {
-      // transient — next tick retries
+      // transient — the next poll retries
     }
     if (cancelled) return;
     const state = cutStateFromReply(opts.format, reply);
+    if (state === 'alarm' || state === 'held') {
+      const word = lastGrblStateWord(reply) || state;
+      log(`Machine reports ${word} — the job is NOT complete.`);
+      stop();
+      opts.onHalt?.(state, word);
+      return;
+    }
     if (state === 'unknown') {
       silent += 1;
+      idle = 0;
       if (silent >= 2) {
         log('Machine does not answer status polls — cut watch off (this is normal for many cutters).');
-        opts.onUnsupported?.();
         stop();
+        opts.onUnsupported?.();
       }
       return;
     }
     silent = 0;
     if (state === 'idle') {
+      idle += 1;
+      if (idle < confirmIdle) {
+        log(`Machine reports idle — confirming (${idle}/${confirmIdle})…`);
+        return;
+      }
       log('Machine reports idle — cut complete.');
-      opts.onDone?.();
       stop();
-    } else {
-      log('Machine is busy — still cutting…');
+      opts.onDone?.();
+      return;
     }
+    idle = 0;
+    log('Machine is busy — still cutting…');
   };
 
-  void poll();
-  timer = window.setInterval(() => { void poll(); }, interval);
+  const tick = async () => {
+    await poll();
+    if (!cancelled) timer = window.setTimeout(() => { void tick(); }, interval);
+  };
+  void tick();
   return { cancel: stop };
 }

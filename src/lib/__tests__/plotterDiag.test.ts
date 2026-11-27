@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { buildDiagnosticsReport, cutStateFromReply, estimateEtaSeconds, estimateTransferSeconds, probeBaud, runConnectionSelfTest, watchCutCompletion, type DiagReportInput } from '../plotterDiag';
+import { buildDiagnosticsReport, cutStateFromReply, estimateEtaSeconds, estimateTransferSeconds, lastCompleteLine, lastGrblStateWord, probeBaud, runConnectionSelfTest, watchCutCompletion, type DiagReportInput } from '../plotterDiag';
 import type { LinkStatus } from '../plotterLink';
 
 describe('estimateTransferSeconds', () => {
@@ -235,12 +235,63 @@ describe('cutStateFromReply', () => {
     expect(cutStateFromReply('hpgl', 'garbage')).toBe('unknown');
   });
 
+  it('HP-GL: the state is the LAST complete reply, never something in front of it', () => {
+    // A stale answer left in the buffer, then the real one: busy, NOT finished.
+    expect(cutStateFromReply('hpgl', '0\r\n2\r\n')).toBe('cutting');
+    expect(cutStateFromReply('hpgl', '1\r\n2\r\n')).toBe('cutting');
+    expect(cutStateFromReply('hpgl', 'garbage\r\n2\r\n')).toBe('cutting');
+    // A position reply (x,y,pen) in front of the status word.
+    expect(cutStateFromReply('hpgl', '400,800,1\r\n2\r\n')).toBe('cutting');
+    // The other way round: the machine has just finished.
+    expect(cutStateFromReply('hpgl', '2\r\n1\r\n')).toBe('idle');
+    expect(cutStateFromReply('hpgl', '2\r\n0\r\n')).toBe('idle');
+    // Whatever follows the final line break is an unfinished fragment (the
+    // reply is still coming in): the closed line before it is already
+    // superseded, so NEITHER is trusted — above all not with "finished".
+    expect(cutStateFromReply('hpgl', '2\r\n0')).toBe('unknown');
+    expect(cutStateFromReply('hpgl', '0\r\n2')).toBe('unknown');
+    // CR-only and ETX-terminated replies are lines too.
+    expect(cutStateFromReply('hpgl', '0\r2\r')).toBe('cutting');
+    expect(cutStateFromReply('hpgl', '0\x032\x03')).toBe('cutting');
+    // Nothing closed at all.
+    expect(cutStateFromReply('hpgl', '\r\n')).toBe('unknown');
+    expect(cutStateFromReply('hpgl', 'garbage\r\n')).toBe('unknown');
+  });
+
+  it('HP-GL: 3 (moving with the pen down) is cutting, not "no answer"', () => {
+    expect(cutStateFromReply('hpgl', '3\r\n')).toBe('cutting');
+    expect(cutStateFromReply('hpgl', '147\r\n')).toBe('unknown'); // other bits set: not guessed
+  });
+
   it('decodes grbl state reports', () => {
     expect(cutStateFromReply('gcode', '<Run|MPos:1,2,0>')).toBe('cutting');
     expect(cutStateFromReply('gcode', '<Home|MPos:0,0,0>')).toBe('cutting');
     expect(cutStateFromReply('gcode', '<Idle|MPos:0,0,0>')).toBe('idle');
-    expect(cutStateFromReply('gcode', '<Hold:0|MPos:0,0,0>')).toBe('idle');
+    expect(cutStateFromReply('gcode', '<Hold:0|MPos:0,0,0>')).toBe('held');
     expect(cutStateFromReply('gcode', 'ok')).toBe('unknown');
+  });
+
+  it('grbl: Alarm / Hold / Door are a halt — never a finished cut', () => {
+    expect(cutStateFromReply('gcode', '<Alarm|MPos:0.000,0.000,5.000|FS:0,0>')).toBe('alarm');
+    expect(cutStateFromReply('gcode', '<Door:0|WPos:1.000,2.000,5.000>')).toBe('held');
+    expect(cutStateFromReply('gcode', '<Door:3|MPos:1.000,2.000,5.000>')).toBe('held');
+    expect(cutStateFromReply('gcode', '<Hold:1|MPos:1.000,2.000,5.000>')).toBe('held');
+    // By the LAST report, as for any other state.
+    expect(cutStateFromReply('gcode', 'ok\r\n<Run|MPos:1,2,0>\r\nok\r\n<Alarm|MPos:1,2,0>')).toBe('alarm');
+    expect(cutStateFromReply('gcode', 'ok\r\n<Alarm|MPos:1,2,0>\r\nok\r\n<Run|MPos:1,2,0>')).toBe('cutting');
+  });
+
+  it('lastCompleteLine / lastGrblStateWord', () => {
+    expect(lastCompleteLine('')).toBe('');
+    expect(lastCompleteLine('  2\r\n')).toBe('2');
+    expect(lastCompleteLine('0\r\n2\r\n')).toBe('2');
+    expect(lastCompleteLine('0\r\n2')).toBeNull(); // still coming in
+    expect(lastCompleteLine('2')).toBe('2');
+    expect(lastCompleteLine('a\x03b\x03')).toBe('b');
+    expect(lastGrblStateWord('')).toBe('');
+    expect(lastGrblStateWord('ok\r\n')).toBe('');
+    expect(lastGrblStateWord('<Run|MPos:1,2,0>\r\nok\r\n<Hold:0|MPos:1,2,0>')).toBe('Hold:0');
+    expect(lastGrblStateWord('<Alarm|MPos:0.000,0.000,5.000|FS:0,0>')).toBe('Alarm');
   });
 });
 
@@ -297,5 +348,109 @@ describe('watchCutCompletion', () => {
     handle.cancel();
     await new Promise(r => setTimeout(r, 30));
     expect(polls).toBeLessThanOrEqual(1);
+  });
+
+  it('one idle reply is not a finish: it takes two in a row, and "busy" in between starts over', async () => {
+    const done = vi.fn();
+    const handle = watchCutCompletion(watchStub(['2\r\n', '1\r\n', '2\r\n', '1\r\n', '1\r\n']), {
+      format: 'hpgl', intervalMs: 5, onDone: done,
+    });
+    await new Promise(r => setTimeout(r, 300));
+    handle.cancel();
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lone idle — a stale "0" harvested where the answer should be — never fires onDone', async () => {
+    const done = vi.fn();
+    const logs: string[] = [];
+    let n = 0;
+    // busy, "idle" once, busy, "idle" once … for as long as the watch runs.
+    const handle = watchCutCompletion(
+      { status: 'connected' as const, query: async () => (n++ % 2 ? '0\r\n' : '2\r\n') },
+      { format: 'hpgl', intervalMs: 5, onDone: done, onLog: l => logs.push(l) },
+    );
+    await new Promise(r => setTimeout(r, 300));
+    handle.cancel();
+    expect(done).not.toHaveBeenCalled();
+    expect(logs.some(l => l.includes('confirming'))).toBe(true);
+  });
+
+  it('confirmIdle: 1 restores the single-poll finish', async () => {
+    const done = vi.fn();
+    const handle = watchCutCompletion(watchStub(['2\r\n', '1\r\n']), {
+      format: 'hpgl', intervalMs: 5, onDone: done, confirmIdle: 1,
+    });
+    await new Promise(r => setTimeout(r, 120));
+    handle.cancel();
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it('grbl Alarm ends the watch through onHalt — never through onDone', async () => {
+    const done = vi.fn();
+    const unsupported = vi.fn();
+    const halts: Array<[string, string]> = [];
+    const handle = watchCutCompletion(watchStub(['<Run|MPos:1.000,0.000,-1.000|FS:1500,0>', 'ok\r\n<Alarm|MPos:1.000,0.000,-1.000|FS:0,0>']), {
+      format: 'gcode', intervalMs: 5, onDone: done, onUnsupported: unsupported, onHalt: (state, word) => halts.push([state, word]),
+    });
+    await new Promise(r => setTimeout(r, 120));
+    handle.cancel();
+    expect(halts).toEqual([['alarm', 'Alarm']]);
+    expect(done).not.toHaveBeenCalled();
+    expect(unsupported).not.toHaveBeenCalled();
+  });
+
+  it('grbl Door / Hold end the watch as "held", with the controller’s own state word', async () => {
+    const done = vi.fn();
+    const halts: Array<[string, string]> = [];
+    const door = watchCutCompletion(watchStub(['<Door:2|WPos:1.000,2.000,5.000>']), {
+      format: 'gcode', intervalMs: 5, onDone: done, onHalt: (state, word) => halts.push([state, word]),
+    });
+    await new Promise(r => setTimeout(r, 60));
+    door.cancel();
+    const hold = watchCutCompletion(watchStub(['ok\r\n<Hold:0|MPos:1,2,-1>']), {
+      format: 'gcode', intervalMs: 5, onDone: done, onHalt: (state, word) => halts.push([state, word]),
+    });
+    await new Promise(r => setTimeout(r, 60));
+    hold.cancel();
+    expect(halts).toEqual([['held', 'Door:2'], ['held', 'Hold:0']]);
+    expect(done).not.toHaveBeenCalled();
+  });
+
+  it('never has two polls in flight: the next question waits for the previous answer', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let polls = 0;
+    const handle = watchCutCompletion(
+      {
+        status: 'connected' as const,
+        query: async () => {
+          polls += 1;
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          await new Promise(r => setTimeout(r, 15));
+          inFlight -= 1;
+          return '2\r\n';
+        },
+      },
+      { format: 'hpgl', intervalMs: 1 },
+    );
+    await new Promise(r => setTimeout(r, 120));
+    handle.cancel();
+    await new Promise(r => setTimeout(r, 30));
+    expect(maxInFlight).toBe(1);
+    expect(polls).toBeGreaterThanOrEqual(3);
+  });
+
+  it('a poll still waiting when the link drops is the last one', async () => {
+    let status: LinkStatus = 'connected';
+    let polls = 0;
+    const stub = {
+      get status(): LinkStatus { return status; },
+      query: async () => { status = 'idle'; polls += 1; return '2\r\n'; }, // the link drops while its answer is awaited
+    };
+    const handle = watchCutCompletion(stub, { format: 'hpgl', intervalMs: 1, onDone: () => {} });
+    await new Promise(r => setTimeout(r, 120));
+    handle.cancel();
+    expect(polls).toBe(1);
   });
 });

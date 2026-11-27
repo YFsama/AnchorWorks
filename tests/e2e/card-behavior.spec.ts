@@ -519,9 +519,12 @@ const BATCH2: CardCase[] = [
   {
     id: 'Send to Plotter', dialog: 'Send to Plotter / Cutter', via: { palette: 'Send to Plotter…' },
     // High-risk card: Cancel remains the ONLY touched action. The 2026-11
-    // reorg split the flat 17-input form into Machine / Cut / Output tabs —
-    // the custom step proves the tablist lands on Machine (nothing
-    // connected) and switches panes; no output/send control is touched.
+    // reorg split the flat 17-input form into Machine / Cut / Output tabs; the
+    // workflow reorg then made Output (the preview) the first tab AND the
+    // landing tab, connected or not. The custom step proves the tablist lands
+    // on Output, switches panes in display order, and that the Machine pane
+    // opens on an uncollapsed connection card with the diagnostics collapsed;
+    // no output/send control is touched.
     custom: async (_page, dialog) => {
       const failures: string[] = [];
       try {
@@ -529,7 +532,8 @@ const BATCH2: CardCase[] = [
         const machine = tabs.getByRole('tab', { name: 'Machine', exact: true });
         const cut = tabs.getByRole('tab', { name: 'Cut settings', exact: true });
         const output = tabs.getByRole('tab', { name: 'Output', exact: true });
-        await expect(machine).toHaveAttribute('aria-selected', 'true');
+        await expect(output).toHaveAttribute('aria-selected', 'true');
+        await expect(dialog.locator('[data-plotter-pane="output"]')).toBeVisible();
         await cut.click();
         await expect(cut).toHaveAttribute('aria-selected', 'true');
         await expect(dialog.locator('[data-plotter-pane="cut"]')).toBeVisible();
@@ -538,6 +542,11 @@ const BATCH2: CardCase[] = [
         await expect(dialog.locator('[data-plotter-pane="output"]')).toBeVisible();
         await machine.click();
         await expect(machine).toHaveAttribute('aria-selected', 'true');
+        await expect(dialog.locator('[data-plotter-pane="machine"]')).toBeVisible();
+        // Machine opens on the connection card (never collapsed); the
+        // diagnostics card is collapsed by default.
+        await expect(dialog.locator('[data-plotter-card="connect"]')).toBeVisible();
+        await expect(dialog.locator('#plotter-diagnostics-toggle')).toHaveAttribute('aria-expanded', 'false');
       } catch (e) {
         failures.push(`Plotter tabs: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
       }

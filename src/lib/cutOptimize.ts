@@ -33,12 +33,17 @@ export function bounds(polys: PolyLite[]): { minX: number; minY: number; maxX: n
  * Mirror a polyline set horizontally (HTV) or vertically about the centre
  * of its own bounding box, so coordinates stay in the same positive region —
  * the cutter still sees the art in the same place, just flipped.
+ *
+ * `around` is the mirror line of a LARGER set this one is cut as part of
+ * (`bounds(larger).minX + maxX` for 'h'). A job is sent in kind groups, and
+ * the printed sheet is flipped as one piece: every group must flip about the
+ * same line, or each group about its own centre slides the kinds apart.
  */
-export function mirrorPolys(polys: PolyLite[], axis: 'h' | 'v'): PolyLite[] {
+export function mirrorPolys(polys: PolyLite[], axis: 'h' | 'v', around?: number): PolyLite[] {
   const b = bounds(polys);
   if (!b) return polys;
-  const mx = b.minX + b.maxX;
-  const my = b.minY + b.maxY;
+  const mx = axis === 'h' ? around ?? b.minX + b.maxX : b.minX + b.maxX;
+  const my = axis === 'v' ? around ?? b.minY + b.maxY : b.minY + b.maxY;
   return polys.map(p => ({
     closed: p.closed,
     points: p.points.map(([x, y]) => (axis === 'h' ? [mx - x, y] : [x, my - y]) as [number, number]),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import { getCanvas } from '../lib/canvasEngine';
 import { buildSimTimeline, cutPrefixPoints, formatDuration, optimizeOrder, sampleSimTimeline, type PolyLite, type SimTimeline } from '../lib/cutOptimize';
@@ -60,8 +60,14 @@ interface Bounds { minX: number; minY: number; w: number; h: number }
  * a single millimetre of vinyl is touched.
  *
  * Everything is mm-space (same as CutPath). The SVG viewBox is mm, but
- * strokes use `vector-effect: non-scaling-stroke` so line weights stay
- * crisp at any preview scale instead of vanishing on a small sticker.
+ * strokes use `vector-effect: non-scaling-stroke` so every LINE — cut line,
+ * positioning marks, start marker, order arrows — stays the same thin weight
+ * (and the same dash rhythm) at any preview scale, from a 10 mm sticker to a
+ * full sheet. Shapes that cannot use it (the marks' corner dots, the replay's
+ * cutter head) are sized through `onScreen()` instead, so they too keep a
+ * constant on-screen size. The sheet's checkerboard follows the app theme via
+ * the --panel tokens: a hard-coded dark board read as a thick black border
+ * around the page in the light theme.
  */
 export function CutPreview({
   cutPaths,
@@ -80,13 +86,26 @@ export function CutPreview({
   const t = useT();
   // Rasterise the canvas once per render-input change. Tainted-canvas
   // (cross-origin image) safely degrades to "no print overlay".
+  // toDataURL() renders the canvas AS SEEN — current zoom and pan included —
+  // while cut paths are document-space. The raster is therefore placed where
+  // the visible viewport sits in the document (viewportTransform maps document
+  // px → raster px), so the artwork lands under its cut lines at any zoom.
   const print = useMemo(() => {
     if (!showPrint) return null;
     const c = getCanvas();
     if (!c) return null;
     try {
       const url = c.toDataURL({ format: 'png', multiplier: 1 });
-      return { url, wMm: c.getWidth() / MM_TO_PX, hMm: c.getHeight() / MM_TO_PX };
+      const vpt = c.viewportTransform;
+      const sx = vpt[0] || 1;
+      const sy = vpt[3] || 1;
+      return {
+        url,
+        x: -vpt[4] / sx / MM_TO_PX,
+        y: -vpt[5] / sy / MM_TO_PX,
+        wMm: c.getWidth() / sx / MM_TO_PX,
+        hMm: c.getHeight() / sy / MM_TO_PX,
+      };
     } catch {
       return null; // tainted canvas — skip the overlay, keep the cut lines
     }
@@ -101,13 +120,38 @@ export function CutPreview({
       }
     }
     if (print) {
-      minX = Math.min(minX, 0); minY = Math.min(minY, 0);
-      maxX = Math.max(maxX, print.wMm); maxY = Math.max(maxY, print.hMm);
+      minX = Math.min(minX, print.x); minY = Math.min(minY, print.y);
+      maxX = Math.max(maxX, print.x + print.wMm); maxY = Math.max(maxY, print.y + print.hMm);
     }
     if (!Number.isFinite(minX)) return null;
     const pad = Math.max(4, (maxX - minX + maxY - minY) * 0.03);
     return { minX: minX - pad, minY: minY - pad, w: (maxX - minX) + pad * 2, h: (maxY - minY) + pad * 2 };
   }, [cutPaths, print]);
+
+  // On-screen scale (px per mm). Measured from the rendered sheet through a
+  // ref callback + ResizeObserver — the only place this component sets state
+  // outside an event, and never synchronously inside an effect.
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const [boxPx, setBoxPx] = useState({ w: 0, h: 0 });
+  const measureRef = useCallback((el: SVGSVGElement | null) => {
+    if (!el) return;
+    const measure = () => setBoxPx({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    if (typeof ResizeObserver === 'undefined') return; // non-browser environment
+    resizeObserverRef.current?.disconnect();
+    resizeObserverRef.current = new ResizeObserver(measure);
+    resizeObserverRef.current.observe(el);
+  }, []);
+  useEffect(() => () => {
+    resizeObserverRef.current?.disconnect();
+    resizeObserverRef.current = null;
+  }, []);
+  // `preserveAspectRatio="meet"` scales both axes alike: the tighter fit wins.
+  const pxPerMm = bounds && boxPx.w > 0 && boxPx.h > 0
+    ? Math.min(boxPx.w / bounds.w, boxPx.h / bounds.h)
+    : 0;
+  /** User-unit size for something that should be `px` pixels on screen. */
+  const onScreen = (px: number) => (pxPerMm > 0 ? px / pxPerMm : px);
 
   // Simulation timeline: expand passes (like the job estimate), order exactly
   // the way the output does, then hand off to the animated overlay + controls.
@@ -177,25 +221,30 @@ export function CutPreview({
 
   const renderSvg = (overlay: React.ReactNode) => (
     <svg
+      ref={measureRef}
       viewBox={`${bounds.minX} ${bounds.minY} ${bounds.w} ${bounds.h}`}
       className={className}
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={t('Cut preview')}
     >
-      {/* Checkerboard so a transparent print / empty sheet reads as "page". */}
+      {/* Checkerboard so a transparent print / empty sheet reads as "page".
+          Theme tokens (--panel2 / --panel3) instead of hard-coded dark tones:
+          the board shows as a margin around the print raster, and on a dark
+          board that margin looked like a thick black border in the light
+          theme. Fallbacks are the former dark-theme colours. */}
       <defs>
         <pattern id="cut-checker" width="6" height="6" patternUnits="userSpaceOnUse">
-          <rect width="6" height="6" fill="#1b1b22" />
-          <rect width="3" height="3" fill="#23232c" />
-          <rect x="3" y="3" width="3" height="3" fill="#23232c" />
+          <rect width="6" height="6" style={{ fill: 'var(--panel2, #1b1b22)' }} />
+          <rect width="3" height="3" style={{ fill: 'var(--panel3, #23232c)' }} />
+          <rect x="3" y="3" width="3" height="3" style={{ fill: 'var(--panel3, #23232c)' }} />
         </pattern>
       </defs>
       <rect x={bounds.minX} y={bounds.minY} width={bounds.w} height={bounds.h} fill="url(#cut-checker)" />
 
       {/* Printed artwork, faint, so the cut lines pop on top. */}
       {print && (
-        <image href={print.url} x={0} y={0} width={print.wMm} height={print.hMm} opacity={0.85} preserveAspectRatio="none" />
+        <image href={print.url} x={print.x} y={print.y} width={print.wMm} height={print.hMm} opacity={0.85} preserveAspectRatio="none" />
       )}
 
       <g transform={mirror ? `translate(${(bounds.minX + bounds.minX + bounds.w)} 0) scale(-1 1)` : undefined}>
@@ -216,7 +265,9 @@ export function CutPreview({
       })}
 
       {/* Registration / positioning marks — amber solid + a dot on the
-          corner so the alignment point is unmistakable. */}
+          corner so the alignment point is unmistakable. The dot is sized for
+          the screen (onScreen), not in mm: a fixed mm radius was a 56 px blob
+          on a small sticker and a 2 px speck on a full sheet. */}
       {regmarks.map((p) => (
         <polyline
           key={p.id}
@@ -237,7 +288,7 @@ export function CutPreview({
             key={`${p.id}-dot`}
             cx={corner[0]}
             cy={corner[1]}
-            r={1.4}
+            r={onScreen(2.6)}
             fill="#ff9a1f"
             vectorEffect="non-scaling-stroke"
           />
@@ -326,6 +377,7 @@ export function CutPreview({
       kinds={sim.kinds}
       feedMmMin={feedMmMin}
       etaSeconds={etaSeconds}
+      pxPerMm={pxPerMm}
       svg={renderSvg}
       className={className}
     />
@@ -347,12 +399,14 @@ function prefersReducedMotion(): boolean {
  * unmount and when the job finishes; jumps straight to the end for
  * reduced-motion users.
  */
-function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, svg, className }: {
+function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, pxPerMm, svg, className }: {
   timeline: SimTimeline;
   kinds: string[];
   feedMmMin: number;
   /** Display-only total override — see CutPreviewProps.etaSeconds. */
   etaSeconds?: number;
+  /** On-screen px per mm (0 = not measured) — keeps the head marker constant. */
+  pxPerMm: number;
   svg: (overlay: React.ReactNode) => React.ReactNode;
   className?: string;
 }) {
@@ -417,7 +471,10 @@ function CutSimulation({ timeline, kinds, feedMmMin, etaSeconds, svg, className 
   }, [timeline]);
 
   const state = sampleSimTimeline(timeline, elapsed);
-  const headR = 2.5; // fixed-size cutter-head marker (non-scaling stroke)
+  // Cutter-head marker: a constant ~4.5 px on screen whatever the zoom (the
+  // 4 px on-screen arm gap below follows it). Falls back to the former 2.5 mm
+  // before the first measurement / where no size can be measured.
+  const headR = pxPerMm > 0 ? 4.5 / pxPerMm : 2.5;
 
   // Ink + travel overlay driven by the sampled state.
   const overlay = (

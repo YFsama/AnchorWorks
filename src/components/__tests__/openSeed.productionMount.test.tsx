@@ -197,7 +197,10 @@ describe('open-time seeding under the production (conditional) mount', () => {
   });
 
   describe('Plotter', () => {
-    it('lands on Machine while nothing is linked and on Output once connected', () => {
+    it('lands on Output (the cut preview) whether or not a plotter is linked', () => {
+      // 2026-11 rework: the preview is what the dialog opens on in both cases
+      // (it used to open on Machine while nothing was linked); the connection
+      // strip on that tab is the way into the Machine tab.
       const link = getSharedPlotterLink();
       const realStatus = link.status;
       try {
@@ -210,7 +213,7 @@ describe('open-time seeding under the production (conditional) mount', () => {
 
       unmountAll();
       const idle = mountLikeApp(<PlotterDialog />, { showPlotter: true });
-      expect(selectedPlotterTab(idle)).toBe('machine');
+      expect(selectedPlotterTab(idle)).toBe('output');
     });
   });
 });

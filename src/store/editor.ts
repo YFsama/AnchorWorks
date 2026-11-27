@@ -48,6 +48,26 @@ export interface CutPath {
 }
 
 /**
+ * Transient "what will the plotter cut" preview drawn on the canvas by
+ * CutPathLayer while the Plotter dialog is open. Derived state: whoever owns
+ * the dialog settings computes it (see lib/cutPreview.ts) and stores it here
+ * so the overlay can read it without React context. Never persisted, never
+ * part of undo history or autosave — those only look at `cutPaths`.
+ */
+export interface CanvasCutPreview {
+  /** Cut lines the machine would follow for the current job, document mm (Y down, like CutPath). */
+  paths: CutPath[];
+  /** Machine origin corner, from the Plotter settings: true = bottom-left
+   *  (machine (0,0) sits at document (0, paperHeightMm)), false = top-left
+   *  (machine (0,0) sits at document (0, 0)). */
+  originBottomLeft: boolean;
+  /** "Paper height" from the Plotter settings, in mm — the material band drawn from the origin. */
+  paperHeightMm: number;
+  /** Mirroring is on: the machine cuts a left-right mirrored copy of the design. */
+  mirror: boolean;
+}
+
+/**
  * Pick the initial theme: explicit user choice in localStorage wins, then
  * the OS `prefers-color-scheme` hint, finally a dark fallback. SSR-safe.
  */
@@ -230,6 +250,11 @@ interface EditorState {
   clearCutPaths: (kind?: CutPath['kind']) => void;
   setCutPathsVisible: (v: boolean) => void;
 
+  // Canvas cut preview — transient overlay state (see CanvasCutPreview).
+  // Not persisted, not in history: setting it never marks the document dirty.
+  canvasCutPreview: CanvasCutPreview | null;
+  setCanvasCutPreview: (p: EditorState['canvasCutPreview']) => void;
+
   // User guides — persistent ruler-dragged guide lines (scene-space position).
   // `axis: 'h'` is a horizontal line varying in Y; 'v' is vertical varying in X.
   // `guideDrag` holds the live drag preview while pulling a new guide off a ruler.
@@ -408,6 +433,8 @@ export const useEditor = create<EditorState>((set) => ({
     cutPaths: kind ? st.cutPaths.filter(p => p.kind !== kind) : [],
   })),
   setCutPathsVisible: (v) => set({ cutPathsVisible: v }),
+  canvasCutPreview: null,
+  setCanvasCutPreview: (p) => set({ canvasCutPreview: p }),
 
   userGuides: loadGuides(),
   guidesLocked: false,

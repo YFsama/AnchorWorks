@@ -98,24 +98,52 @@ export interface IdentifyResult {
   summary: string;
 }
 
+/** grbl's answer to `$I`, reduced to its build string. The buffer a query
+ *  harvests often has the controller's boot banner in front (it is printed
+ *  when the port opens) and always ends in `ok` — neither is the build. */
+export function cleanGrblBuild(reply: string): string {
+  return reply
+    .split(/[\r\n]+/)
+    .map(s => s.trim())
+    .filter(s => s && !/^ok$/i.test(s) && !/^grbl\b/i.test(s))
+    .join(' ');
+}
+
 /** Query a connected machine for its identity: OI; (model), OE; (error),
  *  OH; (page) — or $I (firmware build) on grbl. Silent replies are normal
  *  for clones — the summary says so instead of claiming a fault. */
 export async function identifyMachine(link: Pick<PlotterLink, 'status' | 'query'>, format: 'gcode' | 'hpgl'): Promise<IdentifyResult> {
   if (format === 'gcode') {
-    const build = await link.query('$I', 1200).catch(() => '');
-    const model = build.replace(/[\r\n]+/g, ' ').trim();
+    const build = cleanGrblBuild(await link.query('$I', 1200).catch(() => ''));
     return {
-      model,
+      model: build,
       error: null,
       page: null,
-      suggestedProfileId: model ? 'grbl-generic' : null,
-      summary: model
-        ? `grbl firmware: ${model}`
+      suggestedProfileId: build ? 'grbl-generic' : null,
+      summary: build
+        ? `grbl firmware: ${build}`
         : 'No reply — the controller may be locked (try Unlock) or the baud is wrong.',
     };
   }
-  const model = (await link.query('OI;', 1200).catch(() => '')).replace(/[\r\n;]+/g, '').trim();
+  const oiRaw = await link.query('OI;', 1200).catch(() => '');
+  const oiReply = oiRaw.replace(/[\r\n;]+/g, '').trim();
+  // Same guard as autoDetectCutter: `error:N` to OI; means "not an HP-GL
+  // plotter" (a grbl controller), so identify it as grbl instead of
+  // reporting an HP-GL machine whose model is the error text. The raw reply
+  // is tested: a controller's boot banner sits in front of the first answer.
+  if (isRejectReply(oiRaw)) {
+    const build = cleanGrblBuild(await link.query('$I', 1200).catch(() => ''));
+    return {
+      model: build,
+      error: null,
+      page: null,
+      suggestedProfileId: build ? 'grbl-generic' : null,
+      summary: build
+        ? `grbl firmware: ${build} — switch the output format to G-code`
+        : `Not an HP-GL plotter: it answered OI; with "${oiReply}" (a grbl-style error) but stayed silent to $I.`,
+    };
+  }
+  const model = oiReply;
   const errReply = (await link.query('OE;', 800).catch(() => '')).replace(/[\r\n;]+/g, '').trim();
   const pageReply = (await link.query('OH;', 800).catch(() => '')).replace(/[\r\n;]+/g, '').trim();
   const suggested = suggestProfileFromModel(model);
@@ -127,6 +155,14 @@ export async function identifyMachine(link: Pick<PlotterLink, 'status' | 'query'
     ? `Machine answered: ${parts.join(' · ')}${suggested ? ' — profile suggested' : ''}`
     : 'No reply to OI; — very common for Chinese clones (they ignore status queries). Judge the link by the self-test and a test cut instead.';
   return { model, error: errReply || null, page: pageReply || null, suggestedProfileId: suggested, summary };
+}
+
+/** A reply that is a protocol rejection rather than data — grbl answers any
+ *  statement it does not understand with `error:N`. The line is looked for
+ *  anywhere in the reply: whatever was in the buffer in front of it (the
+ *  boot banner a controller prints when the port opens) must not hide it. */
+export function isRejectReply(reply: string): boolean {
+  return /(?:^|[\r\n])\s*error\s*:\s*\d+/i.test(reply.trim());
 }
 
 export interface DetectedCutter {
@@ -162,6 +198,9 @@ export interface AutoDetectOptions {
   onLog?: (line: string) => void;
   /** Extra bauds to try per port (defaults cover clones + grbl). */
   bauds?: number[];
+  /** Stop between attempts — the operator pressed Connect, or left the page.
+   *  The port being probed right now is still closed cleanly. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -197,22 +236,31 @@ export async function autoDetectCutter(
     ];
     const bauds = opts.bauds ?? [...new Set(defaultBauds)];
     for (const baud of bauds) {
+      if (opts.signal?.aborted) break outer;
       try {
         await link.open({ portPath: port.path, baud, flowControl: flow });
       } catch {
         log(`${port.path} (${chipName}) @ ${baud} — open failed`);
         continue;
       }
-      const model = (await link.query('OI;', 700).catch(() => '')).replace(/[\r\n;]+/g, '').trim();
+      const oiRaw = await link.query('OI;', 700).catch(() => '');
+      const oiReply = oiRaw.replace(/[\r\n;]+/g, '').trim();
+      // A grbl controller rejects the HP-GL probe with `error:N`. That is a
+      // protocol rejection, not a model string: count it as "no reply" so the
+      // `?` probe below gets its chance. (It used to be taken for an HP-GL
+      // machine called "error:20", and the controller was never recognised.)
+      const model = isRejectReply(oiRaw) ? '' : oiReply;
       let grbl = false;
       let grblBuild = '';
       if (!model) {
-        const q = (await link.query('?', 700).catch(() => '')).trim();
-        grbl = q.startsWith('<');
+        // A status report on any of its lines counts — the boot banner may
+        // still be sitting in front of it on a real controller.
+        const q = await link.query('?', 700).catch(() => '');
+        grbl = q.split(/[\r\n]+/).some(line => line.trim().startsWith('<'));
         // Firmware build while the port is open — feeds the identify
         // report and the grbl profile suggestion.
         if (grbl) {
-          grblBuild = (await link.query('$I', 900).catch(() => '')).replace(/[\r\n]+/g, ' ').trim();
+          grblBuild = cleanGrblBuild(await link.query('$I', 900).catch(() => ''));
         }
       }
       await link.close();

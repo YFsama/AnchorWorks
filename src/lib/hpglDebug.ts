@@ -954,7 +954,10 @@ export function parsePositionReply(format: OutputFormat, reply: string, unit: 'm
   if (!raw) return null;
   if (format === 'gcode') {
     // <Idle|MPos:10.500,20.000,5.000|FS:400,0> / <Run|WPos:…>
-    const m = raw.match(/^<(\w+)(?::\d+)?\|(?:[A-Za-z]+:)?(M|W)Pos:(-?[\d.]+),(-?[\d.]+)/);
+    // The buffer also holds whatever piled up in front of the report — the
+    // boot banner, the `ok` of every job line already executed — so take the
+    // LAST report in it rather than anchoring at the start.
+    const m = [...raw.matchAll(/<(\w+)(?::\d+)?\|(?:[A-Za-z]+:)?(M|W)Pos:(-?[\d.]+),(-?[\d.]+)/g)].pop();
     if (!m) return null;
     return { x: Number(m[3]), y: Number(m[4]), state: m[1] };
   }

@@ -50,6 +50,11 @@ export interface PlotterOptions {
    *  the classic CAMM behaviour; turn off to nest several jobs on one
    *  piece of material. */
   ejectAfter: boolean;
+  /** HP-GL only — emit the `IN;` initializer in the header. `IN` resets the
+   *  scaling points on an HP-GL-compliant plotter, which throws away an
+   *  origin set with the app's Set origin (`IP;`), so calibration and
+   *  positioning patterns leave it out. Default true. */
+  initialize?: boolean;
   /** Mirror output horizontally — required for heat-transfer vinyl (HTV),
    *  which is cut from the carrier side and applied face-down. */
   mirror: boolean;
@@ -332,7 +337,13 @@ export function svgToPolylines(svg: string, opts: PlotterOptions): Polyline[] {
   const root = doc.documentElement;
   const polylines: Polyline[] = [];
 
+  // Subtrees that never contain cut geometry. `<defs>` matters most: a
+  // canvas with clipping masks exports each clip shape as a `<path>` inside
+  // `<defs><clipPath>`, and walking it cut the clip outline as a stray line.
+  const SKIPPED = new Set(['defs', 'clipPath', 'mask', 'pattern', 'marker', 'symbol', 'style', 'title', 'desc', 'metadata', 'foreignObject']);
+
   const walk = (node: Element, parentMatrix: DOMMatrix) => {
+    if (SKIPPED.has(node.tagName)) return;
     const m = matrixForNode(node, parentMatrix);
     if (node.tagName === 'path') {
       const d = node.getAttribute('d') ?? '';
@@ -344,12 +355,19 @@ export function svgToPolylines(svg: string, opts: PlotterOptions): Polyline[] {
     } else if (node.tagName === 'rect') {
       const x = +node.getAttribute('x')!, y = +node.getAttribute('y')!;
       const w = +node.getAttribute('width')!, h = +node.getAttribute('height')!;
-      polylines.push({
-        points: [
-          transform(m, x, y), transform(m, x + w, y), transform(m, x + w, y + h), transform(m, x, y + h),
-        ],
-        closed: true,
-      });
+      // The document background is exported as `<rect width="100%" …>`. A
+      // percentage is not a number, and this used to flatten to four NaN
+      // corners that went out on the wire as `PD NaN,NaN,…` — a pen-down at
+      // an illegal position at the start of every canvas-mode job. A
+      // zero-size rect has no outline to cut either.
+      if (w > 0 && h > 0) {
+        polylines.push({
+          points: [
+            transform(m, x, y), transform(m, x + w, y), transform(m, x + w, y + h), transform(m, x, y + h),
+          ],
+          closed: true,
+        });
+      }
     } else if (node.tagName === 'circle') {
       const cx = +node.getAttribute('cx')!, cy = +node.getAttribute('cy')!, r = +node.getAttribute('r')!;
       polylines.push(flattenEllipse(cx, cy, r, r, m, opts.curveTolerance));
@@ -368,8 +386,13 @@ export function svgToPolylines(svg: string, opts: PlotterOptions): Polyline[] {
   };
   walk(root, new DOMMatrix());
 
+  // Last line of defence for every shape type: a node with a missing or
+  // non-numeric attribute (percentages, `auto`, units) flattens to NaN / no
+  // points, and none of that may reach the machine.
+  const finite = (pl: Polyline) => pl.points.length >= 2 && pl.points.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+
   // Convert from px -> user units, flip Y if originBottomLeft
-  return polylines.map(pl => ({
+  return polylines.filter(finite).map(pl => ({
     closed: pl.closed,
     points: pl.points.map(([x, y]) => {
       const ux = x / opts.pxPerUnit;
@@ -382,12 +405,87 @@ export function svgToPolylines(svg: string, opts: PlotterOptions): Polyline[] {
 function matrixForNode(node: Element, parent: DOMMatrix): DOMMatrix {
   const t = node.getAttribute('transform');
   if (!t) return parent;
-  try {
-    const local = new DOMMatrix(t);
-    return parent.multiply(local);
-  } catch {
-    return parent;
+  const local = parseSvgTransform(t);
+  return local ? parent.multiply(local) : parent;
+}
+
+/**
+ * One transform argument with its unit taken off. `px` and unitless are the
+ * canvas's user units; the other absolute units are converted at 96 dpi (the
+ * canvas's CSS px), `deg` is the identity. NaN for anything else
+ * (percentages, `em`, …) so the caller can skip that step.
+ */
+function svgTransformNumber(token: string): number {
+  const m = /^([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)(px|mm|cm|in|pt|pc|q|deg|grad|rad|turn)?$/i.exec(token.trim());
+  if (!m) return NaN;
+  const n = Number(m[1]);
+  switch ((m[2] ?? '').toLowerCase()) {
+    case 'mm': return n * 96 / 25.4;
+    case 'cm': return n * 96 / 2.54;
+    case 'in': return n * 96;
+    case 'pt': return n * 96 / 72;
+    case 'pc': return n * 16;
+    case 'q': return n * 96 / 101.6;
+    default: return n;
   }
+}
+
+/**
+ * Parse an SVG `transform` attribute into a single matrix.
+ *
+ * Fabric serialises every placed element as `transform="matrix(a b c d e f)"`
+ * — space-separated. That is valid SVG, but the DOMMatrix string
+ * constructor runs the *CSS* parser, which only accepts commas, so
+ * `new DOMMatrix(t)` threw a SyntaxError on every transformed node. The old
+ * catch swallowed it and returned the parent matrix, which silently
+ * flattened every object at the page origin: canvas-mode jobs lost all
+ * positions, rotations and scales on the wire. So the numbers are parsed
+ * here explicitly; `matrix`, `translate`, `scale` and `rotate` are supported
+ * with either separator and with or without a unit (`50px` is `50`). Returns
+ * null when nothing in the list parses.
+ */
+function parseSvgTransform(t: string): DOMMatrix | null {
+  let m = new DOMMatrix();
+  let parsedAny = false;
+  const fn = /(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = fn.exec(t))) {
+    const args = match[2].trim().split(/[\s,]+/).filter(Boolean).map(svgTransformNumber);
+    if (!args.length || !args.every(Number.isFinite)) continue;
+    // Built from the six numbers, never through the instance methods: the
+    // maths is the same everywhere, test stand-ins for DOMMatrix included.
+    let step: DOMMatrix | null = null;
+    switch (match[1].toLowerCase()) {
+      case 'matrix':
+        if (args.length === 6) step = new DOMMatrix(args);
+        break;
+      case 'translate':
+        step = new DOMMatrix([1, 0, 0, 1, args[0], args[1] ?? 0]);
+        break;
+      case 'scale':
+        step = new DOMMatrix([args[0], 0, 0, args[1] ?? args[0], 0, 0]);
+        break;
+      case 'rotate': {
+        // rotate(a[, cx cy]): about the origin, or about (cx, cy) when given.
+        const r = args[0] * Math.PI / 180;
+        const c = Math.cos(r), s = Math.sin(r);
+        const cx = args.length >= 3 ? args[1] : 0, cy = args.length >= 3 ? args[2] : 0;
+        step = new DOMMatrix([c, s, -s, c, cx - cx * c + cy * s, cy - cx * s - cy * c]);
+        break;
+      }
+      case 'skewx':
+        step = new DOMMatrix([1, 0, Math.tan(args[0] * Math.PI / 180), 1, 0, 0]);
+        break;
+      case 'skewy':
+        step = new DOMMatrix([1, Math.tan(args[0] * Math.PI / 180), 0, 1, 0, 0]);
+        break;
+    }
+    if (step) {
+      m = m.multiply(step);
+      parsedAny = true;
+    }
+  }
+  return parsedAny ? m : null;
 }
 
 function transform(m: DOMMatrix, x: number, y: number): [number, number] {
@@ -542,7 +640,12 @@ export function generateGCode(polylines: Polyline[], opts: PlotterOptions): stri
   if (spindle) lines.push('M5');
   lines.push('G0 X0 Y0');
   lines.push('M30 ; end');
-  return lines.join('\n');
+  // Trailing newline: grbl (and the simulator) execute a line only when it
+  // is terminated. Without it the NEXT whole-line command sent on the link —
+  // `G92 X0 Y0` from Set origin, a `$J=` jog — was appended to `M30 ; end`
+  // and swallowed by that comment, so Set origin silently did nothing after
+  // a job.
+  return `${lines.join('\n')}\n`;
 }
 
 /** Page footprint in plotter units: at least the geometry plus a margin,
@@ -563,9 +666,15 @@ function pageFootprint(polylines: Polyline[], opts: PlotterOptions): { pageW: nu
  *  configured force/speed embedded (not just Graphtec — Roland-dialect
  *  clones need it in the file too, or they cut with whatever pressure the
  *  panel last had). The bare dialect targets real HP pen plotters, where
- *  FS/VS would be a command error, so it stays clean. */
+ *  FS/VS would be a command error, so it stays clean.
+ *
+ *  `initialize` false leaves out every `IN;`: on an HP-GL-compliant plotter
+ *  `IN` resets P1/P2, which throws away an origin the operator just set
+ *  with `IP;` (the app's Set origin). Calibration and positioning patterns
+ *  exist to check where that origin is, so they are emitted without it. */
 function hpglDialectHeader(opts: PlotterOptions, pageW: number, pageH: number): string[] {
   const dialect = opts.dialect ?? 'bare';
+  const initialize = opts.initialize !== false;
   if (dialect === 'roland-camm') {
     // Matches the `TB25;11280,7920;CT1;` template from real Roland-flavoured
     // cutter files. TB sets overcut depth (corner overshoot for clean
@@ -576,23 +685,21 @@ function hpglDialectHeader(opts: PlotterOptions, pageW: number, pageH: number): 
       `TB${opts.rolandOvercutUnits};`,
       `${pageW},${pageH};`,
       'CT1;',
-      'IN;',
-      'IN;',
-      'IN;',
-      'PA;',
     ];
+    if (initialize) parts.push('IN;', 'IN;', 'IN;');
+    parts.push('PA;');
     if (opts.graphtecForce > 0) parts.push(`FS${Math.round(opts.graphtecForce)};`);
     if (opts.graphtecSpeed > 0) parts.push(`VS${Math.round(opts.graphtecSpeed)};`);
     return parts;
   }
   if (dialect === 'graphtec-fc') {
-    const parts = ['IN;', 'SP1;'];
+    const parts = initialize ? ['IN;', 'SP1;'] : ['SP1;'];
     if (opts.graphtecForce > 0) parts.push(`FS${Math.round(opts.graphtecForce)};`);
     if (opts.graphtecSpeed > 0) parts.push(`VS${Math.round(opts.graphtecSpeed)};`);
     parts.push('PA;');
     return parts;
   }
-  return ['IN;', 'SP1;'];
+  return initialize ? ['IN;', 'SP1;'] : ['SP1;'];
 }
 
 /** Dialect-specific closing statements. Roland ejects (`!PG;`) unless the
@@ -706,20 +813,46 @@ export function buildPlotterOutput(
       if (g) g.push(polylines[i]);
       else groups.set(r, [polylines[i]]);
     }
+    // One mirror line for the whole job. The printed sheet is flipped as one
+    // piece, so every kind must flip about the same line — each group about
+    // its own centre slid the kinds apart (a kiss-cut window landed next to
+    // its print), and disagreed with the canvas overlay, which flips the job.
+    const mirrorLine = opts.mirror ? jobMirrorLine(polylines) : undefined;
     polylines = [...groups.entries()]
       .sort((a, b) => a[0] - b[0])
-      .flatMap(([, g]) => postProcess(g, opts));
+      .flatMap(([, g]) => postProcess(g, opts, mirrorLine));
   } else {
     polylines = postProcess(polylines, opts);
   }
   return format === 'gcode' ? generateGCode(polylines, opts) : generateHPGL(polylines, opts);
 }
 
+/** The horizontal mirror line of a whole job (`minX + maxX` of its cut
+ *  paths), or undefined when there is nothing to measure. */
+function jobMirrorLine(polylines: Polyline[]): number | undefined {
+  let minX = Infinity, maxX = -Infinity;
+  for (const pl of polylines) for (const [x] of pl.points) {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+  }
+  return Number.isFinite(minX) ? minX + maxX : undefined;
+}
+
 /** Apply order optimisation + mirroring per the options. Exported so the
- *  preview/stats UI can mirror the exact geometry the machine will receive. */
+ *  preview/stats UI can mirror the exact geometry the machine will receive.
+ *
+ *  `overcutMm` / `bladeOffsetMm` are millimetres — by name and in the UI —
+ *  while `polylines` are in USER UNITS, which is inches for an inch job.
+ *  They used to be applied as-is, so every inch-mode job cut an overcut and
+ *  blade-offset loop 25.4× too large (0.25 mm became 0.25 in = 6.35 mm).
+ *  `unit` is optional: a caller that passes already-converted user-unit
+ *  values (plotterCalibration.ts) simply omits it and gets no conversion.
+ *  `mirrorLine` is the job-wide mirror line when `polylines` is one group of
+ *  a larger job (see `mirrorPolys`); without it the set mirrors about itself. */
 export function postProcess(
   polylines: Array<{ points: Array<[number, number]>; closed: boolean }>,
-  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm' | 'bladeOffsetMm' | 'reverse' | 'insideFirst'>,
+  opts: Pick<PlotterOptions, 'optimize' | 'mirror' | 'overcutMm' | 'bladeOffsetMm' | 'reverse' | 'insideFirst'> & Partial<Pick<PlotterOptions, 'unit'>>,
+  mirrorLine?: number,
 ): Array<{ points: Array<[number, number]>; closed: boolean }> {
   let out = polylines;
   if (opts.optimize) out = optimizeOrder(out);
@@ -727,12 +860,13 @@ export function postProcess(
   // (which it stably preserves within each containment band).
   if (opts.insideFirst) out = sortInsideFirst(out);
   if (opts.reverse) out = reversePolys(out);
-  if (opts.overcutMm > 0) out = applyOvercut(out, opts.overcutMm);
+  const mmPerUnit = opts.unit === 'in' ? 25.4 : 1; // mm → user units
+  if (opts.overcutMm > 0) out = applyOvercut(out, opts.overcutMm / mmPerUnit);
   // Blade-offset loops go on after overcut and before mirroring, so the
   // mirror flips the finished (looped) geometry.
   const bladeOffsetMm = opts.bladeOffsetMm ?? 0;
-  if (bladeOffsetMm > 0) out = applyBladeOffset(out, bladeOffsetMm);
-  if (opts.mirror) out = mirrorPolys(out, 'h');
+  if (bladeOffsetMm > 0) out = applyBladeOffset(out, bladeOffsetMm / mmPerUnit);
+  if (opts.mirror) out = mirrorPolys(out, 'h', mirrorLine);
   return out;
 }
 

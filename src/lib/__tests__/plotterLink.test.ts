@@ -6,6 +6,7 @@ import {
   toDisplayAscii,
   toHex,
   LINK_CHUNK_BYTES,
+  type LinkEvent,
 } from '../plotterLink';
 
 describe('computeChunkDelayMs', () => {
@@ -195,6 +196,213 @@ describe('PlotterLink (web serial fake)', () => {
     await expect(link.send('JOBJOB')).rejects.toThrow('port unplugged');
     expect(link.status).toBe('error');
   });
+
+  it('cancels a stream mid-way on its job signal and reports the abort', async () => {
+    await link.open({ baud: 9600, flowControl: 'none' }); // paced: 320 ms between chunks
+    const controller = new AbortController();
+    const done: LinkEvent[] = [];
+    const off = link.subscribe((ev) => { if (ev.type === 'done') done.push(ev); });
+    const sending = link.send('X'.repeat(LINK_CHUNK_BYTES * 4), { jobId: 3, signal: controller.signal });
+      await new Promise(r => { setTimeout(r, 400); }); // two chunks out (0 ms, ~320 ms), the third still waiting
+      controller.abort();
+      await expect(sending).rejects.toMatchObject({ name: 'AbortError' });
+      off();
+      // One or two chunks out of four; the rest of the job never left.
+      expect(fake.written.length).toBeGreaterThanOrEqual(LINK_CHUNK_BYTES);
+      expect(fake.written.length).toBeLessThanOrEqual(LINK_CHUNK_BYTES * 2);
+      expect(done.at(-1)).toMatchObject({ aborted: true, jobId: 3, source: 'send' });
+  });
+
+  /* ------------------------------------------------------------------ *
+   * Serialised queries. Two questions are never on the line together, so
+   * a reply can only belong to the question that was asked — the job
+   * monitor's status poll used to be handed a position poll's answer.
+   * ------------------------------------------------------------------ */
+  describe('serialised queries', () => {
+    let link: PlotterLink;
+    let fake: ReturnType<typeof makeFakePort>;
+    const sleep = (ms: number): Promise<void> => new Promise((r) => { setTimeout(r, ms); });
+    const wire = (): string => new TextDecoder().decode(new Uint8Array(fake.written));
+    const say = (text: string): void => fake.enqueueRx(new TextEncoder().encode(text));
+
+    beforeEach(() => {
+      link = new PlotterLink();
+      fake = makeFakePort();
+      installSerial(fake);
+    });
+
+    afterEach(async () => {
+      await link.close().catch(() => undefined);
+      Object.defineProperty(window.navigator, 'serial', { value: undefined, configurable: true });
+    });
+
+    it('two overlapping queries each read the answer to their own question — the second is asked only once the first is answered', async () => {
+      await link.open({ baud: 9600, flowControl: 'hardware' });
+      const position = link.query('OA;', 1500);
+      const status = link.query('OS;', 1500);
+      await sleep(10);
+      expect(wire()).toBe('OA;'); // OS; is still in line
+      expect(link.querying).toBe(true);
+      say('400,800,0\r\n');
+      await expect(position).resolves.toBe('400,800,0\r\n'); // its own answer, not "2"
+      await sleep(10);
+      expect(wire()).toBe('OA;OS;'); // only now is the status question asked
+      say('2\r\n');
+      await expect(status).resolves.toBe('2\r\n'); // its own answer, not the position
+      expect(link.querying).toBe(false);
+    });
+
+    it('the other way round: the status question first, then the position question', async () => {
+      await link.open({ baud: 9600, flowControl: 'hardware' });
+      const status = link.query('OS;', 1500);
+      const position = link.query('OA;', 1500);
+      await sleep(10);
+      expect(wire()).toBe('OS;');
+      say('2\r\n');
+      await expect(status).resolves.toBe('2\r\n');
+      await sleep(10);
+      expect(wire()).toBe('OS;OA;');
+      say('400,800,0\r\n');
+      await expect(position).resolves.toBe('400,800,0\r\n');
+    });
+
+    it('a query standing behind a silent one goes out after that one times out — and its own clock starts then', async () => {
+      await link.open({ baud: 9600, flowControl: 'hardware' });
+      const silent = link.query('OE;', 60); // nobody answers this one
+      const status = link.query('OS;', 500);
+      await sleep(30);
+      expect(wire()).toBe('OE;');
+      await expect(silent).resolves.toBe('');
+      await sleep(10);
+      expect(wire()).toBe('OE;OS;');
+      await sleep(150); // well inside the status query's own 500 ms
+      expect(link.querying).toBe(true);
+      say('2\r\n');
+      await expect(status).resolves.toBe('2\r\n');
+    });
+
+    it('progress / done events name their sender: a query is source "query", a job send carries its jobId', async () => {
+      await link.open({ baud: 9600, flowControl: 'hardware' });
+      const events: LinkEvent[] = [];
+      const off = link.subscribe((ev) => { if (ev.type === 'progress' || ev.type === 'done') events.push(ev); });
+      await link.send('JOB', { jobId: 7 });
+      await link.query('OE;', 20);
+      await link.send('JOG'); // an untagged send: neither a job nor a query
+      off();
+      expect(events.filter((e) => e.type === 'progress')).toEqual([
+        { type: 'progress', sent: 3, total: 3, jobId: 7, source: 'send' },
+        { type: 'progress', sent: 3, total: 3, source: 'query' },
+        { type: 'progress', sent: 3, total: 3, source: 'send' },
+      ]);
+      const done = events.filter((e) => e.type === 'done');
+      expect(done.map((e) => (e as { jobId?: number }).jobId)).toEqual([7, undefined, undefined]);
+      expect(done.map((e) => (e as { source?: string }).source)).toEqual(['send', 'query', 'send']);
+    });
+
+    it('a query whose send fails takes its waiter back: nothing stays in flight, the next reply is not swallowed', async () => {
+      (fake as unknown as { writable: WritableStream<Uint8Array> }).writable = new WritableStream<Uint8Array>({
+        write() { return Promise.reject(new Error('port unplugged')); },
+      });
+      await link.open({ baud: 9600, flowControl: 'hardware' });
+      await expect(link.query('OE;', 1500)).rejects.toThrow('port unplugged');
+      expect(link.querying).toBe(false);
+      // No hang either: the link is down, and the next question is told so at once.
+      await expect(link.query('OS;', 100)).rejects.toThrow(/not connected/);
+    });
+
+    it('queries still in line when the link closes are dropped — not asked of the next connection', async () => {
+      await link.open({ baud: 9600, flowControl: 'hardware' });
+      const onTheLine = link.query('OE;', 5000); // asked, nobody answers
+      const behind = link.query('OS;', 5000); // waiting its turn
+      await sleep(10);
+      expect(wire()).toBe('OE;');
+      await link.close();
+      await expect(onTheLine).resolves.toBe('');
+      await expect(behind).resolves.toBe('');
+      await link.open({ baud: 9600, flowControl: 'hardware' });
+      await sleep(20);
+        expect(wire()).toBe('OE;'); // OS; never went out — not before, not after the reopen
+      });
+
+      /* ---- Reply matching: a question is answered only by what looks like ITS answer. ---- */
+
+      it('a status poll is not answered by the job’s late "ok" lines — only by a report', async () => {
+        await link.open({ baud: 9600, flowControl: 'hardware' });
+        const status = link.query('?', 400);
+        await sleep(10);
+        say('ok\r\n');
+        say('ok\r\nok\r\n'); // the acks of a job's last lines, still coming in
+        await sleep(20);
+        expect(link.querying).toBe(true); // still waiting for ITS answer
+        say('<Alarm|MPos:0.000,0.000,-1.000|FS:0,0>\r\n');
+        await expect(status).resolves.toBe('<Alarm|MPos:0.000,0.000,-1.000|FS:0,0>\r\n'); // the acks are not even in front of it
+      });
+
+      it('when nothing that looks like the answer ever comes, the question still gets everything that did', async () => {
+        await link.open({ baud: 9600, flowControl: 'hardware' });
+        const status = link.query('?', 120);
+        await sleep(10);
+        say('ok\r\n');
+        await sleep(10);
+        say('sure, why not\r\n'); // a controller with ideas of its own
+        await expect(status).resolves.toBe('ok\r\nsure, why not\r\n');
+        expect(link.querying).toBe(false);
+      });
+
+      it('HP-GL: a status poll is not answered by a position reply, nor a position poll by a status word', async () => {
+        await link.open({ baud: 9600, flowControl: 'hardware' });
+        const status = link.query('OS;', 400);
+        await sleep(10);
+        say('400,800,0\r\n'); // a late OA; answer
+        await sleep(20);
+        expect(link.querying).toBe(true);
+        say('2\r\n');
+        await expect(status).resolves.toBe('2\r\n');
+        const position = link.query('OA;', 400);
+        await sleep(10);
+        say('2\r\n'); // a late status word
+        await sleep(20);
+        expect(link.querying).toBe(true);
+        say('400,800,0\r\n');
+        await expect(position).resolves.toBe('400,800,0\r\n');
+      });
+
+      it('HP-GL: an ETX-terminated answer, and an echoed command in front of it, are still its answer', async () => {
+        await link.open({ baud: 9600, flowControl: 'hardware' });
+        const status = link.query('OS;', 300);
+        await sleep(10);
+        fake.enqueueRx(new TextEncoder().encode('2\x03'));
+        await expect(status).resolves.toBe('2\x03');
+        const echoed = link.query('oa;', 300);
+        await sleep(10);
+        say('oa;400, 800, 0\r\n');
+        await expect(echoed).resolves.toBe('oa;400, 800, 0\r\n');
+      });
+
+      it('a command with no known answer shape keeps the old rule: the first terminated data is the reply', async () => {
+        await link.open({ baud: 9600, flowControl: 'hardware' });
+        const model = link.query('OI;', 300);
+        await sleep(10);
+        say('HP7475A\r\n');
+        await expect(model).resolves.toBe('HP7475A\r\n');
+      });
+
+      it('grbl reads are answered by their data, never by a bare ok; a jog only ever gets its ok', async () => {
+        await link.open({ baud: 9600, flowControl: 'hardware' });
+        const build = link.query('$I', 400);
+        await sleep(10);
+        say('ok\r\n'); // the ack of a setting written just before
+        await sleep(20);
+        expect(link.querying).toBe(true);
+        say('[VER:1.1h.20190825:]\r\nok\r\n');
+        await expect(build).resolves.toBe('[VER:1.1h.20190825:]\r\nok\r\n');
+        const jog = link.query('$J=G91 G21 X1 F3000', 400);
+        await sleep(10);
+        say('ok\r\n');
+        await expect(jog).resolves.toBe('ok\r\n');
+      });
+    });
+
 describe('pause / resume gate', () => {
   it('parks the sender between chunks and completes after resume()', async () => {
     await link.open({ baud: 9600, flowControl: 'hardware' }); // no pacing delays

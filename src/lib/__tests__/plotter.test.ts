@@ -12,6 +12,8 @@ import {
   loadPlotterPrefs,
   applyDriftToPolylines,
 } from '../plotter';
+import { simulateMachineCode } from '../hpglDebug';
+import { previewGeometry } from '../cutPreview';
 
 /**
  * jsdom (as of v27) does not implement DOMMatrix or DOMPoint. plotter.ts
@@ -109,6 +111,47 @@ describe('svgToPolylines', () => {
     expect(polylines[0].closed).toBe(false);
     expect(polylines[0].points.length).toBe(2);
   });
+
+  // Canvas-mode jobs read the canvas SVG, where every object carries its
+  // placement as a transform. Losing one flattened the object at the page
+  // origin — on the wire, not only in the preview.
+  const placed = (transform: string): Array<[number, number]> => svgToPolylines(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><path d="M 0 0 L 10 0 L 10 10 Z" transform="${transform}"/></svg>`,
+    { ...defaultPlotterOptions, pxPerUnit: 1, originBottomLeft: false },
+  )[0].points;
+
+  it('applies the space-separated matrix fabric writes for every placed object', () => {
+    const pts = placed('matrix(1 0 0 1 50 60)');
+    expect(pts[0][0]).toBeCloseTo(50, 6);
+    expect(pts[0][1]).toBeCloseTo(60, 6);
+    expect(pts[1][0]).toBeCloseTo(60, 6);
+  });
+
+  it('applies translate however it is spelled — spaces, commas, and with a unit', () => {
+    for (const t of ['translate(50 60)', 'translate(50, 60)', 'translate(50px, 60px)', 'translate(50px 60px)']) {
+      const pts = placed(t);
+      expect(pts[0][0], t).toBeCloseTo(50, 6);
+      expect(pts[0][1], t).toBeCloseTo(60, 6);
+    }
+    // The cut preview rewrites transforms into CSS, which adds the unit.
+    const mm = placed('translate(25.4mm, 0)');
+    expect(mm[0][0]).toBeCloseTo(96, 3); // 25.4 mm at the canvas's 96 dpi
+  });
+
+  it('rotates about a centre and keeps a list of transforms in order', () => {
+    const about = placed('rotate(90 5 5)');
+    expect(about[0][0]).toBeCloseTo(10, 6);
+    expect(about[0][1]).toBeCloseTo(0, 6);
+    const both = placed('translate(100 0) scale(2)');
+    expect(both[2][0]).toBeCloseTo(120, 6); // (10 × 2) + 100
+    expect(both[2][1]).toBeCloseTo(20, 6);
+  });
+
+  it('ignores a transform it cannot read instead of inventing numbers', () => {
+    const pts = placed('translate(50%, 60)');
+    expect(pts[0][0]).toBeCloseTo(0, 6); // the attribute as a whole is not applied
+    expect(pts[1][0]).toBeCloseTo(10, 6);
+  });
 });
 
 describe('generateGCode', () => {
@@ -169,7 +212,11 @@ describe('generateGCode — spindle / laser option', () => {
       'G0 Z5.000 F3000',
       'G0 X0 Y0',
       'M30 ; end',
-    ].join('\n');
+      // The job ends with a newline: grbl runs a line only once it is
+      // terminated, and without it the next whole-line command on the link
+      // (`G92 X0 Y0` from Set origin) was appended to `M30 ; end` and
+      // swallowed by that comment.
+    ].join('\n') + '\n';
     expect(generateGCode(polylines, defaultPlotterOptions)).toBe(expected);
     expect(generateGCode(polylines, { ...defaultPlotterOptions, spindle: undefined })).toBe(expected);
   });
@@ -232,6 +279,21 @@ describe('generateHPGL', () => {
     const out = generateHPGL([], defaultPlotterOptions);
     expect(out).toMatch(/PU0,0;/);
     expect(out).toMatch(/SP0;/);
+  });
+
+  // `IN` resets the scaling points on an HP-GL-compliant plotter, which throws
+  // away an origin set with the app's Set origin (`IP;`). Calibration and
+  // positioning patterns are emitted without it; a job keeps it.
+  it('initialize: false leaves out every IN; in every dialect, and nothing else', () => {
+    const polylines = [{ points: [[1, 1], [2, 1]] as Array<[number, number]>, closed: false }];
+    for (const dialect of ['bare', 'roland-camm', 'graphtec-fc'] as const) {
+      const opts = { ...defaultPlotterOptions, dialect, graphtecForce: 20, graphtecSpeed: 5 };
+      const job = generateHPGL(polylines, opts);
+      const mark = generateHPGL(polylines, { ...opts, initialize: false });
+      expect(job, dialect).toMatch(/(?<![A-Za-z])IN;/);
+      expect(mark, dialect).not.toMatch(/(?<![A-Za-z])IN;/);
+      expect(mark.split('\n'), dialect).toEqual(job.split('\n').filter(l => l !== 'IN;')); // nothing else differs
+    }
   });
 });
 
@@ -453,6 +515,34 @@ describe('kiss/perf cut ordering', () => {
   it('groups through-cuts first, kiss, then perf (stable within groups)', () => {
     const out = buildPlotterOutput('hpgl', { ...defaultPlotterOptions, optimize: false }, cuts);
     expect(puOrder(out)).toEqual([800, 2400, 1600, 0]);
+  });
+
+  it('mirror: every kind flips about the whole job’s line, so a kiss-cut window follows its print', () => {
+    // A die-cut border with a kiss-cut window on its left (x 30–70 of 0–200).
+    const rect = (x0: number, y0: number, x1: number, y1: number): Array<[number, number]> =>
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
+    const job: Array<{ points: Array<[number, number]>; closed: boolean; kind: 'perf' | 'kiss' }> = [
+      { points: rect(0, 0, 200, 100), closed: true, kind: 'perf' },
+      { points: rect(30, 20, 70, 60), closed: true, kind: 'kiss' },
+    ];
+    const out = buildPlotterOutput('gcode', { ...defaultPlotterOptions, optimize: false, mirror: true }, job);
+    const round = (n: number) => Math.round(n * 1000) / 1000;
+    const xRanges = simulateMachineCode('gcode', out).cuts
+      .map((c) => [round(Math.min(...c.map(([x]) => x))), round(Math.max(...c.map(([x]) => x)))] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+    // The sheet is flipped as one piece: the border stays put and the window
+    // lands on its right. Each kind about its own centre left the window at
+    // 30–70 — beside the print it belongs to.
+    expect(xRanges).toEqual([[0, 200], [130, 170]]);
+    // …which is exactly where the canvas overlay draws it.
+    const overlay = previewGeometry({
+      paths: job.map((p, i) => ({ ...p, id: `p${i}` })),
+      originBottomLeft: false,
+      paperHeightMm: 210,
+      mirror: true,
+    });
+    expect(overlay.ghostPaths!.map((g) => [round(Math.min(...g.points.map(([x]) => x))), round(Math.max(...g.points.map(([x]) => x)))].sort((a, b) => a - b))
+      .sort((a, b) => a[0] - b[0])).toEqual([[0, 200], [130, 170]]);
   });
 
   it('still groups after travel optimisation reorders the job', () => {
@@ -678,5 +768,33 @@ describe('drift compensation — default origin flip + prefs round-trip + canvas
     const polys = [{ points: [[5, 5], [6, 5]] as Array<[number, number]>, closed: false }];
     const out = applyDriftToPolylines(polys, drift, { ...defaultPlotterOptions, unit: 'mm', originBottomLeft: false });
     expect(out).toBe(polys); // degenerate extent — no interpolation possible
+  });
+});
+
+describe('postProcess — overcutMm / bladeOffsetMm are millimetres in every unit', () => {
+  // A 1 × 1 square (user units), perimeter 4. The mm-named options used to be
+  // applied as-is on user-unit geometry, so an inch job cut an overcut and a
+  // blade-offset loop 25.4× too large (0.254 mm became 0.254 in).
+  type P = { points: Array<[number, number]>; closed: boolean };
+  const square: P[] = [{ points: [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]], closed: true }];
+  const totalLength = (polys: P[]) => polys.reduce(
+    (sum, p) => sum + p.points.slice(1).reduce((s, [x, y], i) => s + Math.hypot(x - p.points[i][0], y - p.points[i][1]), 0), 0);
+  const base = { optimize: false, mirror: false, reverse: false, insideFirst: false, overcutMm: 0, bladeOffsetMm: 0 };
+
+  it('applies the millimetre overcut as-is for a millimetre job, and when unit is omitted', () => {
+    expect(totalLength(postProcess(square, { ...base, overcutMm: 0.254 }))).toBeCloseTo(4.254, 6);
+    expect(totalLength(postProcess(square, { ...base, overcutMm: 0.254, unit: 'mm' }))).toBeCloseTo(4.254, 6);
+  });
+
+  it('converts the millimetre overcut to inches for an inch job', () => {
+    expect(totalLength(postProcess(square, { ...base, overcutMm: 0.254, unit: 'in' }))).toBeCloseTo(4.01, 6);
+  });
+
+  it('sizes blade-offset loops in millimetres for an inch job too', () => {
+    const extraMm = totalLength(postProcess(square, { ...base, bladeOffsetMm: 0.254, unit: 'mm' })) - 4;
+    const extraInch = totalLength(postProcess(square, { ...base, bladeOffsetMm: 0.254, unit: 'in' })) - 4;
+    expect(extraMm).toBeGreaterThan(0);
+    expect(extraInch).toBeGreaterThan(0);
+    expect(extraMm / extraInch).toBeCloseTo(25.4, 3);
   });
 });

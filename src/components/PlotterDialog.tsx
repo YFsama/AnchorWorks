@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network, Save, Trash2, Upload, ScanSearch, Zap } from 'lucide-react';
+import { X, Download, Loader2, Scissors, Crosshair, Code2, Eye, Image as ImageIcon, Usb, HardDriveDownload, FlipHorizontal2, Route, SquareDashed, Clock, Ruler, FlaskConical, Search, Play, FolderOpen, ChevronDown, Layers, Network, Save, Trash2, Upload, ScanSearch, Zap, Plug, Move } from 'lucide-react';
 import { useEditor, type CutPath } from '../store/editor';
-import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, sendOverSerial, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
+import { buildForceTest, buildPlotterOutput, buildTestCut, defaultPlotterOptions, listSerialPorts, loadPlotterPrefs, savePlotterPrefs, svgToPolylines, applyDriftToPolylines, type HpglDialect, type NativeSerialPort, type PlotterOptions } from '../lib/plotter';
 import { driftPreviewAt } from '../lib/cutDrift';
 import { addUserMaterial, allMaterials, deleteUserMaterial, exportUserMaterialsJson, importUserMaterialsJson, loadUserMaterials, saveUserMaterials, type UserMaterial } from '../lib/userMaterials';
 import { recordLibError } from '../lib/errorLog';
-import { getSharedPlotterLink, type FlowControl } from '../lib/plotterLink';
+import { getSharedPlotterLink, toLinkOpenError, type FlowControl } from '../lib/plotterLink';
 import { connectDataLink, dataLinkHandshake, validateJobName, type DataLinkHandle } from '../lib/dataLink';
 import { buildAbortSnippet, buildCornerTour, buildLaserTest, lintJob, simulateMachineCode, sniffFormat, type LintResult, type MachineRun } from '../lib/hpglDebug';
 import { runAutoSetup, type AutoSetupResult } from '../lib/plotterAutoSetup';
@@ -14,7 +14,6 @@ import { addJobLog, type MachineDraft, type MachineRecord } from '../lib/plotter
 import { estimateEtaSeconds, estimateTransferSeconds } from '../lib/plotterDiag';
 import { addPlotterBridges, addPlotterRegistrationMarks, addPlotterWeedBorder, clearPlotterBridges, clearPlotterRegistrationMarks, clearPlotterWeedBorders } from '../lib/cutPrepActions';
 import type { RegMarkStyle } from '../lib/cutContour';
-import { buildOutlineCutPaths } from '../lib/contourFromSelection';
 import { optimizeOrder, cutStats, estimateSeconds, estimateJobSeconds, formatDuration, applyOvercut, applyBladeOffset, type PolyLite } from '../lib/cutOptimize';
 import { weedCheck, WEED_PROFILES, type WeedIssueKind, type WeedProfileId, type WeedReport } from '../lib/weedCheck';
 import { buildVinylLayers, type VinylLayer } from '../lib/layerJobs';
@@ -22,7 +21,7 @@ import { applyLayerTrap } from '../lib/layerTrap';
 import { cutPathsToDxf } from '../lib/io2';
 import { showConfirm } from '../lib/confirm';
 import { getCanvas } from '../lib/canvasEngine';
-import { download } from '../lib/io';
+import { download, exportSVG } from '../lib/io';
 import { isTauri } from '../lib/runtime';
 import { useT } from '../lib/i18n';
 import { toast } from '../lib/toast';
@@ -31,6 +30,11 @@ import { useFocusRestore } from '../lib/hooks/useFocusRestore';
 import { CutPreview } from './CutPreview';
 import { PlotterConsole } from './PlotterConsole';
 import { AnnotatedCode, MachineSim } from './PlotterCodeViews';
+import { computeCanvasCutPreview, paperHeightToMm, toCanvasCutPreview } from '../lib/cutPreview';
+import { DryRunUnsafeError, buildDryRun } from '../lib/plotterCalibration';
+import { PlotterCalibration } from './PlotterCalibration';
+import { PlotterJobProgress } from './PlotterStatusChip';
+import { plotterJobMonitor } from '../lib/plotterJobMonitor';
 
 const OVERCUT_PRESETS_MM = [0, 0.1, 0.2, 0.3, 0.5, 1];
 const BLADE_OFFSET_PRESETS_MM = [0, 0.25, 0.5];
@@ -92,12 +96,17 @@ const CUT_STRATEGY_OPTIONS = [
 ] as const;
 const PREVIEW_MODES = ['outline', 'code'] as const;
 type PreviewMode = typeof PREVIEW_MODES[number];
-/** Dialog sections (2026-11 reorg): Machine (connection + profile + output
- *  format), Cut (material / speed / blade / strategy parameters), Output
- *  (preview + job prep + send). One pane mounts at a time — the former flat
- *  17-input form was the "too many sliders" noise complaint. */
-const PLOTTER_TABS = ['machine', 'cut', 'output'] as const;
+/** Dialog sections. Array order is display order AND the tablist's arrow-key
+ *  roaming order — workflow order: Output (preview + send) first, then Cut
+ *  settings, then Calibrate & test (blade / distance / positioning tests),
+ *  then Machine (connection / positioning / setup / diagnostics).
+ *  Ids (`plotter-tab-<id>`) are stable hooks for tests and helpers; one pane
+ *  mounts at a time. */
+const PLOTTER_TABS = ['output', 'cut', 'calibrate', 'machine'] as const;
 type PlotterTab = typeof PLOTTER_TABS[number];
+/** The tab every open lands on, connected or not: the operator opens this
+ *  dialog to check the cut preview, so that is the first thing shown. */
+const LANDING_TAB: PlotterTab = 'output';
 /** Code-tab sub-views: raw text / per-statement explanation / animated
  *  replay of the machine code itself (see PlotterCodeViews.tsx). */
 const CODE_VIEW_OPTIONS = [
@@ -108,6 +117,50 @@ const CODE_VIEW_OPTIONS = [
 type CodeViewMode = typeof CODE_VIEW_OPTIONS[number]['value'];
 /** Shared empty run so the annotated/sim views can render before code exists. */
 const EMPTY_RUN: MachineRun = { steps: [], cuts: [], travels: [], segs: [], bbox: null, cutLen: 0, travelLen: 0, penDownMoves: 0 };
+
+/** Timestamp helper kept at module scope — the React compiler purity rule
+ *  flags direct `nowMs()` calls inside component-scope functions. */
+const nowMs = (): number => Date.now();
+
+/* ---- Connect-on-demand guard ----
+ * One place decides whether the cutter link is up and, when it is not, what
+ * the operator sees. Every send (job, test cut, force / corner / laser test,
+ * per-layer job) funnels through the dialog's streamJob → ensureLink, so no
+ * button carries its own "is it connected?" branch. */
+
+/** Why a send did not go out while the link was down. Mirrors
+ *  LinkOpenErrorCode (plotterLink.ts) plus `busy`. */
+type PlotterLinkGate =
+  | 'cancelled' | 'no-port' | 'pick-port' | 'unavailable' | 'open-failed' | 'busy';
+
+interface LinkGateHint {
+  kind: 'info' | 'warn' | 'error';
+  /** Toast title. */
+  title: string;
+  /** Toast body — the next step, in plain words (never a raw DOMException). */
+  message: string;
+}
+
+/** Operator-facing hint for a failed link gate. Pure: no React, no I/O —
+ *  the caller wraps both strings in t(). `detail` is the transport's own
+ *  readable reason and is only used where it helps (several ports / an open
+ *  failure); a dismissed chooser never echoes the browser's raw text. */
+function describeLinkGate(gate: PlotterLinkGate, detail = ''): LinkGateHint {
+  switch (gate) {
+    case 'cancelled':
+      return { kind: 'info', title: 'Port selection cancelled', message: 'Nothing was sent. Pick the cutter’s serial port here, or use Save File instead.' };
+    case 'no-port':
+      return { kind: 'warn', title: 'No serial ports detected', message: 'Nothing was sent. Connect the plotter with a USB cable, power it on, then rescan and try again.' };
+    case 'pick-port':
+      return { kind: 'warn', title: 'Multiple serial ports detected', message: detail || 'Pick the plotter’s port first.' };
+    case 'unavailable':
+      return { kind: 'warn', title: 'Direct USB sending unavailable', message: 'Direct USB sending needs the desktop app or Chrome/Edge over HTTPS / localhost. Use Save File instead.' };
+    case 'busy':
+      return { kind: 'info', title: 'Connecting…', message: 'A connection attempt is already running — wait for it to finish, then try again.' };
+    default:
+      return { kind: 'error', title: 'Could not open the serial port', message: detail || 'Nothing was sent. Check the cable and power, then try again.' };
+  }
+}
 
 export function PlotterDialog() {
   const t = useT();
@@ -140,11 +193,10 @@ export function PlotterDialog() {
   // it's what a cutter operator actually wants to verify), 'code' = the
   // raw G-code / HP-GL text for the machine.
   const [previewMode, setPreviewMode] = useState<PreviewMode>('outline');
-  // Active dialog section — see PLOTTER_TABS. The landing tab (Machine when
-  // nothing is linked, Output when connected) is decided when the dialog
-  // opens: by the initializer below under today's conditional mount, and by
-  // the open-transition reconciliation further down otherwise.
-  const [tab, setTab] = useState<PlotterTab>(() => (link.status === 'connected' ? 'output' : 'machine'));
+  // Active dialog section — see PLOTTER_TABS / LANDING_TAB. Decided when the
+  // dialog opens: by the initializer below under today's conditional mount,
+  // and by the open-transition reconciliation further down otherwise.
+  const [tab, setTab] = useState<PlotterTab>(LANDING_TAB);
   const [showPrint, setShowPrint] = useState(true);
   const [showOrder, setShowOrder] = useState(false);
   // Animated cut simulation replaying the optimized job order.
@@ -153,6 +205,9 @@ export function PlotterDialog() {
   // W×H dimension frame around the job (see CutPreview).
   const [showStart, setShowStart] = useState(false);
   const [showDims, setShowDims] = useState(false);
+  // "Show on canvas": mirror the cut preview onto the main canvas (store
+  // canvasCutPreview, drawn by CutPathLayer) while the dialog is open.
+  const [showOnCanvas, setShowOnCanvas] = useState(false);
   // Registration-mark recipe: shape + arm/shape size in mm (cutContour).
   const [markStyle, setMarkStyle] = useState<RegMarkStyle>('L');
   const [markArm, setMarkArm] = useState(10);
@@ -196,6 +251,8 @@ export function PlotterDialog() {
   const [reviewedPrepAction, setReviewedPrepAction] = useState('');
   const [nativePorts, setNativePorts] = useState<NativeSerialPort[]>([]);
   const [selectedPort, setSelectedPort] = useState(savedPrefs.lastPort ?? '');
+  // Mirrors the console's port choice: the virtual plotter is selected there.
+  const [simSelected, setSimSelected] = useState(false);
   const [portsLoading, setPortsLoading] = useState(false);
   const [portsError, setPortsError] = useState('');
   // Selected brand profile (see machineProfiles.ts) — loads dialect/baud/
@@ -242,11 +299,9 @@ export function PlotterDialog() {
     savePlotterPrefs({ opts, format, materialId, baud, flowControl: flow, lastPort: selectedPort, profileId });
   }, [opts, format, materialId, baud, flow, selectedPort, profileId]);
 
-  // Open-time landing tab (2026-11 reorg): Machine while nothing is linked
-  // (the operator's first job here is picking a profile and connecting), and
-  // straight to Output once a link is already up (past setup — preview and
-  // Send are what they opened the dialog for); the singleton link's status
-  // is read live at that moment. App.tsx mounts the dialog conditionally
+  // Open-time landing tab: always Output (LANDING_TAB) — the preview is why
+  // the dialog gets opened, link or no link; connecting is one click away on
+  // the status strip. App.tsx mounts the dialog conditionally
   // (`{showPlotter && …}`), so each open is a fresh mount and the tab's
   // useState initializer above already lands correctly — this
   // reconciliation is the codebase's open-transition idiom
@@ -255,7 +310,7 @@ export function PlotterDialog() {
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (open) setTab(link.status === 'connected' ? 'output' : 'machine');
+    if (open) setTab(LANDING_TAB);
   }
 
   // Apply a brand profile: dialect + serial knobs + force/speed starting
@@ -380,15 +435,41 @@ export function PlotterDialog() {
   );
 
   // What the preview + stats draw. With cut paths present, that's the active
-  // (colour-filtered) set. With NONE, the plotter exports the canvas geometry
-  // itself — so preview THAT (each object's outline, zero offset) instead of
-  // showing an empty "no cut paths" state for a job that will in fact cut.
+  // (colour-filtered) set. With NONE, the plotter flattens the exported
+  // canvas SVG itself — so preview runs the SAME flattener over the SAME
+  // SVG (canonical mm, top-left document space): the path count and geometry
+  // then match what ships, and objects the pipeline does not cut (text,
+  // images) no longer draw a rectangle. Polylines with non-finite
+  // coordinates (e.g. the canvas background rect) are dropped.
   const previewPaths = useMemo(() => {
     if (cutPathCount > 0) return activePaths;
-    const c = getCanvas();
-    const objs = c?.getObjects().filter(o => !(o as { excludeFromExport?: boolean }).excludeFromExport) ?? [];
-    return buildOutlineCutPaths(objs, 0, 1);
-  }, [cutPathCount, activePaths]);
+    if (!getCanvas()) return [];
+    try {
+      const canon: PlotterOptions = { ...defaultPlotterOptions, curveTolerance: opts.curveTolerance, unit: 'mm', pxPerUnit: 3.7795, originBottomLeft: false };
+      let polys = svgToPolylines(toCssTransforms(exportSVG()), canon);
+      if (opts.drift) polys = applyDriftToPolylines(polys, opts.drift, canon);
+      return polys
+        .filter(p => p.points.length >= 2 && p.points.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y)))
+        .map((p, i): CutPath => ({ id: `canvas-${i}`, points: p.points, closed: p.closed, kind: 'outline' }));
+    } catch {
+      return []; // no DOMMatrix (non-browser environment) — nothing to preview
+    }
+  }, [cutPathCount, activePaths, opts.curveTolerance, opts.drift]);
+
+  // Canvas cut-preview overlay: written from an effect (never during
+  // render), recomputed when the preview geometry or one of the three
+  // document → machine mapping settings changes, and cleared when the
+  // switch goes off and when the dialog unmounts.
+  const setCanvasCutPreview = useEditor(s => s.setCanvasCutPreview);
+  const canvasPaperHeightMm = paperHeightToMm(opts.paperHeightUnits, opts.unit);
+  useEffect(() => {
+    if (!open || !showOnCanvas) return;
+    setCanvasCutPreview(toCanvasCutPreview(
+      computeCanvasCutPreview({ mutedColors, curveTolerance: opts.curveTolerance, drift: opts.drift }),
+      { originBottomLeft: opts.originBottomLeft, paperHeightMm: canvasPaperHeightMm, mirror: opts.mirror },
+    ));
+    return () => { setCanvasCutPreview(null); };
+  }, [open, showOnCanvas, setCanvasCutPreview, previewPaths, mutedColors, opts.curveTolerance, opts.drift, opts.originBottomLeft, canvasPaperHeightMm, opts.mirror]);
 
   // Live job estimate — the numbers a sign shop checks before feeding a
   // metre of vinyl. Built in mm-space from the cut paths (passes expanded),
@@ -396,6 +477,9 @@ export function PlotterDialog() {
   const native = isTauri();
   const webSerial = typeof navigator !== 'undefined' && 'serial' in navigator;
   const canSend = native || webSerial;
+  // "Is the cutter linked?" — read once per render; every send goes through
+  // ensureLink (below), never through a per-button copy of this test.
+  const connected = link.status === 'connected';
 
   const refreshSerialPorts = useCallback(async () => {
     if (!native) return;
@@ -786,12 +870,18 @@ export function PlotterDialog() {
     download(stampedFileName(), payload, 'text/plain');
   };
 
-  /** Stream a job over the persistent link when connected — paced writes,
-   *  live progress, and a real Cancel that lifts the blade. Falls back to
-   *  the legacy one-shot send (which opens/picks the port itself) when the
-   *  operator never connected. Every outcome lands in the job history
-   *  (plotterRecords) so yesterday's working settings stay traceable. */
-  const streamJob = async (payload: string, successMsg: string, kind: 'job' | 'test-cut' = 'job') => {
+  /** Stream a job over the persistent link — paced writes, live progress,
+   *  and a real Cancel that lifts the blade. The link is established on
+   *  demand first: ensureLink below is the ONE gate every send passes
+   *  (job, test cut, force / corner / laser test, per-layer job). Resolves
+   *  false when nothing went out because the operator cancelled or nothing
+   *  could be connected — the hint and the switch to the Machine tab's
+   *  connection card already happened inside the gate. Every outcome that
+   *  reached the wire lands in the job history (plotterRecords) so
+   *  yesterday's working settings stay traceable. */
+  const streamJob = async (payload: string, successMsg: string, kind: 'job' | 'test-cut' = 'job'): Promise<boolean> => {
+    if (!(await ensureLink())) return false;
+    if (link.status !== 'connected') return false; // dropped between gate and send — nothing went out
     const bytes = new TextEncoder().encode(payload).length;
     const logJob = (result: 'ok' | 'aborted' | 'error', seconds: number, target: string) => {
       addJobLog({
@@ -799,7 +889,7 @@ export function PlotterDialog() {
         target,
         profileId,
         format,
-        baud: link.status === 'connected' ? link.baud : baud,
+        baud: link.baud,
         paths: kind === 'test-cut' ? 2 : previewPaths.length,
         bytes,
         seconds,
@@ -808,46 +898,55 @@ export function PlotterDialog() {
       });
       setJobLogVersion(v => v + 1);
     };
-    if (link.status === 'connected') {
-      const abort = new AbortController();
-      abortRef.current = abort;
-      // Fresh handle: mutating the render-scope link trips the compiler's
-      // immutability lint — a handler-local reference is fine.
-      getSharedPlotterLink().activeJobSignal = abort;
-      setJobProgress({ sent: 0, total: bytes, eta: null });
-      setJobPaused(false);
-      const t0 = Date.now();
-      try {
-        await link.send(payload, {
-          signal: abort.signal,
-          onProgress: (sent, total) => setJobProgress({ sent, total, eta: estimateEtaSeconds(sent, total, Date.now() - t0) }),
-        });
-        toast.success(successMsg);
-        logJob('ok', (Date.now() - t0) / 1000, link.describe());
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') {
-          // Stop safely: pen up (HP-GL) / feed hold (grbl) as a best effort.
-          // pauseImmune so the snippet goes out even mid-pause.
-          await link.send(buildAbortSnippet(format), { pauseImmune: true }).catch(() => undefined);
-          toast.warn(t('Job cancelled — blade raised'));
-          logJob('aborted', (Date.now() - t0) / 1000, link.describe());
-        } else {
-          toast.error((e as Error).message);
-          logJob('error', (Date.now() - t0) / 1000, link.describe());
-        }
-      } finally {
-        link.resume(); // release the pause gate whatever happened
-        setJobPaused(false);
-        setJobProgress(null);
-        abortRef.current = null;
-        getSharedPlotterLink().activeJobSignal = null;
+    const abort = new AbortController();
+    abortRef.current = abort;
+    // Fresh handle: mutating the render-scope link trips the compiler's
+    // immutability lint — a handler-local reference is fine.
+    getSharedPlotterLink().activeJobSignal = abort;
+    setJobProgress({ sent: 0, total: bytes, eta: null });
+    setJobPaused(false);
+    // Shared job monitor (this dialog's progress card + the status-bar
+    // chip): what is going out, and — for the "path i of n" readout — the
+    // pen-down paths in cut order. It owns everything after the transfer.
+    // The id it hands back tags this send, so only THIS send's completion
+    // ends the transfer phase — a status query, a jog or a pause snippet on
+    // the same link does not.
+    const jobId = plotterJobMonitor.start({
+      total: bytes,
+      kind,
+      format,
+      unit: opts.unit,
+      cuts: simulateMachineCode(format, payload, opts.unit).cuts,
+    });
+    const t0 = nowMs();
+    try {
+      await link.send(payload, {
+        jobId,
+        signal: abort.signal,
+        onProgress: (sent, total) => setJobProgress({ sent, total, eta: estimateEtaSeconds(sent, total, nowMs() - t0) }),
+      });
+      toast.success(successMsg);
+      logJob('ok', (nowMs() - t0) / 1000, link.describe());
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') {
+        // Stop safely: pen up (HP-GL) / feed hold (grbl) as a best effort.
+        // pauseImmune so the snippet goes out even mid-pause.
+        await link.send(buildAbortSnippet(format), { pauseImmune: true }).catch(() => undefined);
+        toast.warn(t('Job cancelled — blade raised'));
+        logJob('aborted', (nowMs() - t0) / 1000, link.describe());
+      } else {
+        toast.error((e as Error).message);
+        plotterJobMonitor.fail((e as Error).message); // the link's own "done" reads like a success
+        logJob('error', (nowMs() - t0) / 1000, link.describe());
       }
-      return;
+    } finally {
+      link.resume(); // release the pause gate whatever happened
+      setJobPaused(false);
+      setJobProgress(null);
+      abortRef.current = null;
+      getSharedPlotterLink().activeJobSignal = null;
     }
-    const t0 = Date.now();
-    await sendOverSerial(payload, baud, native ? selectedPort || undefined : undefined);
-    toast.success(successMsg);
-    logJob('ok', (Date.now() - t0) / 1000, selectedPort || 'serial');
+    return true;
   };
 
   /** Pause the stream between chunks — the machine drains its buffer and
@@ -971,8 +1070,7 @@ export function PlotterDialog() {
         return false;
       }
     }
-    await streamJob(payload, t('✅ Sent to plotter'));
-    return true;
+    return streamJob(payload, t('✅ Sent to plotter'));
   };
 
   const sendLayer = async (layer: VinylLayer) => {
@@ -1170,7 +1268,7 @@ export function PlotterDialog() {
   const physicsEtaLabel = stats.physicsSeconds !== undefined && Math.abs(stats.physicsSeconds - stats.seconds) > 1
     ? ` · ≈${formatDuration(stats.physicsSeconds)} (${t('physics')})`
     : '';
-  const jobSummaryLabel = `${format.toUpperCase()} · ${outputSourceLabel} · ${previewPaths.length} ${t('paths')} · ${colorSummaryLabel} · ${machineSummaryLabel} · ${materialSummaryLabel} · ${speedSummaryLabel}${cutterPressureSummaryLabel} · ~${formatDuration(stats.seconds)}${physicsEtaLabel}`;
+  const jobSummaryLabel = `${format.toUpperCase()} · ${outputSourceLabel} · ${stats.paths} ${t('paths')} · ${colorSummaryLabel} · ${machineSummaryLabel} · ${materialSummaryLabel} · ${speedSummaryLabel}${cutterPressureSummaryLabel} · ~${formatDuration(stats.seconds)}${physicsEtaLabel}`;
   // Serial transfer preview at the current knobs — a 2 MB PLT at 9600 baud
   // is ~25 s of streaming before the blade moves; the operator should see
   // that coming. Uses the generated preview code when present.
@@ -1389,6 +1487,41 @@ export function PlotterDialog() {
     finally { setBusy(false); }
   };
 
+  /** Send one calibration / positioning test pattern (the Calibrate & test
+   *  tab) — the same gated route as every other send: streamJob → ensureLink
+   *  decides whether anything is connected and shows the hint when not.
+   *  Without a direct path the pattern is saved to a file, like the classic
+   *  tests. The patterns are built by pure, unit-tested code and never carry
+   *  ARMS or eject the sheet. */
+  const sendCalibration = async (payload: string, label: string): Promise<boolean> => {
+    if (!canSend) { download(stampedFileName('calibration'), payload, 'text/plain'); return false; }
+    setBusy(true);
+    try {
+      return await streamJob(payload, `${label}: ${t('✅ Sent to plotter')}`, 'test-cut');
+    } catch (e) { toast.error((e as Error).message); return false; }
+    finally { setBusy(false); }
+  };
+
+  /** Dry run: the REAL job's machine code with every tool-down removed, so
+   *  the head walks the exact geometry, origin, mirroring and order it will
+   *  cut — bounding box first. Derived from the very payload the Output page
+   *  would send (the loaded file too). */
+  const dryRun = async (): Promise<boolean> => {
+    if (outputBlocked) { toast.warn(outputBlockedReason, { title: t('Nothing to output') }); return false; }
+    const payload = code || safeGenerate(() => buildPlotterOutput(format, { ...effectiveOpts, arms: undefined }, overrideCuts));
+    if (payload === null) return false;
+    let safe: string;
+    try {
+      safe = buildDryRun(format, payload, { penUpZ: opts.penUpZ, travelRate: opts.travelRate, unit: opts.unit });
+    } catch (err) {
+      // The Code page is editable: a tool-down the rewrite cannot lift is refused, never sent.
+      if (!(err instanceof DryRunUnsafeError)) throw err;
+      toast.error(t('Dry run refused — the code lowers the tool in a form that cannot be made safe. Check the Code tab.'), { title: t('Dry run') });
+      return false;
+    }
+    return sendCalibration(safe, t('Dry run'));
+  };
+
   /** One-click machine auto-detect (plotterAutoSetup.ts): scan every USB
    *  port, identify the responder, apply profile + format + port + baud —
    *  but NEVER auto-connect; the operator presses Connect (and can then
@@ -1452,6 +1585,387 @@ export function PlotterDialog() {
   const applyBridges = () => {
     addPlotterBridges(t, bridgeCount, bridgeGap);
   };
+  /** Connection card's last row: one-click auto-detect (native) or the
+   *  browser-shell guidance. Scans, identifies and applies profile / format /
+   *  port / baud — it never connects by itself. */
+  const machineSetupActions = (
+    <>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {native ? (
+          <button
+            type="button"
+            className="btn flex items-center gap-1 py-0.5! px-1.5! text-[10px]!"
+            onClick={() => { void autoDetect(); }}
+            disabled={autoDetecting || busy}
+            aria-busy={autoDetecting}
+            title={t('Scan every USB port for a cutter or engraver, identify it, and apply the right profile, format, baud and port. Nothing is sent — you stay in charge of connecting.')}
+          >
+            {autoDetecting ? <Loader2 size={11} className="animate-spin" aria-hidden="true" /> : <ScanSearch size={11} aria-hidden="true" />}
+            {autoDetecting ? t('Detecting…') : t('Auto-detect machine')}
+          </button>
+        ) : (
+          <span className="text-[10px] text-muted" title={t('Web Serial needs a user gesture per port — browsers cannot scan silently.')}>
+            {t('Serial ports you have already authorized are listed here — pick one and connect; the machine is identified automatically.')}
+          </span>
+        )}
+      </div>
+              {autoDetectResult && (
+                <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] leading-relaxed" role="status">
+                  <div className={autoDetectResult.found ? 'text-success' : 'text-muted'}>
+                    {autoDetectResult.found
+                      ? `${t('Cutter found')}: ${autoDetectResult.port} @ ${autoDetectResult.baud}${autoDetectResult.model ? ` — ${autoDetectResult.model}` : autoDetectResult.grblBuild ? ` — ${autoDetectResult.grblBuild}` : ''}`
+                      : autoDetectResult.suspectedClone
+                        ? t('No reply — suspected Chinese clone (they ignore queries). Try 9600 + a test cut.')
+                        : t('No cutter answered on any port — check power / cable, or connect manually and run the self-test.')}
+                  </div>
+                  <ul className="mt-0.5 list-none space-y-0.5 text-muted">
+                    {autoDetectResult.steps.map((s, i) => (
+                      <li key={i}>
+                        <span className={s.status === 'pass' ? 'text-success' : s.status === 'fail' ? 'text-danger' : 'text-muted'}>
+                          {s.status === 'pass' ? '✓' : s.status === 'fail' ? '✕' : '·'}
+                        </span>{' '}{s.label} — {s.detail}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+    </>
+  );
+
+  /** Machine setup (brand profile, output format, dialect, units, pen /
+   *  spindle, page & geometry) — slotted between the positioning card and
+   *  the diagnostics card. Same controls as before the reorg. */
+  const machineSettings = (
+    <div className="grid grid-cols-2 gap-x-3 gap-y-3 text-xs content-start">
+      <div className="col-span-2 field-label">{t('Machine setup')}</div>
+          <div className="col-span-2">
+            <Field label={t('Machine profile')}>
+                <select
+                  className="input"
+                  value={profileId}
+                  onChange={(e) => applyProfile(e.target.value)}
+                  aria-label={t('Machine profile')}
+                  title={t('Pick your machine brand — loads dialect, baud, flow control, force/speed defaults and field notes.')}
+                >
+                  <option value="">{t('Generic / manual')}</option>
+                  {MACHINE_PROFILES.map((p) => (
+                    <option key={p.id} value={p.id}>{`${t(p.brand)} — ${t(p.label)}`}</option>
+                  ))}
+                </select>
+                {profile && (
+                  <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] text-muted leading-relaxed">
+                    <div className="text-ink/80">{t(profile.models)}</div>
+                    <div>{t('Recommends')} {profile.baud} {t('Baud').toLowerCase()} · {t(profile.flowControl === 'none' ? 'None (paced)' : profile.flowControl === 'hardware' ? 'Hardware RTS/CTS' : 'Software XON/XOFF')}{profile.panelOnly ? ` · ${t('force/speed on the machine panel')}` : ` · FS/VS ${profile.defaultForce}g/${profile.defaultSpeed}`}</div>
+                    <ul className="mt-0.5 list-none space-y-0.5">
+                      {profile.quirks.map((q) => (
+                        <li key={q}>· {t(q)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </Field>
+            </div>
+          {/* ---- Output format group (wave-4 noise reduction): the
+              format / dialect / unit segmented picks share one caption. ---- */}
+          <div className="col-span-2 field-label">{t('Output format')}</div>
+          <Field label={t('Format')}>
+            <div
+              className="grid grid-cols-2 gap-1"
+              role="group"
+              aria-label={t('Format')}
+              title={t('Use Left/Right arrows to switch options')}
+              onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_FORMAT_OPTIONS.map(option => option.value), format, setFormat)}
+            >
+              {OUTPUT_FORMAT_OPTIONS.map((option) => {
+                const active = format === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    data-value={option.value}
+                    className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                    onClick={() => setFormat(option.value)}
+                    title={`${t('Set output format to')} ${t(option.label)}`}
+                    aria-pressed={active}
+                  >
+                    {t(option.label)}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+          {format === 'hpgl' && (
+            <Field label={t('Cutter dialect')}>
+              <div
+                className="grid grid-cols-3 gap-1"
+                role="group"
+                aria-label={t('Cutter dialect')}
+                title={t('Use Left/Right arrows to switch options')}
+                onKeyDown={(event) => handleSegmentKeys(event, HPGL_DIALECT_OPTIONS.map(option => option.value), opts.dialect, (value) => setOpts({ ...opts, dialect: value }))}
+              >
+                {HPGL_DIALECT_OPTIONS.map((option) => {
+                  const active = opts.dialect === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-value={option.value}
+                      className={`rounded-md border px-2 py-1 text-[11px] leading-tight transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                      onClick={() => setOpts({ ...opts, dialect: option.value })}
+                      title={`${t('Set cutter dialect to')} ${t(option.label)}`}
+                      aria-pressed={active}
+                    >
+                      {t(option.label)}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
+          <Field label={t('Unit')}>
+            <div
+              className="grid grid-cols-2 gap-1"
+              role="group"
+              aria-label={t('Unit')}
+              title={t('Use Left/Right arrows to switch options')}
+              onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_UNIT_OPTIONS.map(option => option.value), opts.unit, (value) => {
+                const option = OUTPUT_UNIT_OPTIONS.find(item => item.value === value);
+                if (option) setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit });
+              })}
+            >
+              {OUTPUT_UNIT_OPTIONS.map((option) => {
+                const active = opts.unit === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    data-value={option.value}
+                    className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                    onClick={() => setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit })}
+                    title={`${t('Set output unit to')} ${t(option.label)}`}
+                    aria-pressed={active}
+                  >
+                    {t(option.label)}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+          {/* ---- Pen / spindle group: G-code-only head parameters. ---- */}
+          <div className="col-span-2 field-label">{t('Pen & spindle (G-code)')}</div>
+          <Field label={t('Pen down Z')}>
+            <input type="number" step={0.1} className="input-num" value={opts.penDownZ} onChange={(e) => setOpts({ ...opts, penDownZ: +e.target.value })} />
+          </Field>
+          <Field label={t('Pen up Z')}>
+            <input type="number" step={0.1} className="input-num" value={opts.penUpZ} onChange={(e) => setOpts({ ...opts, penUpZ: +e.target.value })} />
+          </Field>
+          {format === 'gcode' && (
+            <Field label={t('Spindle / laser power %')}>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                className="input-num"
+                value={opts.spindle ? Math.round(opts.spindle.rpm / 10) : ''}
+                placeholder={t('off')}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const pct = Number(raw);
+                  setOpts(o => ({
+                    ...o,
+                    spindle: raw !== '' && Number.isFinite(pct) && pct > 0 && pct <= 100
+                      ? { rpm: Math.round(pct * 10), ...(profileId === 'grbl-laser' ? { laserMode: true } : {}) }
+                      : undefined,
+                  }));
+                }}
+                title={t('Spindle/laser power for G-code jobs — M3 S…/M5 around the job; S = percent × 10 (grbl $30=1000). Empty = plain Z-axis pen model.')}
+              />
+            </Field>
+          )}
+          {/* ---- Page & geometry group: page size / curve fidelity / origin. ---- */}
+          <div className="col-span-2 field-label">{t('Page & geometry')}</div>
+          <Field label={`${t('Paper height')} (${opts.unit})`}>
+            <input type="number" className="input-num" value={opts.paperHeightUnits} onChange={(e) => setOpts({ ...opts, paperHeightUnits: +e.target.value })} />
+          </Field>
+          <Field label={t('Curve tolerance (px)')}>
+            <input type="number" step={0.1} className="input-num" value={opts.curveTolerance} onChange={(e) => setOpts({ ...opts, curveTolerance: +e.target.value })} />
+            <div
+              className="grid grid-cols-4 gap-1 mt-1"
+              role="group"
+              aria-label={t('Curve tolerance presets')}
+              aria-describedby="plotter-tolerance-preset-review-status"
+              title={t('Use Left/Right arrows to switch options')}
+              onKeyDown={(event) => handleSegmentKeys(event, CURVE_TOLERANCE_PRESETS_PX.map(String), `${opts.curveTolerance}`, (value) => setOpts({ ...opts, curveTolerance: Number(value) }), (_value, button) => setReviewedTolerancePreset(button?.dataset.review ?? ''))}
+            >
+              <span id="plotter-tolerance-preset-review-status" className="sr-only" aria-live="polite">
+                {`${t('Reviewing')} ${reviewedTolerancePreset || `${t('Curve tolerance')} ${opts.curveTolerance} px`}`}
+              </span>
+              {CURVE_TOLERANCE_PRESETS_PX.map((value) => {
+                const active = Math.abs(opts.curveTolerance - value) < 0.001;
+                const review = `${t('Curve tolerance')} ${value} px`;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    data-value={`${value}`}
+                    data-review={review}
+                    className={`rounded border px-1 py-0.5 text-[10px] transition-colors ${active ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                    onFocus={(event) => setReviewedTolerancePreset(event.currentTarget.dataset.review ?? '')}
+                    onClick={() => setOpts({ ...opts, curveTolerance: value })}
+                    title={`${t('Set curve tolerance to')} ${value} px`}
+                    aria-pressed={active}
+                  >
+                    {value}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+          <div className="col-span-2">
+            <div className="field-label mb-1!">{t('Origin')}</div>
+            <div
+              className="grid grid-cols-2 gap-1"
+              role="group"
+              aria-label={t('Origin')}
+              title={t('Use Left/Right arrows to switch options')}
+              onKeyDown={(event) => handleSegmentKeys(event, ORIGIN_OPTIONS.map(option => option.value), opts.originBottomLeft ? 'bottom-left' : 'top-left', (value) => {
+                const option = ORIGIN_OPTIONS.find(item => item.value === value);
+                if (option) setOpts({ ...opts, originBottomLeft: option.bottomLeft });
+              })}
+            >
+              {ORIGIN_OPTIONS.map((option) => {
+                const active = opts.originBottomLeft === option.bottomLeft;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    data-value={option.value}
+                    className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
+                    onClick={() => setOpts({ ...opts, originBottomLeft: option.bottomLeft })}
+                    title={t(option.title)}
+                    aria-pressed={active}
+                  >
+                    {t(option.label)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+    </div>
+  );
+
+  /** Jump to the Machine tab and focus the first of the two ids that exists
+   *  (the fallback covers a shell with no serial API, hence no Connect
+   *  button). The pane mounts on the tab switch, so the focus runs after
+   *  the commit. */
+  const focusInMachine = (id: string, fallbackId: string) => {
+    setTab('machine');
+    // After the commit that mounts the pane: next frame, then one task later.
+    const afterPaint = (run: () => void) => {
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => { setTimeout(run, 0); });
+      else setTimeout(run, 0);
+    };
+    afterPaint(() => {
+      (document.getElementById(id) ?? document.getElementById(fallbackId))?.focus();
+    });
+  };
+  const goToConnect = () => focusInMachine('plotter-connect-primary', 'plotter-connect-card');
+
+  /** Open the link AND prime the machine the same way from every entry
+   *  point — the console's Connect button and the ensureLink gate below both
+   *  go through here: the brand profile's init statement goes out first,
+   *  then the working area is queried (HP-GL `OH;` / grbl `$130`,`$131`) —
+   *  best effort, an unanswered query is not an error. Resolves true once
+   *  the link is up (the console re-reads the area and identifies the
+   *  machine for its own readouts). `simulate` opens the built-in
+   *  virtual plotter instead of a serial port (rehearsal — no hardware), and
+   *  `portPath` / `baud` let the console override the dialog's choices. A
+   *  port that could not be opened rejects with a classified LinkOpenError
+   *  (plotterLink.ts). */
+  const connectLink = async (connectOpts: { simulate?: boolean; portPath?: string; baud?: number } = {}): Promise<boolean> => {
+    const simulate = !!connectOpts.simulate;
+    // A rehearsal replaces a real link, it never hides behind one: a machine
+    // that happens to be connected is let go first, so nothing asked of the
+    // virtual plotter can reach a blade.
+    if (simulate && link.status === 'connected' && !link.simulated) await link.close().catch(() => {});
+    await link.open({
+      portPath: simulate || !native ? undefined : (connectOpts.portPath || selectedPort || undefined),
+      baud: connectOpts.baud ?? baud,
+      flowControl: flow,
+      // Only ever passed for a rehearsal, so the real-port path is untouched.
+      ...(simulate ? { simulate: true, format, unit: opts.unit, paperHeightMm: paperHeightToMm(opts.paperHeightUnits, opts.unit) } : {}),
+    });
+    // Fresh handle: the awaited open mutated the singleton's status.
+    const live = getSharedPlotterLink();
+    if (live.status !== 'connected') return false;
+    const connectInit = format === 'hpgl' ? profileConnectInit(profile, opts.graphtecForce, opts.graphtecSpeed) : '';
+    if (connectInit) await live.send(connectInit);
+    try {
+      if (format === 'hpgl') {
+        await live.query('OH;', 1000).catch(() => '');
+      } else {
+        await live.query('$130', 900).catch(() => '');
+        await live.query('$131', 900).catch(() => '');
+      }
+    } catch {
+      /* the area query is best-effort — the off-page jog warning stays off */
+    }
+    return live.status === 'connected';
+  };
+
+  /** Readable hint for a failed open. The Connect button (already on the
+   *  Machine tab) reports through here; the gate below uses the same wording
+   *  and additionally switches tabs. */
+  const reportOpenError = (e: unknown) => {
+    const hint = describeLinkGate(toLinkOpenError(e, native ? 'native' : 'web').code, (e as Error).message);
+    toast[hint.kind](t(hint.message), { title: t(hint.title) });
+  };
+
+  /** THE link gate (see the module note above). True when the cutter is
+   *  linked — connecting it on the operator's behalf if needed: the web
+   *  shell opens the browser's port chooser, the desktop shell opens the
+   *  selected / only OS port, and the machine is primed exactly as the
+   *  Connect button primes it (openPlotterLink). False when nothing could
+   *  be linked: one readable hint is shown and the dialog lands on the
+   *  Machine tab's connection card, so the next step is on screen. */
+  const ensureLink = async (): Promise<boolean> => {
+    const fail = (gate: PlotterLinkGate, detail = '') => {
+      const hint = describeLinkGate(gate, detail);
+      toast[hint.kind](t(hint.message), { title: t(hint.title) });
+      goToConnect();
+      if (native) void refreshSerialPorts(); // connection card shows a current port list
+      return false;
+    };
+    if (link.status === 'connecting') return fail('busy');
+    if (simSelected) {
+      // The virtual plotter is the chosen "port": an implicit connect from
+      // Send / Test cut rehearses instead of reaching for a serial port — no
+      // port scan, no browser chooser. It is asked for BEFORE "already
+      // connected" counts: with the virtual plotter selected, a real machine
+      // that happens to be linked is let go, never sent to.
+      try { await connectLink({ simulate: true }); } catch { return fail('open-failed'); }
+      return getSharedPlotterLink().simulated || fail('open-failed');
+    }
+    if (link.status === 'connected') return true;
+    if (!canSend) return fail('unavailable');
+    if (native && nativePorts.length === 0 && !selectedPort) {
+      // Judge "is anything plugged in?" from a live scan, not stale state.
+      const ports = (await listSerialPorts()) ?? [];
+      if (ports.length === 0) return fail('no-port');
+    }
+    // Web shell: say what is about to happen before the chooser takes over.
+    if (!native) toast.info(t('Select the cutter’s serial port in the browser dialog to continue.'), { title: t('Not connected') });
+    try {
+      await connectLink();
+    } catch (e) {
+      const err = toLinkOpenError(e, native ? 'native' : 'web');
+      return fail(err.code, err.message);
+    }
+    // Fresh handle: the awaited open mutated the singleton's status, which
+    // the narrowing above cannot see.
+    return getSharedPlotterLink().status === 'connected' || fail('open-failed');
+  };
+
   const clearBridges = () => clearPlotterBridges(t);
 
   return (
@@ -1485,278 +1999,16 @@ export function PlotterDialog() {
           onKeyDown={handleTabListKeyDown}
           aria-label={t('Plotter sections')}
         >
-          <PlotterTabButton id="machine" active={tab === 'machine'} onClick={() => setTab('machine')} icon={<Usb size={12} aria-hidden="true" />} label={t('Machine')} />
-          <PlotterTabButton id="cut" active={tab === 'cut'} onClick={() => setTab('cut')} icon={<Scissors size={12} aria-hidden="true" />} label={t('Cut settings')} />
           <PlotterTabButton id="output" active={tab === 'output'} onClick={() => setTab('output')} icon={<Eye size={12} aria-hidden="true" />} label={t('Output')} />
+          <PlotterTabButton id="cut" active={tab === 'cut'} onClick={() => setTab('cut')} icon={<Scissors size={12} aria-hidden="true" />} label={t('Cut settings')} />
+          <PlotterTabButton id="calibrate" active={tab === 'calibrate'} onClick={() => setTab('calibrate')} icon={<FlaskConical size={12} aria-hidden="true" />} label={t('Calibrate & test')} />
+          <PlotterTabButton id="machine" active={tab === 'machine'} onClick={() => setTab('machine')} icon={<Usb size={12} aria-hidden="true" />} label={t('Machine')} />
         </div>
 
         {/* Scrollable middle — ONE section pane mounts at a time; the job
             summary rows and the output action row at the bottom stay pinned
             (short-window layout). */}
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {/* ---- Machine pane: auto setup / profile / format / connection ---- */}
-          {tab === 'machine' && (
-          <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-4 py-4 text-xs content-start" role="tabpanel" aria-labelledby="plotter-tab-machine" data-plotter-pane="machine">
-            {/* One-click auto-detect — native path scans + identifies + applies
-                everything except the connection itself; Web Serial can't
-                enumerate ports, so it degrades to guidance. */}
-            <div className="col-span-2">
-              <div className="field-label mb-1!">{t('Auto setup')}</div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {native ? (
-                  <button
-                    type="button"
-                    className="btn-primary flex items-center gap-1 py-1! px-2! text-[11px]!"
-                    onClick={() => { void autoDetect(); }}
-                    disabled={autoDetecting || busy}
-                    aria-busy={autoDetecting}
-                    title={t('Scan every USB port for a cutter or engraver, identify it, and apply the right profile, format, baud and port. Nothing is sent — you stay in charge of connecting.')}
-                  >
-                    {autoDetecting ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : <ScanSearch size={12} aria-hidden="true" />}
-                    {autoDetecting ? t('Detecting…') : t('Auto-detect machine')}
-                  </button>
-                ) : (
-                  <span className="text-[10px] text-muted" title={t('Web Serial needs a user gesture per port — browsers cannot scan silently.')}>
-                    {t('Browsers cannot scan ports — connect with the browser chooser, then run Identify machine in the console.')}
-                  </span>
-                )}
-              </div>
-              {autoDetectResult && (
-                <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] leading-relaxed" role="status">
-                  <div className={autoDetectResult.found ? 'text-success' : 'text-muted'}>
-                    {autoDetectResult.found
-                      ? `${t('Cutter found')}: ${autoDetectResult.port} @ ${autoDetectResult.baud}${autoDetectResult.model ? ` — ${autoDetectResult.model}` : autoDetectResult.grblBuild ? ` — ${autoDetectResult.grblBuild}` : ''}`
-                      : autoDetectResult.suspectedClone
-                        ? t('No reply — suspected Chinese clone (they ignore queries). Try 9600 + a test cut.')
-                        : t('No cutter answered on any port — check power / cable, or connect manually and run the self-test.')}
-                  </div>
-                  <ul className="mt-0.5 list-none space-y-0.5 text-muted">
-                    {autoDetectResult.steps.map((s, i) => (
-                      <li key={i}>
-                        <span className={s.status === 'pass' ? 'text-success' : s.status === 'fail' ? 'text-danger' : 'text-muted'}>
-                          {s.status === 'pass' ? '✓' : s.status === 'fail' ? '✕' : '·'}
-                        </span>{' '}{s.label} — {s.detail}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-            <div className="col-span-2">
-              <Field label={t('Machine profile')}>
-                  <select
-                    className="input"
-                    value={profileId}
-                    onChange={(e) => applyProfile(e.target.value)}
-                    aria-label={t('Machine profile')}
-                    title={t('Pick your machine brand — loads dialect, baud, flow control, force/speed defaults and field notes.')}
-                  >
-                    <option value="">{t('Generic / manual')}</option>
-                    {MACHINE_PROFILES.map((p) => (
-                      <option key={p.id} value={p.id}>{`${t(p.brand)} — ${t(p.label)}`}</option>
-                    ))}
-                  </select>
-                  {profile && (
-                    <div className="mt-1 rounded border border-border bg-panel2/60 px-2 py-1 text-[10px] text-muted leading-relaxed">
-                      <div className="text-ink/80">{t(profile.models)}</div>
-                      <div>{t('Recommends')} {profile.baud} {t('Baud').toLowerCase()} · {t(profile.flowControl === 'none' ? 'None (paced)' : profile.flowControl === 'hardware' ? 'Hardware RTS/CTS' : 'Software XON/XOFF')}{profile.panelOnly ? ` · ${t('force/speed on the machine panel')}` : ` · FS/VS ${profile.defaultForce}g/${profile.defaultSpeed}`}</div>
-                      <ul className="mt-0.5 list-none space-y-0.5">
-                        {profile.quirks.map((q) => (
-                          <li key={q}>· {t(q)}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </Field>
-              </div>
-            {/* ---- Output format group (wave-4 noise reduction): the
-                format / dialect / unit segmented picks share one caption. ---- */}
-            <div className="col-span-2 field-label">{t('Output format')}</div>
-            <Field label={t('Format')}>
-              <div
-                className="grid grid-cols-2 gap-1"
-                role="group"
-                aria-label={t('Format')}
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_FORMAT_OPTIONS.map(option => option.value), format, setFormat)}
-              >
-                {OUTPUT_FORMAT_OPTIONS.map((option) => {
-                  const active = format === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-value={option.value}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onClick={() => setFormat(option.value)}
-                      title={`${t('Set output format to')} ${t(option.label)}`}
-                      aria-pressed={active}
-                    >
-                      {t(option.label)}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-            {format === 'hpgl' && (
-              <Field label={t('Cutter dialect')}>
-                <div
-                  className="grid grid-cols-3 gap-1"
-                  role="group"
-                  aria-label={t('Cutter dialect')}
-                  title={t('Use Left/Right arrows to switch options')}
-                  onKeyDown={(event) => handleSegmentKeys(event, HPGL_DIALECT_OPTIONS.map(option => option.value), opts.dialect, (value) => setOpts({ ...opts, dialect: value }))}
-                >
-                  {HPGL_DIALECT_OPTIONS.map((option) => {
-                    const active = opts.dialect === option.value;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        data-value={option.value}
-                        className={`rounded-md border px-2 py-1 text-[11px] leading-tight transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                        onClick={() => setOpts({ ...opts, dialect: option.value })}
-                        title={`${t('Set cutter dialect to')} ${t(option.label)}`}
-                        aria-pressed={active}
-                      >
-                        {t(option.label)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Field>
-            )}
-            <Field label={t('Unit')}>
-              <div
-                className="grid grid-cols-2 gap-1"
-                role="group"
-                aria-label={t('Unit')}
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, OUTPUT_UNIT_OPTIONS.map(option => option.value), opts.unit, (value) => {
-                  const option = OUTPUT_UNIT_OPTIONS.find(item => item.value === value);
-                  if (option) setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit });
-                })}
-              >
-                {OUTPUT_UNIT_OPTIONS.map((option) => {
-                  const active = opts.unit === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-value={option.value}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onClick={() => setOpts({ ...opts, unit: option.value, pxPerUnit: option.pxPerUnit })}
-                      title={`${t('Set output unit to')} ${t(option.label)}`}
-                      aria-pressed={active}
-                    >
-                      {t(option.label)}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-            {/* ---- Pen / spindle group: G-code-only head parameters. ---- */}
-            <div className="col-span-2 field-label">{t('Pen & spindle (G-code)')}</div>
-            <Field label={t('Pen down Z')}>
-              <input type="number" step={0.1} className="input-num" value={opts.penDownZ} onChange={(e) => setOpts({ ...opts, penDownZ: +e.target.value })} />
-            </Field>
-            <Field label={t('Pen up Z')}>
-              <input type="number" step={0.1} className="input-num" value={opts.penUpZ} onChange={(e) => setOpts({ ...opts, penUpZ: +e.target.value })} />
-            </Field>
-            {format === 'gcode' && (
-              <Field label={t('Spindle / laser power %')}>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  className="input-num"
-                  value={opts.spindle ? Math.round(opts.spindle.rpm / 10) : ''}
-                  placeholder={t('off')}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const pct = Number(raw);
-                    setOpts(o => ({
-                      ...o,
-                      spindle: raw !== '' && Number.isFinite(pct) && pct > 0 && pct <= 100
-                        ? { rpm: Math.round(pct * 10), ...(profileId === 'grbl-laser' ? { laserMode: true } : {}) }
-                        : undefined,
-                    }));
-                  }}
-                  title={t('Spindle/laser power for G-code jobs — M3 S…/M5 around the job; S = percent × 10 (grbl $30=1000). Empty = plain Z-axis pen model.')}
-                />
-              </Field>
-            )}
-            {/* ---- Page & geometry group: page size / curve fidelity / origin. ---- */}
-            <div className="col-span-2 field-label">{t('Page & geometry')}</div>
-            <Field label={`${t('Paper height')} (${opts.unit})`}>
-              <input type="number" className="input-num" value={opts.paperHeightUnits} onChange={(e) => setOpts({ ...opts, paperHeightUnits: +e.target.value })} />
-            </Field>
-            <Field label={t('Curve tolerance (px)')}>
-              <input type="number" step={0.1} className="input-num" value={opts.curveTolerance} onChange={(e) => setOpts({ ...opts, curveTolerance: +e.target.value })} />
-              <div
-                className="grid grid-cols-4 gap-1 mt-1"
-                role="group"
-                aria-label={t('Curve tolerance presets')}
-                aria-describedby="plotter-tolerance-preset-review-status"
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, CURVE_TOLERANCE_PRESETS_PX.map(String), `${opts.curveTolerance}`, (value) => setOpts({ ...opts, curveTolerance: Number(value) }), (_value, button) => setReviewedTolerancePreset(button?.dataset.review ?? ''))}
-              >
-                <span id="plotter-tolerance-preset-review-status" className="sr-only" aria-live="polite">
-                  {`${t('Reviewing')} ${reviewedTolerancePreset || `${t('Curve tolerance')} ${opts.curveTolerance} px`}`}
-                </span>
-                {CURVE_TOLERANCE_PRESETS_PX.map((value) => {
-                  const active = Math.abs(opts.curveTolerance - value) < 0.001;
-                  const review = `${t('Curve tolerance')} ${value} px`;
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      data-value={`${value}`}
-                      data-review={review}
-                      className={`rounded border px-1 py-0.5 text-[10px] transition-colors ${active ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onFocus={(event) => setReviewedTolerancePreset(event.currentTarget.dataset.review ?? '')}
-                      onClick={() => setOpts({ ...opts, curveTolerance: value })}
-                      title={`${t('Set curve tolerance to')} ${value} px`}
-                      aria-pressed={active}
-                    >
-                      {value}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-            <div className="col-span-2">
-              <div className="field-label mb-1!">{t('Origin')}</div>
-              <div
-                className="grid grid-cols-2 gap-1"
-                role="group"
-                aria-label={t('Origin')}
-                title={t('Use Left/Right arrows to switch options')}
-                onKeyDown={(event) => handleSegmentKeys(event, ORIGIN_OPTIONS.map(option => option.value), opts.originBottomLeft ? 'bottom-left' : 'top-left', (value) => {
-                  const option = ORIGIN_OPTIONS.find(item => item.value === value);
-                  if (option) setOpts({ ...opts, originBottomLeft: option.bottomLeft });
-                })}
-              >
-                {ORIGIN_OPTIONS.map((option) => {
-                  const active = opts.originBottomLeft === option.bottomLeft;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-value={option.value}
-                      className={`rounded-md border px-2 py-1 text-xs transition ${active ? 'border-accent2 bg-accent2/15 text-ink' : 'border-border bg-panel2 text-muted hover:text-ink hover:border-accent2/60'}`}
-                      onClick={() => setOpts({ ...opts, originBottomLeft: option.bottomLeft })}
-                      title={t(option.title)}
-                      aria-pressed={active}
-                    >
-                      {t(option.label)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-          )}
           {/* ---- Cut pane: material / speed / blade / strategy ---- */}
           {tab === 'cut' && (
           <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-4 py-4 text-xs content-start" role="tabpanel" aria-labelledby="plotter-tab-cut" data-plotter-pane="cut">
@@ -2309,6 +2561,58 @@ export function PlotterDialog() {
           {/* ---- Output pane: preview / colours / layers / job prep ---- */}
           {tab === 'output' && (
           <div className="flex flex-col px-4 py-4 text-xs" role="tabpanel" aria-labelledby="plotter-tab-output" data-plotter-pane="output">
+            {/* Connection status strip — the Output tab is where every open
+                lands (preview first), so the link state and its one-click
+                exits sit right above the preview: connect when nothing is
+                linked, jump to jogging / origin once something is. */}
+            <div
+              className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded border border-border bg-panel2/60 px-2 py-1.5 text-[11px] tabular-nums"
+              data-plotter-link-status={connected ? 'connected' : 'none'}
+              role="status"
+              aria-live="polite"
+            >
+              <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${connected ? 'bg-success' : link.status === 'error' ? 'bg-danger' : 'bg-muted'}`} aria-hidden="true" />
+              {connected ? (
+                <>
+                  <span className="flex items-center gap-1 font-medium text-ink" title={t('Connected')}>
+                    <Plug size={11} aria-hidden="true" />
+                    {link.describe()}
+                  </span>
+                  <span className="text-muted">
+                    · {profile ? `${t(profile.brand)} — ${t(profile.label)}` : t('Generic / manual')}
+                    {' '}· {format === 'hpgl' ? t(opts.dialect === 'bare' ? 'Bare HP-GL' : opts.dialect === 'roland-camm' ? 'Roland dialect' : 'Graphtec dialect') : t('G-code')}
+                  </span>
+                  <div className="flex-1" />
+                  <button
+                    type="button"
+                    id="plotter-status-jog"
+                    className="btn py-0.5! px-1.5! text-[10px]! flex items-center gap-1"
+                    onClick={() => focusInMachine('plotter-jog-card', 'plotter-connect-primary')}
+                    title={t('Jog the carriage, set the origin and run a test cut.')}
+                  >
+                    <Move size={11} aria-hidden="true" />{t('Jog & origin')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="flex items-center gap-1 font-medium text-ink" title={link.detail || undefined}>
+                    {link.status === 'error' ? t('Connection error') : link.status === 'connecting' ? t('Connecting…') : t('Not connected')}
+                  </span>
+                  <span className="text-muted">{t('Connect the cutter to jog, run a test cut or send over USB.')}</span>
+                  <div className="flex-1" />
+                  <button
+                    type="button"
+                    id="plotter-status-connect"
+                    className="btn-primary py-0.5! px-2! text-[10px]! flex items-center gap-1"
+                    onClick={goToConnect}
+                    title={t('Choose the cutter’s serial port and baud rate.')}
+                  >
+                    <Plug size={11} aria-hidden="true" />{t('Connect…')}
+                  </button>
+                </>
+              )}
+            </div>
+
             <div className="flex items-center justify-between mb-1.5">
               <div>
                 <div className="field-label mb-1">{t('Graphical cut preview')}</div>
@@ -2718,6 +3022,19 @@ export function PlotterDialog() {
                   </button>
                 </span>
               )}
+              {previewMode === 'outline' && (
+                <button
+                  type="button"
+                  id="plotter-show-on-canvas"
+                  className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 transition-colors ${showOnCanvas ? 'border-accent2 bg-accent2/10 text-accent2' : 'border-border text-muted hover:text-ink hover:bg-panel2'}`}
+                  aria-pressed={showOnCanvas}
+                  onClick={() => { setShowOnCanvas(!showOnCanvas); }}
+                  title={t('Overlay the cut lines, machine origin, material range and job size on the main canvas behind this dialog.')}
+                >
+                  <Layers size={11} aria-hidden="true" />
+                  {t('Show on canvas')}
+                </button>
+              )}
               {previewMode === 'code' && (
                 <>
                   <button type="button" className="btn py-1! text-[10px]!" onClick={generate}>{t('Generate Preview')}</button>
@@ -3040,15 +3357,33 @@ export function PlotterDialog() {
           </div>
           )}
 
-          {/* ---- Machine pane (continued): connection strip + debug console
-              + Data-Link. A separate fragment that follows the Output pane
-              in source order — when the Machine tab is active the other
-              panes unmount, so the fragments join seamlessly. ---- */}
+          {/* ---- Machine pane: connection card → position & test card →
+              machine setup → diagnostics & console (all four from
+              PlotterConsole, the middle two slotted in from this dialog),
+              then Data-Link. One pane mounts at a time. ---- */}
+          {/* ---- Calibrate pane: blade / distance / positioning tests.
+              Self-contained (PlotterCalibration.tsx); every send goes back
+              through sendCalibration → streamJob → ensureLink. ---- */}
+          {tab === 'calibrate' && (
+          <div className="px-4 py-3" role="tabpanel" aria-labelledby="plotter-tab-calibrate" data-plotter-pane="calibrate">
+            <PlotterCalibration
+              opts={opts}
+              format={format}
+              jobPaths={previewPaths}
+              onChangeOpts={(patch) => setOpts(o => ({ ...o, ...patch }))}
+              onCut={sendCalibration}
+              onDryRun={dryRun}
+              onForceTest={format === 'hpgl' ? () => { void forceTest(); } : undefined}
+              busy={busy}
+              simulated={link.simulated}
+              simulator={link.simulator}
+              onRehearse={() => { void connectLink({ simulate: true }).catch(reportOpenError); }}
+            />
+          </div>
+          )}
+
           {tab === 'machine' && (
-          <div className="px-4 pb-4" data-plotter-pane="machine">
-          {/* Connection + debug console. The native port picker lives here
-              now, alongside baud / flow control, quick machine commands,
-              jog, and the TX/RX traffic log. */}
+          <div className="px-4 py-4" role="tabpanel" aria-labelledby="plotter-tab-machine" data-plotter-pane="machine">
           <PlotterConsole
             link={link}
             format={format}
@@ -3060,6 +3395,7 @@ export function PlotterDialog() {
             nativePorts={nativePorts}
             selectedPort={selectedPort}
             setSelectedPort={setSelectedPort}
+            onSimulateChange={setSimSelected}
             refreshPorts={() => { void refreshSerialPorts(); }}
             portsLoading={portsLoading}
             portsError={portsError}
@@ -3078,6 +3414,15 @@ export function PlotterDialog() {
             jobLogVersion={jobLogVersion}
             applyProfile={applyProfile}
             machineNameHint={machineNameHint}
+            settings={machineSettings}
+            setupActions={machineSetupActions}
+            onConnect={connectLink}
+            onOpenError={reportOpenError}
+            onTestCut={() => { void testCut(); }}
+            onForceTest={format === 'hpgl' ? () => { void forceTest(); } : undefined}
+            onLaserTest={format === 'gcode' && profileId === 'grbl-laser' ? () => { void laserTest(); } : undefined}
+            onCornerTour={() => { void cornerTour(); }}
+            jobBusy={busy}
           />
 
           {/* Data-Link (network cutter): the Graphtec TCP-9100 barcode
@@ -3197,30 +3542,9 @@ export function PlotterDialog() {
               {outputBlockedReason}
             </div>
           )}
-          {jobProgress && (
-            <div className="mb-2 flex items-center gap-2 text-[10px] text-muted tabular-nums" role="status" aria-live="polite">
-              <span className={`shrink-0 ${jobPaused ? 'text-warning' : ''}`}>
-                {jobPaused ? t('Paused') : t('Sending')} {jobProgress.sent}/{jobProgress.total} B ({Math.floor((jobProgress.sent / Math.max(1, jobProgress.total)) * 100)}%){jobProgress.eta !== null ? ` · ETA ~${jobProgress.eta}s` : ''}
-              </span>
-              <div className="h-1.5 min-w-0 flex-1 rounded bg-border overflow-hidden">
-                <div
-                  className={`h-full transition-[width] duration-150 ${jobPaused ? 'bg-warning' : 'bg-accent2'}`}
-                  style={{ width: `${(jobProgress.sent / Math.max(1, jobProgress.total)) * 100}%` }}
-                />
-              </div>
-              <button
-                type="button"
-                className="btn py-1! px-2! text-[10px]! shrink-0"
-                onClick={() => { void togglePauseJob(); }}
-                title={t('Hold the stream between chunks — the machine drains its buffer and stops. grbl also gets a feed hold.')}
-              >
-                {jobPaused ? t('Resume') : t('Pause')}
-              </button>
-              <button type="button" className="btn py-1! px-2! text-[10px]! text-danger shrink-0" onClick={cancelJob}>
-                {t('Stop job')}
-              </button>
-            </div>
-          )}
+          {/* Stream progress → machine phase (shared monitor, see
+              PlotterStatusChip.tsx). Transfer done is NOT cut done. */}
+          <PlotterJobProgress onTogglePause={() => { void togglePauseJob(); }} onStop={cancelJob} />
           <div
             className="flex items-center gap-2 pt-3 border-t border-border"
             role="group"
@@ -3512,6 +3836,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+/** Rewrite SVG `transform` attributes into the grammar `new DOMMatrix()`
+ *  accepts (CSS): fabric emits the space-separated SVG form
+ *  `matrix(1 0 0 1 x y)` / `translate(x y)`, which DOMMatrix rejects — and
+ *  plotter.ts's svgToPolylines swallows that rejection, dropping every
+ *  object's position. The preview must not stack the artwork on the origin,
+ *  so the exported SVG is normalised here first (pure string rewrite).
+ *  KNOWN ISSUE for the plotter.ts owner: the shipped job still runs the
+ *  un-normalised SVG through the same flattener. */
+function toCssTransforms(svg: string): string {
+  return svg.replace(/\btransform="([^"]*)"/g, (_m, value: string) => `transform="${value.replace(/([a-zA-Z]+)\(([^)]*)\)/g, (whole: string, name: string, args: string) => {
+    const parts = args.trim().split(/[\s,]+/).filter(Boolean);
+    if (parts.length === 0 || parts.some((p) => !/^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(p))) return whole;
+    // translate() is the only one CSS measures in px rather than unitless.
+    const list = parts.map((p) => (name === 'translate' ? `${p}px` : p));
+    return `${name}(${list.join(', ')})`;
+  })}"`);
 }
 
 /** Compact mm distance: metres past 1000mm, else millimetres. */

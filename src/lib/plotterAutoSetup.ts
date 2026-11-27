@@ -73,6 +73,10 @@ export interface AutoSetupOptions {
   /** Format to keep when everything stays silent (default 'hpgl'). */
   currentFormat?: 'gcode' | 'hpgl';
   onLog?: (line: string) => void;
+  /** Stop between steps (the operator pressed Connect, or left the page):
+   *  the port probes end after the attempt in flight and the identify /
+   *  self-test leg is skipped — the result still says what was found. */
+  signal?: AbortSignal;
 }
 
 /** Parse a grbl $$ reply into $key=value pairs. */
@@ -123,6 +127,7 @@ export async function runAutoSetup(
   const found = await autoDetectCutter(link, ports, {
     flowControl: flow,
     ...(opts.bauds ? { bauds: opts.bauds } : {}),
+    ...(opts.signal ? { signal: opts.signal } : {}),
     onLog: log,
   });
 
@@ -162,6 +167,24 @@ export async function runAutoSetup(
     status: 'pass',
     detail: `${found.portPath} @ ${found.baud}${found.chip ? ` (${found.chip.chip})` : ''} — ${found.grbl ? 'grbl controller' : `answered "${found.model}"`}`,
   });
+  if (opts.signal?.aborted) {
+    // Cancelled after the probe: report what it learned, skip the rest.
+    steps.push({ label: 'Identify', status: 'info', detail: 'Stopped — the scan was cancelled after the probe.' });
+    return {
+      found: true,
+      suspectedClone: false,
+      port: found.portPath,
+      baud: found.baud,
+      format: found.grbl ? 'gcode' : 'hpgl',
+      profileId: found.suggestedProfileId,
+      model: found.model,
+      chip: found.chip,
+      grbl: found.grbl,
+      grblBuild: found.grblBuild ?? '',
+      grblSettings: [],
+      steps,
+    };
+  }
 
   let model = found.model;
   let grblBuild = found.grblBuild ?? '';

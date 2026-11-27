@@ -4,8 +4,25 @@ import { createRoot, type Root } from 'react-dom/client';
 import { PlotterDialog } from '../PlotterDialog';
 import { useEditor, type CutPath } from '../../store/editor';
 import { sendOverSerial } from '../../lib/plotter';
+import { getSharedPlotterLink } from '../../lib/plotterLink';
 import { download } from '../../lib/io';
 import { showConfirm } from '../../lib/confirm';
+
+/** Park the shared link in "connected" behind a no-op transport spy. Since
+ *  the connect-on-demand gate, a send while NOT linked is refused with a
+ *  hint and nothing reaches the wire (see plotterGuards.test.tsx) — so a
+ *  test of the send path itself has to start linked. Returns the spy so the
+ *  test can count the jobs that streamed. */
+function linkConnected() {
+  const link = getSharedPlotterLink();
+  link.status = 'connected';
+  const spy = vi.fn<(data: string | Uint8Array) => Promise<void>>().mockResolvedValue(undefined);
+  // Own property shadows the prototype method; removed again in afterEach.
+  Object.defineProperty(link, 'send', { value: spy, configurable: true, writable: true });
+  return spy;
+}
+/** True while a test's fake transport is installed on the shared link. */
+let sendStubbed = false;
 
 /**
  * Wiring tests for the plotter dialog's layered-vinyl and weed-check
@@ -44,7 +61,7 @@ vi.mock('../../lib/confirm', async (importOriginal) => {
 let host: HTMLDivElement;
 let roots: Root[];
 
-function mountDialog(tab: 'machine' | 'cut' | 'output' = 'machine'): HTMLDivElement {
+function mountDialog(tab: 'machine' | 'cut' | 'output' = 'output'): HTMLDivElement {
   const container = document.createElement('div');
   host.appendChild(container);
   const root = createRoot(container);
@@ -53,8 +70,9 @@ function mountDialog(tab: 'machine' | 'cut' | 'output' = 'machine'): HTMLDivElem
     useEditor.setState({ showPlotter: true });
     root.render(<PlotterDialog />);
   });
-  // 2026-11 reorg: the Machine / Cut / Output panes mount one at a time —
-  // switch to the pane under test (no-op when already active).
+  // 2026-11 reorg: the Output / Cut settings / Machine panes mount one at a
+  // time and every open lands on Output (the preview) — switch to the pane
+  // under test (no-op when already active).
   const btn = container.querySelector<HTMLButtonElement>(`#plotter-tab-${tab}`);
   if (btn && btn.getAttribute('aria-selected') !== 'true') {
     act(() => { btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
@@ -154,6 +172,10 @@ afterEach(() => {
     for (const root of roots) root.unmount();
   });
   host.remove();
+  // Undo the fake link so no later test inherits a "connected" cutter.
+  if (sendStubbed) delete (getSharedPlotterLink() as { send?: unknown }).send;
+  sendStubbed = false;
+  getSharedPlotterLink().status = 'idle';
   vi.useRealTimers();
 });
 
@@ -220,22 +242,30 @@ describe('PlotterDialog layers (multi-colour vinyl)', () => {
     useEditor.setState({ cutPaths: layeredJob() });
     const c = mountDialog('output');
     const sendAll = Array.from(c.querySelectorAll('button')).find(b => b.textContent === 'Send all layers')!;
+    // The link gate must pass before anything streams: start connected, with
+    // a no-op transport spy standing in for the wire.
+    const send = linkConnected();
+    sendStubbed = true;
 
     // Decline the swap after layer 1 → only one job streams.
     vi.mocked(showConfirm).mockResolvedValue(false);
     await clickAsync(sendAll);
     await flush();
-    expect(vi.mocked(sendOverSerial)).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(1);
     expect(vi.mocked(showConfirm)).toHaveBeenCalledTimes(1);
 
     // Confirm every swap → both layers stream, layer 2 confirmed as "2 of 2".
-    vi.mocked(sendOverSerial).mockClear();
+    send.mockClear();
     vi.mocked(showConfirm).mockReset().mockResolvedValue(true);
     await clickAsync(sendAll);
     await flush();
-    expect(vi.mocked(sendOverSerial)).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledTimes(2);
     expect(vi.mocked(showConfirm)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(showConfirm).mock.calls[0][0].message).toContain('Layer 2 of 2');
+    // Each streamed layer is that layer's own job — real machine code, over
+    // the persistent link (never the legacy one-shot send).
+    for (const call of send.mock.calls) expect(call[0]).toContain('PU');
+    expect(vi.mocked(sendOverSerial)).not.toHaveBeenCalled();
   });
 });
 
@@ -617,14 +647,14 @@ describe('PlotterDialog Data-Link (network cutter)', () => {
   it('is hidden when the native runtime is inactive', () => {
     vi.mocked(isTauri).mockReturnValue(false);
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('machine'); // Data-Link sits on the Machine pane
     expect(c.textContent).not.toContain('Data-Link (network cutter)');
   });
 
   it('is visible (collapsed) when the native runtime is active', () => {
     vi.mocked(isTauri).mockReturnValue(true);
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('machine'); // Data-Link sits on the Machine pane
     expect(c.textContent).toContain('Data-Link (network cutter)');
     expect(dataLinkHeader(c).getAttribute('aria-expanded')).toBe('false');
     expect(c.querySelector('#plotter-datalink-body')).toBeNull();
@@ -633,7 +663,7 @@ describe('PlotterDialog Data-Link (network cutter)', () => {
   it('Connect & send runs the handshake, shows log lines and toasts success — never the serial/download paths', async () => {
     vi.mocked(isTauri).mockReturnValue(true);
     useEditor.setState({ cutPaths: layeredJob() });
-    const c = mountDialog();
+    const c = mountDialog('machine'); // Data-Link sits on the Machine pane
     click(dataLinkHeader(c)); // expand
 
     // Default job name 'ANCHOR01' is pre-filled; the host starts empty and
