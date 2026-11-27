@@ -126,10 +126,13 @@ export function registerBuiltInFormats(): void {
       exportJSON();
     },
     import: async (input) => {
-      if (input instanceof File) {
-        const { importJSON } = await import('./io2');
-        await importJSON(input);
-      }
+      if (!(input instanceof File)) return;
+      // A project envelope (`.vstudio.json` / `.awk.json`) opens as a project;
+      // a plain canvas state replaces the objects. Handed to the raw loader
+      // unchecked, an envelope cleared the canvas and restored nothing.
+      // `false` = the user declined to replace the open design.
+      const { openJsonFile } = await import('./projectFile');
+      if (!(await openJsonFile(input))) return false;
     },
   });
 

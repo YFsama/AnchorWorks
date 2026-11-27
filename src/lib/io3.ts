@@ -10,7 +10,7 @@ import { printHtmlDocument } from './printer';
 import { toast } from './toast';
 import { t } from './i18n';
 import { logger } from './debug';
-import { findFormatByExt } from './formats';
+import { findFormatByExt, listImporters } from './formats';
 // Vite-native Web Worker import — the `?worker` suffix produces a class that
 // instantiates the bundled worker chunk. Image trace walks every pixel of a
 // raster (up to 256×256) and on larger inputs that's enough to stall the UI;
@@ -447,85 +447,281 @@ function sendTilesToPrint(tiles: string[], pageW: number, pageH: number, cols: n
 /* 4. Drag-and-drop                                                  */
 /* ----------------------------------------------------------------- */
 
-/** Attach drag/drop listeners; returns a teardown function.
- *
- * Toggles the `dragging-files` class on the host element while a drag
- * carrying files is over the canvas, so CSS can show a visible drop target
- * (dashed accent2 outline + tint — see index.css `.canvas-host.dragging-files`).
- * Uses a depth counter to ignore dragenter/dragleave between child elements
- * (canvas, ArtboardLayer, Rulers, etc.) — the class only clears when the
- * drag leaves the wrapper entirely or a drop happens. */
-export function attachDragDrop(el: HTMLElement): () => void {
-  let depth = 0;
-  const isFileDrag = (e: DragEvent): boolean =>
-    !!e.dataTransfer && Array.from(e.dataTransfer.items).some((it) => it.kind === 'file');
-  const onDragOver = (e: DragEvent) => {
-    if (isFileDrag(e)) {
-      e.preventDefault();
-      e.dataTransfer!.dropEffect = 'copy';
-    }
+/** MIME types accepted as rasters when a dropped file carries no extension. */
+const RASTER_MIMES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+/** Lower-cased extension of a file name; '' when the name carries none. */
+function fileExt(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+}
+
+/**
+ * True when a drag event carries files. `types` is the reliable signal while
+ * a drag hovers (browsers withhold `items` details there); `items` covers
+ * engines that omit `types`.
+ */
+function carriesFiles(e: DragEvent): boolean {
+  const dt = e.dataTransfer;
+  if (!dt) return false;
+  if (Array.from(dt.types ?? []).includes('Files')) return true;
+  return Array.from(dt.items ?? []).some((it) => it.kind === 'file');
+}
+
+/** A dropped directory surfaces as a File with no readable contents. */
+function isDroppedFolder(file: File): boolean {
+  const entry = (file as File & { webkitGetAsEntry?: () => { isDirectory?: boolean } | null }).webkitGetAsEntry?.();
+  return !!entry?.isDirectory;
+}
+
+/** File extensions this build can open, rasters first — for the "Supported:" hint. */
+function supportedDropTypes(): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const ext of [...RASTER_EXTS, ...listImporters().map((h) => h.ext)].map((e) => e.toUpperCase())) {
+    if (!seen.has(ext)) { seen.add(ext); out.push(ext); }
+  }
+  return out.join(', ');
+}
+
+/** Screen point at the centre of the visible canvas — where out-of-canvas drops land. */
+function viewportCentreClient(): { clientX: number; clientY: number } {
+  const rect = (getCanvas()?.upperCanvasEl as HTMLCanvasElement | undefined)?.getBoundingClientRect();
+  return {
+    clientX: (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
+    clientY: (rect?.top ?? 0) + (rect?.height ?? 0) / 2,
   };
-  const onDragEnter = (e: DragEvent) => {
-    if (!isFileDrag(e)) return;
-    depth++;
-    if (depth === 1) el.classList.add('dragging-files');
+}
+
+/**
+ * Full-window "release to import" affordance for a file drag hovering over
+ * the chrome (panels, top bar, tool rail) instead of the canvas. Built
+ * imperatively because it follows the drag lifecycle, not React state.
+ * `pointer-events: none` keeps whatever sits under the cursor the drop target.
+ */
+function createDropOverlay(): { setVisible(visible: boolean): void; dispose(): void } {
+  let root: HTMLDivElement | null = null;
+  const build = (): HTMLDivElement => {
+    const el = document.createElement('div');
+    el.setAttribute('aria-hidden', 'true');
+    Object.assign(el.style, {
+      position: 'fixed',
+      inset: '0',
+      zIndex: '120',
+      pointerEvents: 'none',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+      boxSizing: 'border-box',
+      border: '3px dashed var(--accent2)',
+      background: 'color-mix(in oklab, var(--accent2) 6%, transparent)',
+    });
+    const pill = document.createElement('div');
+    Object.assign(pill.style, {
+      marginTop: '56px',
+      padding: '8px 14px',
+      borderRadius: '8px',
+      background: 'var(--panel)',
+      color: 'var(--ink)',
+      border: '1px solid var(--border)',
+      boxShadow: '0 8px 24px rgb(0 0 0 / 0.35)',
+      fontSize: '13px',
+      fontWeight: '600',
+      lineHeight: '1.4',
+      textAlign: 'center',
+    });
+    const detail = document.createElement('div');
+    detail.textContent = t('Files land at the centre of your view');
+    Object.assign(detail.style, { fontSize: '11px', fontWeight: '400', opacity: '0.75' });
+    pill.append(t('Release to import'), detail);
+    el.appendChild(pill);
+    return el;
   };
-  const onDragLeave = (e: DragEvent) => {
-    if (!isFileDrag(e)) return;
-    depth = Math.max(0, depth - 1);
-    if (depth === 0) el.classList.remove('dragging-files');
+  return {
+    setVisible(visible: boolean) {
+      if (!visible) { root?.remove(); return; }
+      root ??= build();
+      if (!root.isConnected) document.body.appendChild(root);
+    },
+    dispose() { root?.remove(); root = null; },
   };
-  const onDrop = async (e: DragEvent) => {
-    depth = 0;
-    el.classList.remove('dragging-files');
-    if (!e.dataTransfer?.files?.length) return;
-    e.preventDefault();
-    // Capture cursor position from the drop event BEFORE any awaits — by
-    // the time the async file reads complete, the original DragEvent has
-    // been recycled and clientX/Y read 0. Pass them to importImageFile so
-    // raster drops land where the user actually let go of the file
-    // (previously they always centred on the canvas, which read as "image
-    // landed on the right" because the canvas itself is offset rightward
-    // by the toolbar).
-    const dropAt = { clientX: e.clientX, clientY: e.clientY };
-    const files = Array.from(e.dataTransfer.files);
-    // Cascade subsequent drops in the same gesture so multiple files
-    // don't stack exactly on top of each other — small per-file offset.
-    let cascade = 0;
-    for (const f of files) {
-      const ext = (f.name.split('.').pop() ?? '').toLowerCase();
-      const isRaster = RASTER_EXTS.includes(ext);
-      // Honour the format registry so drag-drop for newly-registered
-      // formats (PLT, JSON, SVG) Just Works. We gate on registry-hit OR
-      // raster so unknown extensions get a no-op rather than a confusing
-      // toast for "system" drops (URL shortcuts, browser-tab drags, etc.).
-      const handler = findFormatByExt(ext);
-      if (!handler?.import && !isRaster) continue;
-      try {
-        if (handler?.import) {
-          await handler.import(f);
-        } else if (isRaster) {
-          await importImageFile(f, {
-            clientX: dropAt.clientX + cascade,
-            clientY: dropAt.clientY + cascade,
-          });
-          cascade += 16;
-        }
-      } catch (err) {
-        logger.error('io', `drop import failed: ${f.name} — ${err instanceof Error ? err.message : String(err)}`);
+}
+
+export interface DropImportSummary {
+  /** Files that reached the canvas. */
+  imported: number;
+  /** Files whose importer or image decode threw. */
+  failed: number;
+  /** Files this build cannot open (unsupported extension, dropped folder). */
+  unsupported: number;
+}
+
+const MAX_NAMED_FILES = 3;
+
+/** `.vstudio.json` / `.awk.json` by name — enough to order a drop; the content decides what opens. */
+const PROJECT_FILE_NAME = /\.(vstudio|awk)\.json$/i;
+
+/** `"a.png", "b.svg"` — at most three names, an ellipsis standing in for the rest. */
+function quoteNames(files: File[]): string {
+  const shown = files.slice(0, MAX_NAMED_FILES).map((f) => `"${f.name}"`).join(', ');
+  return files.length > MAX_NAMED_FILES ? `${shown} …` : shown;
+}
+
+/** Every outcome of one drop, worded for the user — never a raw exception. */
+function reportDropImport(r: { imported: number; total: number; unreadable: File[]; failed: File[]; unsupported: File[]; folders: File[] }): void {
+  const nothingImported = r.imported === 0 && r.unreadable.length === 0 && r.failed.length === 0;
+  const skippedTitle = nothingImported ? t('Nothing imported') : undefined;
+  if (r.folders.length) {
+    toast.warn(`${t("Couldn't import")} ${quoteNames(r.folders)}. ${t("Folders can't be imported — drop the files inside instead.")}`, { title: skippedTitle });
+  }
+  if (r.unsupported.length) {
+    toast.warn(`${t("Couldn't import")} ${quoteNames(r.unsupported)}. ${t('Unsupported file type.')} ${t('Supported:')} ${supportedDropTypes()}`, { title: skippedTitle });
+  }
+  if (r.unreadable.length) {
+    toast.error(`${t("Couldn't open")} ${quoteNames(r.unreadable)}. ${t('The file may be damaged or not a valid image.')}`, { title: t('Import failed') });
+  }
+  if (r.failed.length) {
+    toast.warn(`${t("Couldn't import")} ${quoteNames(r.failed)}. ${t('The file could not be read. It may be damaged or use features that are not supported.')}`, { title: t('Import failed') });
+  }
+  // One short confirmation for a multi-file drop; a single file speaks for itself.
+  if (r.imported > 0 && r.total > 1) {
+    const tally = r.imported === r.total ? `${r.imported}` : `${r.imported} / ${r.total}`;
+    toast.success(`${tally} ${t('files imported')}`, { title: t('Import') });
+  }
+}
+
+/**
+ * Import the files of one drop. Rasters dropped on the canvas land under the
+ * cursor (later ones cascade 16px so they don't stack exactly); dropped
+ * anywhere else in the window they land on the centre of the current view.
+ * Registry formats (SVG, JSON, PDF, PLT) go through their own importer, which
+ * places them itself. Failures are collected and reported once at the end.
+ */
+export async function importDroppedFiles(
+  files: File[],
+  dropAt: { clientX: number; clientY: number },
+  overCanvas: boolean,
+): Promise<DropImportSummary> {
+  const anchor = overCanvas ? dropAt : viewportCentreClient();
+  const folders: File[] = [];
+  const unsupported: File[] = [];
+  const unreadable: File[] = [];
+  const failed: File[] = [];
+  let imported = 0;
+  let cascade = 0;
+  // A saved project in the drop opens first, so the other files land inside
+  // the project it opens instead of in the design that project replaces.
+  const ordered = [...files].sort((a, b) => Number(PROJECT_FILE_NAME.test(b.name)) - Number(PROJECT_FILE_NAME.test(a.name)));
+  for (const f of ordered) {
+    if (isDroppedFolder(f)) { folders.push(f); continue; }
+    const ext = fileExt(f.name);
+    // Honour the format registry so drag-drop for newly-registered formats
+    // (PLT, JSON, SVG) Just Works; its importer wins over the raster path.
+    const handler = findFormatByExt(ext);
+    const isRaster = RASTER_EXTS.includes(ext) || RASTER_MIMES.includes(f.type);
+    if (!handler?.import && !isRaster) { unsupported.push(f); continue; }
+    let taken = true;
+    try {
+      if (handler?.import) {
+        taken = (await handler.import(f)) !== false;
+      } else {
+        await importImageFile(f, { clientX: anchor.clientX + cascade, clientY: anchor.clientY + cascade });
+        cascade += 16;
       }
+      if (taken) imported += 1;
+    } catch (err) {
+      (handler?.import ? failed : unreadable).push(f);
+      logger.error('io', `drop import failed: ${f.name} — ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+  reportDropImport({
+    imported,
+    total: imported + folders.length + unsupported.length + unreadable.length + failed.length,
+    folders,
+    unsupported,
+    unreadable,
+    failed,
+  });
+  return { imported, failed: failed.length + unreadable.length, unsupported: unsupported.length + folders.length };
+}
+
+/** A file drag that goes silent for this long is treated as over (left the window, cancelled). */
+const DRAG_WATCHDOG_MS = 2000;
+
+/** Attach the window-level drag/drop listeners; returns a teardown function.
+ *
+ * The whole application window accepts file drops — users rarely aim a
+ * dragged file at the canvas precisely, and before this a drop that landed
+ * on a panel or the top bar did nothing at all (on Windows the browser then
+ * opened the file in the tab). Two drop zones share one handler:
+ *
+ *  • over `canvasHost` — the image is placed under the cursor and the host
+ *    keeps its `dragging-files` class (dashed accent2 ring — see index.css
+ *    `.canvas-host.dragging-files`);
+ *  • anywhere else in the window — a full-window dashed overlay says "release
+ *    to import", and rasters land on the centre of the current view.
+ *
+ * Drag state follows `dragenter`/`dragover` recency rather than an
+ * enter/leave depth counter: `dragleave` also fires for every child element
+ * the pointer crosses, and a child that unmounts mid-drag never reports its
+ * leave. A `dragleave` only clears the affordance when no enter/over followed
+ * in the same frame; a watchdog clears it if the drag goes silent.
+ *
+ * Events another in-app drop target already accepted (the Gang Sheet Builder
+ * intake) arrive with `defaultPrevented` and are left alone. */
+export function attachDragDrop(canvasHost: HTMLElement): () => void {
+  let dragging = false;
+  let sawHover = 0;
+  let watchdog = 0;
+  const overlay = createDropOverlay();
+
+  const clearDrag = () => {
+    window.clearTimeout(watchdog);
+    if (!dragging) return;
+    dragging = false;
+    canvasHost.classList.remove('dragging-files');
+    overlay.setVisible(false);
   };
-  el.addEventListener('dragover', onDragOver);
-  el.addEventListener('dragenter', onDragEnter);
-  el.addEventListener('dragleave', onDragLeave);
-  el.addEventListener('drop', onDrop);
+  const onHover = (e: DragEvent) => {
+    if (!carriesFiles(e)) return;
+    if (e.defaultPrevented) { clearDrag(); return; }
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    const overCanvas = e.target instanceof Node && canvasHost.contains(e.target);
+    dragging = true;
+    sawHover++;
+    canvasHost.classList.toggle('dragging-files', overCanvas);
+    overlay.setVisible(!overCanvas);
+    window.clearTimeout(watchdog);
+    watchdog = window.setTimeout(clearDrag, DRAG_WATCHDOG_MS);
+  };
+  const onLeave = (e: DragEvent) => {
+    if (!carriesFiles(e)) return;
+    const seen = sawHover;
+    window.requestAnimationFrame(() => { if (sawHover === seen) clearDrag(); });
+  };
+  const onDrop = (e: DragEvent) => {
+    const isFiles = carriesFiles(e);
+    const overCanvas = e.target instanceof Node && canvasHost.contains(e.target);
+    if (isFiles) clearDrag();
+    // Not a file drop (text, a URL, a layer being reordered): leave it to the browser.
+    if (!isFiles || e.defaultPrevented) return;
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (!files.length) return;
+    void importDroppedFiles(files, { clientX: e.clientX, clientY: e.clientY }, overCanvas);
+  };
+  window.addEventListener('dragenter', onHover);
+  window.addEventListener('dragover', onHover);
+  window.addEventListener('dragleave', onLeave);
+  window.addEventListener('drop', onDrop);
   return () => {
-    el.removeEventListener('dragover', onDragOver);
-    el.removeEventListener('dragenter', onDragEnter);
-    el.removeEventListener('dragleave', onDragLeave);
-    el.removeEventListener('drop', onDrop);
-    el.classList.remove('dragging-files');
+    window.removeEventListener('dragenter', onHover);
+    window.removeEventListener('dragover', onHover);
+    window.removeEventListener('dragleave', onLeave);
+    window.removeEventListener('drop', onDrop);
+    clearDrag();
+    overlay.dispose();
   };
 }
 

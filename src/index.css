@@ -618,13 +618,16 @@
     background-color: rgb(var(--color-canvas-bg));
   }
   /* File drop affordance — dashed accent2 ring + faint tint appears whenever a
- * file drag enters the canvas. Toggled by io3.ts attachDragDrop. */
+   * file drag enters the canvas. Toggled by io3.ts attachDragDrop.
+   * `--accent2` is already a full colour value (rgb(R G B)), so the tint has
+   * to be a color-mix — the old `rgb(var(--accent2) / 0.05)` was invalid and
+   * left the drop state with a ring but no tint. */
   .canvas-host.dragging-files::after {
     content: '';
     position: absolute;
     inset: 10px;
     border: 2px dashed var(--accent2);
-    background: rgb(var(--accent2) / 0.05);
+    background: color-mix(in oklab, var(--accent2) 5%, transparent);
     border-radius: 8px;
     pointer-events: none;
     z-index: 50;

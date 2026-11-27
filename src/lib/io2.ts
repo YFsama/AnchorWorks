@@ -19,9 +19,16 @@ export function exportJSON(): void {
 }
 
 export async function importJSON(file: File): Promise<void> {
+  await loadCanvasJSON(JSON.parse(await file.text()));
+}
+
+/** Replace the canvas objects with a plain Fabric canvas state (what "Export
+ *  JSON" writes). One history step — a single Undo brings the previous
+ *  objects back. Project envelopes must not come here: see
+ *  `projectFile.openJsonFile`, which tells the two apart. */
+export async function loadCanvasJSON(json: unknown): Promise<void> {
   const c = getCanvas(); if (!c) return;
-  const t = await file.text();
-  await c.loadFromJSON(JSON.parse(t));
+  await c.loadFromJSON(json as Record<string, unknown>);
   c.renderAll();
   pushHistory();
 }

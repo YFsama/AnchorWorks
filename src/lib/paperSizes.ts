@@ -26,6 +26,62 @@ export interface PaperPreset {
 }
 
 /**
+ * Sign-shop shortlist: the sizes a sign / identification business cuts and
+ * prints most — yard signs, vinyl banners, roll-up and poster prints, plus
+ * the small identification formats (sticker label, name badge, bumper
+ * sticker, door hanger). Millimetres at the document DPI, portrait-authored
+ * like the rest of the catalogue, so `presetToPx` converts them exactly the
+ * way it converts A4. Inch-based sizes use the exact conversion (24×12 in =
+ * 609.6 × 304.8 mm), which keeps "Banner (24×12 in)" identical to the
+ * artboard row's "24×12 in" preset (2304 × 1152 px at 96 DPI).
+ *
+ * The entries also join `PAPER_PRESETS`, so Document Settings offers them
+ * under their general category and `matchPreset` recognises them.
+ */
+export const SIGN_PRESETS: PaperPreset[] = [
+  // ---- Large-format prints (millimetres) ----------------------------------
+  { id: 'yard-sign-18x24', label: 'Yard sign (18×24 in)', category: 'print', w: 457.2, h: 609.6, unit: 'mm' },
+  { id: 'yard-sign-18x12', label: 'Yard sign (18×12 in)', category: 'print', w: 304.8, h: 457.2, unit: 'mm' },
+  { id: 'banner-24x12', label: 'Banner (24×12 in)', category: 'print', w: 304.8, h: 609.6, unit: 'mm' },
+  { id: 'banner-2x4', label: 'Banner (2×4 ft)', category: 'print', w: 609.6, h: 1219.2, unit: 'mm' },
+  { id: 'banner-3x6', label: 'Banner (3×6 ft)', category: 'print', w: 914.4, h: 1828.8, unit: 'mm' },
+  { id: 'banner-4x8', label: 'Banner / panel (4×8 ft)', category: 'print', w: 1219.2, h: 2438.4, unit: 'mm' },
+  { id: 'poster-24x36', label: 'Poster (24×36 in)', category: 'print', w: 609.6, h: 914.4, unit: 'mm' },
+  { id: 'rollup-banner', label: 'Roll-up banner (850×2000 mm)', category: 'print', w: 850, h: 2000, unit: 'mm' },
+
+  // ---- Identification & small format (millimetres) ------------------------
+  { id: 'sticker-label', label: 'Sticker label (76×51 mm)', category: 'sticker', w: 51, h: 76, unit: 'mm' },
+  { id: 'name-badge', label: 'Name badge (89×38 mm)', category: 'card', w: 38, h: 89, unit: 'mm' },
+  { id: 'bumper-sticker', label: 'Bumper sticker (3×11.5 in)', category: 'sticker', w: 76.2, h: 292.1, unit: 'mm' },
+  { id: 'door-hanger', label: 'Door hanger (3.5×8.5 in)', category: 'sticker', w: 88.9, h: 215.9, unit: 'mm' },
+];
+
+/** Group heading the artboard size picker lists `SIGN_PRESETS` under. */
+export const SIGN_PRESET_GROUP_LABEL = 'Signs & banners';
+
+/**
+ * Presets that are normally used landscape even though the catalogue stores
+ * every size portrait-authored (a banner is wider than it is tall). Picking
+ * one of these in a picker adopts its usual orientation; everything else
+ * (paper, yard signs, posters) opens portrait.
+ */
+export const LANDSCAPE_FIRST_PRESET_IDS: ReadonlySet<string> = new Set([
+  'yard-sign-18x12',
+  'banner-24x12',
+  'banner-2x4',
+  'banner-3x6',
+  'banner-4x8',
+  'sticker-label',
+  'name-badge',
+  'bumper-sticker',
+]);
+
+/** Group heading the artboard size picker lists a preset under. */
+export function presetGroupLabel(preset: PaperPreset): string {
+  return SIGN_PRESETS.includes(preset) ? SIGN_PRESET_GROUP_LABEL : CATEGORY_LABELS[preset.category];
+}
+
+/**
  * The preset catalogue. Ordering inside each category is roughly
  * largest → smallest / most-common → least, since that's the order a user
  * scans a size dropdown. Categories are grouped in the dialog via
@@ -60,6 +116,9 @@ export const PAPER_PRESETS: PaperPreset[] = [
   { id: 'yt-thumb', label: 'YouTube thumbnail (1280×720)', category: 'screen', w: 1280, h: 720, unit: 'px' },
   { id: 'x-header', label: 'X / Twitter header (1500×500)', category: 'screen', w: 1500, h: 500, unit: 'px' },
   { id: 'fullhd', label: 'Full HD (1920×1080)', category: 'screen', w: 1920, h: 1080, unit: 'px' },
+
+  // ---- Sign-shop shortlist (millimetres; see SIGN_PRESETS) ---------------
+  ...SIGN_PRESETS,
 ];
 
 export const CATEGORY_LABELS: Record<PaperCategory, string> = {
@@ -112,3 +171,12 @@ export function matchPreset(widthPx: number, heightPx: number, dpi: number): { i
 function near(a: number, b: number): boolean {
   return Math.abs(a - b) <= 2;
 }
+
+/**
+ * Catalogue for the artboard size picker: the sign-shop shortlist first,
+ * then the rest of `PAPER_PRESETS` (each sign preset appears once).
+ */
+export const ARTBOARD_SIZE_PRESETS: PaperPreset[] = [
+  ...SIGN_PRESETS,
+  ...PAPER_PRESETS.filter((preset) => !SIGN_PRESETS.includes(preset)),
+];

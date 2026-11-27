@@ -1,0 +1,18 @@
+{
+  "kind": "anchorworks-project",
+  "version": 2,
+  "createdAt": 0,
+  "doc": { "width": 900, "height": 700, "unit": "px", "dpi": 96, "background": "#ffffff" },
+  "canvas": {
+    "version": "7.0.0",
+    "background": "#ffffff",
+    "objects": [
+      { "type": "rect", "left": 40, "top": 100, "width": 80, "height": 60, "fill": "#ff8000" },
+      { "type": "rect", "left": 240, "top": 100, "width": 80, "height": 60, "fill": "#0080ff" },
+      { "type": "rect", "left": 440, "top": 100, "width": 80, "height": 60, "fill": "#80ff00" }
+    ]
+  },
+  "artboards": [],
+  "symbols": [],
+  "cutPaths": []
+}

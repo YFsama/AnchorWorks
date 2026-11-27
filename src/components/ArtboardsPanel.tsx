@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, FileImage, FileCode, Target, Copy, Frame, Search, RotateCw } from 'lucide-react';
 import { zoomToArtboard } from '../lib/canvasEngine';
 import { mmToPx } from '../lib/paperSizes';
@@ -7,7 +7,6 @@ import { toast } from '../lib/toast';
 import { showConfirm } from '../lib/confirm';
 import { useT } from '../lib/i18n';
 import {
-  createArtboard,
   createArtboardFromSelection,
   deleteArtboard,
   duplicateArtboard,
@@ -30,6 +29,7 @@ import { actionReviewKey, makeRovingKeys, useReviewedAction } from './ui/useRovi
 import { ActionToolbar } from './ui/ActionToolbar';
 import { SearchableListActions } from './ui/SearchableListActions';
 import type { Artboard } from '../types';
+import { ArtboardSizePicker } from './ArtboardSizePicker';
 
 // The artboard list's review announcer follows focus (each row's onFocus),
 // so the kit's setReview hook is a no-op for that region.
@@ -41,6 +41,11 @@ export function ArtboardsPanel() {
   const [query, setQuery] = useState('');
   const [selectedArtboardIds, setSelectedArtboardIds] = useState<string[]>([]);
   const firstArtboardRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Add Artboard opens the size picker (mounted only while open) instead of
+  // appending a document-sized artboard straight away.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [revealArtboardId, setRevealArtboardId] = useState<string | null>(null);
   const artboards = useEditor(s => s.artboards);
   const dpi = useEditor(s => s.doc.dpi);
   const normalizedQuery = query.trim().toLowerCase();
@@ -89,6 +94,30 @@ export function ArtboardsPanel() {
     else if (n) toast.success(t('Artboards rearranged'));
     else toast.warn(t('Need at least two artboards.'));
   };
+  const closePicker = useCallback(() => setPickerOpen(false), []);
+  // After artboards are created: frame the first new one, drop any filter
+  // that could hide it, and make the batch the list's selection. Scrolling
+  // the row into view waits for the effect below — it runs in the same
+  // commit's passive flush as the picker's focus restore, and after it, so
+  // the panel ends up scrolled to the new row rather than to its trigger.
+  const handleArtboardsCreated = (created: Artboard[]) => {
+    setPickerOpen(false);
+    const first = created[0];
+    if (!first) return;
+    zoomToArtboard({ x: first.x, y: first.y, width: first.width, height: first.height });
+    setQuery('');
+    setFocusedArtboardId(first.id);
+    setSelectedArtboardIds(created.map((a) => a.id));
+    setRevealArtboardId(first.id);
+    toast.success(created.length > 1 ? `${created.length} ${t('artboards created')}` : t('Artboard created'));
+  };
+  useEffect(() => {
+    if (!revealArtboardId) return;
+    // Rows render in store order once the query is cleared.
+    const index = useEditor.getState().artboards.findIndex((a) => a.id === revealArtboardId);
+    const row = index >= 0 ? listRef.current?.querySelectorAll<HTMLElement>('[data-artboard-row]')[index] : undefined;
+    row?.scrollIntoView?.({ block: 'nearest' });
+  }, [revealArtboardId]);
   // Roving keyboard conventions live in ui/useRovingActions. The artboard
   // list is vertical (ArrowUp/Down step, Home/End absolute, clamped —
   // Left/Right ignored) over the rich editor-card rows below, which stay
@@ -134,15 +163,16 @@ export function ArtboardsPanel() {
       <div className="grid grid-cols-2 gap-1">
             <button
               type="button"
-              onClick={() => createArtboard()}
+              onClick={() => setPickerOpen(true)}
+              aria-haspopup="dialog"
               className="btn flex items-center gap-1 justify-center"
-              title={t('Append a new artboard')}
+              title={t('Add one or more artboards at a chosen size')}
             >
               <Plus size={12} aria-hidden="true" /> {t('Add Artboard')}
             </button>
             <button
               type="button"
-              onClick={() => { const ab = createArtboardFromSelection(); if (ab) { zoomToArtboard({ x: ab.x, y: ab.y, width: ab.width, height: ab.height }); toast.success(t('Artboard created')); } else toast.warn(t('Select something first.')); }}
+              onClick={() => { const ab = createArtboardFromSelection(); if (ab) handleArtboardsCreated([ab]); else toast.warn(t('Select something first.')); }}
               className="btn flex items-center gap-1 justify-center"
               title={t('Create an artboard around the selection')}
             >
@@ -255,6 +285,7 @@ export function ArtboardsPanel() {
           ) : (
             <Fragment>
             <div
+              ref={listRef}
               className="space-y-2"
               role="list"
               aria-label={t('Artboards')}
@@ -288,6 +319,7 @@ export function ArtboardsPanel() {
           )}
         </div>
       )}
+      {pickerOpen && <ArtboardSizePicker onClose={closePicker} onCreated={handleArtboardsCreated} />}
     </div>
   );
 }

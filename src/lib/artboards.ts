@@ -763,3 +763,140 @@ export function exportArtboardPNG(id: string, multiplier = 2): string {
     height: ab.height,
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* Batch creation at a chosen size (the Add Artboards picker)          */
+/* ------------------------------------------------------------------ */
+
+/** Where a new batch of artboards goes. */
+export type ArtboardPlacement = 'right' | 'below' | 'left' | 'above' | 'grid';
+
+/** Upper bound for one batch — a typo in the Count field must not freeze the editor. */
+export const MAX_NEW_ARTBOARDS = 100;
+
+/** Gap the batch layout leaves between artboards — the same 30px that
+ *  createArtboard / duplicate / the rearrange prompt use. */
+const NEW_ARTBOARD_GAP = 30;
+
+export interface CreateArtboardsOptions {
+  /** Size in px. Non-positive or non-finite values fall back to the document size. */
+  width: number;
+  height: number;
+  /** Number of artboards to add; clamped to 1..MAX_NEW_ARTBOARDS. Default 1. */
+  count?: number;
+  /** Default 'right'. 'grid' lays the batch out from the document origin. */
+  placement?: ArtboardPlacement;
+  /** Artboard the batch attaches to — see resolveArtboardAnchor. */
+  anchorId?: string | null;
+  /** 'grid' only: columns per row. Default ceil(sqrt(count)); clamped to 1..count. */
+  columns?: number;
+  /** Gap between artboards in px. Default 30. */
+  spacing?: number;
+  /** Name prefix. Default 'Artboard'; numbering continues the existing list. */
+  prefix?: string;
+}
+
+function clampInteger(value: number | undefined, fallback: number, min: number, max: number): number {
+  const n = Math.floor(value ?? fallback);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
+function rectsIntersect(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+/**
+ * The artboard a new batch attaches to: the given one when it still exists,
+ * else the active artboard (the one holding the selected object), else the
+ * one under the centre of the view (what the user is looking at), else the
+ * last one in the list. Null when the document has no artboards.
+ */
+export function resolveArtboardAnchor(explicitId?: string | null): Artboard | null {
+  const list = getArtboards();
+  if (list.length === 0) return null;
+  const explicit = explicitId ? list.find((a) => a.id === explicitId) : undefined;
+  if (explicit) return explicit;
+  const active = getActiveArtboard();
+  if (active) return active;
+  const canvas = getCanvas();
+  const vt = canvas?.viewportTransform;
+  if (canvas && vt && vt[0] && vt[3]) {
+    const cx = (canvas.getWidth() / 2 - vt[4]) / vt[0];
+    const cy = (canvas.getHeight() / 2 - vt[5]) / vt[3];
+    const inView = list.find((a) => cx >= a.x && cx <= a.x + a.width && cy >= a.y && cy <= a.y + a.height);
+    if (inView) return inView;
+  }
+  return list[list.length - 1];
+}
+
+/**
+ * Add `count` artboards of one size in a single commit and return them.
+ *
+ *  - 'right' / 'below' / 'left' / 'above': a row or column that starts next
+ *    to the anchor artboard, top- or left-aligned with it. If a neighbour
+ *    already occupies that spot the whole row slides further along its
+ *    direction until it is clear, so the batch never lands on top of an
+ *    existing artboard.
+ *  - 'grid': rows of `columns` starting at the document origin (0, 0). When
+ *    the origin is already taken — the usual case, the first artboard sits
+ *    there — the grid starts below every existing artboard instead, still at
+ *    x = 0.
+ *
+ * Nothing on the canvas moves: artboards are independent of the objects, so
+ * artwork outside or between them is untouched.
+ */
+export function createArtboards(options: CreateArtboardsOptions): Artboard[] {
+  const list = getArtboards();
+  const doc = useEditor.getState().doc;
+  const size = (value: number | undefined, fallback: number): number =>
+    Number.isFinite(value) && (value as number) > 0 ? Math.round(value as number) : fallback;
+  const width = size(options.width, doc.width ?? 800);
+  const height = size(options.height, doc.height ?? 600);
+  const count = clampInteger(options.count, 1, 1, MAX_NEW_ARTBOARDS);
+  const placement: ArtboardPlacement = options.placement ?? 'right';
+  const spacing = Math.max(0, options.spacing ?? NEW_ARTBOARD_GAP);
+  const prefix = options.prefix ?? 'Artboard';
+  const pitchX = width + spacing;
+  const pitchY = height + spacing;
+
+  const raw: Array<{ x: number; y: number }> = [];
+  if (placement === 'grid') {
+    const cols = clampInteger(options.columns, Math.ceil(Math.sqrt(count)), 1, count);
+    for (let i = 0; i < count; i++) raw.push({ x: (i % cols) * pitchX, y: Math.floor(i / cols) * pitchY });
+    if (list.length && raw.some((p) => list.some((a) => rectsIntersect({ ...p, width, height }, a)))) {
+      const below = Math.max(...list.map((a) => a.y + a.height)) + spacing;
+      for (const p of raw) p.y += below;
+    }
+  } else {
+    const anchor = resolveArtboardAnchor(options.anchorId);
+    const base = anchor
+      ? placement === 'right' ? { x: anchor.x + anchor.width + spacing, y: anchor.y }
+        : placement === 'left' ? { x: anchor.x - spacing - width, y: anchor.y }
+          : placement === 'below' ? { x: anchor.x, y: anchor.y + anchor.height + spacing }
+            : { x: anchor.x, y: anchor.y - spacing - height }
+      : { x: 0, y: 0 };
+    const step = placement === 'right' ? { x: pitchX, y: 0 }
+      : placement === 'left' ? { x: -pitchX, y: 0 }
+        : placement === 'below' ? { x: 0, y: pitchY }
+          : { x: 0, y: -pitchY };
+    for (let i = 0; i < count; i++) raw.push({ x: base.x + step.x * i, y: base.y + step.y * i });
+    let guard = 0;
+    while (guard++ < 1000 && raw.some((p) => list.some((a) => rectsIntersect({ ...p, width, height }, a)))) {
+      for (const p of raw) { p.x += step.x; p.y += step.y; }
+    }
+  }
+
+  const created: Artboard[] = raw.map((p, i) => ({
+    id: nextId(),
+    name: `${prefix} ${list.length + i + 1}`,
+    x: Math.round(p.x),
+    y: Math.round(p.y),
+    width,
+    height,
+  }));
+  commit([...list, ...created]);
+  return created;
+}

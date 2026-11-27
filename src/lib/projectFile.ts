@@ -32,6 +32,8 @@ import { t } from './i18n';
 import { toast } from './toast';
 import { addRecent } from './recentFiles';
 import { isTauri, callNative } from './runtime';
+import { showConfirm } from './confirm';
+import { getChangeSeq, markProjectSaved } from './autosave';
 import { restoreVariableWidthOnCanvas } from './variableWidth';
 
 export interface ProjectFile {
@@ -230,10 +232,63 @@ export async function applyProject(p: ProjectFile): Promise<void> {
 
   // Seed a history entry so the open is undoable back to whatever was there.
   pushHistory();
+  // The file on disk now matches the canvas, so nothing is "unsaved" any
+  // more — otherwise a clean exit right after opening would offer to restore
+  // a document that is already safely stored.
+  markProjectSaved();
+}
+
+/**
+ * Open a JSON file that reached the app without the project picker — dropped
+ * on the window, or picked by a generic "Open SVG / JSON" dialog. A project
+ * envelope opens as a project (the decision ⌘/Ctrl+O makes); anything else is
+ * a plain Fabric canvas state and replaces the objects only.
+ *
+ * Both replace work that is open now, so a canvas that holds anything asks
+ * first. Resolves `false` when the user declines — nothing was changed.
+ */
+export async function openJsonFile(file: File): Promise<boolean> {
+  const parsed: unknown = JSON.parse(await file.text());
+  const isProject = isProjectFile(parsed);
+  if ((getCanvas()?.getObjects().length ?? 0) > 0) {
+    const ok = await showConfirm({
+      title: isProject ? t('Open project') : t('Import JSON'),
+      message: `“${file.name}” ${isProject
+        ? t('replaces the design that is open now — artboards and symbols included.')
+        : t('replaces the objects on the canvas.')}`,
+      confirmLabel: isProject ? t('Open') : t('Import'),
+    });
+    if (!ok) return false;
+  }
+  if (!isProject) {
+    const { loadCanvasJSON } = await import('./io2');
+    await loadCanvasJSON(parsed);
+    return true;
+  }
+  await applyProject(parsed);
+  // The file came without a handle and without a path: the next save asks
+  // where to put it, exactly like the picker-less open below.
+  currentHandle = null;
+  currentNativePath = null;
+  currentName = file.name;
+  emitName();
+  addRecent(file.name, capturePreview());
+  toast.success(`${t('Opened')} ${file.name}`);
+  return true;
 }
 
 function serializeProject(): string {
   return JSON.stringify(buildProject());
+}
+
+/**
+ * Serialise for a save, paired with the change counter (`autosave.ts`) the
+ * bytes represent. `markProjectSaved(seq)` then credits exactly that state —
+ * an edit made while the file was being written stays unsaved.
+ */
+function serializeForSave(): { body: string; seq: number } {
+  const seq = getChangeSeq();
+  return { body: serializeProject(), seq };
 }
 
 /**
@@ -265,7 +320,7 @@ async function writeToHandle(handle: FileSystemFileHandleLike, body: string): Pr
  */
 export async function saveProjectToFile(name?: string): Promise<void> {
   const suggestedName = name || currentName || DEFAULT_NAME;
-  const body = serializeProject();
+  const { body, seq } = serializeForSave();
 
   // Native shell: route through Tauri's `fs_save_project` so the user sees
   // the OS file dialog and the bytes land via the Rust file system (no
@@ -286,6 +341,7 @@ export async function saveProjectToFile(name?: string): Promise<void> {
       const leaf = chosen.split(/[\\/]/).pop() ?? suggestedName;
       currentName = leaf;
       emitName();
+      markProjectSaved(seq);
       addRecent(leaf, capturePreview());
       toast.success(`${t('Saved')} ${leaf}`);
       return;
@@ -306,6 +362,7 @@ export async function saveProjectToFile(name?: string): Promise<void> {
       currentHandle = handle;
       currentName = handle.name ?? suggestedName;
       emitName();
+      markProjectSaved(seq);
       addRecent(currentName, capturePreview());
       toast.success(`${t('Saved')} ${currentName}`);
       return;
@@ -323,6 +380,7 @@ export async function saveProjectToFile(name?: string): Promise<void> {
     download(suggestedName, body, 'application/json');
     currentName = suggestedName;
     emitName();
+    markProjectSaved(seq);
     addRecent(suggestedName, capturePreview());
     toast.success(`${t('Saved')} ${suggestedName}`);
   } catch (err) {
@@ -421,12 +479,14 @@ export async function saveProjectQuick(): Promise<void> {
   // Native quick-save: write back to the path Tauri returned on the last
   // save/open without re-prompting. Mirrors the FS-Access path below.
   if (isTauri() && currentNativePath) {
+    const { body, seq } = serializeForSave();
     try {
       await callNative<string | null>(
         'fs_save_project',
-        { bytes: serializeProject(), suggestedName: currentName ?? null, path: currentNativePath },
+        { bytes: body, suggestedName: currentName ?? null, path: currentNativePath },
         async () => null,
       );
+      markProjectSaved(seq);
       if (currentName) addRecent(currentName, capturePreview());
       toast.success(`${t('Saved')} ${currentName ?? t('project')}`);
       return;
@@ -436,8 +496,10 @@ export async function saveProjectQuick(): Promise<void> {
     }
   }
   if (currentHandle) {
+    const { body, seq } = serializeForSave();
     try {
-      await writeToHandle(currentHandle, serializeProject());
+      await writeToHandle(currentHandle, body);
+      markProjectSaved(seq);
       if (currentName) addRecent(currentName, capturePreview());
       toast.success(`${t('Saved')} ${currentName ?? t('project')}`);
       return;

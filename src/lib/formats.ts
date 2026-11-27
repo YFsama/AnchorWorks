@@ -53,9 +53,11 @@ export interface FormatHandler {
   /**
    * Import entry point. Either a File (drag-drop / file picker) or a
    * string (SVG markup, JSON text). Implementations choose which they
-   * accept; the registry doesn't coerce.
+   * accept; the registry doesn't coerce. Resolving `false` reports that
+   * nothing was imported by the user's choice — a drop tally must not
+   * count it.
    */
-  import?: (input: File | string) => Promise<void> | void;
+  import?: (input: File | string) => Promise<void | false> | void;
 }
 
 const registry = new Map<string, FormatHandler>();

@@ -6,6 +6,7 @@ import { loadArtboardsFromStorage } from '../lib/artboards';
 import { getGridSize } from '../lib/preferences';
 import { useEditor } from '../store/editor';
 import { useT } from '../lib/i18n';
+import { toast } from '../lib/toast';
 import { Rulers } from './Rulers';
 import { GridOverlay } from './GridOverlay';
 import { ArtboardLayer } from './ArtboardLayer';
@@ -149,28 +150,103 @@ export function CanvasView() {
 
   useEffect(() => { setTool(tool); }, [tool]);
 
-  // Drag-drop dispatcher (io3) — dynamic import at the top of this mount
-  // effect keeps the ~29 kB io3 module out of the eagerly-parsed entry chunk
-  // while arming drag-drop within milliseconds of boot (same shape as the
-  // tauriMenu effect in App.tsx). StrictMode-safe: if the effect tears down
-  // before the chunk lands, `cancelled` skips attaching (no leaked
-  // listeners); if it already attached, the cleanup detaches as before.
+  // Drag-drop dispatcher (io3) — the window accepts file drops as soon as
+  // this effect runs, while the io3 module itself stays a lazy chunk (keeps
+  // the ~29 kB module out of the eagerly-parsed entry chunk — MenuBar /
+  // CommandPalette reach it the same way).
+  //
+  // Phase 1, synchronous: a tiny guard on `window` cancels the browser's
+  // default for file drags (navigating the tab to the file) and queues any
+  // drop that lands before the chunk is ready, behind a "Preparing import…"
+  // toast. Phase 2, once io3 resolves: the guard hands over — io3's own
+  // window-level listeners take over and the queued drops are imported.
+  // StrictMode-safe: if the effect tears down before the chunk lands,
+  // `cancelled` skips the hand-off (no leaked listeners); if it already
+  // attached, the cleanup detaches as before.
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
+    type Io3 = typeof import('../lib/io3');
+    type Drop = { files: File[]; clientX: number; clientY: number; overCanvas: boolean };
+    let io3: Io3 | null = null;
+    let loading = true;
     let detach: (() => void) | null = null;
     let cancelled = false;
-    void import('../lib/io3')
-      .then((m) => {
-        if (cancelled) return;
-        detach = m.attachDragDrop(wrap);
-      })
-      .catch((e) => console.warn('io3 chunk failed to load — drag-drop disabled', e));
+    let preparingToast: string | null = null;
+    const queued: Drop[] = [];
+    const isFileDrag = (e: DragEvent): boolean => {
+      const dt = e.dataTransfer;
+      return !!dt && (Array.from(dt.types ?? []).includes('Files') || Array.from(dt.items ?? []).some((it) => it.kind === 'file'));
+    };
+    const importDrop = (m: Io3, drop: Drop) => {
+      void m.importDroppedFiles(drop.files, { clientX: drop.clientX, clientY: drop.clientY }, drop.overCanvas);
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (isFileDrag(e) && !e.defaultPrevented) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!isFileDrag(e) || e.defaultPrevented) return;
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      if (!files.length) return;
+      const drop: Drop = {
+        files,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        overCanvas: e.target instanceof Node && wrap.contains(e.target),
+      };
+      if (io3) importDrop(io3, drop);
+      else {
+        queued.push(drop);
+        preparingToast ??= toast.info(t('Preparing import…'), { duration: 0 });
+        if (!loading) load();
+      }
+    };
+    const detachGuard = () => {
+      window.removeEventListener('dragenter', onDragOver);
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('drop', onDrop);
+    };
+    const dismissPreparing = () => {
+      if (preparingToast) toast.dismiss(preparingToast);
+      preparingToast = null;
+    };
+    // A failed chunk fetch leaves the guard armed, so the page still never
+    // navigates to the file; the next drop retries the load.
+    const load = (): void => {
+      loading = true;
+      void import('../lib/io3')
+        .then((m) => {
+          io3 = m;
+          if (cancelled) return;
+          detachGuard();
+          detach = m.attachDragDrop(wrap);
+          for (const drop of queued.splice(0)) importDrop(m, drop);
+          dismissPreparing();
+        })
+        .catch((e) => {
+          console.warn('io3 chunk failed to load — drag-drop disabled', e);
+          loading = false;
+          if (cancelled) return;
+          // The guard stays armed so the page still never navigates to the
+          // file; the next drop retries the chunk.
+          if (queued.length) toast.error(t("Import isn't ready yet. Reload the page and try again."), { title: t('Import failed') });
+          queued.length = 0;
+          dismissPreparing();
+        });
+    };
+    window.addEventListener('dragenter', onDragOver);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
+    load();
     return () => {
       cancelled = true;
+      detachGuard();
+      dismissPreparing();
       detach?.();
     };
-  }, []);
+    // `t` is the stable translator from useT() — a dependency only in name.
+  }, [t]);
 
   // Surface a custom event when the user right-clicks anywhere inside the
   // canvas wrapper. `CanvasContextMenu` (mounted in App.tsx) listens for it
